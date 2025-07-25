@@ -18,7 +18,7 @@ def show_results():
         
         /* Container */
         .main .block-container {
-            padding-top: 2rem !important;
+            padding-top: 1rem !important;
             max-width: 900px !important;
             margin: 0 auto !important;
         }
@@ -27,7 +27,7 @@ def show_results():
         h1 {
             color: white !important;
             text-align: center !important;
-            font-size: 3rem !important;
+            font-size: 2.5rem !important;
             font-weight: 800 !important;
             margin-bottom: 0.5rem !important;
             letter-spacing: -0.02em !important;
@@ -35,7 +35,7 @@ def show_results():
         
         h3 {
             color: #1a1a1a !important;
-            font-size: 1.75rem !important;
+            font-size: 1.5rem !important;
             font-weight: 700 !important;
             margin-bottom: 0.5rem !important;
         }
@@ -43,26 +43,26 @@ def show_results():
         .subtitle {
             color: rgba(255, 255, 255, 0.9);
             text-align: center;
-            font-size: 1.25rem;
-            margin-bottom: 3rem;
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
             font-weight: 400;
         }
         
         /* Ingredients section */
         .ingredients-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 24px;
-            padding: 2rem;
-            margin-bottom: 3rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e9ecef;
         }
         
         .ingredients-header {
             color: #1a1a1a;
-            font-size: 1.25rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
@@ -71,185 +71,226 @@ def show_results():
         .ingredient-tag {
             display: inline-flex;
             align-items: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 0.5rem 1.25rem;
-            border-radius: 100px;
+            background: #f8f9fa;
+            color: #495057;
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
             margin: 0.25rem;
-            font-size: 0.95rem;
-            font-weight: 600;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
-            transition: all 0.3s ease;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s ease;
         }
         
         .ingredient-tag:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.35);
+            background: #e9ecef;
+            transform: translateY(-1px);
         }
         
         /* Recipe cards */
         .recipe-container {
             background: white;
-            border-radius: 24px;
+            border-radius: 16px;
             overflow: hidden;
-            margin-bottom: 2rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e9ecef;
+            transition: all 0.2s ease;
         }
         
         .recipe-container:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
         }
         
         .recipe-header {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            padding: 2rem;
-            border-bottom: 1px solid #e9ecef;
+            padding: 1.5rem;
+            border-bottom: 1px solid #f0f0f0;
         }
         
         .recipe-content {
-            padding: 2rem;
+            padding: 1.5rem;
         }
         
         .recipe-description {
             color: #6c757d;
-            font-size: 1.1rem;
-            line-height: 1.6;
-            margin-bottom: 2rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 1.5rem;
         }
         
         /* Metrics styling */
         [data-testid="metric-container"] {
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 12px;
+            background: transparent;
+            padding: 0.75rem;
             text-align: center;
-            transition: all 0.3s ease;
-        }
-        
-        [data-testid="metric-container"]:hover {
-            background: #e9ecef;
-            transform: translateY(-2px);
+            border: none !important;
         }
         
         [data-testid="metric-container"] label {
             color: #6c757d !important;
-            font-size: 0.875rem !important;
-            font-weight: 600 !important;
+            font-size: 0.75rem !important;
+            font-weight: 500 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.05em !important;
         }
         
         [data-testid="metric-container"] [data-testid="metric-value"] {
             color: #1a1a1a !important;
-            font-size: 1.5rem !important;
-            font-weight: 700 !important;
+            font-size: 1.25rem !important;
+            font-weight: 600 !important;
         }
         
         /* Buttons */
         .stButton > button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-            color: white !important;
-            border: none !important;
-            padding: 0.75rem 2rem !important;
-            font-weight: 600 !important;
-            border-radius: 12px !important;
-            transition: all 0.3s ease !important;
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.25) !important;
+            background: white !important;
+            color: #1a1a1a !important;
+            border: 1px solid #e9ecef !important;
+            padding: 0.6rem 1.5rem !important;
+            font-weight: 500 !important;
+            border-radius: 8px !important;
+            transition: all 0.2s ease !important;
+            font-size: 0.875rem !important;
         }
         
         .stButton > button:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 12px 28px rgba(102, 126, 234, 0.35) !important;
+            background: #f8f9fa !important;
+            border-color: #dee2e6 !important;
+            transform: translateY(-1px) !important;
         }
         
-        /* Back button special styling */
-        .back-btn button {
-            background: rgba(255, 255, 255, 0.2) !important;
-            border: 2px solid rgba(255, 255, 255, 0.3) !important;
-            box-shadow: none !important;
+        /* Primary action button */
+        .primary-action button {
+            background: #1a1a1a !important;
+            color: white !important;
+            border: none !important;
         }
         
-        .back-btn button:hover {
-            background: rgba(255, 255, 255, 0.3) !important;
+        .primary-action button:hover {
+            background: #000 !important;
+        }
+        
+        /* Logo hover effect */
+        .logo-link:hover {
+            opacity: 0.8;
+            transform: translateY(-1px);
         }
         
         /* Recipe steps */
         .stExpander {
-            background: #f8f9fa;
-            border-radius: 12px;
-            border: none !important;
+            background: #fafafa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef !important;
             margin-top: 1rem;
         }
         
         .stExpander [data-testid="stExpanderToggleIcon"] {
-            color: #667eea !important;
+            color: #6c757d !important;
         }
         
         /* Success messages */
         .stSuccess {
-            background: rgba(40, 167, 69, 0.1);
-            border: 2px solid #28a745;
-            border-radius: 12px;
-            color: #28a745;
-            font-weight: 600;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            color: #155724;
+            font-weight: 500;
+            font-size: 0.875rem;
         }
         
         /* Divider */
         hr {
-            margin: 3rem 0 !important;
+            margin: 2rem 0 !important;
             border: none !important;
             height: 1px !important;
-            background: rgba(255, 255, 255, 0.2) !important;
+            background: #e9ecef !important;
         }
         
         /* Bottom CTA */
         .bottom-section {
             text-align: center;
-            margin: 4rem 0 2rem;
+            margin: 3rem 0 2rem;
         }
         
         /* Free uses notice */
         .premium-notice {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
+            background: white;
             padding: 2rem;
-            border-radius: 24px;
+            border-radius: 16px;
             text-align: center;
-            margin-top: 3rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin-top: 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e9ecef;
         }
         
         .premium-notice h4 {
             color: #1a1a1a;
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
         }
         
         .premium-notice p {
             color: #6c757d;
-            font-size: 1.1rem;
-            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+            margin-bottom: 1.25rem;
+        }
+        
+        /* Floating emojis */
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); opacity: 0.03; }
+            50% { transform: translateY(-20px) rotate(180deg); opacity: 0.05; }
+            100% { transform: translateY(0px) rotate(360deg); opacity: 0.03; }
+        }
+        
+        .floating-emoji {
+            position: fixed;
+            animation: float 6s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
         }
         </style>
+    """, unsafe_allow_html=True)
+    
+    # Add floating food emojis
+    st.markdown("""
+    <div class="floating-emoji" style="top: 10%; left: 5%; font-size: 80px; animation-delay: 0s;">🍳</div>
+    <div class="floating-emoji" style="top: 20%; right: 10%; font-size: 60px; animation-delay: 2s;">🥗</div>
+    <div class="floating-emoji" style="bottom: 30%; left: 15%; font-size: 70px; animation-delay: 4s;">🍝</div>
+    <div class="floating-emoji" style="bottom: 20%; right: 5%; font-size: 90px; animation-delay: 1s;">🥘</div>
     """, unsafe_allow_html=True)
     
     # Celebration
     rain(emoji="✨", font_size=20, falling_speed=5, animation_length=1)
     
-    # Back button
-    col1, col2, col3 = st.columns([1, 10, 1])
-    with col1:
-        with st.container():
-            st.markdown('<div class="back-btn">', unsafe_allow_html=True)
-            if st.button("← Back", key="back_btn"):
-                st.session_state.current_page = 'camera'
-                st.session_state.processing = False
-                st.session_state.photo_taken = False
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+    # Logo at top center - using HTML with JavaScript for click handling
+    st.markdown("""
+        <div style="text-align: center; margin-bottom: 1.5rem; margin-top: -1rem;">
+            <a href="#" onclick="window.location.reload(); return false;" style="text-decoration: none;">
+                <div style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <div style="
+                        width: 32px;
+                        height: 32px;
+                        background: #25F4EE;
+                        border-radius: 8px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 20px;
+                    ">
+                        👨‍🍳
+                    </div>
+                    <span style="
+                        font-size: 1.5rem;
+                        font-weight: 800;
+                        color: #25F4EE;
+                        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                        letter-spacing: -0.02em;
+                    ">SnapChef</span>
+                </div>
+            </a>
+        </div>
+    """, unsafe_allow_html=True)
     
     # Title
     st.markdown("# Your Personalized Recipes ✨")
@@ -364,9 +405,10 @@ def show_results():
     
     # Bottom CTA
     st.markdown('<div class="bottom-section">', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 3, 1])
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("📸 Snap Another Fridge", key="new_snap", use_container_width=True, type="primary"):
+        st.markdown('<div class="primary-action">', unsafe_allow_html=True)
+        if st.button("Snap Another Fridge", key="new_snap", use_container_width=True, icon="📸"):
             # Reset states
             st.session_state.photo_taken = False
             st.session_state.processing = False
@@ -375,6 +417,7 @@ def show_results():
             st.session_state.generated_recipes = []
             st.session_state.current_page = 'camera'
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Premium notice for free users

@@ -20,22 +20,20 @@ def render_logo(size="large", gradient=True):
                 <div style="
                     width: {icon_size};
                     height: {icon_size};
-                    background: linear-gradient(135deg, #25F4EE 0%, #FE2C55 100%);
+                    background: #25F4EE;
                     border-radius: 12px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     font-size: calc({icon_size} * 0.6);
-                    box-shadow: 0 8px 32px rgba(254, 44, 85, 0.3);
+                    box-shadow: 0 8px 32px rgba(37, 244, 238, 0.3);
                 ">
-                    📸
+                    👨‍🍳
                 </div>
                 <span style="
                     font-size: {font_size};
                     font-weight: 800;
-                    background: linear-gradient(135deg, #25F4EE 0%, #FE2C55 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
+                    color: #25F4EE;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                     letter-spacing: -0.02em;
                 ">SnapChef</span>
@@ -56,7 +54,7 @@ def render_logo(size="large", gradient=True):
                     justify-content: center;
                     font-size: calc({icon_size} * 0.6);
                 ">
-                    📸
+                    👨‍🍳
                 </div>
                 <span style="
                     font-size: {font_size};

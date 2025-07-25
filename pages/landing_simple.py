@@ -140,7 +140,7 @@ def show_landing():
     """, unsafe_allow_html=True)
     
     # Logo
-    st.markdown(render_logo("hero", gradient=False), unsafe_allow_html=True)
+    st.markdown(render_logo("hero", gradient=True), unsafe_allow_html=True)
     
     # Hero Title
     st.markdown("<h1>Turn Your Fridge<br>Into Magic ✨</h1>", unsafe_allow_html=True)
@@ -149,12 +149,42 @@ def show_landing():
     st.markdown("<h2>AI-powered recipes from what you already have</h2>", unsafe_allow_html=True)
     
     # Free uses indicator
-    st.markdown(f'<div style="text-align: center;"><span class="free-uses-badge">🎉 {st.session_state.free_uses} free snaps remaining</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="text-align: center;"><span class="free-uses-badge">Hey Friend, Here\'s {st.session_state.free_uses} free snaps on us! 👇</span></div>', unsafe_allow_html=True)
     
-    # Main CTA Button
+    # Main CTA Button with styled logo
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("📸 SnapChef", key="main_snap", use_container_width=True):
+        # Custom CSS for gradient text and button styling
+        st.markdown("""
+        <style>
+        /* Button container styling */
+        div[data-testid="column"]:nth-child(2) .stButton > button {
+            background: white !important;
+            border: none !important;
+            padding: 1.25rem 3rem !important;
+            border-radius: 50px !important;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2) !important;
+            transition: all 0.3s ease !important;
+            font-size: 1.25rem !important;
+            font-weight: 800 !important;
+        }
+        
+        div[data-testid="column"]:nth-child(2) .stButton > button:hover {
+            transform: translateY(-3px) !important;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25) !important;
+        }
+        
+        /* Style the button text with single color */
+        div[data-testid="column"]:nth-child(2) .stButton > button span {
+            color: #25F4EE !important;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            letter-spacing: -0.02em;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Use native icon parameter with emoji
+        if st.button("SnapChef", key="main_snap", use_container_width=True, icon="👨‍🍳"):
             if st.session_state.free_uses > 0:
                 st.session_state.free_uses -= 1
                 st.session_state.current_page = 'camera'
@@ -218,7 +248,8 @@ def show_landing():
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("🚀 Get Started Free", key="bottom_cta", use_container_width=True):
+        # Use native icon parameter for bottom button
+        if st.button("Get Started Free", key="bottom_cta", use_container_width=True, icon="🚀"):
             if st.session_state.free_uses > 0:
                 st.session_state.current_page = 'camera'
                 st.rerun()
