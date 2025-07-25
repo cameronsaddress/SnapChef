@@ -4,121 +4,183 @@ import json
 from openai import OpenAI
 from typing import List, Dict, Optional
 import streamlit as st
+from prompts import (
+    format_ingredient_detection_prompt,
+    format_recipe_generation_prompt,
+    INGREDIENT_DETECTION_SCHEMA as INGREDIENT_SCHEMA,
+    RECIPE_GENERATION_SCHEMA as RECIPE_SCHEMA,
+    validate_ingredient_response,
+    validate_recipe_response
+)
 
 # Initialize Grok client
-client = OpenAI(
-    api_key=os.getenv("XAI_API_KEY"),
-    base_url="https://api.x.ai/v1"
-)
+api_key = os.getenv("XAI_API_KEY")
+if api_key:
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.x.ai/v1"
+    )
+else:
+    client = None  # Will use mock data
 
 def encode_image_to_base64(image_bytes) -> str:
     """Convert image bytes to base64 string"""
     return base64.b64encode(image_bytes).decode('utf-8')
 
 @st.cache_data(ttl=3600)
-def detect_ingredients(image_base64: str) -> List[str]:
+def detect_ingredients(image_base64: str) -> Dict[str, Any]:
     """Detect ingredients from fridge/pantry photo using Grok 4"""
+    if not client:
+        # Return error if no API key
+        return {
+            "ingredients": [],
+            "error": "API key not configured. Please set up your XAI_API_KEY.",
+            "confidence": "none"
+        }
+    
     try:
+        # Get the formatted prompt
+        prompt = format_ingredient_detection_prompt()
+        
         response = client.chat.completions.create(
-            model="grok-4",
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_base64}",
-                            "detail": "high"
+            model="grok-vision-beta",  # Use vision model for image analysis
+            messages=[
+                {
+                    "role": "system",
+                    "content": prompt
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}",
+                                "detail": "high"
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": f"Please analyze this image and identify any food ingredients. If this is not a kitchen/fridge/pantry image or no food items are visible, return an empty ingredients list. Return the result in the following JSON format:\n{json.dumps(INGREDIENT_SCHEMA, indent=2)}"
                         }
-                    },
-                    {
-                        "type": "text",
-                        "text": """Identify all food items and ingredients visible in this fridge/pantry photo. 
-                        Be thorough and specific. List them as a JSON array of strings.
-                        Example format: ["eggs", "milk", "carrots", "chicken breast", "pasta"]"""
-                    }
-                ]
-            }],
+                    ]
+                }
+            ],
             temperature=0.7,
-            max_tokens=500
+            max_tokens=1000
         )
         
         # Parse the response
         content = response.choices[0].message.content
-        # Extract JSON from the response
-        try:
-            # Find JSON array in the response
-            start = content.find('[')
-            end = content.rfind(']') + 1
-            if start >= 0 and end > start:
-                ingredients = json.loads(content[start:end])
-                return ingredients
-        except:
-            # Fallback: split by common delimiters
-            ingredients = [item.strip() for item in content.replace('\n', ',').split(',') if item.strip()]
-            return ingredients
+        
+        # Validate and extract JSON
+        result = validate_ingredient_response(content)
+        if result:
+            # Check if we actually found ingredients
+            if len(result['ingredients']) == 0:
+                return {
+                    "ingredients": [],
+                    "error": "No food ingredients detected in the image. Please take a photo of your fridge, pantry, or kitchen ingredients.",
+                    "confidence": result.get('confidence', 'low')
+                }
+            return {
+                "ingredients": result['ingredients'],
+                "confidence": result.get('confidence', 'medium'),
+                "total_items": result.get('total_items', len(result['ingredients']))
+            }
+        
+        # If parsing failed completely
+        return {
+            "ingredients": [],
+            "error": "Failed to analyze the image. Please try again with a clearer photo.",
+            "confidence": "low"
+        }
             
     except Exception as e:
-        st.error(f"Error detecting ingredients: {str(e)}")
-        # Return mock data for development
-        return ["eggs", "milk", "cheese", "tomatoes", "chicken", "pasta", "onions", "garlic"]
+        # Return error instead of mock data
+        return {
+            "ingredients": [],
+            "error": f"Error analyzing image: {str(e)}",
+            "confidence": "none"
+        }
+
+def get_mock_ingredients() -> List[Dict]:
+    """Return mock ingredient data for development"""
+    return [
+        {"name": "eggs", "quantity": "12", "unit": "count", "category": "dairy"},
+        {"name": "milk", "quantity": "1", "unit": "gallon", "category": "dairy"},
+        {"name": "cheddar cheese", "quantity": "8", "unit": "oz", "category": "dairy"},
+        {"name": "tomatoes", "quantity": "4", "unit": "medium", "category": "produce"},
+        {"name": "chicken breast", "quantity": "2", "unit": "lbs", "category": "protein"},
+        {"name": "pasta", "quantity": "1", "unit": "box", "category": "grains"},
+        {"name": "onions", "quantity": "3", "unit": "medium", "category": "produce"},
+        {"name": "garlic", "quantity": "1", "unit": "head", "category": "produce"}
+    ]
 
 @st.cache_data(ttl=3600)
-def generate_meals(ingredients: List[str], dietary_preferences: List[str] = None, count: int = 3) -> List[Dict]:
-    """Generate meal ideas using detected ingredients"""
+def generate_meals(ingredients: List[Dict], dietary_preferences: List[str] = None, cuisine_preferences: str = None) -> List[Dict]:
+    """Generate 5 dinner ideas with main dish + side dish using detected ingredients"""
+    if not client:
+        # Return mock data if no API key
+        return get_mock_meals_v2()
+    
     try:
-        diet_text = f" Filter for these dietary preferences: {', '.join(dietary_preferences)}." if dietary_preferences else ""
+        # Convert ingredient objects to simple list for prompt
+        ingredient_list = [ing['name'] for ing in ingredients]
         
-        prompt = f"""Given these ingredients: {', '.join(ingredients)}
-        
-        Generate {count} creative meal ideas that use ONLY these ingredients (no additional ingredients required).{diet_text}
-        
-        For each meal, provide:
-        1. name: Creative meal name
-        2. description: Brief appealing description
-        3. recipe: Step-by-step cooking instructions
-        4. prep_time: Preparation time in minutes
-        5. cook_time: Cooking time in minutes
-        6. servings: Number of servings
-        7. nutrition: Estimated nutritional info (calories, protein, carbs, fat)
-        8. difficulty: easy/medium/hard
-        9. tags: Array of tags (e.g., "quick", "healthy", "comfort food")
-        10. share_caption: A viral-worthy caption for social media with emojis and hashtags
-        
-        Return as a JSON array of meal objects.
-        Include #SnapChefChallenge and #WhatsInYourFridge hashtags in share_caption."""
+        # Get the formatted prompt
+        prompt = format_recipe_generation_prompt(
+            ingredients=ingredient_list,
+            dietary_preferences=', '.join(dietary_preferences) if dietary_preferences else None,
+            cuisine_preferences=cuisine_preferences
+        )
         
         response = client.chat.completions.create(
-            model="grok-4",
-            messages=[{
-                "role": "user",
-                "content": prompt
-            }],
+            model="grok-beta",
+            messages=[
+                {
+                    "role": "system", 
+                    "content": prompt
+                },
+                {
+                    "role": "user",
+                    "content": f"Based on these ingredients, please generate 5 dinner ideas (each with a main dish and side dish) in the following JSON format:\n{json.dumps(RECIPE_SCHEMA, indent=2)}"
+                }
+            ],
             temperature=0.8,
-            max_tokens=2000
+            max_tokens=4000
         )
         
         content = response.choices[0].message.content
         
-        # Extract JSON from response
+        # Validate and extract JSON
+        recipes = validate_recipe_response(content)
+        if recipes and len(recipes) >= 5:
+            return recipes[:5]  # Return exactly 5 recipes
+        
+        # Try to extract any JSON array from response
         try:
             start = content.find('[')
             end = content.rfind(']') + 1
             if start >= 0 and end > start:
                 meals = json.loads(content[start:end])
-                return meals
+                if isinstance(meals, list) and len(meals) > 0:
+                    return meals[:5]
         except:
             pass
         
         # Return mock data if parsing fails
-        return get_mock_meals(ingredients, dietary_preferences)
+        return get_mock_meals_v2()
         
     except Exception as e:
         st.error(f"Error generating meals: {str(e)}")
-        return get_mock_meals(ingredients, dietary_preferences)
+        return get_mock_meals_v2()
 
 def generate_video_script(recipe: Dict) -> str:
     """Generate TikTok-style video script for a recipe"""
+    if not client:
+        return f"Quick recipe video: Show ingredients → Fast cooking montage → Final dish reveal! 🍳✨ #SnapChefChallenge"
+    
     try:
         prompt = f"""Create a 15-30 second TikTok video script for this recipe: {recipe['name']}
         
@@ -146,6 +208,16 @@ def generate_video_script(recipe: Dict) -> str:
 
 def generate_challenge_idea() -> Dict:
     """Generate a daily challenge idea"""
+    if not client:
+        # Return default challenge if no API key
+        return {
+            "name": "Fridge Raid Friday",
+            "description": "Make something delicious with your leftover ingredients!",
+            "rules": ["Use at least 3 leftovers", "No grocery shopping allowed", "Share your before & after"],
+            "hashtag": "#FridgeRaidFriday",
+            "points": 40
+        }
+    
     try:
         prompt = """Create a fun, viral-worthy cooking challenge for SnapChef users.
         
@@ -194,76 +266,201 @@ def generate_challenge_idea() -> Dict:
             "points": 40
         }
 
-def get_mock_meals(ingredients: List[str], dietary_preferences: List[str] = None) -> List[Dict]:
-    """Return mock meal data for development"""
+def get_mock_meals_v2() -> List[Dict]:
+    """Return mock meal data for development - 5 complete dinner ideas"""
     return [
         {
-            "name": "Quick Veggie Stir-Fry",
-            "description": "A colorful and healthy stir-fry using your fresh vegetables",
-            "recipe": [
-                "Heat oil in a large pan",
-                "Add chopped vegetables",
-                "Stir-fry for 5-7 minutes",
-                "Season with soy sauce and garlic",
-                "Serve hot"
+            "name": "Herb-Crusted Chicken & Roasted Vegetables",
+            "description": "Juicy chicken breast with a crispy herb crust, served with perfectly roasted seasonal vegetables",
+            "main_dish": "Herb-Crusted Chicken Breast",
+            "side_dish": "Honey-Glazed Roasted Root Vegetables",
+            "total_time": 45,
+            "prep_time": 15,
+            "cook_time": 30,
+            "servings": 4,
+            "difficulty": "medium",
+            "ingredients_used": [
+                {"name": "chicken breast", "amount": "4 pieces"},
+                {"name": "garlic", "amount": "4 cloves"},
+                {"name": "onions", "amount": "2 medium"},
+                {"name": "tomatoes", "amount": "2 large"}
             ],
-            "prep_time": 10,
-            "cook_time": 10,
-            "servings": 2,
+            "instructions": [
+                "Preheat oven to 400°F (200°C)",
+                "Season chicken breasts with salt, pepper, and minced garlic",
+                "Create herb crust with breadcrumbs and dried herbs",
+                "Press herb mixture onto chicken breasts",
+                "Cut vegetables into uniform pieces",
+                "Toss vegetables with olive oil, salt, and honey",
+                "Bake chicken for 25-30 minutes until golden",
+                "Roast vegetables alongside chicken",
+                "Let chicken rest for 5 minutes before serving",
+                "Plate chicken with roasted vegetables"
+            ],
             "nutrition": {
-                "calories": 250,
-                "protein": 8,
-                "carbs": 35,
-                "fat": 10
+                "calories": 420,
+                "protein": 35,
+                "carbs": 28,
+                "fat": 18
             },
-            "difficulty": "easy",
-            "tags": ["quick", "healthy", "vegetarian"],
-            "share_caption": "Just whipped up this amazing stir-fry with leftovers! 🥦🥕 Who else is team #NoFoodWaste? Try the #SnapChefChallenge #WhatsInYourFridge #HealthyEating"
+            "tips": "Pound chicken to even thickness for uniform cooking",
+            "tags": ["healthy", "protein-rich", "gluten-free-option"],
+            "share_caption": "Just made this incredible herb-crusted chicken dinner! 🍗✨ The kitchen smells AMAZING! Who else is winning at dinner tonight? #SnapChefChallenge #WhatsInYourFridge #HomeCooking #DinnerWin"
         },
         {
-            "name": "Protein Power Bowl",
-            "description": "A satisfying bowl packed with protein and flavor",
-            "recipe": [
-                "Cook your protein of choice",
-                "Prepare a base of grains or greens",
-                "Add fresh vegetables",
-                "Top with a simple sauce",
-                "Garnish and enjoy"
+            "name": "Creamy Tomato Pasta & Garlic Bread",
+            "description": "Rich and creamy tomato pasta with fresh basil, paired with crispy homemade garlic bread",
+            "main_dish": "Creamy Tomato Basil Pasta",
+            "side_dish": "Crispy Garlic Bread",
+            "total_time": 30,
+            "prep_time": 10,
+            "cook_time": 20,
+            "servings": 4,
+            "difficulty": "easy",
+            "ingredients_used": [
+                {"name": "pasta", "amount": "1 lb"},
+                {"name": "tomatoes", "amount": "4 medium"},
+                {"name": "garlic", "amount": "6 cloves"},
+                {"name": "milk", "amount": "1/2 cup"},
+                {"name": "cheese", "amount": "1 cup"}
             ],
+            "instructions": [
+                "Bring large pot of salted water to boil",
+                "Cook pasta according to package directions",
+                "Dice tomatoes and mince garlic",
+                "Sauté garlic in olive oil until fragrant",
+                "Add diced tomatoes and simmer for 10 minutes",
+                "Add milk and cheese to create creamy sauce",
+                "Prepare garlic butter with minced garlic",
+                "Spread on bread slices and toast until golden",
+                "Drain pasta and toss with sauce",
+                "Serve pasta hot with garlic bread on the side"
+            ],
+            "nutrition": {
+                "calories": 480,
+                "protein": 18,
+                "carbs": 65,
+                "fat": 16
+            },
+            "tips": "Save some pasta water to adjust sauce consistency",
+            "tags": ["comfort-food", "vegetarian", "family-favorite"],
+            "share_caption": "Comfort food at its finest! 🍝 This creamy tomato pasta is giving me all the cozy vibes. Perfect dinner for tonight! #SnapChefChallenge #WhatsInYourFridge #PastaLove #ComfortFood"
+        },
+        {
+            "name": "Cheesy Vegetable Frittata & Fresh Salad",
+            "description": "Fluffy egg frittata loaded with vegetables and cheese, served with a crisp garden salad",
+            "main_dish": "Garden Vegetable Frittata",
+            "side_dish": "Mixed Green Salad with Vinaigrette",
+            "total_time": 35,
             "prep_time": 15,
             "cook_time": 20,
-            "servings": 1,
+            "servings": 6,
+            "difficulty": "easy",
+            "ingredients_used": [
+                {"name": "eggs", "amount": "8 large"},
+                {"name": "cheese", "amount": "1.5 cups"},
+                {"name": "onions", "amount": "1 medium"},
+                {"name": "tomatoes", "amount": "2 medium"},
+                {"name": "milk", "amount": "1/4 cup"}
+            ],
+            "instructions": [
+                "Preheat oven to 375°F (190°C)",
+                "Whisk eggs with milk, salt, and pepper",
+                "Dice onions and tomatoes",
+                "Sauté onions until softened",
+                "Add tomatoes and cook briefly",
+                "Pour egg mixture over vegetables in oven-safe pan",
+                "Sprinkle cheese on top",
+                "Bake for 15-20 minutes until set",
+                "Prepare salad with fresh greens",
+                "Whisk simple vinaigrette and toss with salad"
+            ],
             "nutrition": {
-                "calories": 450,
-                "protein": 35,
-                "carbs": 40,
-                "fat": 15
+                "calories": 320,
+                "protein": 22,
+                "carbs": 12,
+                "fat": 20
             },
-            "difficulty": "medium",
-            "tags": ["protein", "meal-prep", "nutritious"],
-            "share_caption": "Meal prep game strong! 💪 This power bowl is giving me LIFE! Who's joining the #SnapChefChallenge? #WhatsInYourFridge #MealPrep #HealthyLifestyle"
+            "tips": "Use a cast iron skillet for best results",
+            "tags": ["brunch", "vegetarian", "meal-prep"],
+            "share_caption": "Brunch for dinner? YES PLEASE! 🍳 This veggie frittata is so fluffy and delicious! Perfect for using up those fridge ingredients. #SnapChefChallenge #WhatsInYourFridge #EggcellentDinner"
         },
         {
-            "name": "Comfort Pasta Fusion",
-            "description": "A cozy pasta dish that brings comfort to any day",
-            "recipe": [
-                "Boil pasta according to package",
-                "Sauté available vegetables",
-                "Mix pasta with veggies",
-                "Add cheese or cream if available",
-                "Season to taste"
-            ],
-            "prep_time": 5,
+            "name": "Chicken Stir-Fry & Egg Fried Rice",
+            "description": "Quick and flavorful chicken stir-fry with colorful vegetables, served over homemade egg fried rice",
+            "main_dish": "Garlic Ginger Chicken Stir-Fry",
+            "side_dish": "Vegetable Egg Fried Rice",
+            "total_time": 25,
+            "prep_time": 10,
             "cook_time": 15,
-            "servings": 3,
+            "servings": 4,
+            "difficulty": "easy",
+            "ingredients_used": [
+                {"name": "chicken breast", "amount": "1 lb"},
+                {"name": "eggs", "amount": "3"},
+                {"name": "onions", "amount": "1 large"},
+                {"name": "garlic", "amount": "4 cloves"},
+                {"name": "leftover rice or pasta", "amount": "3 cups cooked"}
+            ],
+            "instructions": [
+                "Cut chicken into bite-sized pieces",
+                "Prepare all vegetables - dice onions, mince garlic",
+                "Heat wok or large pan over high heat",
+                "Stir-fry chicken until cooked through",
+                "Remove chicken and scramble eggs",
+                "Add cold rice and break up clumps",
+                "Stir-fry rice with vegetables",
+                "Return chicken to pan",
+                "Season with soy sauce and sesame oil",
+                "Serve immediately while hot"
+            ],
             "nutrition": {
                 "calories": 380,
-                "protein": 12,
-                "carbs": 55,
+                "protein": 28,
+                "carbs": 42,
                 "fat": 12
             },
+            "tips": "Use day-old rice for best fried rice texture",
+            "tags": ["quick", "asian-inspired", "one-pan"],
+            "share_caption": "Takeout who? 🥡 This homemade stir-fry is better than delivery! Ready in 25 minutes using just my fridge ingredients! #SnapChefChallenge #WhatsInYourFridge #StirFryNight #QuickDinner"
+        },
+        {
+            "name": "Loaded Veggie Quesadillas & Tomato Salsa",
+            "description": "Crispy cheese quesadillas stuffed with seasoned vegetables, served with fresh tomato salsa",
+            "main_dish": "Three-Cheese Vegetable Quesadillas",
+            "side_dish": "Fresh Chunky Tomato Salsa",
+            "total_time": 20,
+            "prep_time": 10,
+            "cook_time": 10,
+            "servings": 4,
             "difficulty": "easy",
-            "tags": ["comfort-food", "quick", "family-friendly"],
-            "share_caption": "Comfort food mode: ACTIVATED! 🍝✨ Made this with whatever was in my fridge and it's *chef's kiss* #SnapChefChallenge #WhatsInYourFridge #ComfortFood #HomeCooking"
+            "ingredients_used": [
+                {"name": "cheese", "amount": "2 cups shredded"},
+                {"name": "onions", "amount": "1 medium"},
+                {"name": "tomatoes", "amount": "3 large"},
+                {"name": "garlic", "amount": "2 cloves"},
+                {"name": "tortillas or flatbread", "amount": "8"}
+            ],
+            "instructions": [
+                "Dice onions and sauté until caramelized",
+                "Prepare fresh salsa with diced tomatoes",
+                "Add minced garlic and lime juice to salsa",
+                "Heat griddle or large pan",
+                "Layer cheese and vegetables on tortilla",
+                "Fold tortilla and cook until golden",
+                "Flip and cook other side until crispy",
+                "Cut into wedges",
+                "Serve hot with fresh salsa",
+                "Garnish with sour cream if available"
+            ],
+            "nutrition": {
+                "calories": 340,
+                "protein": 16,
+                "carbs": 32,
+                "fat": 18
+            },
+            "tips": "Don't overfill quesadillas to prevent spillage",
+            "tags": ["mexican-inspired", "vegetarian", "quick"],
+            "share_caption": "Quesadilla night is the BEST night! 🌮 These loaded veggie quesadillas are crispy, cheesy perfection! Who's coming over? #SnapChefChallenge #WhatsInYourFridge #QuesadillaLove #MeatlessMonday"
         }
     ]

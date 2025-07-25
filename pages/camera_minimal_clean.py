@@ -5,6 +5,7 @@ from PIL import Image
 import io
 from utils.api import encode_image_to_base64, detect_ingredients, generate_meals
 from utils.session import update_streak, add_points
+from prompts import get_random_progress_message
 
 def show_camera():
     # Apply gradient background and minimal styling
@@ -228,10 +229,24 @@ def process_photo_with_progress():
             st.markdown('</div>', unsafe_allow_html=True)
     
     try:
-        # Step 1: Process image
-        status_placeholder.markdown('<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">📸 Processing image...</p>', unsafe_allow_html=True)
-        progress_bar.progress(10)
-        time.sleep(0.5)
+        # Progress messages array
+        messages = [
+            ("📸 Analyzing your fridge with AI superpowers...", 10),
+            (get_random_progress_message(), 20),
+            ("🔍 Detecting ingredients...", 30),
+            (get_random_progress_message(), 40),
+            ("🤖 Oh man, this is going to be good!", 50),
+            (get_random_progress_message(), 60),
+            ("👨‍🍳 Consulting with virtual Gordon Ramsay...", 70),
+            (get_random_progress_message(), 80),
+            ("✨ Adding a pinch of culinary magic...", 90),
+            ("🎉 Your personalized recipes are ready!", 100)
+        ]
+        
+        # Show initial message
+        status_placeholder.markdown(f'<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">{messages[0][0]}</p>', unsafe_allow_html=True)
+        progress_bar.progress(messages[0][1])
+        time.sleep(0.8)
         
         # Get photo bytes
         photo_bytes = st.session_state.photo.getvalue()
@@ -245,30 +260,56 @@ def process_photo_with_progress():
             img.save(img_byte_arr, format=img.format or 'JPEG', quality=85)
             photo_bytes = img_byte_arr.getvalue()
         
-        progress_bar.progress(25)
+        # Show second message
+        status_placeholder.markdown(f'<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">{messages[1][0]}</p>', unsafe_allow_html=True)
+        progress_bar.progress(messages[1][1])
+        time.sleep(0.8)
         
-        # Step 2: Detect ingredients
-        status_placeholder.markdown('<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">🔍 Detecting ingredients...</p>', unsafe_allow_html=True)
+        # Encode image
         photo_base64 = encode_image_to_base64(photo_bytes)
-        progress_bar.progress(40)
+        
+        # Show detecting message
+        status_placeholder.markdown(f'<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">{messages[2][0]}</p>', unsafe_allow_html=True)
+        progress_bar.progress(messages[2][1])
         time.sleep(0.5)
         
-        ingredients = detect_ingredients(photo_base64)
-        progress_bar.progress(60)
+        # Detect ingredients
+        detection_result = detect_ingredients(photo_base64)
         
-        if ingredients:
-            status_placeholder.markdown(f'<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">✅ Found {len(ingredients)} ingredients!</p>', unsafe_allow_html=True)
-            time.sleep(1)
+        # Check if detection was successful
+        if 'error' in detection_result or len(detection_result.get('ingredients', [])) == 0:
+            # Clear progress and show error
+            progress_bar.empty()
+            status_placeholder.empty()
+            
+            error_msg = detection_result.get('error', 'No ingredients found in the image.')
+            st.error(f"❌ {error_msg}")
+            
+            # Add retry button
+            if st.button("📸 Take Another Photo", use_container_width=True):
+                st.session_state.photo_taken = False
+                st.session_state.processing = False
+                st.session_state.photo = None
+                st.rerun()
+            return
         
-        # Step 3: Generate recipes
-        status_placeholder.markdown('<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">👨‍🍳 Creating personalized recipes...</p>', unsafe_allow_html=True)
-        progress_bar.progress(80)
+        # Extract ingredients list
+        ingredients = detection_result.get('ingredients', [])
         
+        # Show more progress messages
+        for i in range(3, 7):
+            status_placeholder.markdown(f'<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">{messages[i][0]}</p>', unsafe_allow_html=True)
+            progress_bar.progress(messages[i][1])
+            time.sleep(0.8)
+        
+        # Generate recipes
         recipes = generate_meals(ingredients, st.session_state.get('dietary_preferences', []))
-        progress_bar.progress(100)
         
-        status_placeholder.markdown('<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">✨ Recipes ready!</p>', unsafe_allow_html=True)
-        time.sleep(0.5)
+        # Show final messages
+        for i in range(7, 10):
+            status_placeholder.markdown(f'<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">{messages[i][0]}</p>', unsafe_allow_html=True)
+            progress_bar.progress(messages[i][1])
+            time.sleep(0.6)
         
         # Store results
         st.session_state.detected_ingredients = ingredients

@@ -305,7 +305,22 @@ def show_results():
         # Create ingredient tags
         ingredients_html = '<div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">'
         for ing in ingredients:
-            ingredients_html += f'<span class="ingredient-tag">✓ {ing}</span>'
+            # Handle both dict and string formats
+            if isinstance(ing, dict):
+                name = ing.get('name', '')
+                quantity = ing.get('quantity', '')
+                unit = ing.get('unit', '')
+                # Format the ingredient display
+                if quantity and unit:
+                    display_text = f"{name} ({quantity} {unit})"
+                elif quantity:
+                    display_text = f"{name} ({quantity})"
+                else:
+                    display_text = name
+            else:
+                display_text = str(ing)
+            
+            ingredients_html += f'<span class="ingredient-tag">✓ {display_text}</span>'
         ingredients_html += '</div>'
         
         st.markdown(ingredients_html, unsafe_allow_html=True)
@@ -384,7 +399,8 @@ def show_results():
             # Recipe steps
             if st.session_state.get(f"show_steps_{idx}", False):
                 with st.expander("Step-by-Step Instructions", expanded=True):
-                    steps = recipe.get('recipe', [])
+                    # Try different keys for instructions
+                    steps = recipe.get('instructions', recipe.get('recipe', []))
                     if steps:
                         for i, step in enumerate(steps, 1):
                             st.markdown(f"**Step {i}:** {step}")
