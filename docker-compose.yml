@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  snapchef:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - XAI_API_KEY=${XAI_API_KEY}
+      - STRIPE_API_KEY=${STRIPE_API_KEY}
+      - DATABASE_URL=postgresql://snapchef:password@postgres:5432/snapchef
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - postgres
+    restart: unless-stopped
+  
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=snapchef
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=snapchef
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

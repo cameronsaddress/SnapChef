@@ -1,0 +1,12 @@
+cookie:
+  expiry_days: 30
+  key: VMt3xOlBzuejHAFTII3k4PERPIvsz6Wft_kAuf3UKC8
+  name: snapchef_auth
+credentials:
+  usernames:
+    demo_user:
+      email: demo@snapchef.com
+      name: Demo User
+      password: $2b$12$3rUFD1JzLRlWFKKt06yr3.C6FyBRQRA6YmQYIiY4IV/UNcOgs/bfe
+preauthorized:
+  emails: []
