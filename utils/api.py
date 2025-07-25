@@ -2,7 +2,7 @@ import os
 import base64
 import json
 from openai import OpenAI
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import streamlit as st
 from prompts import (
     format_ingredient_detection_prompt,
