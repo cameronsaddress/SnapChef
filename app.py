@@ -74,7 +74,7 @@ def main():
         from pages.landing_simple import show_landing
         show_landing()
     elif st.session_state.current_page == 'camera':
-        from pages.camera_improved import show_camera
+        from pages.camera_minimal_clean import show_camera
         show_camera()
     elif st.session_state.current_page == 'auth':
         from pages.auth import show_auth
@@ -88,6 +88,9 @@ def main():
     elif st.session_state.current_page == 'profile':
         from pages.profile_modern import show_profile
         show_profile()
+    elif st.session_state.current_page == 'results':
+        from pages.results_professional import show_results
+        show_results()
 
 if __name__ == "__main__":
     main()
