@@ -42,6 +42,9 @@ def detect_ingredients(image_base64: str) -> Dict[str, Any]:
         # Get the formatted prompt
         prompt = format_ingredient_detection_prompt()
         
+        # Log API call for debugging (remove in production)
+        print(f"Making API call to Grok Vision with image size: {len(image_base64)} characters")
+        
         response = client.chat.completions.create(
             model="grok-vision-beta",  # Use vision model for image analysis
             messages=[
@@ -67,11 +70,13 @@ def detect_ingredients(image_base64: str) -> Dict[str, Any]:
                 }
             ],
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=1000,
+            response_format={"type": "text"}  # Ensure we get text response
         )
         
         # Parse the response
         content = response.choices[0].message.content
+        print(f"Received response from API: {content[:200]}...")  # Log first 200 chars
         
         # Validate and extract JSON
         result = validate_ingredient_response(content)
@@ -148,7 +153,8 @@ def generate_meals(ingredients: List[Dict], dietary_preferences: List[str] = Non
                 }
             ],
             temperature=0.8,
-            max_tokens=4000
+            max_tokens=4000,
+            response_format={"type": "text"}  # Ensure we get text response
         )
         
         content = response.choices[0].message.content

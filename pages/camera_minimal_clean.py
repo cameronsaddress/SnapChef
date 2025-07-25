@@ -278,19 +278,37 @@ def process_photo_with_progress():
         
         # Check if detection was successful
         if 'error' in detection_result or len(detection_result.get('ingredients', [])) == 0:
-            # Clear progress and show error
+            # Stop progress bar at current position and show error
+            progress_bar.progress(30)  # Stop at detection phase
+            
+            error_msg = detection_result.get('error', 'No ingredients found in the image.')
+            status_placeholder.markdown(f'<p class="status-text" style="color: #ff6b6b; font-size: 1.2rem; margin-top: 1rem;">❌ {error_msg}</p>', unsafe_allow_html=True)
+            
+            # Wait a moment for user to read the error
+            time.sleep(2)
+            
+            # Clear progress bar and status
             progress_bar.empty()
             status_placeholder.empty()
             
-            error_msg = detection_result.get('error', 'No ingredients found in the image.')
+            # Show error in standard Streamlit error box
             st.error(f"❌ {error_msg}")
             
+            # Add helpful tips based on error type
+            if "No food ingredients detected" in error_msg:
+                st.info("💡 Tips for better results:\n"
+                       "- Make sure the photo shows the inside of your fridge or pantry\n"
+                       "- Ensure good lighting and clear visibility of items\n"
+                       "- Try to capture multiple ingredients in one shot")
+            
             # Add retry button
-            if st.button("📸 Take Another Photo", use_container_width=True):
-                st.session_state.photo_taken = False
-                st.session_state.processing = False
-                st.session_state.photo = None
-                st.rerun()
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("📸 Take Another Photo", use_container_width=True, key="retry_photo"):
+                    st.session_state.photo_taken = False
+                    st.session_state.processing = False
+                    st.session_state.photo = None
+                    st.rerun()
             return
         
         # Extract ingredients list
@@ -303,7 +321,36 @@ def process_photo_with_progress():
             time.sleep(0.8)
         
         # Generate recipes
-        recipes = generate_meals(ingredients, st.session_state.get('dietary_preferences', []))
+        try:
+            recipes = generate_meals(ingredients, st.session_state.get('dietary_preferences', []))
+            
+            # Check if recipe generation failed
+            if not recipes or len(recipes) == 0:
+                raise Exception("Failed to generate recipes. Please try again.")
+                
+        except Exception as recipe_error:
+            # Stop progress at recipe generation phase
+            progress_bar.progress(70)
+            status_placeholder.markdown('<p class="status-text" style="color: #ff6b6b; font-size: 1.2rem; margin-top: 1rem;">❌ Error generating recipes</p>', unsafe_allow_html=True)
+            time.sleep(2)
+            
+            # Clear progress and show error
+            progress_bar.empty()
+            status_placeholder.empty()
+            
+            st.error(f"❌ Failed to generate recipes: {str(recipe_error)}")
+            st.info("💡 We detected your ingredients but couldn't generate recipes. Please try again.")
+            
+            # Show detected ingredients
+            if ingredients:
+                st.success(f"✅ We found {len(ingredients)} ingredients in your image.")
+            
+            # Retry button
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("🔄 Generate Recipes Again", use_container_width=True, key="retry_recipes"):
+                    st.rerun()
+            return
         
         # Show final messages
         for i in range(7, 10):
@@ -329,12 +376,27 @@ def process_photo_with_progress():
         st.rerun()
         
     except Exception as e:
+        # Stop and clear the progress bar
         progress_bar.empty()
         status_placeholder.empty()
-        st.error(f"❌ Oops! Something went wrong: {str(e)}")
         
-        if st.button("🔄 Try Again", use_container_width=True):
-            st.session_state.photo_taken = False
-            st.session_state.processing = False
-            st.session_state.photo = None
-            st.rerun()
+        # Show detailed error message
+        error_message = str(e)
+        if "API" in error_message or "api_key" in error_message:
+            st.error("❌ API Error: Please check your API key configuration.")
+        elif "connection" in error_message.lower() or "network" in error_message.lower():
+            st.error("❌ Network Error: Please check your internet connection.")
+        else:
+            st.error(f"❌ Oops! Something went wrong: {error_message}")
+        
+        # Add helpful message
+        st.info("💡 Tip: Make sure you have a stable internet connection and your API key is properly configured.")
+        
+        # Retry button
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🔄 Try Again", use_container_width=True):
+                st.session_state.photo_taken = False
+                st.session_state.processing = False
+                st.session_state.photo = None
+                st.rerun()
