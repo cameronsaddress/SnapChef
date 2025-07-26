@@ -141,22 +141,24 @@ def show_results():
             font-weight: 600 !important;
         }
         
-        /* Buttons */
+        /* Buttons - modern design */
         .stButton > button {
             background: white !important;
             color: #1a1a1a !important;
-            border: 1px solid #e9ecef !important;
-            padding: 0.6rem 1.5rem !important;
-            font-weight: 500 !important;
-            border-radius: 8px !important;
+            border: 2px solid #e9ecef !important;
+            padding: 0.75rem 1.75rem !important;
+            font-weight: 600 !important;
+            border-radius: 12px !important;
             transition: all 0.2s ease !important;
-            font-size: 0.875rem !important;
+            font-size: 0.9375rem !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
         }
         
         .stButton > button:hover {
             background: #f8f9fa !important;
             border-color: #dee2e6 !important;
-            transform: translateY(-1px) !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
         }
         
         /* Primary action button */
@@ -338,32 +340,71 @@ def show_results():
             st.markdown('<div class="recipe-header">', unsafe_allow_html=True)
             st.markdown(f"### {recipe.get('name', 'Untitled Recipe')}")
             st.markdown(f'<p class="recipe-description">{recipe.get("description", "")}</p>', unsafe_allow_html=True)
+            
+            # Main and Side dish tags
+            main_dish = recipe.get('main_dish', '')
+            side_dish = recipe.get('side_dish', '')
+            if main_dish or side_dish:
+                st.markdown('<div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap;">', unsafe_allow_html=True)
+                if main_dish:
+                    st.markdown(f'<span style="background: #e3f2fd; color: #1976d2; padding: 0.375rem 0.875rem; border-radius: 20px; font-size: 0.875rem; font-weight: 500; border: 1px solid #bbdefb;">🍽️ Main: {main_dish}</span>', unsafe_allow_html=True)
+                if side_dish:
+                    st.markdown(f'<span style="background: #f3e5f5; color: #7b1fa2; padding: 0.375rem 0.875rem; border-radius: 20px; font-size: 0.875rem; font-weight: 500; border: 1px solid #e1bee7;">🥗 Side: {side_dish}</span>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            
             st.markdown('</div>', unsafe_allow_html=True)
             
             # Recipe content
             st.markdown('<div class="recipe-content">', unsafe_allow_html=True)
             
-            # Metrics in columns
-            metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+            # Custom metrics display
+            st.markdown('<div style="display: flex; justify-content: space-around; margin: 1.5rem 0; flex-wrap: wrap; gap: 1rem;">', unsafe_allow_html=True)
             
-            with metric_col1:
-                total_time = recipe.get('prep_time', 15) + recipe.get('cook_time', 15)
-                st.metric("⏱️ Time", f"{total_time} min")
+            # Time
+            total_time = recipe.get('total_time', recipe.get('prep_time', 15) + recipe.get('cook_time', 15))
+            st.markdown(f'''
+                <div style="background: #f8f9fa; padding: 1rem 1.5rem; border-radius: 12px; text-align: center; flex: 1; min-width: 120px; border: 1px solid #e9ecef;">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">⏱️</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: #1a1a1a;">{total_time} min</div>
+                    <div style="font-size: 0.875rem; color: #6c757d;">Total Time</div>
+                </div>
+            ''', unsafe_allow_html=True)
             
-            with metric_col2:
-                calories = recipe.get('nutrition', {}).get('calories', 'N/A')
-                st.metric("🔥 Calories", str(calories))
+            # Calories
+            calories = recipe.get('nutrition', {}).get('calories', 'N/A')
+            st.markdown(f'''
+                <div style="background: #f8f9fa; padding: 1rem 1.5rem; border-radius: 12px; text-align: center; flex: 1; min-width: 120px; border: 1px solid #e9ecef;">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🔥</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: #1a1a1a;">{calories}</div>
+                    <div style="font-size: 0.875rem; color: #6c757d;">Calories</div>
+                </div>
+            ''', unsafe_allow_html=True)
             
-            with metric_col3:
-                servings = recipe.get('servings', 2)
-                st.metric("👥 Servings", str(servings))
+            # Servings
+            servings = recipe.get('servings', 4)
+            st.markdown(f'''
+                <div style="background: #f8f9fa; padding: 1rem 1.5rem; border-radius: 12px; text-align: center; flex: 1; min-width: 120px; border: 1px solid #e9ecef;">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">👥</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: #1a1a1a;">{servings}</div>
+                    <div style="font-size: 0.875rem; color: #6c757d;">Servings</div>
+                </div>
+            ''', unsafe_allow_html=True)
             
-            with metric_col4:
-                difficulty = recipe.get('difficulty', 'Easy')
-                st.metric("📊 Level", difficulty)
+            # Difficulty
+            difficulty = recipe.get('difficulty', 'easy').title()
+            difficulty_color = '#28a745' if difficulty.lower() == 'easy' else '#ffc107' if difficulty.lower() == 'medium' else '#dc3545'
+            st.markdown(f'''
+                <div style="background: #f8f9fa; padding: 1rem 1.5rem; border-radius: 12px; text-align: center; flex: 1; min-width: 120px; border: 1px solid #e9ecef;">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">📊</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: {difficulty_color};">{difficulty}</div>
+                    <div style="font-size: 0.875rem; color: #6c757d;">Difficulty</div>
+                </div>
+            ''', unsafe_allow_html=True)
             
-            # Spacing
-            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Spacing before action buttons
+            st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
             
             # Action buttons
             btn_col1, btn_col2, btn_col3 = st.columns(3)
@@ -414,7 +455,7 @@ def show_results():
             
             # Add spacing between recipes
             if idx < len(recipes) - 1:
-                st.markdown("<br><br>", unsafe_allow_html=True)
+                st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
     
     else:
         st.error("No recipes were generated. Please try again with a clearer photo.")
