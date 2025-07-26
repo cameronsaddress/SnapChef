@@ -43,10 +43,31 @@ def show_camera():
             background: linear-gradient(90deg, #25F4EE 0%, #FE2C55 100%) !important;
         }
         
-        /* Camera/File uploader container */
+        /* Camera/File uploader container - responsive */
         .stCameraInput, .stFileUploader {
             margin: 2rem auto;
-            max-width: 500px;
+            max-width: 90vw;
+            width: 100%;
+        }
+        
+        /* Mobile responsive adjustments */
+        @media (max-width: 768px) {
+            .stCameraInput, .stFileUploader {
+                margin: 1rem auto;
+                max-width: 95vw;
+            }
+            
+            .main .block-container {
+                padding-top: 1rem !important;
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+                max-width: 100% !important;
+            }
+            
+            .camera-header {
+                font-size: 2rem;
+                margin-bottom: 1rem;
+            }
         }
         
         /* Hide default camera label */
@@ -62,15 +83,33 @@ def show_camera():
             justify-content: center;
         }
         
-        /* Round camera preview */
+        /* Round camera preview - responsive sizing */
         .stCameraInput video {
             border-radius: 20px !important;
             overflow: hidden !important;
+            width: 100% !important;
+            max-width: 90vw !important;
+            height: auto !important;
+            aspect-ratio: 4/3;
+            object-fit: cover;
         }
         
         .stCameraInput img {
             border-radius: 20px !important;
             overflow: hidden !important;
+            width: 100% !important;
+            max-width: 90vw !important;
+            height: auto !important;
+        }
+        
+        /* Mobile camera adjustments */
+        @media (max-width: 768px) {
+            .stCameraInput video,
+            .stCameraInput img {
+                border-radius: 16px !important;
+                max-width: 95vw !important;
+                aspect-ratio: 3/4; /* Portrait orientation for mobile */
+            }
         }
         
         /* Style the camera button container */
@@ -157,8 +196,37 @@ def show_camera():
     if st.session_state.processing:
         process_photo_with_progress()
     else:
-        # Camera input without label
-        photo = st.camera_input("", label_visibility="hidden")
+        # Camera input without label - with back camera preference
+        # Note: Streamlit doesn't directly support camera selection,
+        # but we can add a data attribute that some browsers may respect
+        photo = st.camera_input("", 
+                               label_visibility="hidden",
+                               key="camera_input",
+                               help="Take a photo of your fridge or pantry")
+        
+        # Add JavaScript to try to use back camera (environment facing)
+        st.markdown("""
+        <script>
+        // Try to use back camera on mobile devices
+        document.addEventListener('DOMContentLoaded', function() {
+            const videoElements = document.querySelectorAll('video');
+            videoElements.forEach(video => {
+                if (video && video.srcObject) {
+                    const tracks = video.srcObject.getTracks();
+                    tracks.forEach(track => {
+                        const constraints = track.getConstraints();
+                        // Try to set facingMode to environment (back camera)
+                        if (track.kind === 'video') {
+                            track.applyConstraints({
+                                facingMode: { ideal: 'environment' }
+                            }).catch(e => console.log('Could not apply camera constraints:', e));
+                        }
+                    });
+                }
+            });
+        });
+        </script>
+        """, unsafe_allow_html=True)
         
         if photo and not st.session_state.photo_taken:
             st.session_state.photo = photo
@@ -172,15 +240,23 @@ def process_photo_with_progress():
     # Style for progress container
     st.markdown("""
         <style>
-        /* Processing container above camera */
+        /* Processing container above camera - responsive */
         .processing-container {
             background: rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(10px);
             padding: 1.5rem;
             border-radius: 20px;
             text-align: center;
-            max-width: 500px;
+            max-width: 90vw;
             margin: 0 auto 2rem auto;
+        }
+        
+        @media (max-width: 768px) {
+            .processing-container {
+                padding: 1rem;
+                margin: 0 auto 1rem auto;
+                max-width: 95vw;
+            }
         }
         
         /* Style progress bar */
@@ -206,9 +282,10 @@ def process_photo_with_progress():
         # Add styling for the captured image
         st.markdown("""
             <style>
-            /* Container to match camera size */
+            /* Container to match camera size - responsive */
             .image-container {
-                max-width: 500px;
+                max-width: 90vw;
+                width: 100%;
                 margin: 0 auto;
             }
             
@@ -217,16 +294,27 @@ def process_photo_with_progress():
                 border-radius: 20px !important;
                 width: 100%;
                 height: auto;
+                max-width: 90vw;
+            }
+            
+            /* Mobile adjustments for captured image */
+            @media (max-width: 768px) {
+                .image-container {
+                    max-width: 95vw;
+                }
+                
+                .image-container .stImage > img {
+                    border-radius: 16px !important;
+                    max-width: 95vw;
+                }
             }
             </style>
         """, unsafe_allow_html=True)
         
-        # Create container matching camera dimensions
-        col1, col2, col3 = st.columns([1, 3, 1])
-        with col2:
-            st.markdown('<div class="image-container">', unsafe_allow_html=True)
-            st.image(st.session_state.photo)
-            st.markdown('</div>', unsafe_allow_html=True)
+        # Create responsive container for captured image
+        st.markdown('<div class="image-container">', unsafe_allow_html=True)
+        st.image(st.session_state.photo, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     
     try:
         # Progress messages array
