@@ -47,7 +47,7 @@ def detect_ingredients(image_base64: str) -> Dict[str, Any]:
         print(f"Making API call to Grok Vision with image size: {len(image_base64)} characters")
         
         response = client.chat.completions.create(
-            model="grok-2-vision-latest",  # Use latest Grok 2 vision model
+            model="grok-2-latest",  # Use Grok 2 for non-vision tasks
             messages=[
                 {
                     "role": "system",
@@ -304,7 +304,7 @@ def analyze_fridge_and_generate_recipes(image_base64: str, dietary_preferences: 
         print(f"Making combined API call with image size: {len(image_base64)} characters")
         
         response = client.chat.completions.create(
-            model="grok-2-vision-latest",
+            model="grok-4-0709",  # Using Grok 4 model for vision + text
             messages=[
                 {
                     "role": "system",
