@@ -87,36 +87,45 @@ def show_results():
             transform: translateY(-1px);
         }
         
-        /* Recipe cards */
+        /* Recipe cards - gradient background */
         .recipe-container {
-            background: white;
-            border-radius: 16px;
-            overflow: hidden;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e9ecef;
-            transition: all 0.2s ease;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 24px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
         }
         
         .recipe-container:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            transform: translateY(-4px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
         }
         
         .recipe-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: 1rem;
+        }
+        
+        .recipe-title {
+            color: white !important;
+            font-size: 1.875rem !important;
+            font-weight: 700 !important;
+            margin: 0 0 0.5rem 0 !important;
+            line-height: 1.3 !important;
         }
         
         .recipe-content {
-            padding: 1.5rem;
+            /* Content is now directly in container */
         }
         
         .recipe-description {
-            color: #6c757d;
-            font-size: 0.95rem;
-            line-height: 1.5;
-            margin-bottom: 1.5rem;
+            color: #1a1a1a;
+            font-size: 1.0625rem;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 1rem;
+            border-radius: 12px;
         }
         
         /* Metrics styling */
@@ -200,12 +209,9 @@ def show_results():
             font-size: 0.875rem;
         }
         
-        /* Divider */
+        /* Remove dividers */
         hr {
-            margin: 2rem 0 !important;
-            border: none !important;
-            height: 1px !important;
-            background: #e9ecef !important;
+            display: none !important;
         }
         
         /* Bottom CTA */
@@ -357,65 +363,56 @@ def show_results():
             # Recipe content
             st.markdown('<div class="recipe-content">', unsafe_allow_html=True)
             
-            # Custom metrics display
-            st.markdown('<div style="display: flex; justify-content: space-around; margin: 1.5rem 0; flex-wrap: wrap; gap: 1rem;">', unsafe_allow_html=True)
-            
-            # Time
+            # Metrics in single white card
             total_time = recipe.get('total_time', recipe.get('prep_time', 15) + recipe.get('cook_time', 15))
-            st.markdown(f'''
-                <div style="background: #f8f9fa; padding: 1rem 1.5rem; border-radius: 12px; text-align: center; flex: 1; min-width: 120px; border: 1px solid #e9ecef;">
-                    <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">⏱️</div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: #1a1a1a;">{total_time} min</div>
-                    <div style="font-size: 0.875rem; color: #6c757d;">Total Time</div>
-                </div>
-            ''', unsafe_allow_html=True)
-            
-            # Calories
             calories = recipe.get('nutrition', {}).get('calories', 'N/A')
-            st.markdown(f'''
-                <div style="background: #f8f9fa; padding: 1rem 1.5rem; border-radius: 12px; text-align: center; flex: 1; min-width: 120px; border: 1px solid #e9ecef;">
-                    <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🔥</div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: #1a1a1a;">{calories}</div>
-                    <div style="font-size: 0.875rem; color: #6c757d;">Calories</div>
-                </div>
-            ''', unsafe_allow_html=True)
-            
-            # Servings
             servings = recipe.get('servings', 4)
-            st.markdown(f'''
-                <div style="background: #f8f9fa; padding: 1rem 1.5rem; border-radius: 12px; text-align: center; flex: 1; min-width: 120px; border: 1px solid #e9ecef;">
-                    <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">👥</div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: #1a1a1a;">{servings}</div>
-                    <div style="font-size: 0.875rem; color: #6c757d;">Servings</div>
-                </div>
-            ''', unsafe_allow_html=True)
-            
-            # Difficulty
             difficulty = recipe.get('difficulty', 'easy').title()
             difficulty_color = '#28a745' if difficulty.lower() == 'easy' else '#ffc107' if difficulty.lower() == 'medium' else '#dc3545'
+            
             st.markdown(f'''
-                <div style="background: #f8f9fa; padding: 1rem 1.5rem; border-radius: 12px; text-align: center; flex: 1; min-width: 120px; border: 1px solid #e9ecef;">
-                    <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">📊</div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: {difficulty_color};">{difficulty}</div>
-                    <div style="font-size: 0.875rem; color: #6c757d;">Difficulty</div>
+                <div style="background: white; padding: 5px; border-radius: 12px; margin: 1.5rem 0;">
+                    <div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap;">
+                        <div style="text-align: center; padding: 0.5rem 1rem;">
+                            <span style="font-size: 1.2rem;">⏱️</span>
+                            <span style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a; margin-left: 0.5rem;">{total_time} min</span>
+                        </div>
+                        <div style="text-align: center; padding: 0.5rem 1rem;">
+                            <span style="font-size: 1.2rem;">🔥</span>
+                            <span style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a; margin-left: 0.5rem;">{calories} cal</span>
+                        </div>
+                        <div style="text-align: center; padding: 0.5rem 1rem;">
+                            <span style="font-size: 1.2rem;">👥</span>
+                            <span style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a; margin-left: 0.5rem;">{servings} servings</span>
+                        </div>
+                        <div style="text-align: center; padding: 0.5rem 1rem;">
+                            <span style="font-size: 1.2rem;">📊</span>
+                            <span style="font-size: 1.1rem; font-weight: 600; color: {difficulty_color}; margin-left: 0.5rem;">{difficulty}</span>
+                        </div>
+                    </div>
                 </div>
             ''', unsafe_allow_html=True)
-            
-            st.markdown('</div>', unsafe_allow_html=True)
             
             # Spacing before action buttons
             st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
             
-            # Action buttons
-            btn_col1, btn_col2, btn_col3 = st.columns(3)
+            # Action buttons - only Instructions and Share
+            btn_col1, btn_col2 = st.columns(2)
             
             with btn_col1:
-                if st.button("🍳 Cook This Recipe", key=f"cook_{idx}", use_container_width=True):
-                    st.success("✓ Recipe saved to your collection! +20 points")
-                    add_points(20, "Cooked recipe")
+                steps_key = f"show_steps_{idx}"
+                is_expanded = st.session_state.get(steps_key, False)
+                
+                if st.button(
+                    "📋 Hide Instructions" if is_expanded else "📋 Instructions", 
+                    key=f"steps_{idx}", 
+                    use_container_width=True
+                ):
+                    st.session_state[steps_key] = not is_expanded
+                    st.rerun()
             
             with btn_col2:
-                if st.button("📱 Share Recipe", key=f"share_{idx}", use_container_width=True):
+                if st.button("📱 Share Your SnapChef Recipe!", key=f"share_{idx}", use_container_width=True):
                     with st.expander("Share this recipe", expanded=True):
                         share_text = f"I just made {recipe.get('name', 'this amazing dish')} using SnapChef! 🍳✨"
                         st.code(share_text)
@@ -425,18 +422,6 @@ def show_results():
                         with share_col2:
                             st.button("Share to Instagram", key=f"ig_{idx}", use_container_width=True)
             
-            with btn_col3:
-                steps_key = f"show_steps_{idx}"
-                is_expanded = st.session_state.get(steps_key, False)
-                
-                if st.button(
-                    "📋 Hide Steps" if is_expanded else "📋 View Steps", 
-                    key=f"steps_{idx}", 
-                    use_container_width=True
-                ):
-                    st.session_state[steps_key] = not is_expanded
-                    st.rerun()
-            
             # Recipe steps
             if st.session_state.get(f"show_steps_{idx}", False):
                 with st.expander("Step-by-Step Instructions", expanded=True):
@@ -445,8 +430,7 @@ def show_results():
                     if steps:
                         for i, step in enumerate(steps, 1):
                             st.markdown(f"**Step {i}:** {step}")
-                            if i < len(steps):
-                                st.markdown("---")
+                            # No dividers between steps
                     else:
                         st.info("Detailed steps will be available soon.")
             
