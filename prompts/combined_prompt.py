@@ -50,7 +50,13 @@ Based on the detected ingredients, generate 5 complete dinner ideas:
 - Vary the cuisines and cooking methods
 - Keep total cooking time reasonable (15-60 minutes)
 - Make recipes practical for home cooking
-- Include clear, numbered instructions
+- Include DETAILED, numbered instructions (minimum 5-8 steps per recipe)
+- Each instruction should include:
+  * Specific temperatures and timing
+  * Cooking techniques and methods
+  * Visual cues for doneness (e.g., "until edges are golden", "when onions are translucent")
+  * Tips for best results
+  * Clear action verbs (dice, sauté, simmer, etc.)
 
 RESPONSE FORMAT:
 Return your complete analysis in the following JSON structure:
@@ -87,8 +93,11 @@ Return your complete analysis in the following JSON structure:
         {"name": "ingredient", "amount": "quantity"}
       ],
       "instructions": [
-        "Step 1 instruction",
-        "Step 2 instruction"
+        "Step 1: Detailed instruction with specific techniques, temperatures, and timing",
+        "Step 2: Continue with clear, actionable steps",
+        "Step 3: Include cooking tips and visual cues (e.g., 'until golden brown')",
+        "Step 4: More steps as needed",
+        "Step 5: Final plating and serving instructions"
       ],
       "nutrition": {
         "calories": 400,

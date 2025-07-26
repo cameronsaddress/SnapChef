@@ -45,7 +45,7 @@ def show_results():
         }
         
         .main .block-container {
-            padding-top: 70px !important; /* Account for fixed header */
+            padding-top: 65px !important; /* Account for fixed header - reduced from 70px */
             max-width: 900px !important;
             margin: 0 auto !important;
             padding-left: 1rem;
@@ -101,6 +101,34 @@ def show_results():
             display: flex;
             align-items: center;
             gap: 0.5rem;
+        }
+        
+        .ingredients-scroll-container {
+            max-height: 300px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            margin-top: 0.5rem;
+        }
+        
+        .ingredients-scroll-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .ingredients-scroll-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        
+        .ingredients-scroll-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+        
+        .ingredients-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
         }
         
         .ingredient-tag {
@@ -412,8 +440,8 @@ def show_results():
             st.markdown('<div class="ingredients-container-marker"></div>', unsafe_allow_html=True)
             st.markdown('<div class="ingredients-header">🔍 We found these ingredients in your fridge</div>', unsafe_allow_html=True)
             
-            # Create ingredient tags
-            ingredients_html = '<div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">'
+            # Create ingredient tags with scrollable container
+            ingredients_html = '<div class="ingredients-scroll-container"><div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">'
             for ing in ingredients:
                 # Handle both dict and string formats
                 if isinstance(ing, dict):
@@ -431,7 +459,7 @@ def show_results():
                     display_text = str(ing)
                 
                 ingredients_html += f'<span class="ingredient-tag">✓ {display_text}</span>'
-            ingredients_html += '</div>'
+            ingredients_html += '</div></div>'  # Close both the flex container and scroll container
             
             st.markdown(ingredients_html, unsafe_allow_html=True)
     
@@ -467,7 +495,19 @@ def show_results():
                 calories = recipe.get('nutrition', {}).get('calories', 'N/A')
                 servings = recipe.get('servings', 4)
                 difficulty = recipe.get('difficulty', 'easy').title()
-                difficulty_color = '#28a745' if difficulty.lower() == 'easy' else '#ffc107' if difficulty.lower() == 'medium' else '#dc3545'
+                # More professional difficulty indicator using dots
+                if difficulty.lower() == 'easy':
+                    difficulty_dots = '●○○'
+                    difficulty_color = '#28a745'
+                    difficulty_text = 'Easy'
+                elif difficulty.lower() == 'medium':
+                    difficulty_dots = '●●○'
+                    difficulty_color = '#ffc107'
+                    difficulty_text = 'Medium'
+                else:
+                    difficulty_dots = '●●●'
+                    difficulty_color = '#dc3545'
+                    difficulty_text = 'Hard'
                 
                 st.markdown(f'''
                     <div style="background: white; padding: 5px; border-radius: 12px; margin: 1.5rem 0;">
@@ -485,8 +525,10 @@ def show_results():
                                 <span style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a; margin-left: 0.5rem;">{servings} servings</span>
                             </div>
                             <div style="text-align: center; padding: 0.5rem 1rem;">
-                                <span style="font-size: 1.2rem;">📊</span>
-                                <span style="font-size: 1.1rem; font-weight: 600; color: {difficulty_color}; margin-left: 0.5rem;">{difficulty}</span>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-size: 1.2rem; color: {difficulty_color}; letter-spacing: 2px;">{difficulty_dots}</span>
+                                    <span style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a;">{difficulty_text}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -511,7 +553,7 @@ def show_results():
                         st.rerun()
                 
                 with btn_col2:
-                    if st.button("📱 Share Your SnapChef ✨ Recipe!", key=f"share_{idx}", use_container_width=True):
+                    if st.button("📱 Share for credits!", key=f"share_{idx}", use_container_width=True):
                         with st.expander("Share this recipe", expanded=True):
                             share_text = f"I just made {recipe.get('name', 'this amazing dish')} using SnapChef ✨! 🍳"
                             st.code(share_text)
@@ -527,9 +569,29 @@ def show_results():
                         # Try different keys for instructions
                         steps = recipe.get('instructions', recipe.get('recipe', []))
                         if steps:
+                            # Create a printable version of the recipe
+                            recipe_text = f"# {recipe.get('name', 'Recipe')}\n\n"
+                            recipe_text += f"**{recipe.get('description', '')}**\n\n"
+                            recipe_text += f"- Total Time: {total_time} minutes\n"
+                            recipe_text += f"- Servings: {servings}\n"
+                            recipe_text += f"- Difficulty: {difficulty_text}\n\n"
+                            recipe_text += "## Instructions:\n"
+                            
                             for i, step in enumerate(steps, 1):
                                 st.markdown(f"**Step {i}:** {step}")
-                                # No dividers between steps
+                                recipe_text += f"{i}. {step}\n"
+                            
+                            # Add print button at the bottom
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            col1, col2, col3 = st.columns([2, 1, 2])
+                            with col2:
+                                st.download_button(
+                                    label="🖨️ Print Recipe",
+                                    data=recipe_text,
+                                    file_name=f"{recipe.get('name', 'recipe').replace(' ', '_')}.txt",
+                                    mime="text/plain",
+                                    key=f"print_{idx}"
+                                )
                         else:
                             st.info("Detailed steps will be available soon.")
             
