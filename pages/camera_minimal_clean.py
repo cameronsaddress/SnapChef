@@ -52,20 +52,29 @@ def show_camera():
         
         /* Camera/File uploader container - responsive */
         .stCameraInput, .stFileUploader {
-            margin: 2rem auto;
+            margin: 0 auto;
             max-width: 90vw;
             width: 100%;
+            height: 90vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         /* Mobile responsive adjustments */
         @media (max-width: 768px) {
             .stCameraInput, .stFileUploader {
-                margin: 1rem auto;
                 max-width: 95vw;
+                height: 85vh;
+            }
+            
+            .stCameraInput video,
+            .stCameraInput img {
+                height: 75vh !important;
             }
             
             .main .block-container {
-                padding-top: 1rem !important;
+                padding-top: 80px !important;
                 padding-left: 1rem !important;
                 padding-right: 1rem !important;
                 max-width: 100% !important;
@@ -73,7 +82,7 @@ def show_camera():
             
             .camera-header {
                 font-size: 2rem;
-                margin-bottom: 1rem;
+                margin-bottom: 0.5rem;
             }
         }
         
@@ -96,8 +105,7 @@ def show_camera():
             overflow: hidden !important;
             width: 100% !important;
             max-width: 90vw !important;
-            height: auto !important;
-            aspect-ratio: 4/3;
+            height: 80vh !important;
             object-fit: cover;
         }
         
@@ -132,11 +140,13 @@ def show_camera():
             font-size: 3rem;
             font-weight: 800;
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             letter-spacing: -0.02em;
             color: white;
             text-decoration: none !important;
+            position: relative;
+            z-index: 20;
         }
         
         /* Remove any link styling */
@@ -168,15 +178,10 @@ def show_camera():
     if 'processing' not in st.session_state:
         st.session_state.processing = False
     
-    # Back button
-    if st.button("← Back", key="back_btn"):
-        st.session_state.photo_taken = False
-        st.session_state.processing = False
-        st.session_state.current_page = 'landing'
-        st.rerun()
+    # Back button removed - navigation handled by top bar
     
     # Add styled header
-    st.markdown('<h1 class="camera-header">Take a photo of your fridge</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="camera-header">Take a photo of your fridge or pantry</h1>', unsafe_allow_html=True)
     
     # Process photo if taken - show progress above camera
     if st.session_state.processing:
@@ -273,14 +278,19 @@ def process_photo_with_progress():
                 max-width: 90vw;
                 width: 100%;
                 margin: 0 auto;
+                height: 80vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
             
             /* Round the captured image */
             .image-container .stImage > img {
                 border-radius: 20px !important;
                 width: 100%;
-                height: auto;
+                height: 80vh;
                 max-width: 90vw;
+                object-fit: cover;
             }
             
             /* Mobile adjustments for captured image */
@@ -292,6 +302,7 @@ def process_photo_with_progress():
                 .image-container .stImage > img {
                     border-radius: 16px !important;
                     max-width: 95vw;
+                    height: 75vh;
                 }
             }
             </style>

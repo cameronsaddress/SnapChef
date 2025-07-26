@@ -146,8 +146,10 @@ def show_landing():
         </style>
     """, unsafe_allow_html=True)
     
-    # Logo
+    # Logo - positioned 5px below topbar
+    st.markdown('<div style="margin-top: 5px;">', unsafe_allow_html=True)
     st.markdown(render_logo("hero", gradient=True), unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # Hero Title
     st.markdown("<h1>Turn Your Fridge<br>Into Magic ✨</h1>", unsafe_allow_html=True)

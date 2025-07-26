@@ -84,22 +84,21 @@ def render_topbar():
         </div>
         
         <script>
-        document.getElementById('logo-nav').addEventListener('click', function() {
-            window.parent.postMessage({type: 'streamlit:setComponentValue', value: 'navigate_home'}, '*');
+        // Make the entire logo clickable
+        document.addEventListener('DOMContentLoaded', function() {
+            const logoNav = document.getElementById('logo-nav');
+            if (logoNav) {
+                logoNav.style.cursor = 'pointer';
+                logoNav.addEventListener('click', function() {
+                    // Navigate to home by triggering a page reload with landing page
+                    const currentUrl = new URL(window.location);
+                    currentUrl.searchParams.set('page', 'landing');
+                    window.location.href = currentUrl.toString();
+                });
+            }
         });
         </script>
     """, unsafe_allow_html=True)
-    
-    # Create invisible button for navigation
-    col1, col2, col3 = st.columns([1, 10, 1])
-    with col1:
-        if st.button("🏠", key="hidden_home_nav", help="Go to home"):
-            st.session_state.current_page = 'landing'
-            st.session_state.photo_taken = False
-            st.session_state.processing = False
-            if 'photo' in st.session_state:
-                del st.session_state.photo
-            st.rerun()
 
 def add_floating_food_animation():
     """Add floating food animation that works on all pages"""
