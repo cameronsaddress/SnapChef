@@ -25,10 +25,12 @@ def show_camera():
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
         
-        /* Remove top padding */
+        /* Remove top padding and use full width for camera page */
         .main .block-container {
             padding-top: 80px !important; /* Account for fixed header */
-            max-width: 600px !important;
+            max-width: 100% !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
             margin: 0 auto !important;
         }
         
@@ -52,10 +54,10 @@ def show_camera():
         
         /* Camera container - full viewport approach */
         div[data-testid="stCameraInput"] {
-            height: calc(100vh - 150px) !important;
-            height: calc(100dvh - 150px) !important; /* Dynamic viewport height for mobile */
-            max-height: calc(100vh - 150px) !important;
-            width: 100% !important;
+            height: calc(100vh - 120px) !important;
+            height: calc(100dvh - 120px) !important; /* Dynamic viewport height for mobile */
+            max-height: calc(100vh - 120px) !important;
+            width: calc(100vw - 2rem) !important;
             margin: 0 auto;
             display: flex !important;
             flex-direction: column !important;
@@ -67,7 +69,7 @@ def show_camera():
         div[data-testid="stCameraInput"] > div {
             height: 100% !important;
             width: 100% !important;
-            max-width: 90vw !important;
+            max-width: 100% !important;
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;
@@ -99,9 +101,10 @@ def show_camera():
         /* Mobile responsive adjustments */
         @media (max-width: 768px) {
             div[data-testid="stCameraInput"] {
-                height: calc(100vh - 120px) !important;
-                height: calc(100dvh - 120px) !important;
+                height: calc(100vh - 100px) !important;
+                height: calc(100dvh - 100px) !important;
                 height: -webkit-fill-available !important;
+                width: calc(100vw - 1rem) !important;
             }
             
             div[data-testid="stCameraInput"] video,
@@ -110,15 +113,16 @@ def show_camera():
             }
             
             .main .block-container {
-                padding-top: 80px !important;
-                padding-left: 1rem !important;
-                padding-right: 1rem !important;
+                padding-top: 70px !important;
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
                 max-width: 100% !important;
             }
             
             .camera-header {
-                font-size: 2rem;
+                font-size: 1.75rem;
                 margin-bottom: 0.5rem;
+                padding: 0 0.5rem;
             }
         }
         
@@ -143,7 +147,7 @@ def show_camera():
             margin-bottom: 1rem;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             letter-spacing: -0.02em;
-            color: white;
+            color: white !important;
             text-decoration: none !important;
             position: relative;
             z-index: 20;
@@ -202,14 +206,19 @@ def show_camera():
         function resizeCameraToFullViewport() {
             const cameraContainers = document.querySelectorAll('[data-testid="stCameraInput"]');
             const viewportHeight = window.innerHeight;
-            const headerHeight = 150; // Adjust based on your header
+            const viewportWidth = window.innerWidth;
+            const headerHeight = 120; // Adjust based on your header
             const targetHeight = viewportHeight - headerHeight;
+            const targetWidth = viewportWidth - 32; // Account for padding
             
             cameraContainers.forEach(container => {
-                // Set container height
+                // Set container height and width
                 container.style.height = targetHeight + 'px';
                 container.style.maxHeight = targetHeight + 'px';
+                container.style.width = targetWidth + 'px';
+                container.style.maxWidth = targetWidth + 'px';
                 container.style.setProperty('height', targetHeight + 'px', 'important');
+                container.style.setProperty('width', targetWidth + 'px', 'important');
                 
                 // Find and resize video/img elements
                 const videos = container.querySelectorAll('video');
@@ -217,14 +226,18 @@ def show_camera():
                 
                 videos.forEach(video => {
                     video.style.height = '100%';
+                    video.style.width = 'auto';
                     video.style.maxHeight = '100%';
+                    video.style.maxWidth = '100%';
                     video.style.setProperty('height', '100%', 'important');
                     video.style.objectFit = 'contain';
                 });
                 
                 images.forEach(img => {
                     img.style.height = '100%';
+                    img.style.width = 'auto';
                     img.style.maxHeight = '100%';
+                    img.style.maxWidth = '100%';
                     img.style.setProperty('height', '100%', 'important');
                     img.style.objectFit = 'contain';
                 });
@@ -234,6 +247,8 @@ def show_camera():
                 childDivs.forEach(div => {
                     div.style.height = '100%';
                     div.style.maxHeight = '100%';
+                    div.style.width = '100%';
+                    div.style.maxWidth = '100%';
                 });
             });
         }
