@@ -38,6 +38,8 @@ def show_landing():
             font-weight: 400 !important;
             text-align: center !important;
             opacity: 0.9;
+            margin-top: 0.5rem !important;
+            margin-bottom: 2rem !important;
         }
         
         h3 {
@@ -149,13 +151,10 @@ def show_landing():
     # Logo - positioned 5px below topbar
     st.markdown('<div style="margin-top: 5px;">', unsafe_allow_html=True)
     st.markdown(render_logo("hero", gradient=True), unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
     
-    # Hero Title
-    st.markdown("<h1>Meal Magic!</h1>", unsafe_allow_html=True)
-    
-    # Subtitle
+    # Subtitle directly below logo
     st.markdown("<h2>AI-powered recipes from what you already have</h2>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # Free uses indicator
     st.markdown(f'<div style="text-align: center;"><span class="free-uses-badge">Hey Friend, Here\'s {st.session_state.free_uses} free snaps on us! 👇</span></div>', unsafe_allow_html=True)

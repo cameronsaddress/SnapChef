@@ -27,7 +27,7 @@ def show_camera():
         
         /* Remove top padding and use full width for camera page */
         .main .block-container {
-            padding-top: 80px !important; /* Account for fixed header */
+            padding-top: 65px !important; /* 60px header + 5px spacing */
             max-width: 100% !important;
             padding-left: 1rem !important;
             padding-right: 1rem !important;
@@ -74,6 +74,15 @@ def show_camera():
             flex-direction: column !important;
             align-items: center !important;
             justify-content: center !important;
+            background: transparent !important;
+        }
+        
+        /* Remove white background from all camera elements */
+        div[data-testid="stCameraInput"],
+        div[data-testid="stCameraInput"] > div,
+        div[data-testid="stCameraInput"] > div > div {
+            background: transparent !important;
+            background-color: transparent !important;
         }
         
         /* The actual video/image elements */
@@ -113,7 +122,7 @@ def show_camera():
             }
             
             .main .block-container {
-                padding-top: 70px !important;
+                padding-top: 65px !important; /* 60px header + 5px spacing */
                 padding-left: 0.5rem !important;
                 padding-right: 0.5rem !important;
                 max-width: 100% !important;
@@ -122,7 +131,6 @@ def show_camera():
             .camera-header {
                 font-size: 1.75rem;
                 margin-bottom: 0.5rem;
-                padding: 0 0.5rem;
             }
         }
         
@@ -131,19 +139,46 @@ def show_camera():
             display: none !important;
         }
         
-        /* Style the camera button container */
+        /* Style the camera button container - move to top */
+        .stCameraInput > div {
+            display: flex !important;
+            flex-direction: column-reverse !important;
+        }
+        
         .stCameraInput > div > div:last-child {
             width: 100%;
             display: flex;
             justify-content: center;
-            margin-top: 1rem;
+            margin-bottom: 1rem;
+            margin-top: 0;
+            order: -1; /* Move to top */
+        }
+        
+        /* Style the Take Photo button with teal color */
+        .stCameraInput button {
+            background: #25F4EE !important;
+            color: #1a1a1a !important;
+            border: none !important;
+            padding: 0.75rem 2rem !important;
+            font-size: 1rem !important;
+            font-weight: 600 !important;
+            border-radius: 25px !important;
+            box-shadow: 0 4px 15px rgba(37, 244, 238, 0.3) !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        .stCameraInput button:hover {
+            background: #00E5DB !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(37, 244, 238, 0.4) !important;
         }
         
         /* Page header */
         .camera-header {
-            font-size: 3rem;
+            font-size: 2.5rem;
             font-weight: 800;
             text-align: center;
+            margin-top: 0;
             margin-bottom: 1rem;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             letter-spacing: -0.02em;
@@ -151,6 +186,17 @@ def show_camera():
             text-decoration: none !important;
             position: relative;
             z-index: 20;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0 1rem;
+        }
+        
+        /* Responsive font sizing to ensure one line */
+        @media (max-width: 480px) {
+            .camera-header {
+                font-size: 1.5rem;
+            }
         }
         
         /* Remove any link styling */
@@ -187,9 +233,12 @@ def show_camera():
     # Add styled header
     st.markdown('<h1 class="camera-header">Take a photo of your fridge or pantry</h1>', unsafe_allow_html=True)
     
-    # Process photo if taken - show progress above camera
+    # Create a container for progress bar (will be empty when not processing)
+    progress_container = st.container()
+    
+    # Process photo if taken - show progress in the container
     if st.session_state.processing:
-        process_photo_with_progress()
+        process_photo_with_progress(progress_container)
     else:
         # Camera input without label - with back camera preference
         # Note: Streamlit doesn't directly support camera selection,
@@ -253,27 +302,51 @@ def show_camera():
             });
         }
         
-        // Try to use back camera on mobile devices
-        document.addEventListener('DOMContentLoaded', function() {
-            // Resize camera on load
-            resizeCameraToFullViewport();
-            
-            // Handle back camera
+        // Function to switch to back camera
+        function switchToBackCamera() {
             const videoElements = document.querySelectorAll('video');
             videoElements.forEach(video => {
                 if (video && video.srcObject) {
                     const tracks = video.srcObject.getTracks();
                     tracks.forEach(track => {
-                        const constraints = track.getConstraints();
-                        // Try to set facingMode to environment (back camera)
                         if (track.kind === 'video') {
-                            track.applyConstraints({
-                                facingMode: { ideal: 'environment' }
-                            }).catch(e => console.log('Could not apply camera constraints:', e));
+                            // Stop the current track
+                            track.stop();
+                            
+                            // Request new stream with back camera
+                            navigator.mediaDevices.getUserMedia({
+                                video: { 
+                                    facingMode: { exact: 'environment' },
+                                    width: { ideal: 1920 },
+                                    height: { ideal: 1080 }
+                                }
+                            }).then(newStream => {
+                                video.srcObject = newStream;
+                            }).catch(err => {
+                                // Fallback to any camera if rear not available
+                                navigator.mediaDevices.getUserMedia({
+                                    video: { 
+                                        facingMode: 'environment',
+                                        width: { ideal: 1920 },
+                                        height: { ideal: 1080 }
+                                    }
+                                }).then(newStream => {
+                                    video.srcObject = newStream;
+                                }).catch(e => console.log('Camera error:', e));
+                            });
                         }
                     });
                 }
             });
+        }
+        
+        // Try to use back camera on mobile devices
+        document.addEventListener('DOMContentLoaded', function() {
+            // Resize camera on load
+            resizeCameraToFullViewport();
+            
+            // Try to switch to back camera after a delay
+            setTimeout(switchToBackCamera, 500);
         });
         
         // Resize on window resize
@@ -284,6 +357,13 @@ def show_camera():
             const hasCameraInput = document.querySelector('[data-testid="stCameraInput"]');
             if (hasCameraInput) {
                 resizeCameraToFullViewport();
+                
+                // Also try to switch to back camera when video element appears
+                const video = hasCameraInput.querySelector('video');
+                if (video && !video.hasAttribute('data-camera-switched')) {
+                    video.setAttribute('data-camera-switched', 'true');
+                    setTimeout(switchToBackCamera, 100);
+                }
             }
         });
         
@@ -305,28 +385,32 @@ def show_camera():
             st.session_state.processing = True
             st.rerun()
 
-def process_photo_with_progress():
+def process_photo_with_progress(progress_container):
     """Process photo with progress bar"""
     
     # Style for progress container
     st.markdown("""
         <style>
-        /* Processing container above camera - responsive */
-        .processing-container {
+        /* Processing container marker for CSS targeting */
+        .progress-container-marker {
+            display: none;
+        }
+        
+        /* Target the container with our marker */
+        div[data-testid="stVerticalBlock"]:has(.progress-container-marker) {
             background: rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(10px);
             padding: 1.5rem;
             border-radius: 20px;
             text-align: center;
-            max-width: 90vw;
             margin: 0 auto 2rem auto;
+            min-height: 100px;
         }
         
         @media (max-width: 768px) {
-            .processing-container {
+            div[data-testid="stVerticalBlock"]:has(.progress-container-marker) {
                 padding: 1rem;
                 margin: 0 auto 1rem auto;
-                max-width: 95vw;
             }
         }
         
@@ -335,18 +419,36 @@ def process_photo_with_progress():
             max-width: 400px;
             margin: 0 auto;
         }
+        
+        /* Center status text */
+        div[data-testid="stVerticalBlock"]:has(.progress-container-marker) .status-text {
+            text-align: center;
+            color: white;
+            font-size: 1.2rem;
+            margin-top: 1rem;
+        }
+        
+        /* Fallback for browsers without :has() support */
+        @supports not selector(:has(*)) {
+            .progress-container-marker + * {
+                background: rgba(0, 0, 0, 0.2);
+                backdrop-filter: blur(10px);
+                padding: 1.5rem;
+                border-radius: 20px;
+                margin: 0 auto 2rem auto;
+            }
+        }
         </style>
     """, unsafe_allow_html=True)
     
-    # Create processing container above camera
-    with st.container():
-        st.markdown('<div class="processing-container">', unsafe_allow_html=True)
+    # Use the provided container for progress elements
+    with progress_container:
+        # Add marker for CSS targeting
+        st.markdown('<div class="progress-container-marker"></div>', unsafe_allow_html=True)
         
         # Progress bar and status
         progress_bar = st.progress(0)
         status_placeholder = st.empty()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
     
     # Show the camera preview with the captured image in a container matching camera size
     if hasattr(st.session_state, 'photo') and st.session_state.photo:
