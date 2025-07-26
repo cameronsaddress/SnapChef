@@ -25,21 +25,28 @@ def show_landing():
         
         h1 {
             color: white !important;
-            font-size: 4rem !important;
+            font-size: clamp(2.5rem, 7vw, 4rem) !important;
             font-weight: 800 !important;
             text-align: center !important;
             line-height: 1.1 !important;
             margin-top: 2rem !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
         }
         
         h2 {
             color: white !important;
-            font-size: 1.5rem !important;
+            font-size: clamp(1rem, 3vw, 1.5rem) !important;
             font-weight: 400 !important;
             text-align: center !important;
             opacity: 0.9;
             margin-top: 0.5rem !important;
             margin-bottom: 2rem !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            padding: 0 1rem !important;
         }
         
         h3 {
@@ -132,14 +139,6 @@ def show_landing():
         }
         
         @media (max-width: 768px) {
-            h1 {
-                font-size: 3rem !important;
-            }
-            
-            h2 {
-                font-size: 1.25rem !important;
-            }
-            
             .stButton > button {
                 padding: 1rem 2rem !important;
                 font-size: 1.1rem !important;
@@ -184,7 +183,7 @@ def show_landing():
         
         /* Style the button text with single color */
         div[data-testid="column"]:nth-child(2) .stButton > button span {
-            color: #25F4EE !important;
+            color: #000 !important;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             letter-spacing: -0.02em;
         }

@@ -51,7 +51,7 @@ def render_topbar():
         .logo-icon {
             width: 36px;
             height: 36px;
-            background: #25F4EE;
+            background: #000;
             border-radius: 10px;
             display: flex;
             align-items: center;
@@ -63,7 +63,7 @@ def render_topbar():
         .logo-text {
             font-size: 1.5rem;
             font-weight: 800;
-            color: #25F4EE;
+            color: #000;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             letter-spacing: -0.02em;
             margin: 0;

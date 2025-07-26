@@ -16,26 +16,29 @@ def render_logo(size="large", gradient=True):
     if gradient:
         logo_html = f"""
         <div style="text-align: center; margin: 20px 0;">
-            <div style="display: inline-flex; align-items: center; gap: 12px;">
+            <div style="display: inline-flex; align-items: center; gap: clamp(8px, 2vw, 12px); white-space: nowrap;">
                 <div style="
-                    width: {icon_size};
-                    height: {icon_size};
-                    background: #25F4EE;
+                    width: clamp(40px, 8vw, {icon_size});
+                    height: clamp(40px, 8vw, {icon_size});
+                    min-width: 40px;
+                    min-height: 40px;
+                    background: #000;
                     border-radius: 12px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: calc({icon_size} * 0.6);
-                    box-shadow: 0 8px 32px rgba(37, 244, 238, 0.3);
+                    font-size: clamp(24px, 5vw, calc({icon_size} * 0.6));
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
                 ">
                     👨‍🍳
                 </div>
                 <span style="
-                    font-size: {font_size};
+                    font-size: clamp(32px, 7vw, {font_size});
                     font-weight: 800;
-                    color: #25F4EE;
+                    color: #000;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                     letter-spacing: -0.02em;
+                    white-space: nowrap;
                 ">SnapChef ✨</span>
             </div>
         </div>
@@ -43,25 +46,28 @@ def render_logo(size="large", gradient=True):
     else:
         logo_html = f"""
         <div style="text-align: center; margin: 20px 0;">
-            <div style="display: inline-flex; align-items: center; gap: 12px;">
+            <div style="display: inline-flex; align-items: center; gap: clamp(8px, 2vw, 12px); white-space: nowrap;">
                 <div style="
-                    width: {icon_size};
-                    height: {icon_size};
+                    width: clamp(40px, 8vw, {icon_size});
+                    height: clamp(40px, 8vw, {icon_size});
+                    min-width: 40px;
+                    min-height: 40px;
                     background: #000;
                     border-radius: 12px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: calc({icon_size} * 0.6);
+                    font-size: clamp(24px, 5vw, calc({icon_size} * 0.6));
                 ">
                     👨‍🍳
                 </div>
                 <span style="
-                    font-size: {font_size};
+                    font-size: clamp(32px, 7vw, {font_size});
                     font-weight: 800;
                     color: #000;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                     letter-spacing: -0.02em;
+                    white-space: nowrap;
                 ">SnapChef ✨</span>
             </div>
         </div>

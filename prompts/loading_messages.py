@@ -1,0 +1,60 @@
+"""
+Loading messages for LLM processing wait time
+"""
+
+LOADING_MESSAGES = [
+    "🔍 Scanning every corner of your fridge...",
+    "🤖 AI is identifying your ingredients...",
+    "👨‍🍳 Consulting with our virtual chef...",
+    "🧠 Analyzing flavor combinations...",
+    "📊 Calculating perfect recipe matches...",
+    "🌟 Finding your next culinary masterpiece...",
+    "🥘 Brewing up some delicious ideas...",
+    "🎯 Matching ingredients to recipes...",
+    "💫 Sprinkling some AI magic...",
+    "🔬 Analyzing nutritional values...",
+    "🍳 Crafting personalized recipes just for you...",
+    "🎨 Getting creative with your ingredients...",
+    "📖 Searching our recipe database...",
+    "🧪 Testing flavor compatibility...",
+    "🌈 Creating something special...",
+    "🎪 Juggling your ingredients perfectly...",
+    "🎭 Preparing a culinary performance...",
+    "🏆 Finding award-winning combinations...",
+    "🚀 Launching recipe generation...",
+    "💡 Having a brilliant idea...",
+    "🎲 Rolling for deliciousness...",
+    "🗺️ Exploring global cuisines...",
+    "🏰 Building your meal kingdom...",
+    "🌊 Diving deep into flavor profiles...",
+    "⚡ Supercharging your dinner plans...",
+    "🎯 Zeroing in on the perfect meal...",
+    "🌮 Assembling taste sensations...",
+    "🍕 Calculating optimal ingredient ratios...",
+    "🥗 Mixing up something fresh...",
+    "🍝 Untangling recipe possibilities...",
+    "🌶️ Adding just the right spice...",
+    "🧩 Solving the dinner puzzle...",
+    "🎪 Performing culinary acrobatics...",
+    "🌟 Polishing your recipe gems...",
+    "🎨 Painting with flavors...",
+    "🏗️ Constructing your meal plan...",
+    "🌺 Garnishing with creativity...",
+    "🎭 Choreographing taste harmony...",
+    "🔮 Predicting delicious outcomes...",
+    "🌈 Blending colors and flavors...",
+    "🎪 Balancing ingredients like a pro...",
+    "🚁 Airlifting recipes from the cloud...",
+    "🌊 Surfing the flavor waves...",
+    "🏆 Competing for your taste buds...",
+    "💫 Aligning the culinary stars...",
+    "🎯 Hitting the flavor bullseye...",
+    "🌟 Making your ingredients shine...",
+    "🎨 Sketching your dinner blueprint...",
+    "🧙‍♂️ Casting delicious spells...",
+    "🎪 Running the recipe circus..."
+]
+
+def get_loading_message(index: int) -> str:
+    """Get a loading message by index"""
+    return LOADING_MESSAGES[index % len(LOADING_MESSAGES)]

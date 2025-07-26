@@ -6,6 +6,8 @@ import io
 from utils.api import encode_image_to_base64, analyze_fridge_and_generate_recipes
 from utils.session import update_streak, add_points
 from prompts import get_random_progress_message
+from prompts.loading_messages import LOADING_MESSAGES
+import random
 from components.topbar import render_topbar, add_floating_food_animation
 
 def show_camera():
@@ -148,11 +150,6 @@ def show_camera():
                 padding-right: 0.5rem !important;
                 max-width: 100% !important;
             }
-            
-            .camera-header {
-                font-size: 1.75rem;
-                margin-bottom: 0.5rem;
-            }
         }
         
         /* Hide default camera label */
@@ -194,9 +191,25 @@ def show_camera():
             box-shadow: 0 6px 20px rgba(37, 244, 238, 0.4) !important;
         }
         
+        /* Camera swap button positioning */
+        .stCameraInput [data-testid="stCameraInputSwapButton"] {
+            position: absolute !important;
+            top: 10px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            z-index: 100 !important;
+            background: rgba(255, 255, 255, 0.9) !important;
+            border-radius: 50% !important;
+            width: 40px !important;
+            height: 40px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        
         /* Page header */
         .camera-header {
-            font-size: 2.5rem;
+            font-size: clamp(1.25rem, 5vw, 2.5rem);
             font-weight: 800;
             text-align: center;
             margin-top: 0;
@@ -211,13 +224,6 @@ def show_camera():
             overflow: hidden;
             text-overflow: ellipsis;
             padding: 0 1rem;
-        }
-        
-        /* Responsive font sizing to ensure one line */
-        @media (max-width: 480px) {
-            .camera-header {
-                font-size: 1.5rem;
-            }
         }
         
         /* Remove any link styling */
@@ -238,6 +244,21 @@ def show_camera():
             color: rgba(255, 255, 255, 0.9);
             font-size: 1.1rem;
             margin: 1rem 0;
+        }
+        
+        /* Override Streamlit error and info message colors */
+        .stAlert {
+            background: rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(10px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        }
+        
+        .stAlert > div {
+            color: white !important;
+        }
+        
+        .stAlert svg {
+            fill: white !important;
         }
         
         </style>
@@ -572,16 +593,46 @@ def process_photo_with_progress():
         progress_bar.progress(messages[2][1])
         time.sleep(0.5)
         
-        # Make single API call for ingredients and recipes
-        with status_placeholder.container():
-            st.markdown(f'<p class="status-text">🤖 Analyzing your fridge and creating personalized recipes...</p>', unsafe_allow_html=True)
-        progress_bar.progress(20)
+        # Make single API call for ingredients and recipes with rotating messages
+        import threading
+        import queue
         
-        # Single API call
-        result = analyze_fridge_and_generate_recipes(
-            photo_base64, 
-            st.session_state.get('dietary_preferences', [])
-        )
+        # Create a queue to store the API result
+        result_queue = queue.Queue()
+        
+        # Function to run API call in background
+        def api_call_thread():
+            api_result = analyze_fridge_and_generate_recipes(
+                photo_base64, 
+                st.session_state.get('dietary_preferences', [])
+            )
+            result_queue.put(api_result)
+        
+        # Start API call in background thread
+        api_thread = threading.Thread(target=api_call_thread)
+        api_thread.start()
+        
+        # Show rotating messages while waiting
+        message_index = 0
+        progress_value = 20
+        
+        while api_thread.is_alive():
+            # Update message
+            current_message = LOADING_MESSAGES[message_index % len(LOADING_MESSAGES)]
+            with status_placeholder.container():
+                st.markdown(f'<p class="status-text">{current_message}</p>', unsafe_allow_html=True)
+            
+            # Update progress bar (slowly increase from 20 to 80)
+            if progress_value < 80:
+                progress_value += 2
+            progress_bar.progress(progress_value)
+            
+            # Move to next message
+            message_index += 1
+            time.sleep(1.5)  # Show each message for 1.5 seconds
+        
+        # Get the result from the queue
+        result = result_queue.get()
         
         print(f"API Result: {result}")  # Debug logging
         
