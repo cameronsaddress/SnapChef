@@ -55,7 +55,7 @@ def show_camera():
             margin: 0 auto;
             max-width: 90vw;
             width: 100%;
-            height: 90vh;
+            height: 80vh;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -65,12 +65,12 @@ def show_camera():
         @media (max-width: 768px) {
             .stCameraInput, .stFileUploader {
                 max-width: 95vw;
-                height: 85vh;
+                height: 75vh;
             }
             
             .stCameraInput video,
             .stCameraInput img {
-                height: 75vh !important;
+                height: 65vh !important;
             }
             
             .main .block-container {
@@ -105,7 +105,7 @@ def show_camera():
             overflow: hidden !important;
             width: 100% !important;
             max-width: 90vw !important;
-            height: 80vh !important;
+            height: 70vh !important;
             object-fit: cover;
         }
         
@@ -278,7 +278,7 @@ def process_photo_with_progress():
                 max-width: 90vw;
                 width: 100%;
                 margin: 0 auto;
-                height: 80vh;
+                height: 70vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -288,7 +288,7 @@ def process_photo_with_progress():
             .image-container .stImage > img {
                 border-radius: 20px !important;
                 width: 100%;
-                height: 80vh;
+                height: 70vh;
                 max-width: 90vw;
                 object-fit: cover;
             }
@@ -302,7 +302,7 @@ def process_photo_with_progress():
                 .image-container .stImage > img {
                     border-radius: 16px !important;
                     max-width: 95vw;
-                    height: 75vh;
+                    height: 65vh;
                 }
             }
             </style>
