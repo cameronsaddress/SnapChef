@@ -192,34 +192,47 @@ def show_camera():
             box-shadow: 0 6px 20px rgba(37, 244, 238, 0.4) !important;
         }
         
-        /* Camera swap button positioning - target all possible selectors */
-        .stCameraInput [data-testid="stCameraInputSwapButton"],
-        .stCameraInput button[aria-label*="Switch"],
-        .stCameraInput button[aria-label*="switch"],
-        .stCameraInput button[aria-label*="camera"],
-        .stCameraInput button[title*="Switch"],
-        .stCameraInput button[title*="switch"] {
+        /* Target camera video container for proper button positioning */
+        div[data-testid="stCameraInput"] > div > div:has(video) {
+            position: relative !important;
+        }
+        
+        /* Camera swap button - use more specific targeting */
+        div[data-testid="stCameraInput"] button[kind="secondary"],
+        div[data-testid="stCameraInput"] button:has(svg),
+        div[data-testid="stCameraInput"] > div > div > button,
+        button[aria-label*="Switch camera"] {
             position: absolute !important;
             top: 10px !important;
             left: 50% !important;
             transform: translateX(-50%) !important;
             right: auto !important;
-            z-index: 100 !important;
+            z-index: 1000 !important;
             background: rgba(255, 255, 255, 0.9) !important;
             border-radius: 50% !important;
             width: 40px !important;
             height: 40px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+            padding: 0 !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
             margin: 0 !important;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
         }
         
-        /* Hide duplicate switch camera buttons */
-        .stCameraInput button:nth-of-type(2)[aria-label*="Switch"],
-        .stCameraInput button:nth-of-type(2)[aria-label*="switch"],
-        .stCameraInput button:last-child:not(:first-child) {
+        /* Hide text button that appears after flip */
+        div[data-testid="stCameraInput"] button:not(:has(svg)),
+        div[data-testid="stCameraInput"] button[kind="secondary"]:not(:has(svg)),
+        button:contains("Switch camera") {
             display: none !important;
+        }
+        
+        /* Ensure only icon button is visible */
+        div[data-testid="stCameraInput"] button svg {
+            width: 20px !important;
+            height: 20px !important;
         }
         
         
@@ -468,6 +481,55 @@ def show_camera():
         // Also try resizing after a delay
         setTimeout(resizeCameraToFullViewport, 500);
         setTimeout(resizeCameraToFullViewport, 1000);
+        
+        // Function to fix camera button positioning and hide text buttons
+        function fixCameraButtons() {
+            // Find all buttons in camera input
+            const cameraInput = document.querySelector('[data-testid="stCameraInput"]');
+            if (!cameraInput) return;
+            
+            const buttons = cameraInput.querySelectorAll('button');
+            buttons.forEach(button => {
+                // Check if button contains text (not icon)
+                const hasText = button.textContent && button.textContent.trim().length > 0 && !button.querySelector('svg');
+                if (hasText && (button.textContent.includes('Switch') || button.textContent.includes('switch'))) {
+                    // Hide text buttons
+                    button.style.display = 'none';
+                }
+                
+                // Position icon buttons in center
+                if (button.querySelector('svg')) {
+                    button.style.position = 'absolute';
+                    button.style.top = '10px';
+                    button.style.left = '50%';
+                    button.style.transform = 'translateX(-50%)';
+                    button.style.right = 'auto';
+                    button.style.zIndex = '1000';
+                }
+            });
+        }
+        
+        // Run button fix on load and mutations
+        document.addEventListener('DOMContentLoaded', function() {
+            fixCameraButtons();
+            
+            // Watch for changes
+            const observer = new MutationObserver(function(mutations) {
+                fixCameraButtons();
+            });
+            
+            const cameraContainer = document.querySelector('[data-testid="stCameraInput"]');
+            if (cameraContainer) {
+                observer.observe(cameraContainer, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true
+                });
+            }
+        });
+        
+        // Also run periodically to catch dynamic changes
+        setInterval(fixCameraButtons, 500);
         </script>
         """, unsafe_allow_html=True)
         
