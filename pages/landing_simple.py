@@ -192,8 +192,13 @@ def show_landing():
         
         # Use native icon parameter with emoji
         if st.button("SnapChef ✨", key="main_snap", use_container_width=True, icon="👨‍🍳"):
-            if st.session_state.free_uses > 0:
-                st.session_state.free_uses -= 1
+            # Check device-based free uses
+            from utils.device_fingerprint import decrement_free_use
+            
+            if st.session_state.authenticated or (st.session_state.device_id and decrement_free_use(st.session_state.device_id)):
+                # Update session state
+                if not st.session_state.authenticated:
+                    st.session_state.free_uses = max(0, st.session_state.free_uses - 1)
                 st.session_state.current_page = 'camera'
                 st.rerun()
             else:

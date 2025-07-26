@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit_extras.let_it_rain import rain
 from utils.session import add_points
 from components.topbar import render_topbar, add_floating_food_animation
+from components.share_buttons import render_share_buttons
 
 def show_results():
     """Display recipe results with professional design"""
@@ -554,14 +555,8 @@ def show_results():
                 
                 with btn_col2:
                     if st.button("📱 Share for credits!", key=f"share_{idx}", use_container_width=True):
-                        with st.expander("Share this recipe", expanded=True):
-                            share_text = f"I just made {recipe.get('name', 'this amazing dish')} using SnapChef ✨! 🍳"
-                            st.code(share_text)
-                            share_col1, share_col2 = st.columns(2)
-                            with share_col1:
-                                st.button("Share to TikTok", key=f"tiktok_{idx}", use_container_width=True)
-                            with share_col2:
-                                st.button("Share to Instagram", key=f"ig_{idx}", use_container_width=True)
+                        st.session_state[f"show_share_{idx}"] = not st.session_state.get(f"show_share_{idx}", False)
+                        st.rerun()
                 
                 # Recipe steps
                 if st.session_state.get(f"show_steps_{idx}", False):
@@ -594,6 +589,10 @@ def show_results():
                                 )
                         else:
                             st.info("Detailed steps will be available soon.")
+                
+                # Share buttons section
+                if st.session_state.get(f"show_share_{idx}", False):
+                    render_share_buttons(recipe.get('name', 'this amazing dish'), idx)
             
             # Add spacing between recipes
             if idx < len(recipes) - 1:

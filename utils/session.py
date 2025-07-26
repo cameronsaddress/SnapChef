@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import datetime
+from .device_fingerprint import get_device_fingerprint, check_free_uses, inject_fingerprint_collector
 
 def init_session_state():
     """Initialize session state variables"""
@@ -23,12 +24,32 @@ def init_session_state():
         'referred_by': None,
         'challenge_participation': [],
         'votes_cast': [],
-        'votes_received': 0
+        'votes_received': 0,
+        'device_id': None,
+        'free_uses': 3  # Will be overridden by device tracking
     }
     
     for key, default_value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = default_value
+    
+    # Initialize device fingerprinting
+    if st.session_state.device_id is None:
+        # Inject fingerprint collector JavaScript
+        st.markdown(inject_fingerprint_collector(), unsafe_allow_html=True)
+        
+        # Get device fingerprint
+        device_id = get_device_fingerprint()
+        st.session_state.device_id = device_id
+        
+        # Check free uses for this device
+        device_data = check_free_uses(device_id)
+        st.session_state.free_uses = device_data['uses_remaining']
+        
+        # If authenticated, update device tracking
+        if st.session_state.authenticated and st.session_state.user_id:
+            from .device_fingerprint import link_device_to_user
+            link_device_to_user(device_id, st.session_state.user_id)
 
 def check_daily_limit():
     """Check if user has reached their daily meal generation limit"""
