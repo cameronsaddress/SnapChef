@@ -6,8 +6,15 @@ import io
 from utils.api import encode_image_to_base64, analyze_fridge_and_generate_recipes
 from utils.session import update_streak, add_points
 from prompts import get_random_progress_message
+from components.topbar import render_topbar, add_floating_food_animation
 
 def show_camera():
+    # Render top bar
+    render_topbar()
+    
+    # Add floating food animation
+    add_floating_food_animation()
+    
     # Apply gradient background and minimal styling
     st.markdown("""
         <style>
@@ -20,7 +27,7 @@ def show_camera():
         
         /* Remove top padding */
         .main .block-container {
-            padding-top: 2rem !important;
+            padding-top: 80px !important; /* Account for fixed header */
             max-width: 600px !important;
             margin: 0 auto !important;
         }
@@ -152,28 +159,7 @@ def show_camera():
             margin: 1rem 0;
         }
         
-        /* Floating emojis */
-        @keyframes float {
-            0% { transform: translateY(0px) rotate(0deg); opacity: 0.1; }
-            50% { transform: translateY(-20px) rotate(180deg); opacity: 0.15; }
-            100% { transform: translateY(0px) rotate(360deg); opacity: 0.1; }
-        }
-        
-        .floating-emoji {
-            position: fixed;
-            animation: float 6s ease-in-out infinite;
-            pointer-events: none;
-            z-index: 0;
-        }
         </style>
-    """, unsafe_allow_html=True)
-    
-    # Add floating food emojis
-    st.markdown("""
-    <div class="floating-emoji" style="top: 10%; left: 5%; font-size: 80px; animation-delay: 0s;">🍳</div>
-    <div class="floating-emoji" style="top: 20%; right: 10%; font-size: 60px; animation-delay: 2s;">🥗</div>
-    <div class="floating-emoji" style="bottom: 30%; left: 15%; font-size: 70px; animation-delay: 4s;">🍝</div>
-    <div class="floating-emoji" style="bottom: 20%; right: 5%; font-size: 90px; animation-delay: 1s;">🥘</div>
     """, unsafe_allow_html=True)
     
     # Initialize states

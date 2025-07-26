@@ -1,8 +1,15 @@
 import streamlit as st
 from utils.logo import render_logo
 import time
+from components.topbar import render_topbar, add_floating_food_animation
 
 def show_landing():
+    # Render top bar
+    render_topbar()
+    
+    # Add floating food animation
+    add_floating_food_animation()
+    
     # Apply custom CSS
     st.markdown("""
         <style>
@@ -258,24 +265,4 @@ def show_landing():
                 st.rerun()
     
     # Add some floating emojis for visual interest
-    st.markdown("""
-    <style>
-    @keyframes float {
-        0% { transform: translateY(0px) rotate(0deg); opacity: 0.1; }
-        50% { transform: translateY(-20px) rotate(180deg); opacity: 0.15; }
-        100% { transform: translateY(0px) rotate(360deg); opacity: 0.1; }
-    }
-    
-    .floating-emoji {
-        position: fixed;
-        animation: float 6s ease-in-out infinite;
-        pointer-events: none;
-        z-index: 0;
-    }
-    </style>
-    
-    <div class="floating-emoji" style="top: 10%; left: 5%; font-size: 80px; animation-delay: 0s;">🍳</div>
-    <div class="floating-emoji" style="top: 20%; right: 10%; font-size: 60px; animation-delay: 2s;">🥗</div>
-    <div class="floating-emoji" style="bottom: 30%; left: 15%; font-size: 70px; animation-delay: 4s;">🍝</div>
-    <div class="floating-emoji" style="bottom: 20%; right: 5%; font-size: 90px; animation-delay: 1s;">🥘</div>
-    """, unsafe_allow_html=True)
+    # Floating food is now handled by add_floating_food_animation()
