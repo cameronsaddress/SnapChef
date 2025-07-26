@@ -152,7 +152,7 @@ def show_landing():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Hero Title
-    st.markdown("<h1>Turn Your Fridge<br>Into Magic ✨</h1>", unsafe_allow_html=True)
+    st.markdown("<h1>It's Ingredient Magic!</h1>", unsafe_allow_html=True)
     
     # Subtitle
     st.markdown("<h2>AI-powered recipes from what you already have</h2>", unsafe_allow_html=True)
