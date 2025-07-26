@@ -9,7 +9,7 @@ load_dotenv()
 
 # Page configuration
 st.set_page_config(
-    page_title="SnapChef - Turn Your Fridge into Meals",
+    page_title="SnapChef ✨ - Turn Your Fridge into Meals",
     page_icon="📸",
     layout="wide",
     initial_sidebar_state="collapsed"

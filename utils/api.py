@@ -322,7 +322,7 @@ def analyze_fridge_and_generate_recipes(image_base64: str, dietary_preferences: 
                         },
                         {
                             "type": "text",
-                            "text": "Please analyze this fridge/pantry image and provide both ingredient detection and recipe generation as specified in the prompt."
+                            "text": "Please perform a THOROUGH, systematic scan of this image. Identify EVERY visible food item, beverage, condiment, and ingredient - aim for completeness. Don't skip small items or things in the background. After listing all ingredients, generate creative recipes. Remember: typical fridges contain 15-40+ items, so be exhaustive in your search."
                         }
                     ]
                 }

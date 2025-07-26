@@ -13,14 +13,24 @@ def render_topbar():
             top: 0;
             left: 0;
             right: 0;
+            width: 100vw;
             height: 60px;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            z-index: 999;
+            z-index: 99999;
             display: flex;
             align-items: center;
             padding: 0 2rem;
+            box-sizing: border-box;
+        }
+        
+        /* Ensure topbar breaks out of any parent transforms */
+        @media screen {
+            .top-bar {
+                position: fixed !important;
+                transform: translateZ(0);
+            }
         }
         
         /* Logo container */
@@ -79,7 +89,7 @@ def render_topbar():
         <div class="top-bar">
             <div class="logo-container" id="logo-nav">
                 <div class="logo-icon">👨‍🍳</div>
-                <div class="logo-text">SnapChef</div>
+                <div class="logo-text">SnapChef ✨</div>
             </div>
         </div>
         

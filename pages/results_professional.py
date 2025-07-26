@@ -23,7 +23,27 @@ def show_results():
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
         
-        /* Container */
+        /* Ensure topbar is truly at the top */
+        .top-bar {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100vw !important;
+            z-index: 99999 !important;
+        }
+        
+        /* Remove any transforms or positioning from parent containers */
+        .main {
+            transform: none !important;
+            position: static !important;
+        }
+        
+        /* Container - match landing/camera pages structure */
+        .main > div {
+            padding-top: 2rem;
+        }
+        
         .main .block-container {
             padding-top: 70px !important; /* Account for fixed header */
             max-width: 900px !important;
@@ -380,8 +400,6 @@ def show_results():
     # Celebration
     rain(emoji="✨", font_size=20, falling_speed=5, animation_length=1)
     
-    # No need for logo here, it's in the top bar now
-    
     # Title
     st.markdown("# Your Personalized Recipes ✨")
     st.markdown('<p class="subtitle">Crafted from the ingredients in your fridge</p>', unsafe_allow_html=True)
@@ -493,9 +511,9 @@ def show_results():
                         st.rerun()
                 
                 with btn_col2:
-                    if st.button("📱 Share Your SnapChef Recipe!", key=f"share_{idx}", use_container_width=True):
+                    if st.button("📱 Share Your SnapChef ✨ Recipe!", key=f"share_{idx}", use_container_width=True):
                         with st.expander("Share this recipe", expanded=True):
-                            share_text = f"I just made {recipe.get('name', 'this amazing dish')} using SnapChef! 🍳✨"
+                            share_text = f"I just made {recipe.get('name', 'this amazing dish')} using SnapChef ✨! 🍳"
                             st.code(share_text)
                             share_col1, share_col2 = st.columns(2)
                             with share_col1:

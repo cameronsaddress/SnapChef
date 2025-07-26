@@ -192,7 +192,7 @@ def show_landing():
         """, unsafe_allow_html=True)
         
         # Use native icon parameter with emoji
-        if st.button("SnapChef", key="main_snap", use_container_width=True, icon="👨‍🍳"):
+        if st.button("SnapChef ✨", key="main_snap", use_container_width=True, icon="👨‍🍳"):
             if st.session_state.free_uses > 0:
                 st.session_state.free_uses -= 1
                 st.session_state.current_page = 'camera'

@@ -9,13 +9,7 @@ from prompts import get_random_progress_message
 from components.topbar import render_topbar, add_floating_food_animation
 
 def show_camera():
-    # Render top bar
-    render_topbar()
-    
-    # Add floating food animation
-    add_floating_food_animation()
-    
-    # Apply gradient background and minimal styling
+    # Apply gradient background and minimal styling FIRST
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -23,6 +17,33 @@ def show_camera():
         /* Gradient background */
         .stApp {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow-x: hidden;
+        }
+        
+        /* Force topbar to absolute top */
+        .top-bar {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100vw !important;
+            z-index: 99999 !important;
+        }
+        
+        /* Remove any parent transforms */
+        .main {
+            transform: none !important;
+            position: static !important;
+        }
+        
+        /* Ensure stApp is the outermost container */
+        body > div:first-child {
+            position: static !important;
+        }
+        
+        /* Match structure of landing/results pages */
+        .main > div {
+            padding-top: 2rem;
         }
         
         /* Remove top padding and use full width for camera page */
@@ -222,29 +243,30 @@ def show_camera():
         </style>
     """, unsafe_allow_html=True)
     
-    # Initialize states
+    # Initialize states BEFORE rendering anything
     if 'photo_taken' not in st.session_state:
         st.session_state.photo_taken = False
     if 'processing' not in st.session_state:
         st.session_state.processing = False
     
-    # Back button removed - navigation handled by top bar
+    # Render top bar AFTER CSS
+    render_topbar()
+    
+    # Add floating food animation AFTER CSS
+    add_floating_food_animation()
     
     # Add styled header
     st.markdown('<h1 class="camera-header">Take a photo of your fridge or pantry</h1>', unsafe_allow_html=True)
     
-    # Create a container for progress bar (will be empty when not processing)
-    progress_container = st.container()
-    
-    # Process photo if taken - show progress in the container
+    # Process photo if taken
     if st.session_state.processing:
-        process_photo_with_progress(progress_container)
+        process_photo_with_progress()
     else:
         # Camera input without label - with back camera preference
         # Note: Streamlit doesn't directly support camera selection,
         # but we can add a data attribute that some browsers may respect
-        photo = st.camera_input("", 
-                               label_visibility="hidden",
+        photo = st.camera_input("Camera", 
+                               label_visibility="collapsed",
                                key="camera_input",
                                help="Take a photo of your fridge or pantry")
         
@@ -383,74 +405,61 @@ def show_camera():
             st.session_state.photo = photo
             st.session_state.photo_taken = True
             st.session_state.processing = True
+            time.sleep(0.5)  # Small delay to ensure photo is captured
             st.rerun()
 
-def process_photo_with_progress(progress_container):
+def process_photo_with_progress():
     """Process photo with progress bar"""
     
     # Style for progress container
     st.markdown("""
         <style>
-        /* Processing container marker for CSS targeting */
-        .progress-container-marker {
-            display: none;
-        }
-        
-        /* Target the container with our marker */
-        div[data-testid="stVerticalBlock"]:has(.progress-container-marker) {
-            background: rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(10px);
-            padding: 1.5rem;
-            border-radius: 20px;
-            text-align: center;
-            margin: 0 auto 2rem auto;
-            min-height: 100px;
-        }
-        
-        @media (max-width: 768px) {
-            div[data-testid="stVerticalBlock"]:has(.progress-container-marker) {
-                padding: 1rem;
-                margin: 0 auto 1rem auto;
-            }
-        }
-        
         /* Style progress bar */
         .stProgress {
             max-width: 400px;
             margin: 0 auto;
         }
         
-        /* Center status text */
-        div[data-testid="stVerticalBlock"]:has(.progress-container-marker) .status-text {
+        /* Style for progress section */
+        .progress-section {
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem;
+            border-radius: 20px;
             text-align: center;
+            margin: 0 auto 2rem auto;
+            max-width: 500px;
+            min-height: 100px;
+        }
+        
+        .status-text {
             color: white;
             font-size: 1.2rem;
             margin-top: 1rem;
         }
         
-        /* Fallback for browsers without :has() support */
-        @supports not selector(:has(*)) {
-            .progress-container-marker + * {
-                background: rgba(0, 0, 0, 0.2);
-                backdrop-filter: blur(10px);
-                padding: 1.5rem;
-                border-radius: 20px;
-                margin: 0 auto 2rem auto;
+        @media (max-width: 768px) {
+            .progress-section {
+                padding: 1rem;
+                margin: 0 auto 1rem auto;
             }
         }
         </style>
     """, unsafe_allow_html=True)
     
-    # Use the provided container for progress elements
-    with progress_container:
-        # Add marker for CSS targeting
-        st.markdown('<div class="progress-container-marker"></div>', unsafe_allow_html=True)
+    # Create a container for the progress section
+    with st.container():
+        # Add the progress section div FIRST (right under header)
+        st.markdown('<div class="progress-section">', unsafe_allow_html=True)
         
         # Progress bar and status
         progress_bar = st.progress(0)
         status_placeholder = st.empty()
+        
+        # Don't close the div yet - it will be closed after all content is added
+        progress_section_open = True
     
-    # Show the camera preview with the captured image in a container matching camera size
+    # Show the camera preview with the captured image AFTER progress section
     if hasattr(st.session_state, 'photo') and st.session_state.photo:
         # Add styling for the captured image
         st.markdown("""
@@ -458,9 +467,9 @@ def process_photo_with_progress(progress_container):
             /* Container to match camera size - responsive */
             .image-container {
                 width: 100%;
-                margin: 0 auto;
-                height: calc(100vh - 150px);
-                height: calc(100dvh - 150px);
+                margin: 2rem auto 0;
+                height: calc(100vh - 300px);
+                height: calc(100dvh - 300px);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -479,8 +488,8 @@ def process_photo_with_progress(progress_container):
             /* Mobile adjustments for captured image */
             @media (max-width: 768px) {
                 .image-container {
-                    height: calc(100vh - 120px);
-                    height: calc(100dvh - 120px);
+                    height: calc(100vh - 250px);
+                    height: calc(100dvh - 250px);
                 }
                 
                 .image-container .stImage > img {
@@ -550,39 +559,41 @@ def process_photo_with_progress(progress_container):
             st.session_state.get('dietary_preferences', [])
         )
         
+        print(f"API Result: {result}")  # Debug logging
+        
         # Check if analysis was successful
         if 'error' in result or (len(result.get('ingredients', [])) == 0 and len(result.get('recipes', [])) == 0):
-            # Stop progress bar and show error
+            # Update progress bar to show error occurred
             progress_bar.progress(30)
             
             error_msg = result.get('error', 'No ingredients found in the image.')
-            status_placeholder.markdown(f'<p class="status-text" style="color: #ff6b6b; font-size: 1.2rem; margin-top: 1rem;">❌ {error_msg}</p>', unsafe_allow_html=True)
+            print(f"Showing error: {error_msg}")  # Debug logging
             
-            # Wait a moment for user to read the error
-            time.sleep(2)
-            
-            # Clear progress bar and status
-            progress_bar.empty()
-            status_placeholder.empty()
-            
-            # Show error in standard Streamlit error box
-            st.error(f"❌ {error_msg}")
-            
-            # Add helpful tips
-            if "No food ingredients detected" in error_msg:
-                st.info("💡 Tips for better results:\n"
-                       "- Make sure the photo shows the inside of your fridge or pantry\n"
-                       "- Ensure good lighting and clear visibility of items\n"
-                       "- Try to capture multiple ingredients in one shot")
-            
-            # Add retry button
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                if st.button("📸 Take Another Photo", use_container_width=True, key="retry_photo"):
-                    st.session_state.photo_taken = False
-                    st.session_state.processing = False
-                    st.session_state.photo = None
-                    st.rerun()
+            # Update the status placeholder with error
+            with status_placeholder:
+                st.error(f"❌ {error_msg}")
+                
+                # Add helpful tips
+                if "No food ingredients detected" in error_msg:
+                    st.info("💡 Tips for better results:\n"
+                           "- Make sure the photo shows the inside of your fridge or pantry\n"
+                           "- Ensure good lighting and clear visibility of items\n"
+                           "- Try to capture multiple ingredients in one shot")
+                
+                # Add retry button
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    if st.button("📸 Take Another Photo", use_container_width=True, key="retry_photo"):
+                        st.session_state.photo_taken = False
+                        st.session_state.processing = False
+                        st.session_state.photo = None
+                        st.rerun()
+        
+        # Close the progress section div if still open
+        if progress_section_open:
+            st.markdown('</div>', unsafe_allow_html=True)
+            # Close the progress section div
+            st.markdown('</div>', unsafe_allow_html=True)
             return
         
         # Extract data from result
@@ -591,13 +602,15 @@ def process_photo_with_progress(progress_container):
         
         # Show progress messages
         for i in range(3, 8):
-            status_placeholder.markdown(f'<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">{messages[i][0]}</p>', unsafe_allow_html=True)
+            with status_placeholder:
+                st.markdown(f'<p class="status-text">{messages[i][0]}</p>', unsafe_allow_html=True)
             progress_bar.progress(messages[i][1])
             time.sleep(0.6)
         
         # Show final messages
         for i in range(7, 10):
-            status_placeholder.markdown(f'<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">{messages[i][0]}</p>', unsafe_allow_html=True)
+            with status_placeholder:
+                st.markdown(f'<p class="status-text">{messages[i][0]}</p>', unsafe_allow_html=True)
             progress_bar.progress(messages[i][1])
             time.sleep(0.6)
         
@@ -616,30 +629,34 @@ def process_photo_with_progress(progress_container):
         # Navigate to results
         time.sleep(1)
         st.session_state.current_page = 'results'
+        # Close the progress section div before rerun
+        st.markdown('</div>', unsafe_allow_html=True)
         st.rerun()
         
     except Exception as e:
-        # Stop and clear the progress bar
-        progress_bar.empty()
-        status_placeholder.empty()
+        print(f"Exception occurred: {str(e)}")  # Debug logging
+        # Update progress bar to show error occurred
+        progress_bar.progress(30)
         
-        # Show detailed error message
-        error_message = str(e)
-        if "API" in error_message or "api_key" in error_message:
-            st.error("❌ API Error: Please check your API key configuration.")
-        elif "connection" in error_message.lower() or "network" in error_message.lower():
-            st.error("❌ Network Error: Please check your internet connection.")
-        else:
-            st.error(f"❌ Oops! Something went wrong: {error_message}")
-        
-        # Add helpful message
-        st.info("💡 Tip: Make sure you have a stable internet connection and your API key is properly configured.")
-        
-        # Retry button
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            if st.button("🔄 Try Again", use_container_width=True):
-                st.session_state.photo_taken = False
-                st.session_state.processing = False
-                st.session_state.photo = None
-                st.rerun()
+        # Update the status placeholder with error
+        with status_placeholder:
+            # Show detailed error message
+            error_message = str(e)
+            if "API" in error_message or "api_key" in error_message:
+                st.error("❌ API Error: Please check your API key configuration.")
+            elif "connection" in error_message.lower() or "network" in error_message.lower():
+                st.error("❌ Network Error: Please check your internet connection.")
+            else:
+                st.error(f"❌ Oops! Something went wrong: {error_message}")
+            
+            # Add helpful message
+            st.info("💡 Tip: Make sure you have a stable internet connection and your API key is properly configured.")
+            
+            # Retry button
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("🔄 Try Again", use_container_width=True):
+                    st.session_state.photo_taken = False
+                    st.session_state.processing = False
+                    st.session_state.photo = None
+                    st.rerun()

@@ -36,7 +36,7 @@ def render_logo(size="large", gradient=True):
                     color: #25F4EE;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                     letter-spacing: -0.02em;
-                ">SnapChef</span>
+                ">SnapChef ✨</span>
             </div>
         </div>
         """
@@ -62,7 +62,7 @@ def render_logo(size="large", gradient=True):
                     color: #000;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                     letter-spacing: -0.02em;
-                ">SnapChef</span>
+                ">SnapChef ✨</span>
             </div>
         </div>
         """
