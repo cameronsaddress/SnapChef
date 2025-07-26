@@ -134,8 +134,10 @@ def parse_combined_response(response: str) -> dict:
             "raw_response": response
         }
     except json.JSONDecodeError:
-        # Try to extract JSON from the response
+        # Try to extract and fix truncated JSON
         import re
+        
+        # First try to extract complete JSON object
         json_match = re.search(r'\{.*\}', response, re.DOTALL)
         if json_match:
             try:
@@ -148,6 +150,81 @@ def parse_combined_response(response: str) -> dict:
                 }
             except:
                 pass
+        
+        # If that fails, try to salvage truncated JSON
+        try:
+            # Find where ingredients array starts and ends
+            ingredients_start = response.find('"ingredients": [')
+            if ingredients_start > -1:
+                # Try to find the end of ingredients array
+                bracket_count = 0
+                in_string = False
+                escape_next = False
+                
+                i = ingredients_start + len('"ingredients": [')
+                ingredients_end = -1
+                
+                while i < len(response):
+                    char = response[i]
+                    
+                    if escape_next:
+                        escape_next = False
+                    elif char == '\\':
+                        escape_next = True
+                    elif char == '"' and not escape_next:
+                        in_string = not in_string
+                    elif not in_string:
+                        if char == '[':
+                            bracket_count += 1
+                        elif char == ']':
+                            if bracket_count == 0:
+                                ingredients_end = i
+                                break
+                            bracket_count -= 1
+                    
+                    i += 1
+                
+                # Extract ingredients array
+                if ingredients_end > -1:
+                    ingredients_json = response[ingredients_start + len('"ingredients": '):ingredients_end + 1]
+                    ingredients = json.loads(ingredients_json)
+                    
+                    # Also try to extract image_analysis
+                    image_analysis = {}
+                    analysis_match = re.search(r'"image_analysis":\s*({[^}]+})', response)
+                    if analysis_match:
+                        try:
+                            image_analysis = json.loads(analysis_match.group(1))
+                        except:
+                            pass
+                    
+                    # Extract any complete recipes before truncation
+                    recipes = []
+                    recipes_start = response.find('"recipes": [')
+                    if recipes_start > -1 and recipes_start > ingredients_end:
+                        try:
+                            # Try to extract whatever recipes we can
+                            recipes_substr = response[recipes_start:]
+                            # Find complete recipe objects
+                            recipe_matches = re.findall(r'\{[^{]*?"name":[^}]+?\}', recipes_substr)
+                            for match in recipe_matches[:5]:  # Limit to 5 recipes
+                                try:
+                                    recipe = json.loads(match)
+                                    if 'name' in recipe:
+                                        recipes.append(recipe)
+                                except:
+                                    pass
+                        except:
+                            pass
+                    
+                    return {
+                        "ingredients": ingredients,
+                        "recipes": recipes,
+                        "image_analysis": image_analysis,
+                        "raw_response": response
+                    }
+        except Exception as e:
+            print(f"Error parsing truncated JSON: {str(e)}")
     
     return {
         "ingredients": [],

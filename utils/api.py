@@ -328,7 +328,7 @@ def analyze_fridge_and_generate_recipes(image_base64: str, dietary_preferences: 
                 }
             ],
             temperature=0.7,
-            max_tokens=4000
+            max_tokens=8000  # Increased to handle thorough ingredient detection
         )
         
         # Parse the response
