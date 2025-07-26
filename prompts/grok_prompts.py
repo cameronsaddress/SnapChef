@@ -397,10 +397,32 @@ def validate_recipe_response(response: str) -> List[Dict[str, Any]]:
         # Try to parse JSON from the response
         import re
         
-        # Look for JSON object or array in the response
-        json_match = re.search(r'\{[^{}]*"recipes"\s*:\s*\[[^\]]+\][^{}]*\}|\[[^\[\]]*\{[^{}]+\}[^\[\]]*\]', response, re.DOTALL)
-        if json_match:
-            data = json.loads(json_match.group())
+        # Try multiple approaches to find JSON in the response
+        data = None
+        
+        # First, try to parse the entire response as JSON
+        try:
+            data = json.loads(response)
+        except:
+            # If that fails, look for JSON object or array in the response
+            json_patterns = [
+                r'\{[^{}]*"recipes"\s*:\s*\[.*?\].*?\}',  # Object with recipes array
+                r'\[\s*\{.*?\}.*?\]',  # Direct array of objects
+                r'```json\s*(.+?)\s*```',  # JSON in markdown code block
+                r'```\s*(.+?)\s*```'  # Any code block
+            ]
+            
+            for pattern in json_patterns:
+                match = re.search(pattern, response, re.DOTALL)
+                if match:
+                    try:
+                        json_str = match.group(1) if match.groups() else match.group(0)
+                        data = json.loads(json_str)
+                        break
+                    except:
+                        continue
+        
+        if data:
             
             # Handle both object with recipes key and direct array
             if isinstance(data, dict) and 'recipes' in data:

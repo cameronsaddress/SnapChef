@@ -450,3 +450,39 @@ def show_results():
             if st.button("✨ Upgrade to Premium", key="upgrade_btn", use_container_width=True):
                 st.session_state.current_page = 'auth'
                 st.rerun()
+    
+    # Debug section (only show if responses exist)
+    if st.session_state.get('raw_ingredient_response') or st.session_state.get('raw_recipe_response'):
+        st.markdown("<br><br><hr>", unsafe_allow_html=True)
+        
+        # Small debug toggle at bottom
+        if st.button("🔧 Show Debug Info", key="debug_toggle", help="View raw LLM responses for troubleshooting"):
+            st.session_state.show_debug = not st.session_state.get('show_debug', False)
+        
+        if st.session_state.get('show_debug', False):
+            st.markdown("### 🔍 Debug Information")
+            
+            # Show raw ingredient detection response
+            if st.session_state.get('raw_ingredient_response'):
+                with st.expander("📦 Raw Ingredient Detection Response", expanded=False):
+                    st.code(st.session_state.raw_ingredient_response, language="json")
+            
+            # Show raw recipe generation response
+            if st.session_state.get('raw_recipe_response'):
+                with st.expander("🍳 Raw Recipe Generation Response", expanded=False):
+                    st.code(st.session_state.raw_recipe_response, language="json")
+            
+            # Show detected ingredients as sent to recipe generation
+            if ingredients:
+                with st.expander("🧾 Ingredients Sent to Recipe Generation", expanded=False):
+                    ingredient_names = [ing.get('name', str(ing)) if isinstance(ing, dict) else str(ing) for ing in ingredients]
+                    st.json(ingredient_names)
+            
+            # Clear debug info button
+            if st.button("🗑️ Clear Debug Info", key="clear_debug"):
+                if 'raw_ingredient_response' in st.session_state:
+                    del st.session_state.raw_ingredient_response
+                if 'raw_recipe_response' in st.session_state:
+                    del st.session_state.raw_recipe_response
+                st.session_state.show_debug = False
+                st.rerun()

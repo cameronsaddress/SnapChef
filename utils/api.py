@@ -78,6 +78,9 @@ def detect_ingredients(image_base64: str) -> Dict[str, Any]:
         content = response.choices[0].message.content
         print(f"Received response from API: {content[:200]}...")  # Log first 200 chars
         
+        # Store raw response for debugging
+        st.session_state.raw_ingredient_response = content
+        
         # Validate and extract JSON
         result = validate_ingredient_response(content)
         if result:
@@ -141,7 +144,7 @@ def generate_meals(ingredients: List[Dict], dietary_preferences: List[str] = Non
         )
         
         response = client.chat.completions.create(
-            model="grok-beta",
+            model="grok-2-latest",  # Use latest Grok 2 model for text generation
             messages=[
                 {
                     "role": "system", 
@@ -158,6 +161,10 @@ def generate_meals(ingredients: List[Dict], dietary_preferences: List[str] = Non
         )
         
         content = response.choices[0].message.content
+        print(f"Recipe generation response: {content[:500]}...")  # Debug log
+        
+        # Store raw response for debugging
+        st.session_state.raw_recipe_response = content
         
         # Validate and extract JSON
         recipes = validate_recipe_response(content)
@@ -175,12 +182,15 @@ def generate_meals(ingredients: List[Dict], dietary_preferences: List[str] = Non
         except:
             pass
         
-        # Return mock data if parsing fails
-        return get_mock_meals_v2()
+        # Return empty list if parsing fails (no mock data)
+        print("Failed to parse recipe response, returning empty list")
+        return []
         
     except Exception as e:
         st.error(f"Error generating meals: {str(e)}")
-        return get_mock_meals_v2()
+        # Store error for debugging
+        st.session_state.raw_recipe_response = f"Error: {str(e)}"
+        return []  # Return empty list instead of mock data
 
 def generate_video_script(recipe: Dict) -> str:
     """Generate TikTok-style video script for a recipe"""
