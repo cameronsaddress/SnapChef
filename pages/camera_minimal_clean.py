@@ -77,6 +77,7 @@ def show_camera():
         
         /* Camera container - full viewport approach */
         div[data-testid="stCameraInput"] {
+            position: relative !important;
             height: calc(100vh - 120px) !important;
             height: calc(100dvh - 120px) !important; /* Dynamic viewport height for mobile */
             max-height: calc(100vh - 120px) !important;
@@ -191,12 +192,18 @@ def show_camera():
             box-shadow: 0 6px 20px rgba(37, 244, 238, 0.4) !important;
         }
         
-        /* Camera swap button positioning */
-        .stCameraInput [data-testid="stCameraInputSwapButton"] {
+        /* Camera swap button positioning - target all possible selectors */
+        .stCameraInput [data-testid="stCameraInputSwapButton"],
+        .stCameraInput button[aria-label*="Switch"],
+        .stCameraInput button[aria-label*="switch"],
+        .stCameraInput button[aria-label*="camera"],
+        .stCameraInput button[title*="Switch"],
+        .stCameraInput button[title*="switch"] {
             position: absolute !important;
             top: 10px !important;
             left: 50% !important;
             transform: translateX(-50%) !important;
+            right: auto !important;
             z-index: 100 !important;
             background: rgba(255, 255, 255, 0.9) !important;
             border-radius: 50% !important;
@@ -205,11 +212,20 @@ def show_camera():
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
+            margin: 0 !important;
         }
+        
+        /* Hide duplicate switch camera buttons */
+        .stCameraInput button:nth-of-type(2)[aria-label*="Switch"],
+        .stCameraInput button:nth-of-type(2)[aria-label*="switch"],
+        .stCameraInput button:last-child:not(:first-child) {
+            display: none !important;
+        }
+        
         
         /* Page header */
         .camera-header {
-            font-size: clamp(1.25rem, 5vw, 2.5rem);
+            font-size: clamp(0.9rem, 4vw, 2.5rem);
             font-weight: 800;
             text-align: center;
             margin-top: 0;
@@ -220,10 +236,17 @@ def show_camera():
             text-decoration: none !important;
             position: relative;
             z-index: 20;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            white-space: normal;
+            line-height: 1.2;
             padding: 0 1rem;
+            display: block;
+            width: 100%;
+        }
+        
+        @media (max-width: 420px) {
+            .camera-header {
+                font-size: clamp(0.8rem, 3.5vw, 1.5rem);
+            }
         }
         
         /* Remove any link styling */
