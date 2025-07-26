@@ -50,27 +50,63 @@ def show_camera():
             background: linear-gradient(90deg, #25F4EE 0%, #FE2C55 100%) !important;
         }
         
-        /* Camera/File uploader container - responsive */
-        .stCameraInput, .stFileUploader {
+        /* Camera container - full viewport approach */
+        div[data-testid="stCameraInput"] {
+            height: calc(100vh - 150px) !important;
+            height: calc(100dvh - 150px) !important; /* Dynamic viewport height for mobile */
+            max-height: calc(100vh - 150px) !important;
+            width: 100% !important;
             margin: 0 auto;
-            max-width: 90vw;
-            width: 100%;
-            height: 80vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        
+        /* Target all levels of camera component */
+        div[data-testid="stCameraInput"] > div {
+            height: 100% !important;
+            width: 100% !important;
+            max-width: 90vw !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        
+        /* The actual video/image elements */
+        div[data-testid="stCameraInput"] video,
+        div[data-testid="stCameraInput"] img {
+            height: 100% !important;
+            width: auto !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            object-fit: contain !important;
+            border-radius: 20px !important;
+            overflow: hidden !important;
+        }
+        
+        /* Alternative selectors for broader compatibility */
+        .stCameraInput {
+            height: calc(100vh - 150px) !important;
+            height: -webkit-fill-available !important;
+        }
+        
+        .stCameraInput > div > div {
+            height: 100% !important;
         }
         
         /* Mobile responsive adjustments */
         @media (max-width: 768px) {
-            .stCameraInput, .stFileUploader {
-                max-width: 95vw;
-                height: 75vh;
+            div[data-testid="stCameraInput"] {
+                height: calc(100vh - 120px) !important;
+                height: calc(100dvh - 120px) !important;
+                height: -webkit-fill-available !important;
             }
             
-            .stCameraInput video,
-            .stCameraInput img {
-                height: 65vh !important;
+            div[data-testid="stCameraInput"] video,
+            div[data-testid="stCameraInput"] img {
+                border-radius: 16px !important;
             }
             
             .main .block-container {
@@ -89,42 +125,6 @@ def show_camera():
         /* Hide default camera label */
         .stCameraInput > label {
             display: none !important;
-        }
-        
-        /* Camera container styling */
-        .stCameraInput > div {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        /* Round camera preview - responsive sizing */
-        .stCameraInput video {
-            border-radius: 20px !important;
-            overflow: hidden !important;
-            width: 100% !important;
-            max-width: 90vw !important;
-            height: 70vh !important;
-            object-fit: cover;
-        }
-        
-        .stCameraInput img {
-            border-radius: 20px !important;
-            overflow: hidden !important;
-            width: 100% !important;
-            max-width: 90vw !important;
-            height: auto !important;
-        }
-        
-        /* Mobile camera adjustments */
-        @media (max-width: 768px) {
-            .stCameraInput video,
-            .stCameraInput img {
-                border-radius: 16px !important;
-                max-width: 95vw !important;
-                aspect-ratio: 3/4; /* Portrait orientation for mobile */
-            }
         }
         
         /* Style the camera button container */
@@ -195,11 +195,55 @@ def show_camera():
                                key="camera_input",
                                help="Take a photo of your fridge or pantry")
         
-        # Add JavaScript to try to use back camera (environment facing)
+        # Add JavaScript to try to use back camera and resize camera to full viewport
         st.markdown("""
         <script>
+        // Function to resize camera to full viewport
+        function resizeCameraToFullViewport() {
+            const cameraContainers = document.querySelectorAll('[data-testid="stCameraInput"]');
+            const viewportHeight = window.innerHeight;
+            const headerHeight = 150; // Adjust based on your header
+            const targetHeight = viewportHeight - headerHeight;
+            
+            cameraContainers.forEach(container => {
+                // Set container height
+                container.style.height = targetHeight + 'px';
+                container.style.maxHeight = targetHeight + 'px';
+                container.style.setProperty('height', targetHeight + 'px', 'important');
+                
+                // Find and resize video/img elements
+                const videos = container.querySelectorAll('video');
+                const images = container.querySelectorAll('img');
+                
+                videos.forEach(video => {
+                    video.style.height = '100%';
+                    video.style.maxHeight = '100%';
+                    video.style.setProperty('height', '100%', 'important');
+                    video.style.objectFit = 'contain';
+                });
+                
+                images.forEach(img => {
+                    img.style.height = '100%';
+                    img.style.maxHeight = '100%';
+                    img.style.setProperty('height', '100%', 'important');
+                    img.style.objectFit = 'contain';
+                });
+                
+                // Also resize parent divs
+                const childDivs = container.querySelectorAll('div');
+                childDivs.forEach(div => {
+                    div.style.height = '100%';
+                    div.style.maxHeight = '100%';
+                });
+            });
+        }
+        
         // Try to use back camera on mobile devices
         document.addEventListener('DOMContentLoaded', function() {
+            // Resize camera on load
+            resizeCameraToFullViewport();
+            
+            // Handle back camera
             const videoElements = document.querySelectorAll('video');
             videoElements.forEach(video => {
                 if (video && video.srcObject) {
@@ -216,6 +260,27 @@ def show_camera():
                 }
             });
         });
+        
+        // Resize on window resize
+        window.addEventListener('resize', resizeCameraToFullViewport);
+        
+        // Use MutationObserver to catch when camera loads
+        const observer = new MutationObserver(function(mutations) {
+            const hasCameraInput = document.querySelector('[data-testid="stCameraInput"]');
+            if (hasCameraInput) {
+                resizeCameraToFullViewport();
+            }
+        });
+        
+        // Start observing
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+        
+        // Also try resizing after a delay
+        setTimeout(resizeCameraToFullViewport, 500);
+        setTimeout(resizeCameraToFullViewport, 1000);
         </script>
         """, unsafe_allow_html=True)
         
@@ -275,10 +340,10 @@ def process_photo_with_progress():
             <style>
             /* Container to match camera size - responsive */
             .image-container {
-                max-width: 90vw;
                 width: 100%;
                 margin: 0 auto;
-                height: 70vh;
+                height: calc(100vh - 150px);
+                height: calc(100dvh - 150px);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -287,22 +352,22 @@ def process_photo_with_progress():
             /* Round the captured image */
             .image-container .stImage > img {
                 border-radius: 20px !important;
-                width: 100%;
-                height: 70vh;
-                max-width: 90vw;
-                object-fit: cover;
+                height: 100%;
+                width: auto;
+                max-width: 100%;
+                max-height: 100%;
+                object-fit: contain;
             }
             
             /* Mobile adjustments for captured image */
             @media (max-width: 768px) {
                 .image-container {
-                    max-width: 95vw;
+                    height: calc(100vh - 120px);
+                    height: calc(100dvh - 120px);
                 }
                 
                 .image-container .stImage > img {
                     border-radius: 16px !important;
-                    max-width: 95vw;
-                    height: 65vh;
                 }
             }
             </style>

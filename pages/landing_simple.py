@@ -41,7 +41,7 @@ def show_landing():
         }
         
         h3 {
-            color: #1a1a1a !important;
+            color: white !important;
             font-size: 2.5rem !important;
             font-weight: 800 !important;
             text-align: center !important;
@@ -152,7 +152,7 @@ def show_landing():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Hero Title
-    st.markdown("<h1>It's Magic! ✨</h1>", unsafe_allow_html=True)
+    st.markdown("<h1>Meal Magic!</h1>", unsafe_allow_html=True)
     
     # Subtitle
     st.markdown("<h2>AI-powered recipes from what you already have</h2>", unsafe_allow_html=True)
@@ -217,7 +217,7 @@ def show_landing():
             <div class="feature-icon">📸</div>
             <div class="feature-title">Snap Your Fridge</div>
             <div class="feature-description">
-                Take a quick photo of your fridge or pantry. Our AI instantly recognizes all your ingredients.
+                Take a quick photo of your fridge or pantry. In less than a minute, our AI recognizes all your ingredients.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -228,7 +228,7 @@ def show_landing():
             <div class="feature-icon">🤖</div>
             <div class="feature-title">AI Magic</div>
             <div class="feature-description">
-                Our advanced AI analyzes your ingredients and creates personalized recipes just for you.
+                Our advanced AI analyzes your ingredients and creates personalized recipes from the stuff you actually have.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -239,7 +239,7 @@ def show_landing():
             <div class="feature-icon">🍳</div>
             <div class="feature-title">Cook & Share</div>
             <div class="feature-description">
-                Get step-by-step recipes and share your creations with friends. Save money, reduce waste!
+                Get step-by-step recipes and share your creations with friends. No more wasted groceries, no more "what's for dinner?".
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -250,7 +250,7 @@ def show_landing():
     # Bottom CTA
     st.markdown("""
     <div class="bottom-cta">
-        <h3>Ready to reduce food waste?</h3>
+        <h3>Ready to eat like a king?</h3>
         <p>Join thousands who are saving money and eating better</p>
     </div>
     """, unsafe_allow_html=True)
