@@ -3,7 +3,7 @@ from streamlit_extras.let_it_rain import rain
 import time
 from PIL import Image
 import io
-from utils.api import encode_image_to_base64, detect_ingredients, generate_meals
+from utils.api import encode_image_to_base64, analyze_fridge_and_generate_recipes
 from utils.session import update_streak, add_points
 from prompts import get_random_progress_message
 
@@ -361,15 +361,22 @@ def process_photo_with_progress():
         progress_bar.progress(messages[2][1])
         time.sleep(0.5)
         
-        # Detect ingredients
-        detection_result = detect_ingredients(photo_base64)
+        # Make single API call for ingredients and recipes
+        status_placeholder.markdown(f'<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">🤖 Analyzing your fridge and creating personalized recipes...</p>', unsafe_allow_html=True)
+        progress_bar.progress(20)
         
-        # Check if detection was successful
-        if 'error' in detection_result or len(detection_result.get('ingredients', [])) == 0:
-            # Stop progress bar at current position and show error
-            progress_bar.progress(30)  # Stop at detection phase
+        # Single API call
+        result = analyze_fridge_and_generate_recipes(
+            photo_base64, 
+            st.session_state.get('dietary_preferences', [])
+        )
+        
+        # Check if analysis was successful
+        if 'error' in result or (len(result.get('ingredients', [])) == 0 and len(result.get('recipes', [])) == 0):
+            # Stop progress bar and show error
+            progress_bar.progress(30)
             
-            error_msg = detection_result.get('error', 'No ingredients found in the image.')
+            error_msg = result.get('error', 'No ingredients found in the image.')
             status_placeholder.markdown(f'<p class="status-text" style="color: #ff6b6b; font-size: 1.2rem; margin-top: 1rem;">❌ {error_msg}</p>', unsafe_allow_html=True)
             
             # Wait a moment for user to read the error
@@ -382,7 +389,7 @@ def process_photo_with_progress():
             # Show error in standard Streamlit error box
             st.error(f"❌ {error_msg}")
             
-            # Add helpful tips based on error type
+            # Add helpful tips
             if "No food ingredients detected" in error_msg:
                 st.info("💡 Tips for better results:\n"
                        "- Make sure the photo shows the inside of your fridge or pantry\n"
@@ -399,46 +406,15 @@ def process_photo_with_progress():
                     st.rerun()
             return
         
-        # Extract ingredients list
-        ingredients = detection_result.get('ingredients', [])
+        # Extract data from result
+        ingredients = result.get('ingredients', [])
+        recipes = result.get('recipes', [])
         
-        # Show more progress messages
-        for i in range(3, 7):
+        # Show progress messages
+        for i in range(3, 8):
             status_placeholder.markdown(f'<p class="status-text" style="color: white; font-size: 1.2rem; margin-top: 1rem;">{messages[i][0]}</p>', unsafe_allow_html=True)
             progress_bar.progress(messages[i][1])
-            time.sleep(0.8)
-        
-        # Generate recipes
-        try:
-            recipes = generate_meals(ingredients, st.session_state.get('dietary_preferences', []))
-            
-            # Check if recipe generation failed
-            if not recipes or len(recipes) == 0:
-                raise Exception("Failed to generate recipes. Please try again.")
-                
-        except Exception as recipe_error:
-            # Stop progress at recipe generation phase
-            progress_bar.progress(70)
-            status_placeholder.markdown('<p class="status-text" style="color: #ff6b6b; font-size: 1.2rem; margin-top: 1rem;">❌ Error generating recipes</p>', unsafe_allow_html=True)
-            time.sleep(2)
-            
-            # Clear progress and show error
-            progress_bar.empty()
-            status_placeholder.empty()
-            
-            st.error(f"❌ Failed to generate recipes: {str(recipe_error)}")
-            st.info("💡 We detected your ingredients but couldn't generate recipes. Please try again.")
-            
-            # Show detected ingredients
-            if ingredients:
-                st.success(f"✅ We found {len(ingredients)} ingredients in your image.")
-            
-            # Retry button
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                if st.button("🔄 Generate Recipes Again", use_container_width=True, key="retry_recipes"):
-                    st.rerun()
-            return
+            time.sleep(0.6)
         
         # Show final messages
         for i in range(7, 10):

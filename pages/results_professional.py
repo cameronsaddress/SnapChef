@@ -452,7 +452,7 @@ def show_results():
                 st.rerun()
     
     # Debug section (only show if responses exist)
-    if st.session_state.get('raw_ingredient_response') or st.session_state.get('raw_recipe_response'):
+    if st.session_state.get('raw_combined_response') or st.session_state.get('raw_ingredient_response') or st.session_state.get('raw_recipe_response'):
         st.markdown("<br><br><hr>", unsafe_allow_html=True)
         
         # Small debug toggle at bottom
@@ -462,24 +462,30 @@ def show_results():
         if st.session_state.get('show_debug', False):
             st.markdown("### 🔍 Debug Information")
             
-            # Show raw ingredient detection response
-            if st.session_state.get('raw_ingredient_response'):
+            # Show raw combined response (new single API call)
+            if st.session_state.get('raw_combined_response'):
+                with st.expander("🍳 Raw Vision Model Response (Single API Call)", expanded=True):
+                    st.code(st.session_state.raw_combined_response, language="json")
+            
+            # Show raw ingredient detection response (old separate call)
+            elif st.session_state.get('raw_ingredient_response'):
                 with st.expander("📦 Raw Ingredient Detection Response", expanded=False):
                     st.code(st.session_state.raw_ingredient_response, language="json")
             
-            # Show raw recipe generation response
+            # Show raw recipe generation response (old separate call)
             if st.session_state.get('raw_recipe_response'):
                 with st.expander("🍳 Raw Recipe Generation Response", expanded=False):
                     st.code(st.session_state.raw_recipe_response, language="json")
             
-            # Show detected ingredients as sent to recipe generation
+            # Show detected ingredients
             if ingredients:
-                with st.expander("🧾 Ingredients Sent to Recipe Generation", expanded=False):
-                    ingredient_names = [ing.get('name', str(ing)) if isinstance(ing, dict) else str(ing) for ing in ingredients]
-                    st.json(ingredient_names)
+                with st.expander("🧾 Detected Ingredients", expanded=False):
+                    st.json(ingredients)
             
             # Clear debug info button
             if st.button("🗑️ Clear Debug Info", key="clear_debug"):
+                if 'raw_combined_response' in st.session_state:
+                    del st.session_state.raw_combined_response
                 if 'raw_ingredient_response' in st.session_state:
                     del st.session_state.raw_ingredient_response
                 if 'raw_recipe_response' in st.session_state:

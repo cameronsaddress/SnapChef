@@ -12,6 +12,7 @@ from prompts import (
     validate_ingredient_response,
     validate_recipe_response
 )
+from prompts.combined_prompt import get_combined_prompt, parse_combined_response
 
 # Initialize Grok client
 api_key = os.getenv("XAI_API_KEY")
@@ -280,6 +281,82 @@ def generate_challenge_idea() -> Dict:
             "rules": ["Use at least 3 leftovers", "No grocery shopping allowed", "Share your before & after"],
             "hashtag": "#FridgeRaidFriday",
             "points": 40
+        }
+
+@st.cache_data(ttl=3600)
+def analyze_fridge_and_generate_recipes(image_base64: str, dietary_preferences: List[str] = None) -> Dict[str, Any]:
+    """Single API call to detect ingredients and generate recipes using vision model"""
+    if not client:
+        return {
+            "ingredients": [],
+            "recipes": [],
+            "error": "API key not configured. Please set up your XAI_API_KEY."
+        }
+    
+    try:
+        # Get the combined prompt
+        prompt = get_combined_prompt()
+        
+        # Add dietary preferences if provided
+        if dietary_preferences:
+            prompt += f"\n\nDIETARY PREFERENCES: {', '.join(dietary_preferences)}"
+        
+        print(f"Making combined API call with image size: {len(image_base64)} characters")
+        
+        response = client.chat.completions.create(
+            model="grok-2-vision-latest",
+            messages=[
+                {
+                    "role": "system",
+                    "content": prompt
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}",
+                                "detail": "high"
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": "Please analyze this fridge/pantry image and provide both ingredient detection and recipe generation as specified in the prompt."
+                        }
+                    ]
+                }
+            ],
+            temperature=0.7,
+            max_tokens=4000
+        )
+        
+        # Parse the response
+        content = response.choices[0].message.content
+        print(f"Received combined response: {content[:200]}...")
+        
+        # Store raw response for debugging
+        st.session_state.raw_combined_response = content
+        
+        # Parse the combined response
+        result = parse_combined_response(content)
+        
+        # Check if we got valid data
+        if not result["ingredients"] and not result.get("image_analysis", {}).get("is_food_image", True):
+            return {
+                "ingredients": [],
+                "recipes": [],
+                "error": "No food ingredients detected. Please take a photo of your fridge, pantry, or kitchen ingredients."
+            }
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error in combined API call: {str(e)}")
+        return {
+            "ingredients": [],
+            "recipes": [],
+            "error": f"Error analyzing image: {str(e)}"
         }
 
 def get_mock_meals_v2() -> List[Dict]:
