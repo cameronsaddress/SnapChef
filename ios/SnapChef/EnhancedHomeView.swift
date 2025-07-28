@@ -11,20 +11,15 @@ struct EnhancedHomeView: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // Full screen animated background
+                MagicalBackground()
+                    .ignoresSafeArea()
+                
                 ScrollView {
                     VStack(spacing: 40) {
                         // Animated Logo
                         HeroLogoView()
                             .scaleEffect(logoScale)
-                            .onAppear {
-                                withAnimation(.spring(response: 0.8, dampingFraction: 0.6)) {
-                                    logoScale = 1
-                                }
-                                
-                                withAnimation(.easeOut(duration: 0.5).delay(0.3)) {
-                                    contentVisible = true
-                                }
-                            }
                         
                         // Main CTA
                         VStack(spacing: 20) {
@@ -77,7 +72,17 @@ struct EnhancedHomeView: View {
                 }
             }
             .navigationBarHidden(true)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .particleExplosion(trigger: $particleTrigger)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.6)) {
+                logoScale = 1
+            }
+            
+            withAnimation(.easeOut(duration: 0.5).delay(0.3)) {
+                contentVisible = true
+            }
         }
         .fullScreenCover(isPresented: $showingCamera) {
             EnhancedCameraView()
@@ -163,7 +168,7 @@ struct FreeUsesIndicatorEnhanced: View {
     @State private var pulseScale: CGFloat = 1
     
     var body: some View {
-        GlassmorphicCard {
+        GlassmorphicCard(content: {
             HStack(spacing: 12) {
                 // Animated icon
                 ZStack {
@@ -204,7 +209,7 @@ struct FreeUsesIndicatorEnhanced: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
-        }
+        })
         .onAppear {
             withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                 pulseScale = 1.1
@@ -277,7 +282,7 @@ struct FeatureCardEnhanced: View {
             .padding(.vertical, 24)
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
-        }, cornerRadius: 20, glowColor: color)
+        }, glowColor: color)
         .scaleEffect(isSelected ? 1.05 : 1)
     }
 }
@@ -338,7 +343,7 @@ struct ChallengeCard: View {
                     .scaleEffect(0.9)
             }
             .padding(30)
-        }, cornerRadius: 20, glowColor: Color(hex: "#f093fb"))
+        }, glowColor: Color(hex: "#f093fb"))
         .padding(.horizontal, 10)
     }
 }
@@ -381,7 +386,7 @@ struct EnhancedRecipeCard: View {
     @State private var isPressed = false
     
     var body: some View {
-        GlassmorphicCard {
+        GlassmorphicCard(content: {
             VStack(alignment: .leading, spacing: 12) {
                 // Recipe image placeholder with gradient
                 RoundedRectangle(cornerRadius: 12)
@@ -420,7 +425,7 @@ struct EnhancedRecipeCard: View {
             }
             .padding(16)
             .frame(width: 220)
-        }
+        })
         .scaleEffect(isPressed ? 0.95 : 1)
         .onTapGesture {
             isPressed = true

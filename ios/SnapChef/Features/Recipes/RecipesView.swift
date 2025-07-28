@@ -6,7 +6,7 @@ struct RecipesView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                GradientBackground()
+                MagicalBackground()
                     .ignoresSafeArea()
                 
                 ScrollView {

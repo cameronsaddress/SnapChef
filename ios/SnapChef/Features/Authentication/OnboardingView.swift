@@ -24,7 +24,7 @@ struct OnboardingView: View {
     
     var body: some View {
         ZStack {
-            GradientBackground()
+            MagicalBackground()
                 .ignoresSafeArea()
             
             VStack {

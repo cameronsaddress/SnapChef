@@ -9,9 +9,8 @@
 /* Begin PBXBuildFile section */
 		09A7E3BFA651EF24792DAE75 /* GlassmorphicComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F190CCE2F51225F63B9697D6 /* GlassmorphicComponents.swift */; };
 		0A19D54755B00F55E24F26F3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213986243A296CEDAE62DDDA /* ContentView.swift */; };
+		1522F542AF93C22294D467B0 /* ColorExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F86BA371D3D52CF301892C /* ColorExtensions.swift */; };
 		16E6AF01876156B9CB2FB1E1 /* EnhancedProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07A7B624E9CEDDD6FAD0A36 /* EnhancedProfileView.swift */; };
-		19D8EF7E5CC267801D975415 /* FloatingFoodAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61861A922A347F1F9465FCD /* FloatingFoodAnimation.swift */; };
-		1E055677FC7067CF7204F381 /* GradientBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1117A4D98FB19EB2482543 /* GradientBackground.swift */; };
 		1F3CC9E8D39F4DC49EDA72C5 /* MagicalTransitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A8DCF3FDF7CB6D914529906 /* MagicalTransitions.swift */; };
 		2422E5C1C7E414D8FF5A0B7C /* NetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FDC970FB5C6C618DA4E006 /* NetworkManager.swift */; };
 		3D3E665FBADF8F0744D3031D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A63C4DB0B7644F30FDA29A28 /* Assets.xcassets */; };
@@ -75,16 +74,15 @@
 		94CF88BBD5E77A33A82328C4 /* HapticManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HapticManager.swift; path = SnapChef/Core/Utilities/HapticManager.swift; sourceTree = "<group>"; };
 		A4C57C769C4C623E7618C155 /* Preview Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = "Preview Assets.xcassets"; path = "SnapChef/Preview Content/Preview Assets.xcassets"; sourceTree = "<group>"; };
 		A63C4DB0B7644F30FDA29A28 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = SnapChef/Design/Assets.xcassets; sourceTree = "<group>"; };
-		AC1117A4D98FB19EB2482543 /* GradientBackground.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GradientBackground.swift; path = SnapChef/Design/Components/GradientBackground.swift; sourceTree = "<group>"; };
 		AC78FF6A05EC393900B9FB58 /* SubscriptionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SubscriptionView.swift; path = SnapChef/Features/Authentication/SubscriptionView.swift; sourceTree = "<group>"; };
 		C07A7B624E9CEDDD6FAD0A36 /* EnhancedProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EnhancedProfileView.swift; path = SnapChef/Features/Profile/EnhancedProfileView.swift; sourceTree = "<group>"; };
 		C3EE797F94908AFA8D7BA233 /* SnapChef.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = SnapChef.entitlements; path = SnapChef/SnapChef.entitlements; sourceTree = "<group>"; };
+		C4F86BA371D3D52CF301892C /* ColorExtensions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ColorExtensions.swift; path = SnapChef/Design/ColorExtensions.swift; sourceTree = "<group>"; };
 		D196EE678D8EF55E9771CC8F /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = SnapChef/Core/ViewModels/AppState.swift; sourceTree = "<group>"; };
 		D763DE380F1DB760696FA722 /* EnhancedHomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EnhancedHomeView.swift; path = SnapChef/EnhancedHomeView.swift; sourceTree = "<group>"; };
 		E4C4CDE71E399F7520469E0E /* User.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = User.swift; path = SnapChef/Core/Models/User.swift; sourceTree = "<group>"; };
 		F190CCE2F51225F63B9697D6 /* GlassmorphicComponents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GlassmorphicComponents.swift; path = SnapChef/Design/GlassmorphicComponents.swift; sourceTree = "<group>"; };
 		F43329C15A8E8386F4370D4E /* SnapChefApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SnapChefApp.swift; path = SnapChef/App/SnapChefApp.swift; sourceTree = "<group>"; };
-		F61861A922A347F1F9465FCD /* FloatingFoodAnimation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FloatingFoodAnimation.swift; path = SnapChef/Design/Components/FloatingFoodAnimation.swift; sourceTree = "<group>"; };
 		F704D9176B948F55CD9DC566 /* ShareSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShareSheet.swift; path = SnapChef/Features/Sharing/ShareSheet.swift; sourceTree = "<group>"; };
 		F927FA724DAF0F3B30276BA3 /* CameraView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CameraView.swift; path = SnapChef/Features/Camera/CameraView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -252,8 +250,6 @@
 		A5BD5D6F19A84974656DB3B7 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				F61861A922A347F1F9465FCD /* FloatingFoodAnimation.swift */,
-				AC1117A4D98FB19EB2482543 /* GradientBackground.swift */,
 			);
 			name = Components;
 			sourceTree = "<group>";
@@ -267,6 +263,7 @@
 				5DA5F85BA1128E74A3D20C2C /* MorphingTabBar.swift */,
 				7A8DCF3FDF7CB6D914529906 /* MagicalTransitions.swift */,
 				A63C4DB0B7644F30FDA29A28 /* Assets.xcassets */,
+				C4F86BA371D3D52CF301892C /* ColorExtensions.swift */,
 			);
 			name = Design;
 			sourceTree = "<group>";
@@ -429,9 +426,8 @@
 				09A7E3BFA651EF24792DAE75 /* GlassmorphicComponents.swift in Sources */,
 				713CFE731576EA1A3CB03CCA /* MorphingTabBar.swift in Sources */,
 				1F3CC9E8D39F4DC49EDA72C5 /* MagicalTransitions.swift in Sources */,
-				19D8EF7E5CC267801D975415 /* FloatingFoodAnimation.swift in Sources */,
-				1E055677FC7067CF7204F381 /* GradientBackground.swift in Sources */,
 				FD38CE225949CF345B8EF964 /* RecipeDetailView.swift in Sources */,
+				1522F542AF93C22294D467B0 /* ColorExtensions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

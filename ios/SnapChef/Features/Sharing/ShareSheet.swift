@@ -9,7 +9,7 @@ struct ShareSheet: View {
     var body: some View {
         NavigationView {
             ZStack {
-                GradientBackground()
+                MagicalBackground()
                     .ignoresSafeArea()
                 
                 VStack(spacing: 24) {

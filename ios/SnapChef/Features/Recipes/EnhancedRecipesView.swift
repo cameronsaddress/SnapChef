@@ -12,6 +12,10 @@ struct EnhancedRecipesView: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // Full screen animated background
+                MagicalBackground()
+                    .ignoresSafeArea()
+                
                 ScrollView {
                     VStack(spacing: 30) {
                         // Header
@@ -79,6 +83,7 @@ struct EnhancedRecipesView: View {
                 }
             }
             .navigationBarHidden(true)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .onAppear {
                 withAnimation(.easeOut(duration: 0.5)) {
                     contentVisible = true

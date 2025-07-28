@@ -36,19 +36,17 @@ struct EnhancedProfileView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
+            ZStack {
+                // Full screen animated background
+                MagicalBackground()
+                    .ignoresSafeArea()
+                
+                ScrollView {
                 VStack(spacing: 30) {
                     // Enhanced Profile Header
                     EnhancedProfileHeader(user: authManager.currentUser)
                         .scaleEffect(profileImageScale)
-                        .onAppear {
-                            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                                profileImageScale = 1
-                            }
-                            withAnimation(.easeOut(duration: 0.5).delay(0.2)) {
-                                contentVisible = true
-                            }
-                        }
+                        .scaleEffect(profileImageScale)
                     
                     // Gamification Stats
                     GamificationStatsView()
@@ -86,7 +84,17 @@ struct EnhancedProfileView: View {
                 .padding(.top, 20)
             }
             .scrollContentBackground(.hidden)
+            }
             .navigationBarHidden(true)
+            .toolbarBackground(.hidden, for: .navigationBar)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                profileImageScale = 1
+            }
+            withAnimation(.easeOut(duration: 0.5).delay(0.2)) {
+                contentVisible = true
+            }
         }
         .sheet(isPresented: $showingSubscriptionView) {
             SubscriptionView()

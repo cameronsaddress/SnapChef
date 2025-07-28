@@ -22,6 +22,7 @@ struct SnapChefApp: App {
         // Configure appearance
         configureNavigationBar()
         configureTableView()
+        configureWindow()
         
         // Initialize services
         NetworkManager.shared.configure()
@@ -52,5 +53,10 @@ struct SnapChefApp: App {
         
         // Make collection views transparent
         UICollectionView.appearance().backgroundColor = .clear
+    }
+    
+    private func configureWindow() {
+        // Configure scroll view appearances
+        UIScrollView.appearance().backgroundColor = .clear
     }
 }

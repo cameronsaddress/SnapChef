@@ -10,6 +10,7 @@ class CameraModel: NSObject, ObservableObject {
     @Published var preview: AVCaptureVideoPreviewLayer?
     @Published var isCameraAuthorized = false
     @Published var currentPosition: AVCaptureDevice.Position = .back
+    @Published var isSessionReady = false
     
     private var photoCompletion: ((UIImage) -> Void)?
     
@@ -21,14 +22,18 @@ class CameraModel: NSObject, ObservableObject {
     }
     
     func requestCameraPermission() {
+        print("Requesting camera permission...")
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
+            print("Camera already authorized")
             DispatchQueue.main.async { [weak self] in
                 self?.isCameraAuthorized = true
                 self?.setupCamera()
             }
         case .notDetermined:
+            print("Camera permission not determined, requesting...")
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                print("Camera permission granted: \(granted)")
                 DispatchQueue.main.async {
                     self?.isCameraAuthorized = granted
                     if granted {
@@ -37,6 +42,7 @@ class CameraModel: NSObject, ObservableObject {
                 }
             }
         case .denied, .restricted:
+            print("Camera permission denied or restricted")
             DispatchQueue.main.async { [weak self] in
                 self?.isCameraAuthorized = false
             }
@@ -53,22 +59,34 @@ class CameraModel: NSObject, ObservableObject {
     }
     
     func setupCamera() {
+        print("Setting up camera...")
         session.beginConfiguration()
         
-        // Remove existing inputs
+        // Remove existing inputs and outputs
         session.inputs.forEach { session.removeInput($0) }
+        session.outputs.forEach { session.removeOutput($0) }
         
-        // Setup camera input
-        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: currentPosition) else {
+        // Setup camera input - try rear camera first, then any available
+        let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+            ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+            ?? AVCaptureDevice.default(for: .video)
+        
+        guard let camera = camera else {
+            print("No camera available")
             session.commitConfiguration()
             return
         }
+        
+        print("Found camera: \(camera.localizedName) at position: \(camera.position.rawValue)")
         
         do {
             let input = try AVCaptureDeviceInput(device: camera)
             
             if session.canAddInput(input) {
                 session.addInput(input)
+                print("Added camera input")
+            } else {
+                print("Cannot add camera input")
             }
             
             if session.canAddOutput(output) {
@@ -78,30 +96,52 @@ class CameraModel: NSObject, ObservableObject {
                     output.maxPhotoDimensions = CMVideoDimensions(width: 4032, height: 3024) // iPhone default max
                 }
                 output.maxPhotoQualityPrioritization = .quality
+                print("Added photo output")
+            } else {
+                print("Cannot add photo output")
             }
             
             session.commitConfiguration()
             
+            // Update position based on actual camera
+            currentPosition = camera.position
+            
             // Start session on background queue
             let captureSession = session
-            DispatchQueue.global(qos: .userInitiated).async {
-                captureSession.startRunning()
+            Task {
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                        captureSession.startRunning()
+                        print("Camera session started: \(captureSession.isRunning)")
+                        DispatchQueue.main.async {
+                            self?.isSessionReady = true
+                            continuation.resume()
+                        }
+                    }
+                }
             }
             
         } catch {
             print("Camera setup error: \(error)")
             session.commitConfiguration()
+            isSessionReady = false
         }
     }
     
     func flipCamera() {
         HapticManager.impact(.light)
         
+        isSessionReady = false
         currentPosition = currentPosition == .back ? .front : .back
         setupCamera()
     }
     
     func capturePhoto(completion: @escaping (UIImage) -> Void) {
+        guard isSessionReady else {
+            print("Camera session not ready")
+            return
+        }
+        
         photoCompletion = completion
         
         // High quality settings - use HEVC if available
@@ -207,6 +247,7 @@ struct CameraPreview: UIViewRepresentable {
     
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: UIScreen.main.bounds)
+        view.backgroundColor = .black
         
         let previewLayer = AVCaptureVideoPreviewLayer(session: cameraModel.session)
         previewLayer.frame = view.bounds
@@ -221,8 +262,21 @@ struct CameraPreview: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UIView, context: Context) {
-        if let previewLayer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
-            previewLayer.frame = uiView.bounds
+        guard let previewLayer = uiView.layer.sublayers?.first(where: { $0 is AVCaptureVideoPreviewLayer }) as? AVCaptureVideoPreviewLayer else {
+            // Create preview layer if it doesn't exist
+            let newPreviewLayer = AVCaptureVideoPreviewLayer(session: cameraModel.session)
+            newPreviewLayer.frame = uiView.bounds
+            newPreviewLayer.videoGravity = .resizeAspectFill
+            uiView.layer.addSublayer(newPreviewLayer)
+            
+            Task { @MainActor in
+                cameraModel.preview = newPreviewLayer
+            }
+            return
         }
+        
+        // Update existing preview layer
+        previewLayer.frame = uiView.bounds
+        previewLayer.session = cameraModel.session
     }
 }

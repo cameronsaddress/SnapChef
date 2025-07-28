@@ -16,9 +16,18 @@ struct EnhancedCameraView: View {
     
     var body: some View {
         ZStack {
-            // Camera preview
-            CameraPreview(cameraModel: cameraModel)
-                .ignoresSafeArea()
+            // Camera preview (bottom layer)
+            if cameraModel.isCameraAuthorized {
+                CameraPreview(cameraModel: cameraModel)
+                    .ignoresSafeArea()
+                    .opacity(cameraModel.isSessionReady ? 1 : 0)
+                    .animation(.easeIn(duration: 0.3), value: cameraModel.isSessionReady)
+            } else {
+                // Fallback background when camera not available
+                MagicalBackground()
+                    .ignoresSafeArea()
+                    .overlay(Color.black.opacity(0.3))
+            }
             
             // Scanning overlay
             if !isProcessing {
@@ -48,8 +57,14 @@ struct EnhancedCameraView: View {
             }
         }
         .onAppear {
-            cameraModel.requestCameraPermission()
             startScanAnimation()
+            // Request permission and setup camera
+            Task {
+                cameraModel.requestCameraPermission()
+            }
+        }
+        .onDisappear {
+            cameraModel.stopSession()
         }
         .fullScreenCover(isPresented: $showingResults) {
             EnhancedRecipeResultsView(recipes: generatedRecipes)
@@ -86,7 +101,7 @@ struct EnhancedCameraView: View {
             do {
                 // API call here
                 // For now, using mock data
-                await Task.sleep(3_000_000_000) // 3 seconds
+                try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
                 
                 generatedRecipes = MockDataProvider.shared.mockRecipeResponse().recipes ?? []
                 showingResults = true
@@ -308,7 +323,7 @@ struct CameraControlsEnhanced: View {
         VStack(spacing: 30) {
             // Instructions
             if !isProcessing {
-                Text("Point at your fridge or pantry")
+                Text(cameraModel.isSessionReady ? "Point at your fridge or pantry" : "Initializing camera...")
                     .font(.system(size: 20, weight: .medium, design: .rounded))
                     .foregroundColor(.white)
                     .padding(.horizontal, 40)
@@ -326,7 +341,7 @@ struct CameraControlsEnhanced: View {
             // Capture button
             CaptureButtonEnhanced(
                 action: capturePhoto,
-                isDisabled: isProcessing,
+                isDisabled: isProcessing || !cameraModel.isSessionReady,
                 triggerAnimation: $captureAnimation
             )
             

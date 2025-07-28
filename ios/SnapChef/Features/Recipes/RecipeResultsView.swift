@@ -9,7 +9,7 @@ struct RecipeResultsView: View {
     
     var body: some View {
         ZStack {
-            GradientBackground()
+            MagicalBackground()
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
