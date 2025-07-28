@@ -27,6 +27,13 @@ class NetworkManager {
     // MARK: - Recipe Generation
     
     func analyzeImage(_ image: UIImage, deviceId: String) async throws -> RecipeGenerationResponse {
+        // Use mock data in debug mode
+        if MockDataProvider.shared.useMockData {
+            // Simulate network delay
+            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            return MockDataProvider.shared.mockRecipeResponse()
+        }
+        
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
             throw NetworkError.invalidInput
         }
@@ -47,11 +54,19 @@ class NetworkManager {
     // MARK: - Device Management
     
     func getDeviceStatus(deviceId: String) async throws -> DeviceStatus {
+        if MockDataProvider.shared.useMockData {
+            return MockDataProvider.shared.mockDeviceStatus()
+        }
+        
         let endpoint = "\(baseURL)/api/v1/device/\(deviceId)/status"
         return try await get(endpoint)
     }
     
     func consumeFreeUse(deviceId: String) async throws -> FreeUseResponse {
+        if MockDataProvider.shared.useMockData {
+            return FreeUseResponse(success: true, remainingUses: 2, isBlocked: false)
+        }
+        
         let endpoint = "\(baseURL)/api/v1/device/\(deviceId)/consume"
         return try await post(endpoint, body: EmptyRequest())
     }
