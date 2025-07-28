@@ -4,6 +4,7 @@ import CryptoKit
 import AdSupport
 import AppTrackingTransparency
 
+@MainActor
 class DeviceManager: ObservableObject {
     @Published var deviceId: String = ""
     @Published var freeUsesRemaining: Int = 3
@@ -71,10 +72,8 @@ class DeviceManager: ObservableObject {
         do {
             let response = try await NetworkManager.shared.consumeFreeUse(deviceId: deviceId)
             
-            DispatchQueue.main.async {
-                self.freeUsesRemaining = response.remainingUses
-                self.isBlocked = response.isBlocked
-            }
+            self.freeUsesRemaining = response.remainingUses
+            self.isBlocked = response.isBlocked
             
             return !response.isBlocked && response.success
         } catch {
@@ -87,11 +86,9 @@ class DeviceManager: ObservableObject {
         do {
             let status = try await NetworkManager.shared.getDeviceStatus(deviceId: deviceId)
             
-            DispatchQueue.main.async {
-                self.freeUsesRemaining = status.freeUsesRemaining
-                self.isBlocked = status.isBlocked
-                self.hasUnlimitedAccess = status.hasSubscription
-            }
+            self.freeUsesRemaining = status.freeUsesRemaining
+            self.isBlocked = status.isBlocked
+            self.hasUnlimitedAccess = status.hasSubscription
         } catch {
             print("Error fetching device status: \(error)")
         }

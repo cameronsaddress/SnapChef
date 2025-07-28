@@ -6,9 +6,10 @@ struct HomeView: View {
     @State private var showingCamera = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
-                GradientBackground()
+                // Background gradient - ensuring it shows
+                Color.clear
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -24,7 +25,7 @@ struct HomeView: View {
                                         .offset(x: 80, y: -10)
                                 )
                             
-                            Text("Turn your fridge into a feast!")
+                            Text("AI-powered recipes from what you already have")
                                 .font(.system(size: 20, weight: .medium))
                                 .foregroundColor(.white.opacity(0.9))
                         }
@@ -72,8 +73,18 @@ struct HomeView: View {
                     }
                     .padding(.bottom, 100)
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationBarHidden(true)
+        }
+        .background(Color.clear)
+        .onAppear {
+            // Make navigation bar transparent
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithTransparentBackground()
+            appearance.backgroundColor = .clear
+            UINavigationBar.appearance().standardAppearance = appearance
+            UINavigationBar.appearance().scrollEdgeAppearance = appearance
         }
         .fullScreenCover(isPresented: $showingCamera) {
             CameraView()

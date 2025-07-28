@@ -27,7 +27,7 @@ struct SocialShareManager {
         
         text += "🍳 Just made \(recipe.name) with @SnapChef!\n"
         text += "⏱ Only \(recipe.cookTime + recipe.prepTime) minutes\n"
-        text += "📱 Turn your fridge into a feast with AI\n\n"
+        text += "📱 AI-powered recipes from what you already have\n\n"
         
         if platform != .twitter { // Twitter has character limit
             text += "Get the app: snapchef.app"
@@ -139,13 +139,3 @@ struct SocialShareManager {
     }
 }
 
-// Helper to get the current view controller
-extension View {
-    func getRootViewController() -> UIViewController? {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first else {
-            return nil
-        }
-        return window.rootViewController
-    }
-}

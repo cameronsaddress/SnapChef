@@ -1,7 +1,8 @@
 import SwiftUI
 import AuthenticationServices
-import GoogleSignIn
+// import GoogleSignIn  // TODO: Add GoogleSignIn package dependency
 
+@MainActor
 class AuthenticationManager: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var currentUser: User?
@@ -24,15 +25,11 @@ class AuthenticationManager: ObservableObject {
         Task {
             do {
                 let user = try await NetworkManager.shared.validateToken(token)
-                DispatchQueue.main.async {
-                    self.currentUser = user
-                    self.isAuthenticated = true
-                }
+                self.currentUser = user
+                self.isAuthenticated = true
             } catch {
-                DispatchQueue.main.async {
-                    self.keychain.delete(self.authTokenKey)
-                    self.isAuthenticated = false
-                }
+                self.keychain.delete(self.authTokenKey)
+                self.isAuthenticated = false
             }
         }
     }
@@ -58,6 +55,9 @@ class AuthenticationManager: ObservableObject {
     }
     
     func signInWithGoogle(presentingViewController: UIViewController) async throws {
+        // TODO: Implement when GoogleSignIn package is added
+        throw AuthError.missingConfiguration
+        /*
         guard let clientID = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_CLIENT_ID") as? String else {
             throw AuthError.missingConfiguration
         }
@@ -75,6 +75,7 @@ class AuthenticationManager: ObservableObject {
         )
         
         try await authenticateWithBackend(provider: .google, authData: authData)
+        */
     }
     
     private func authenticateWithBackend<T: Encodable>(provider: AuthProvider, authData: T) async throws {
@@ -83,12 +84,10 @@ class AuthenticationManager: ObservableObject {
             authData: authData
         )
         
-        DispatchQueue.main.async {
-            self.keychain.set(response.token, forKey: self.authTokenKey)
-            self.currentUser = response.user
-            self.isAuthenticated = true
-            self.showAuthSheet = false
-        }
+        self.keychain.set(response.token, forKey: self.authTokenKey)
+        self.currentUser = response.user
+        self.isAuthenticated = true
+        self.showAuthSheet = false
     }
     
     func signOut() {
@@ -97,7 +96,7 @@ class AuthenticationManager: ObservableObject {
         isAuthenticated = false
         
         // Sign out from Google if needed
-        GIDSignIn.sharedInstance.signOut()
+        // GIDSignIn.sharedInstance.signOut()  // TODO: Enable when GoogleSignIn is added
     }
     
     func promptForAuthIfNeeded(deviceManager: DeviceManager) {

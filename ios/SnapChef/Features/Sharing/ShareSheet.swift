@@ -31,35 +31,31 @@ struct ShareSheet: View {
                     
                     // Share buttons
                     VStack(spacing: 16) {
-                        SharePlatformButton(
+                        LegacySharePlatformButton(
                             platform: .tiktok,
                             recipe: recipe,
                             message: shareMessage,
-                            view: self,
                             onShare: { trackShare(platform: "tiktok") }
                         )
                         
-                        SharePlatformButton(
+                        LegacySharePlatformButton(
                             platform: .instagram,
                             recipe: recipe,
                             message: shareMessage,
-                            view: self,
                             onShare: { trackShare(platform: "instagram") }
                         )
                         
-                        SharePlatformButton(
+                        LegacySharePlatformButton(
                             platform: .twitter,
                             recipe: recipe,
                             message: shareMessage,
-                            view: self,
                             onShare: { trackShare(platform: "twitter") }
                         )
                         
-                        SharePlatformButton(
+                        LegacySharePlatformButton(
                             platform: .copy,
                             recipe: recipe,
                             message: shareMessage,
-                            view: self,
                             onShare: {
                                 copyToClipboard()
                                 trackShare(platform: "clipboard")
@@ -130,7 +126,7 @@ struct ShareSheet: View {
         if !shareMessage.isEmpty {
             text += "\(shareMessage)\n\n"
         }
-        text += "Made with SnapChef - Turn your fridge into a feast! ✨\n"
+        text += "Made with SnapChef - AI-powered recipes from what you already have ✨\n"
         text += "Download: snapchef.app"
         return text
     }
@@ -175,16 +171,15 @@ struct SharePreviewCard: View {
     }
 }
 
-struct SharePlatformButton<Content: View>: View {
+struct LegacySharePlatformButton: View {
     let platform: SharePlatform
     let recipe: Recipe
     let message: String
-    let view: Content
     let onShare: () -> Void
     
     var body: some View {
         Button(action: {
-            platform.share(recipe: recipe, message: message, from: view)
+            platform.share(recipe: recipe, message: message)
             onShare()
         }) {
             HStack {
@@ -256,14 +251,66 @@ enum SharePlatform {
         }
     }
     
-    func share(recipe: Recipe, message: String, from view: View) {
-        guard let rootVC = view.getRootViewController() else { return }
-        SocialShareManager.shareToSocial(
-            platform: self,
-            recipe: recipe,
-            message: message,
-            from: rootVC
-        )
+    func share(recipe: Recipe, message: String) {
+        // We'll handle the view controller lookup inside each share method
+        switch self {
+        case .tiktok:
+            shareTikTok(recipe: recipe, message: message)
+        case .instagram:
+            shareInstagram(recipe: recipe, message: message)
+        case .twitter:
+            shareTwitter(recipe: recipe, message: message)
+        case .copy:
+            copyText(recipe: recipe, message: message)
+        }
+    }
+    
+    private func shareTikTok(recipe: Recipe, message: String) {
+        let text = formatShareText(recipe: recipe, message: message)
+        UIPasteboard.general.string = text
+        
+        if let url = URL(string: "tiktok://"), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    private func shareInstagram(recipe: Recipe, message: String) {
+        let text = formatShareText(recipe: recipe, message: message)
+        UIPasteboard.general.string = text
+        
+        if let url = URL(string: "instagram://camera"), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        } else if let url = URL(string: "instagram://"), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    private func shareTwitter(recipe: Recipe, message: String) {
+        let text = formatShareText(recipe: recipe, message: message)
+        let encodedText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        
+        if let url = URL(string: "twitter://post?text=\(encodedText)"), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        } else if let url = URL(string: "https://twitter.com/intent/tweet?text=\(encodedText)") {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    private func copyText(recipe: Recipe, message: String) {
+        let text = formatShareText(recipe: recipe, message: message)
+        UIPasteboard.general.string = text
+    }
+    
+    private func formatShareText(recipe: Recipe, message: String) -> String {
+        var text = ""
+        if !message.isEmpty {
+            text += "\(message)\n\n"
+        }
+        text += "🍳 Just made \(recipe.name) with @SnapChef!\n"
+        text += "⏱ Only \(recipe.cookTime + recipe.prepTime) minutes\n"
+        text += "📱 AI-powered recipes from what you already have\n\n"
+        text += "#SnapChef #AIRecipes #HomeCooking"
+        return text
     }
 }
 

@@ -12,7 +12,6 @@ struct SnapChefApp: App {
                 .environmentObject(appState)
                 .environmentObject(authManager)
                 .environmentObject(deviceManager)
-                .preferredColorScheme(.light)
                 .onAppear {
                     setupApp()
                 }
@@ -22,6 +21,7 @@ struct SnapChefApp: App {
     private func setupApp() {
         // Configure appearance
         configureNavigationBar()
+        configureTableView()
         
         // Initialize services
         NetworkManager.shared.configure()
@@ -43,5 +43,14 @@ struct SnapChefApp: App {
         UINavigationBar.appearance().standardAppearance = appearance
         UINavigationBar.appearance().compactAppearance = appearance
         UINavigationBar.appearance().scrollEdgeAppearance = appearance
+    }
+    
+    private func configureTableView() {
+        // Make table views transparent
+        UITableView.appearance().backgroundColor = .clear
+        UITableViewCell.appearance().backgroundColor = .clear
+        
+        // Make collection views transparent
+        UICollectionView.appearance().backgroundColor = .clear
     }
 }

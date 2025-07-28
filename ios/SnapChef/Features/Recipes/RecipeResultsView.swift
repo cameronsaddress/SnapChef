@@ -217,7 +217,7 @@ struct RecipeDetailCard: View {
     }
 }
 
-struct DifficultyBadge: View {
+struct LegacyDifficultyBadge: View {
     let difficulty: Recipe.Difficulty
     
     var body: some View {

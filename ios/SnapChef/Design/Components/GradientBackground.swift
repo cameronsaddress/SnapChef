@@ -1,5 +1,27 @@
 import SwiftUI
 
+struct FridgeFlyThroughBackground: View {
+    @State private var animateGradient = false
+    
+    var body: some View {
+        LinearGradient(
+            colors: [
+                Color(hex: "#4ECDC4"), // Teal
+                Color(hex: "#45B7D1"), // Light Blue
+                Color(hex: "#3A7CA5"), // Ocean Blue
+                Color(hex: "#2E5266")  // Steel Blue
+            ],
+            startPoint: animateGradient ? .topLeading : .bottomTrailing,
+            endPoint: animateGradient ? .bottomTrailing : .topLeading
+        )
+        .hueRotation(.degrees(animateGradient ? 30 : 0))
+        .animation(.easeInOut(duration: 8).repeatForever(autoreverses: true), value: animateGradient)
+        .onAppear {
+            animateGradient = true
+        }
+    }
+}
+
 struct GradientBackground: View {
     @State private var animateGradient = false
     
@@ -54,5 +76,5 @@ extension Color {
 }
 
 #Preview {
-    GradientBackground()
+    FridgeFlyThroughBackground()
 }

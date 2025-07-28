@@ -7,21 +7,20 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            // Gradient background with floating food
-            ZStack {
-                GradientBackground()
-                    .ignoresSafeArea()
-                
-                FloatingFoodAnimation()
-                    .allowsHitTesting(false)
-            }
+            // Magical animated background
+            MagicalBackground()
+                .ignoresSafeArea()
+                .zIndex(0)
             
             // Main navigation on top
-            if appState.isFirstLaunch {
-                OnboardingView()
-            } else {
-                MainTabView()
+            Group {
+                if appState.isFirstLaunch {
+                    OnboardingView()
+                } else {
+                    MainTabView()
+                }
             }
+            .zIndex(2)
         }
     }
 }
@@ -30,44 +29,54 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            HomeView()
-                .tabItem {
-                    Label("Home", systemImage: "house.fill")
+        ZStack {
+            // Content based on selected tab
+            Group {
+                switch selectedTab {
+                case 0:
+                    EnhancedHomeView()
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                            removal: .opacity.combined(with: .scale(scale: 1.02))
+                        ))
+                case 1:
+                    EnhancedCameraView()
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                            removal: .opacity.combined(with: .scale(scale: 1.02))
+                        ))
+                case 2:
+                    EnhancedRecipesView()
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                            removal: .opacity.combined(with: .scale(scale: 1.02))
+                        ))
+                case 3:
+                    EnhancedProfileView()
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                            removal: .opacity.combined(with: .scale(scale: 1.02))
+                        ))
+                default:
+                    EnhancedHomeView()
                 }
-                .tag(0)
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
             
-            CameraView()
-                .tabItem {
-                    Label("Snap", systemImage: "camera.fill")
-                }
-                .tag(1)
-            
-            RecipesView()
-                .tabItem {
-                    Label("Recipes", systemImage: "book.fill")
-                }
-                .tag(2)
-            
-            ProfileView()
-                .tabItem {
-                    Label("Profile", systemImage: "person.fill")
-                }
-                .tag(3)
+            // Custom morphing tab bar
+            VStack {
+                Spacer()
+                
+                MorphingTabBar(selectedTab: $selectedTab)
+                    .padding(.horizontal, 30)
+                    .padding(.bottom, 30)
+                    .shadow(
+                        color: Color.black.opacity(0.2),
+                        radius: 20,
+                        y: 10
+                    )
+            }
         }
-        .accentColor(.white)
-        .onAppear {
-            setupTabBarAppearance()
-        }
-    }
-    
-    private func setupTabBarAppearance() {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithTransparentBackground()
-        appearance.backgroundColor = UIColor.black.withAlphaComponent(0.8)
-        
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
     }
 }
 

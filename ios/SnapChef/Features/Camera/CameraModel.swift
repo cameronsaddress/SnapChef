@@ -1,8 +1,9 @@
 import SwiftUI
-import AVFoundation
+@preconcurrency import AVFoundation
 import UIKit
 import CoreMedia
 
+@MainActor
 class CameraModel: NSObject, ObservableObject {
     @Published var session = AVCaptureSession()
     @Published var output = AVCapturePhotoOutput()
@@ -12,38 +13,42 @@ class CameraModel: NSObject, ObservableObject {
     
     private var photoCompletion: ((UIImage) -> Void)?
     
-    override init() {
+    nonisolated override init() {
         super.init()
-        checkCameraPermission()
+        Task { @MainActor in
+            checkCameraPermission()
+        }
     }
     
     func requestCameraPermission() {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
-            setupCamera()
-            isCameraAuthorized = true
+            DispatchQueue.main.async { [weak self] in
+                self?.isCameraAuthorized = true
+                self?.setupCamera()
+            }
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-                if granted {
-                    DispatchQueue.main.async {
+                DispatchQueue.main.async {
+                    self?.isCameraAuthorized = granted
+                    if granted {
                         self?.setupCamera()
-                        self?.isCameraAuthorized = true
                     }
                 }
             }
         case .denied, .restricted:
-            isCameraAuthorized = false
+            DispatchQueue.main.async { [weak self] in
+                self?.isCameraAuthorized = false
+            }
         @unknown default:
             break
         }
     }
     
     private func checkCameraPermission() {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized:
-            isCameraAuthorized = true
-        default:
-            isCameraAuthorized = false
+        let authorized = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+        DispatchQueue.main.async { [weak self] in
+            self?.isCameraAuthorized = authorized
         }
     }
     
@@ -78,8 +83,9 @@ class CameraModel: NSObject, ObservableObject {
             session.commitConfiguration()
             
             // Start session on background queue
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                self?.session.startRunning()
+            let captureSession = session
+            DispatchQueue.global(qos: .userInitiated).async {
+                captureSession.startRunning()
             }
             
         } catch {
@@ -111,9 +117,10 @@ class CameraModel: NSObject, ObservableObject {
     }
     
     func stopSession() {
-        if session.isRunning {
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                self?.session.stopRunning()
+        let captureSession = session
+        if captureSession.isRunning {
+            DispatchQueue.global(qos: .userInitiated).async {
+                captureSession.stopRunning()
             }
         }
     }
@@ -122,15 +129,15 @@ class CameraModel: NSObject, ObservableObject {
 // MARK: - AVCapturePhotoCaptureDelegate
 
 extension CameraModel: AVCapturePhotoCaptureDelegate {
-    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+    nonisolated func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         if let error = error {
             print("Photo capture error: \(error)")
             // Create a fallback image for simulator
             #if targetEnvironment(simulator)
-            DispatchQueue.main.async { [weak self] in
-                if let fallbackImage = self?.createFallbackImage() {
-                    self?.photoCompletion?(fallbackImage)
-                    self?.photoCompletion = nil
+            Task { @MainActor in
+                if let fallbackImage = self.createFallbackImage() {
+                    self.photoCompletion?(fallbackImage)
+                    self.photoCompletion = nil
                 }
             }
             #endif
@@ -146,13 +153,13 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         // Process image (resize if needed)
         let processedImage = processImage(image)
         
-        DispatchQueue.main.async { [weak self] in
-            self?.photoCompletion?(processedImage)
-            self?.photoCompletion = nil
+        Task { @MainActor in
+            self.photoCompletion?(processedImage)
+            self.photoCompletion = nil
         }
     }
     
-    private func createFallbackImage() -> UIImage? {
+    nonisolated private func createFallbackImage() -> UIImage? {
         let size = CGSize(width: 300, height: 300)
         UIGraphicsBeginImageContextWithOptions(size, false, 0)
         defer { UIGraphicsEndImageContext() }
@@ -168,7 +175,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         return UIGraphicsGetImageFromCurrentImageContext()
     }
     
-    private func processImage(_ image: UIImage) -> UIImage {
+    nonisolated private func processImage(_ image: UIImage) -> UIImage {
         let maxDimension: CGFloat = 1920
         
         let width = image.size.width
@@ -206,7 +213,9 @@ struct CameraPreview: UIViewRepresentable {
         previewLayer.videoGravity = .resizeAspectFill
         view.layer.addSublayer(previewLayer)
         
-        cameraModel.preview = previewLayer
+        Task { @MainActor in
+            cameraModel.preview = previewLayer
+        }
         
         return view
     }

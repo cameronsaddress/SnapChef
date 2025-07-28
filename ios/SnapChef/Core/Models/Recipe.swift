@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 struct Recipe: Identifiable, Codable {
     let id: UUID
@@ -32,6 +33,14 @@ struct Recipe: Identifiable, Codable {
             case .easy: return "👶"
             case .medium: return "👨‍🍳"
             case .hard: return "🔥"
+            }
+        }
+        
+        var swiftUIColor: Color {
+            switch self {
+            case .easy: return Color(hex: "#43e97b")
+            case .medium: return Color(hex: "#ffa726")
+            case .hard: return Color(hex: "#ef5350")
             }
         }
     }
