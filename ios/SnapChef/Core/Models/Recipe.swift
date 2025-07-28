@@ -1,7 +1,7 @@
 import Foundation
 
 struct Recipe: Identifiable, Codable {
-    let id = UUID()
+    let id: UUID
     let name: String
     let description: String
     let ingredients: [Ingredient]
@@ -38,7 +38,7 @@ struct Recipe: Identifiable, Codable {
 }
 
 struct Ingredient: Identifiable, Codable {
-    let id = UUID()
+    let id: UUID
     let name: String
     let quantity: String
     let unit: String?

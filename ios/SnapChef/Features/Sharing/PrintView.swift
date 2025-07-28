@@ -250,12 +250,13 @@ struct NutritionRow: View {
 
 #Preview {
     PrintView(recipe: Recipe(
+        id: UUID(),
         name: "Chicken Stir Fry",
         description: "A quick and healthy Asian-inspired dish",
         ingredients: [
-            Ingredient(name: "Chicken breast", quantity: "500", unit: "g", isAvailable: true),
-            Ingredient(name: "Bell peppers", quantity: "2", unit: nil, isAvailable: true),
-            Ingredient(name: "Soy sauce", quantity: "3", unit: "tbsp", isAvailable: false)
+            Ingredient(id: UUID(), name: "Chicken breast", quantity: "500", unit: "g", isAvailable: true),
+            Ingredient(id: UUID(), name: "Bell peppers", quantity: "2", unit: nil, isAvailable: true),
+            Ingredient(id: UUID(), name: "Soy sauce", quantity: "3", unit: "tbsp", isAvailable: false)
         ],
         instructions: [
             "Cut chicken into bite-sized pieces",

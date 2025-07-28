@@ -18,11 +18,12 @@ struct ContentView: View {
                 MainTabView()
             }
         }
-        .overlay(alignment: .top) {
-            // Floating food animations
+        .background(
+            // Floating food animations behind everything
             FloatingFoodAnimation()
                 .allowsHitTesting(false)
-        }
+                .zIndex(-1)
+        )
     }
 }
 

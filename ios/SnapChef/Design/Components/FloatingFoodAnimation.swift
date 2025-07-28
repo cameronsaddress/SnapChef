@@ -49,7 +49,7 @@ struct FloatingFood: View {
     
     private func startAnimation() {
         withAnimation(.easeIn(duration: 0.5)) {
-            opacity = 0.7
+            opacity = 0.3 // More translucent
         }
         
         animateFloat()

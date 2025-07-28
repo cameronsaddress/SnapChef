@@ -16,16 +16,17 @@ class MockDataProvider {
     func mockRecipeResponse() -> RecipeGenerationResponse {
         let recipes = [
             Recipe(
+                id: UUID(),
                 name: "Garden Fresh Salad",
                 description: "A colorful and nutritious salad with fresh vegetables",
                 ingredients: [
-                    Ingredient(name: "Mixed greens", quantity: "4", unit: "cups", isAvailable: true),
-                    Ingredient(name: "Cherry tomatoes", quantity: "1", unit: "cup", isAvailable: true),
-                    Ingredient(name: "Cucumber", quantity: "1", unit: "medium", isAvailable: true),
-                    Ingredient(name: "Red onion", quantity: "1/4", unit: "cup", isAvailable: true),
-                    Ingredient(name: "Feta cheese", quantity: "1/2", unit: "cup", isAvailable: false),
-                    Ingredient(name: "Olive oil", quantity: "3", unit: "tbsp", isAvailable: true),
-                    Ingredient(name: "Lemon juice", quantity: "2", unit: "tbsp", isAvailable: false)
+                    Ingredient(id: UUID(), name: "Mixed greens", quantity: "4", unit: "cups", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Cherry tomatoes", quantity: "1", unit: "cup", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Cucumber", quantity: "1", unit: "medium", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Red onion", quantity: "1/4", unit: "cup", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Feta cheese", quantity: "1/2", unit: "cup", isAvailable: false),
+                    Ingredient(id: UUID(), name: "Olive oil", quantity: "3", unit: "tbsp", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Lemon juice", quantity: "2", unit: "tbsp", isAvailable: false)
                 ],
                 instructions: [
                     "Wash and dry the mixed greens thoroughly",
@@ -54,16 +55,17 @@ class MockDataProvider {
                 createdAt: Date()
             ),
             Recipe(
+                id: UUID(),
                 name: "Quick Chicken Stir-Fry",
                 description: "A fast and flavorful Asian-inspired dish perfect for busy weeknights",
                 ingredients: [
-                    Ingredient(name: "Chicken breast", quantity: "1", unit: "lb", isAvailable: true),
-                    Ingredient(name: "Broccoli florets", quantity: "2", unit: "cups", isAvailable: true),
-                    Ingredient(name: "Bell pepper", quantity: "1", unit: "large", isAvailable: true),
-                    Ingredient(name: "Soy sauce", quantity: "3", unit: "tbsp", isAvailable: false),
-                    Ingredient(name: "Garlic", quantity: "3", unit: "cloves", isAvailable: true),
-                    Ingredient(name: "Ginger", quantity: "1", unit: "tbsp", isAvailable: false),
-                    Ingredient(name: "Vegetable oil", quantity: "2", unit: "tbsp", isAvailable: true)
+                    Ingredient(id: UUID(), name: "Chicken breast", quantity: "1", unit: "lb", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Broccoli florets", quantity: "2", unit: "cups", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Bell pepper", quantity: "1", unit: "large", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Soy sauce", quantity: "3", unit: "tbsp", isAvailable: false),
+                    Ingredient(id: UUID(), name: "Garlic", quantity: "3", unit: "cloves", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Ginger", quantity: "1", unit: "tbsp", isAvailable: false),
+                    Ingredient(id: UUID(), name: "Vegetable oil", quantity: "2", unit: "tbsp", isAvailable: true)
                 ],
                 instructions: [
                     "Cut chicken into bite-sized pieces",
@@ -93,17 +95,18 @@ class MockDataProvider {
                 createdAt: Date()
             ),
             Recipe(
+                id: UUID(),
                 name: "Hearty Vegetable Soup",
                 description: "A warming and comforting soup packed with seasonal vegetables",
                 ingredients: [
-                    Ingredient(name: "Onion", quantity: "1", unit: "large", isAvailable: true),
-                    Ingredient(name: "Carrots", quantity: "3", unit: "medium", isAvailable: true),
-                    Ingredient(name: "Celery", quantity: "3", unit: "stalks", isAvailable: true),
-                    Ingredient(name: "Potatoes", quantity: "2", unit: "large", isAvailable: true),
-                    Ingredient(name: "Vegetable broth", quantity: "6", unit: "cups", isAvailable: false),
-                    Ingredient(name: "Canned tomatoes", quantity: "1", unit: "can", isAvailable: true),
-                    Ingredient(name: "Green beans", quantity: "1", unit: "cup", isAvailable: true),
-                    Ingredient(name: "Italian seasoning", quantity: "2", unit: "tsp", isAvailable: true)
+                    Ingredient(id: UUID(), name: "Onion", quantity: "1", unit: "large", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Carrots", quantity: "3", unit: "medium", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Celery", quantity: "3", unit: "stalks", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Potatoes", quantity: "2", unit: "large", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Vegetable broth", quantity: "6", unit: "cups", isAvailable: false),
+                    Ingredient(id: UUID(), name: "Canned tomatoes", quantity: "1", unit: "can", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Green beans", quantity: "1", unit: "cup", isAvailable: true),
+                    Ingredient(id: UUID(), name: "Italian seasoning", quantity: "2", unit: "tsp", isAvailable: true)
                 ],
                 instructions: [
                     "Dice onion, carrots, celery, and potatoes into uniform pieces",

@@ -44,11 +44,11 @@ struct CameraView: View {
                 // Top bar
                 HStack {
                     Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 24, weight: .medium))
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 32, weight: .medium))
                             .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
-                            .background(Circle().fill(Color.white.opacity(0.2)))
+                            .background(Circle().fill(Color.black.opacity(0.5)))
+                            .clipShape(Circle())
                     }
                     
                     Spacer()
@@ -136,11 +136,11 @@ struct CameraView: View {
         }
     }
     
-    private func clampedFontSize(min: CGFloat, preferred: CGFloat, max: CGFloat) -> CGFloat {
+    private func clampedFontSize(min minSize: CGFloat, preferred: CGFloat, max maxSize: CGFloat) -> CGFloat {
         let screenWidth = UIScreen.main.bounds.width
         let scaleFactor = screenWidth / 375.0 // Base on iPhone 11 Pro width
         let scaled = preferred * scaleFactor
-        return min(max(scaled, min), max)
+        return min(max(scaled, minSize), maxSize)
     }
     
     private func capturePhoto() {

@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import UIKit
+import CoreMedia
 
 class CameraModel: NSObject, ObservableObject {
     @Published var session = AVCaptureSession()
@@ -67,7 +68,10 @@ class CameraModel: NSObject, ObservableObject {
             
             if session.canAddOutput(output) {
                 session.addOutput(output)
-                output.isHighResolutionCaptureEnabled = true
+                // Use maxPhotoDimensions for iOS 16+
+                if #available(iOS 16.0, *) {
+                    output.maxPhotoDimensions = CMVideoDimensions(width: 4032, height: 3024) // iPhone default max
+                }
                 output.maxPhotoQualityPrioritization = .quality
             }
             
@@ -94,13 +98,14 @@ class CameraModel: NSObject, ObservableObject {
     func capturePhoto(completion: @escaping (UIImage) -> Void) {
         photoCompletion = completion
         
-        let settings = AVCapturePhotoSettings()
-        settings.flashMode = .off
-        
-        // High quality settings
-        if let photoFormat = output.availablePhotoCodecTypes.first(where: { $0 == .heif }) {
-            settings.photoCodecType = photoFormat
+        // High quality settings - use HEVC if available
+        let settings: AVCapturePhotoSettings
+        if output.availablePhotoCodecTypes.contains(.hevc) {
+            settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
+        } else {
+            settings = AVCapturePhotoSettings()
         }
+        settings.flashMode = .off
         
         output.capturePhoto(with: settings, delegate: self)
     }

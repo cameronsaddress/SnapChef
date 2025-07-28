@@ -77,7 +77,7 @@ class AuthenticationManager: ObservableObject {
         try await authenticateWithBackend(provider: .google, authData: authData)
     }
     
-    private func authenticateWithBackend(provider: AuthProvider, authData: Any) async throws {
+    private func authenticateWithBackend<T: Encodable>(provider: AuthProvider, authData: T) async throws {
         let response = try await NetworkManager.shared.authenticate(
             provider: provider,
             authData: authData

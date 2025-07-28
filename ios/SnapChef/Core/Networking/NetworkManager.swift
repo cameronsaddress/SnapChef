@@ -73,14 +73,9 @@ class NetworkManager {
     
     // MARK: - Authentication
     
-    func authenticate(provider: AuthProvider, authData: Any) async throws -> AuthResponse {
+    func authenticate<T: Encodable>(provider: AuthProvider, authData: T) async throws -> AuthResponse {
         let endpoint = "\(baseURL)/api/v1/auth/\(provider.rawValue)"
-        
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(authData as! Encodable)
-        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
-        
-        return try await post(endpoint, body: json)
+        return try await post(endpoint, body: authData)
     }
     
     func validateToken(_ token: String) async throws -> User {

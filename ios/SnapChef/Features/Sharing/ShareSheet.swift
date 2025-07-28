@@ -35,6 +35,7 @@ struct ShareSheet: View {
                             platform: .tiktok,
                             recipe: recipe,
                             message: shareMessage,
+                            view: self,
                             onShare: { trackShare(platform: "tiktok") }
                         )
                         
@@ -42,13 +43,23 @@ struct ShareSheet: View {
                             platform: .instagram,
                             recipe: recipe,
                             message: shareMessage,
+                            view: self,
                             onShare: { trackShare(platform: "instagram") }
+                        )
+                        
+                        SharePlatformButton(
+                            platform: .twitter,
+                            recipe: recipe,
+                            message: shareMessage,
+                            view: self,
+                            onShare: { trackShare(platform: "twitter") }
                         )
                         
                         SharePlatformButton(
                             platform: .copy,
                             recipe: recipe,
                             message: shareMessage,
+                            view: self,
                             onShare: {
                                 copyToClipboard()
                                 trackShare(platform: "clipboard")
@@ -164,15 +175,16 @@ struct SharePreviewCard: View {
     }
 }
 
-struct SharePlatformButton: View {
+struct SharePlatformButton<Content: View>: View {
     let platform: SharePlatform
     let recipe: Recipe
     let message: String
+    let view: Content
     let onShare: () -> Void
     
     var body: some View {
         Button(action: {
-            platform.share(recipe: recipe, message: message)
+            platform.share(recipe: recipe, message: message, from: view)
             onShare()
         }) {
             HStack {
@@ -200,13 +212,15 @@ struct SharePlatformButton: View {
 enum SharePlatform {
     case tiktok
     case instagram
+    case twitter
     case copy
     
     var title: String {
         switch self {
         case .tiktok: return "Share to TikTok"
         case .instagram: return "Share to Instagram"
-        case .copy: return "Copy Link"
+        case .twitter: return "Share to X"
+        case .copy: return "Copy Text"
         }
     }
     
@@ -214,6 +228,7 @@ enum SharePlatform {
         switch self {
         case .tiktok: return "music.note"
         case .instagram: return "camera"
+        case .twitter: return "x.circle"
         case .copy: return "doc.on.doc"
         }
     }
@@ -233,73 +248,22 @@ enum SharePlatform {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
+            case .twitter:
+                Color.black
             case .copy:
                 Color.white.opacity(0.2)
             }
         }
     }
     
-    func share(recipe: Recipe, message: String) {
-        switch self {
-        case .tiktok:
-            shareTikTok(recipe: recipe, message: message)
-        case .instagram:
-            shareInstagram(recipe: recipe, message: message)
-        case .copy:
-            break // Handled separately
-        }
-    }
-    
-    private func shareTikTok(recipe: Recipe, message: String) {
-        var text = "#SnapChef #\(recipe.name.replacingOccurrences(of: " ", with: ""))"
-        if !message.isEmpty {
-            text = "\(message) \(text)"
-        }
-        text += " #Recipe #Cooking #FoodHack"
-        
-        // TikTok doesn't have a direct share URL, so we open the app
-        if let url = URL(string: "tiktok://") {
-            if UIApplication.shared.canOpenURL(url) {
-                UIApplication.shared.open(url)
-            } else {
-                // Fallback to App Store
-                if let appStoreURL = URL(string: "https://apps.apple.com/app/tiktok/id835599320") {
-                    UIApplication.shared.open(appStoreURL)
-                }
-            }
-        }
-        
-        // Copy text to clipboard for easy paste
-        UIPasteboard.general.string = text
-    }
-    
-    private func shareInstagram(recipe: Recipe, message: String) {
-        // Instagram Stories deep link
-        if let url = URL(string: "instagram-stories://share") {
-            if UIApplication.shared.canOpenURL(url) {
-                UIApplication.shared.open(url)
-            } else {
-                // Fallback to Instagram app
-                if let instagramURL = URL(string: "instagram://") {
-                    if UIApplication.shared.canOpenURL(instagramURL) {
-                        UIApplication.shared.open(instagramURL)
-                    } else {
-                        // Fallback to App Store
-                        if let appStoreURL = URL(string: "https://apps.apple.com/app/instagram/id389801252") {
-                            UIApplication.shared.open(appStoreURL)
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Copy text for easy paste
-        var text = "🍳 \(recipe.name)\n"
-        if !message.isEmpty {
-            text += "\(message)\n"
-        }
-        text += "\nMade with @SnapChef ✨"
-        UIPasteboard.general.string = text
+    func share(recipe: Recipe, message: String, from view: View) {
+        guard let rootVC = view.getRootViewController() else { return }
+        SocialShareManager.shareToSocial(
+            platform: self,
+            recipe: recipe,
+            message: message,
+            from: rootVC
+        )
     }
 }
 
@@ -322,6 +286,7 @@ struct ShareTextFieldStyle: TextFieldStyle {
 
 #Preview {
     ShareSheet(recipe: Recipe(
+        id: UUID(),
         name: "Chicken Stir Fry",
         description: "A quick and healthy dish",
         ingredients: [],

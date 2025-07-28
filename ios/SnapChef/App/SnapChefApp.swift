@@ -30,7 +30,7 @@ struct SnapChefApp: App {
         deviceManager.checkDeviceStatus()
         
         // Setup analytics
-        AnalyticsManager.shared.initialize()
+        // AnalyticsManager.shared.initialize() // TODO: Add AnalyticsManager.swift to Xcode project
     }
     
     private func configureNavigationBar() {
