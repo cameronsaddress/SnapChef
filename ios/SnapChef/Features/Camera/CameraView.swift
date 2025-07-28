@@ -146,6 +146,16 @@ struct CameraView: View {
     private func capturePhoto() {
         HapticManager.impact(.medium)
         
+        // Check if camera is authorized
+        guard cameraModel.isCameraAuthorized else {
+            print("Camera not authorized")
+            // In simulator, use test image
+            #if targetEnvironment(simulator)
+            useTestPhoto()
+            #endif
+            return
+        }
+        
         cameraModel.capturePhoto { image in
             processImage(image)
         }

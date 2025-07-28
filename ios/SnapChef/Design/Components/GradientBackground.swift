@@ -6,10 +6,10 @@ struct GradientBackground: View {
     var body: some View {
         LinearGradient(
             gradient: Gradient(colors: [
-                Color(hex: "#FF6B6B"),
-                Color(hex: "#4ECDC4"),
-                Color(hex: "#45B7D1"),
-                Color(hex: "#96CEB4")
+                Color(hex: "#4ECDC4"), // Teal
+                Color(hex: "#45B7D1"), // Light Blue
+                Color(hex: "#3FA9C4"), // Medium Blue
+                Color(hex: "#52D3D8") // Cyan
             ]),
             startPoint: animateGradient ? .topLeading : .bottomLeading,
             endPoint: animateGradient ? .bottomTrailing : .topTrailing

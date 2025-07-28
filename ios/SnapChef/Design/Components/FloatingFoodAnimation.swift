@@ -31,9 +31,9 @@ struct FloatingFood: View {
         self.screenSize = screenSize
         self.index = index
         
-        // Random starting position
-        let startX = CGFloat.random(in: 0...screenSize.width)
-        let startY = CGFloat.random(in: -100...0)
+        // Random starting position - ensure food starts fully off-screen
+        let startX = CGFloat.random(in: 50...(screenSize.width - 50))
+        let startY = -100 // Always start above the screen
         self._position = State(initialValue: CGPoint(x: startX, y: startY))
     }
     

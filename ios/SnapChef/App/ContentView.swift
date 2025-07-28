@@ -7,23 +7,22 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            // Gradient background
-            GradientBackground()
-                .ignoresSafeArea()
+            // Gradient background with floating food
+            ZStack {
+                GradientBackground()
+                    .ignoresSafeArea()
+                
+                FloatingFoodAnimation()
+                    .allowsHitTesting(false)
+            }
             
-            // Main navigation
+            // Main navigation on top
             if appState.isFirstLaunch {
                 OnboardingView()
             } else {
                 MainTabView()
             }
         }
-        .background(
-            // Floating food animations behind everything
-            FloatingFoodAnimation()
-                .allowsHitTesting(false)
-                .zIndex(-1)
-        )
     }
 }
 

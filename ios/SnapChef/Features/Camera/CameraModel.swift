@@ -125,11 +125,21 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         if let error = error {
             print("Photo capture error: \(error)")
+            // Create a fallback image for simulator
+            #if targetEnvironment(simulator)
+            DispatchQueue.main.async { [weak self] in
+                if let fallbackImage = self?.createFallbackImage() {
+                    self?.photoCompletion?(fallbackImage)
+                    self?.photoCompletion = nil
+                }
+            }
+            #endif
             return
         }
         
         guard let imageData = photo.fileDataRepresentation(),
               let image = UIImage(data: imageData) else {
+            print("Failed to get image data from photo")
             return
         }
         
@@ -140,6 +150,22 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
             self?.photoCompletion?(processedImage)
             self?.photoCompletion = nil
         }
+    }
+    
+    private func createFallbackImage() -> UIImage? {
+        let size = CGSize(width: 300, height: 300)
+        UIGraphicsBeginImageContextWithOptions(size, false, 0)
+        defer { UIGraphicsEndImageContext() }
+        
+        guard let context = UIGraphicsGetCurrentContext() else { return nil }
+        
+        // Draw gradient
+        let colors = [UIColor.systemTeal.cgColor, UIColor.systemBlue.cgColor]
+        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors as CFArray, locations: nil) {
+            context.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size.width, y: size.height), options: [])
+        }
+        
+        return UIGraphicsGetImageFromCurrentImageContext()
     }
     
     private func processImage(_ image: UIImage) -> UIImage {
