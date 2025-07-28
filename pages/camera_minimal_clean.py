@@ -538,9 +538,41 @@ def show_camera():
             st.session_state.photo_taken = True
             st.session_state.processing = True
             st.rerun()
+        
+        # Add test button for development
+        st.markdown("<br>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🧪 Use Test Fridge Photo", key="test_photo", use_container_width=True):
+                # Import test image
+                from utils.test_images import get_test_fridge_image
+                import io
+                
+                # Get test image bytes
+                test_image_bytes = get_test_fridge_image()
+                
+                # Create a file-like object that mimics uploaded file
+                class TestPhoto:
+                    def __init__(self, image_bytes):
+                        self._bytes = image_bytes
+                    
+                    def getvalue(self):
+                        return self._bytes
+                
+                # Set test photo in session state
+                st.session_state.photo = TestPhoto(test_image_bytes)
+                st.session_state.photo_taken = True
+                st.session_state.processing = True
+                st.rerun()
 
 def process_photo_with_progress():
     """Process photo with progress bar - rebuilt for reliability"""
+    
+    # Decrement free uses if not authenticated
+    if not st.session_state.authenticated and st.session_state.device_id:
+        from utils.device_fingerprint import check_free_uses
+        device_data = check_free_uses(st.session_state.device_id)
+        st.session_state.free_uses = device_data['uses_remaining']
     
     # Create containers for different UI sections
     progress_container = st.container()

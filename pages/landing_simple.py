@@ -156,7 +156,11 @@ def show_landing():
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Free uses indicator
-    st.markdown(f'<div style="text-align: center;"><span class="free-uses-badge">Hey Friend, Here\'s {st.session_state.free_uses} free snaps on us! 👇</span></div>', unsafe_allow_html=True)
+    if st.session_state.free_uses > 0:
+        uses_text = f"{st.session_state.free_uses} free snap{'s' if st.session_state.free_uses > 1 else ''}"
+        st.markdown(f'<div style="text-align: center;"><span class="free-uses-badge">Hey Friend, Here\'s {uses_text} on us! 👇</span></div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div style="text-align: center;"><span class="free-uses-badge">No free snaps remaining - Sign up to continue! 🚀</span></div>', unsafe_allow_html=True)
     
     # Main CTA Button with styled logo
     col1, col2, col3 = st.columns([1, 2, 1])
