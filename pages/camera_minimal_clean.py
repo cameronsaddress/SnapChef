@@ -666,7 +666,12 @@ def process_photo_with_progress():
                 </style>
             """, unsafe_allow_html=True)
             
-            st.image(st.session_state.photo, use_container_width=True)
+            # Display the image - handle both regular uploads and test photos
+            if hasattr(st.session_state.photo, 'getvalue'):
+                # For both UploadedFile and TestPhoto objects
+                st.image(st.session_state.photo.getvalue(), use_container_width=True)
+            else:
+                st.image(st.session_state.photo, use_container_width=True)
     
     try:
         # Progress messages array
