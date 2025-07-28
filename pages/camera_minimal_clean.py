@@ -555,8 +555,14 @@ def show_camera():
                 class TestPhoto:
                     def __init__(self, image_bytes):
                         self._bytes = image_bytes
+                        self.name = "test_fridge.jpg"
+                        self.type = "image/jpeg"
+                        self.size = len(image_bytes)
                     
                     def getvalue(self):
+                        return self._bytes
+                    
+                    def read(self):
                         return self._bytes
                 
                 # Set test photo in session state
@@ -692,7 +698,9 @@ def process_photo_with_progress():
         if img.size[0] > max_size[0] or img.size[1] > max_size[1]:
             img.thumbnail(max_size, Image.Resampling.LANCZOS)
             img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format=img.format or 'JPEG', quality=85)
+            # Use format if available, otherwise default to JPEG
+            img_format = getattr(img, 'format', 'JPEG') or 'JPEG'
+            img.save(img_byte_arr, format=img_format, quality=85)
             photo_bytes = img_byte_arr.getvalue()
         
         # Show second message
