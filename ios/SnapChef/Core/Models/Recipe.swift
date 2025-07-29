@@ -30,9 +30,9 @@ struct Recipe: Identifiable, Codable {
         
         var emoji: String {
             switch self {
-            case .easy: return "👶"
+            case .easy: return "🧑‍🍳"
             case .medium: return "👨‍🍳"
-            case .hard: return "🔥"
+            case .hard: return "👩‍🍳🔥"
             }
         }
         

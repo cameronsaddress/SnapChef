@@ -222,6 +222,9 @@ struct ShareImageContent: View {
     let afterPhoto: UIImage?
     let style: ShareGeneratorView.ShareStyle
     
+    @State private var customChefName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
+    @State private var customPhotoData: Data? = UserDefaults.standard.data(forKey: "CustomChefPhoto")
+    
     var backgroundGradient: LinearGradient {
         switch style {
         case .homeCook:
@@ -411,14 +414,47 @@ struct ShareImageContent: View {
                 
                 Spacer()
                 
-                // App branding
-                HStack {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 20, weight: .bold))
-                    Text("SnapChef")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                // App branding with custom chef info
+                VStack(spacing: 12) {
+                    HStack(spacing: 16) {
+                        // Custom chef photo or default
+                        if let photoData = customPhotoData,
+                           let uiImage = UIImage(data: photoData) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 40, height: 40)
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(textColor.opacity(0.3), lineWidth: 2)
+                                )
+                        } else {
+                            Circle()
+                                .fill(textColor.opacity(0.2))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Text(customChefName.isEmpty ? "SC" : customChefName.prefix(1).uppercased())
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(textColor)
+                                )
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Made by \(customChefName.isEmpty ? "SnapChef" : customChefName)")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(textColor.opacity(0.8))
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 12, weight: .bold))
+                                Text("SnapChef")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                            }
+                            .foregroundColor(textColor)
+                        }
+                    }
                 }
-                .foregroundColor(textColor)
                 .padding(.bottom, 30)
             }
             .padding(.top, 40)

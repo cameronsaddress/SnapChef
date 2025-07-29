@@ -71,10 +71,6 @@ struct EnhancedHomeView: View {
                             }
                         }
                         
-                        // Feature Cards
-                        FeatureCardsGrid()
-                            .padding(.horizontal, 20)
-                        
                         // Mystery Meal Button
                         MysteryMealButton(
                             isAnimating: $mysteryMealAnimation,
@@ -293,78 +289,6 @@ struct FreeUsesIndicatorEnhanced: View {
     }
 }
 
-// MARK: - Feature Cards Grid
-struct FeatureCardsGrid: View {
-    let features = [
-        ("🤖", "AI Magic", "Smart recipe generation", Color(hex: "#667eea")),
-        ("⚡", "Instant", "Results in seconds, meals in minutes", Color(hex: "#f093fb")),
-        ("🎯", "Personal", "Tailored to you", Color(hex: "#4facfe")),
-        ("🌟", "Share", "Go viral instantly", Color(hex: "#43e97b"))
-    ]
-    
-    @State private var selectedIndex: Int? = nil
-    
-    var body: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 16),
-            GridItem(.flexible(), spacing: 16)
-        ], spacing: 16) {
-            ForEach(0..<features.count, id: \.self) { index in
-                FeatureCardEnhanced(
-                    emoji: features[index].0,
-                    title: features[index].1,
-                    description: features[index].2,
-                    color: features[index].3,
-                    isSelected: selectedIndex == index
-                )
-                .aspectRatio(1, contentMode: .fit)
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        selectedIndex = selectedIndex == index ? nil : index
-                    }
-                    
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                }
-            }
-        }
-    }
-}
-
-struct FeatureCardEnhanced: View {
-    let emoji: String
-    let title: String
-    let description: String
-    let color: Color
-    let isSelected: Bool
-    
-    var body: some View {
-        GlassmorphicCard(content: {
-            VStack(spacing: 12) {
-                // Emoji with animation
-                Text(emoji)
-                    .font(.system(size: 40))
-                    .scaleEffect(isSelected ? 1.2 : 1)
-                    .rotationEffect(.degrees(isSelected ? 10 : 0))
-                
-                Text(title)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                
-                Text(description)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.9)
-            }
-            .padding(.vertical, 24)
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity)
-        }, glowColor: color)
-        .scaleEffect(isSelected ? 1.05 : 1)
-    }
-}
 
 // MARK: - Viral Challenge Section
 struct ViralChallengeSection: View {

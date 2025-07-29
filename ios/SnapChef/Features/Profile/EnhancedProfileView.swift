@@ -101,6 +101,9 @@ struct EnhancedProfileHeader: View {
     let user: User?
     @State private var glowAnimation = false
     @State private var rotationAngle: Double = 0
+    @State private var showingEditProfile = false
+    @State private var customName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
+    @State private var customPhotoData: Data? = UserDefaults.standard.data(forKey: "CustomChefPhoto")
     
     var body: some View {
         VStack(spacing: 20) {
@@ -125,26 +128,40 @@ struct EnhancedProfileHeader: View {
                     .opacity(glowAnimation ? 0.8 : 1)
                 
                 // Profile container
-                GlassmorphicCard(content: {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "#667eea"),
-                                    Color(hex: "#764ba2")
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                Button(action: { showingEditProfile = true }) {
+                    GlassmorphicCard(content: {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#667eea"),
+                                        Color(hex: "#764ba2")
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
-                        .frame(width: 120, height: 120)
-                        .overlay(
-                            Text((user?.name ?? "?").prefix(1).uppercased())
-                                .font(.system(size: 48, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                        )
-                }, cornerRadius: 60)
-                .frame(width: 120, height: 120)
+                            .frame(width: 120, height: 120)
+                            .overlay(
+                                Group {
+                                    if let photoData = customPhotoData,
+                                       let uiImage = UIImage(data: photoData) {
+                                        Image(uiImage: uiImage)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 120, height: 120)
+                                            .clipShape(Circle())
+                                    } else {
+                                        Text((customName.isEmpty ? (user?.name ?? "Guest") : customName).prefix(1).uppercased())
+                                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                                            .foregroundColor(.white)
+                                    }
+                                }
+                            )
+                    }, cornerRadius: 60)
+                    .frame(width: 120, height: 120)
+                }
+                .buttonStyle(PlainButtonStyle())
                 
                 // Level badge
                 VStack {
@@ -160,15 +177,18 @@ struct EnhancedProfileHeader: View {
             
             // User info with gradient text
             VStack(spacing: 8) {
-                Text(user?.name ?? "Guest Chef")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color.white, Color.white.opacity(0.9)],
-                            startPoint: .top,
-                            endPoint: .bottom
+                Button(action: { showingEditProfile = true }) {
+                    Text(customName.isEmpty ? (user?.name ?? "Guest Chef") : customName)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.white, Color.white.opacity(0.9)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
                         )
-                    )
+                }
+                .buttonStyle(PlainButtonStyle())
                 
                 Text(user?.email ?? "Start your culinary journey")
                     .font(.system(size: 16, weight: .medium))
@@ -182,6 +202,12 @@ struct EnhancedProfileHeader: View {
             }
         }
         .padding(.top, 40)
+        .sheet(isPresented: $showingEditProfile) {
+            EditProfileView(
+                customName: $customName,
+                customPhotoData: $customPhotoData
+            )
+        }
         .onAppear {
             withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
                 rotationAngle = 360
@@ -643,7 +669,7 @@ struct UpgradePrompt: View {
 // MARK: - Social Stats Card
 struct SocialStatsCard: View {
     @EnvironmentObject var appState: AppState
-    @State private var isExpanded = false
+    @State private var isExpanded = true
     
     var body: some View {
         GlassmorphicCard(content: {
@@ -825,6 +851,187 @@ struct EnhancedSignOutButton: View {
             Button("Sign Out", role: .destructive, action: action)
         } message: {
             Text("You'll need to sign in again to access your recipes and progress.")
+        }
+    }
+}
+
+// MARK: - Edit Profile View
+struct EditProfileView: View {
+    @Binding var customName: String
+    @Binding var customPhotoData: Data?
+    @Environment(\.dismiss) var dismiss
+    
+    @State private var tempName: String = ""
+    @State private var showingImagePicker = false
+    @State private var selectedImage: UIImage?
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                MagicalBackground()
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 30) {
+                    // Profile Photo
+                    Button(action: { showingImagePicker = true }) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(hex: "#667eea"),
+                                            Color(hex: "#764ba2")
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 150, height: 150)
+                            
+                            if let image = selectedImage {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 150, height: 150)
+                                    .clipShape(Circle())
+                            } else if let photoData = customPhotoData,
+                                      let uiImage = UIImage(data: photoData) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 150, height: 150)
+                                    .clipShape(Circle())
+                            } else {
+                                VStack(spacing: 12) {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(.white)
+                                    Text("Add Photo")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            
+                            // Edit overlay
+                            VStack {
+                                Spacer()
+                                HStack {
+                                    Spacer()
+                                    Circle()
+                                        .fill(Color(hex: "#43e97b"))
+                                        .frame(width: 36, height: 36)
+                                        .overlay(
+                                            Image(systemName: "pencil")
+                                                .font(.system(size: 16, weight: .bold))
+                                                .foregroundColor(.white)
+                                        )
+                                        .offset(x: -10, y: -10)
+                                }
+                            }
+                            .frame(width: 150, height: 150)
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    // Name Input
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Chef Name")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        TextField("Enter your chef name", text: $tempName)
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.white.opacity(0.1))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .padding(.horizontal, 30)
+                    
+                    Spacer()
+                }
+                .padding(.top, 30)
+            }
+            .navigationTitle("Edit Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        // Save the changes
+                        customName = tempName
+                        if let image = selectedImage {
+                            customPhotoData = image.jpegData(compressionQuality: 0.8)
+                        }
+                        
+                        // Persist to UserDefaults
+                        UserDefaults.standard.set(customName, forKey: "CustomChefName")
+                        if let photoData = customPhotoData {
+                            UserDefaults.standard.set(photoData, forKey: "CustomChefPhoto")
+                        }
+                        
+                        dismiss()
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Color(hex: "#43e97b"))
+                }
+            }
+        }
+        .onAppear {
+            tempName = customName
+        }
+        .sheet(isPresented: $showingImagePicker) {
+            ImagePicker(selectedImage: $selectedImage)
+        }
+    }
+}
+
+// MARK: - Image Picker
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var selectedImage: UIImage?
+    @Environment(\.dismiss) var dismiss
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .photoLibrary
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
+        
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.selectedImage = image
+            }
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
         }
     }
 }
