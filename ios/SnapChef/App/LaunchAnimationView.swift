@@ -163,8 +163,8 @@ struct LaunchAnimationView: View {
                 }
             }
             
-            // End animation after exactly 4 seconds total (0.8s delay + 3.2s animation)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
+            // End animation after exactly 8 seconds total (0.8s delay + 7.2s animation)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 7.2) {
                 animationTimer.invalidate()
                 
                 withAnimation(.easeOut(duration: 0.3)) {

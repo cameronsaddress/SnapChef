@@ -47,6 +47,14 @@ struct EnhancedHomeView: View {
                             )
                             .padding(.horizontal, 30)
                             .modifier(ShakeEffect(shakeNumber: buttonShake ? 2 : 0))
+                            .background(
+                                GeometryReader { geometry in
+                                    Color.clear
+                                        .onAppear {
+                                            updateButtonFrames(geometry.frame(in: .global))
+                                        }
+                                }
+                            )
                             
                             // Equal spacing below button
                             Spacer()
@@ -147,6 +155,10 @@ struct EnhancedHomeView: View {
                 startButtonShake()
             }
         }
+    }
+    
+    private func updateButtonFrames(_ frame: CGRect) {
+        fallingFoodManager.updateButtonFrames([frame])
     }
 }
 
@@ -642,12 +654,18 @@ struct ShakeEffect: AnimatableModifier {
 class FallingFoodManager: ObservableObject {
     @Published var emojis: [FallingFoodEmoji] = []
     private let foodEmojis = ["🍕", "🍔", "🌮", "🍜", "🍝", "🥗", "🍣", "🥘", "🍛", "🥙", "🍱", "🥪", "🌯", "🍖", "🍗", "🥓", "🧀", "🥚", "🍳", "🥞"]
+    private var buttonFrames: [CGRect] = []
     
     struct FallingFoodEmoji: Identifiable {
         let id = UUID()
         var position: CGPoint
         var velocity: CGVector
         let emoji: String
+        var hasBouncedOffButton = false
+    }
+    
+    func updateButtonFrames(_ frames: [CGRect]) {
+        buttonFrames = frames
     }
     
     func startFallingFood() {
@@ -661,8 +679,8 @@ class FallingFoodManager: ObservableObject {
     }
     
     private func scheduleNextEmoji() {
-        // Random delay between 2-5 seconds for more natural spacing
-        let delay = Double.random(in: 2...5)
+        // Random delay between 0.5-3 seconds, ensuring minimum 0.5s spacing
+        let delay = Double.random(in: 0.5...3)
         
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             self.dropEmoji()
@@ -673,50 +691,30 @@ class FallingFoodManager: ObservableObject {
     private func dropEmoji() {
         let screenWidth = UIScreen.main.bounds.width
         
-        // Usually drop 1, occasionally drop 2
-        let count = Double.random(in: 0...1) < 0.8 ? 1 : 2
+        // Always drop only 1 emoji
+        let x = CGFloat.random(in: 50...screenWidth - 50)
         
-        // If dropping 2, ensure they're spaced apart
-        var lastX: CGFloat = 0
+        let emoji = FallingFoodEmoji(
+            position: CGPoint(
+                x: x,
+                y: CGFloat.random(in: -50 ... -30) // Slight variation in start height
+            ),
+            velocity: CGVector(
+                dx: CGFloat.random(in: -30...30), // Wider horizontal variation
+                dy: CGFloat.random(in: 80...120) // More variation in fall speed
+            ),
+            emoji: foodEmojis.randomElement() ?? "🍕",
+            hasBouncedOffButton: false
+        )
         
-        for i in 0..<count {
-            var x = CGFloat.random(in: 50...screenWidth - 50)
-            
-            // If this is the second emoji, ensure it's at least 100 points away from the first
-            if i == 1 && abs(x - lastX) < 100 {
-                x = lastX < screenWidth / 2 ? lastX + 100 : lastX - 100
-                // Ensure it's still within bounds
-                x = max(50, min(screenWidth - 50, x))
-            }
-            lastX = x
-            
-            let emoji = FallingFoodEmoji(
-                position: CGPoint(
-                    x: x,
-                    y: CGFloat.random(in: -50 ... -30) // Slight variation in start height
-                ),
-                velocity: CGVector(
-                    dx: CGFloat.random(in: -30...30), // Wider horizontal variation
-                    dy: CGFloat.random(in: 80...120) // More variation in fall speed
-                ),
-                emoji: foodEmojis.randomElement() ?? "🍕"
-            )
-            
-            // Add a small delay between multiple emojis
-            if i == 0 {
-                emojis.append(emoji)
-            } else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    self.emojis.append(emoji)
-                }
-            }
-        }
+        emojis.append(emoji)
     }
     
     private func updatePhysics() {
         let deltaTime = 0.016
         let gravity: Double = 400
         let screenHeight = UIScreen.main.bounds.height
+        let bounceDamping: Double = 0.5
         
         for i in emojis.indices {
             // Apply gravity
@@ -725,12 +723,43 @@ class FallingFoodManager: ObservableObject {
             // Update position
             emojis[i].position.x += emojis[i].velocity.dx * deltaTime
             emojis[i].position.y += emojis[i].velocity.dy * deltaTime
+            
+            // Check collision with buttons (only if hasn't bounced yet)
+            if !emojis[i].hasBouncedOffButton {
+                for buttonFrame in buttonFrames {
+                    if isCollidingWithButton(emoji: emojis[i], buttonFrame: buttonFrame) {
+                        // Bounce off button
+                        emojis[i].velocity.dy = -abs(emojis[i].velocity.dy) * bounceDamping
+                        emojis[i].velocity.dx += CGFloat.random(in: -40...40)
+                        
+                        // Move emoji to top of button
+                        emojis[i].position.y = buttonFrame.minY - 15
+                        
+                        // Mark as having bounced
+                        emojis[i].hasBouncedOffButton = true
+                        break
+                    }
+                }
+            }
         }
         
         // Remove emojis that have fallen off screen
         emojis.removeAll { emoji in
             emoji.position.y > screenHeight + 50
         }
+    }
+    
+    private func isCollidingWithButton(emoji: FallingFoodEmoji, buttonFrame: CGRect) -> Bool {
+        // Check if emoji is within horizontal bounds of button
+        let emojiLeft = emoji.position.x - 15
+        let emojiRight = emoji.position.x + 15
+        
+        if emojiLeft < buttonFrame.maxX && emojiRight > buttonFrame.minX {
+            // Check if emoji bottom is touching button top
+            let emojiBottom = emoji.position.y + 15
+            return emojiBottom >= buttonFrame.minY && emojiBottom <= buttonFrame.minY + 20 && emoji.velocity.dy > 0
+        }
+        return false
     }
 }
 
