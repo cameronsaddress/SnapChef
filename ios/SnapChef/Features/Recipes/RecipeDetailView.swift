@@ -101,7 +101,7 @@ struct RecipeDetailView: View {
                     Button(action: { showingPrintView = true }) {
                         Image(systemName: "printer")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.black)
+                            .foregroundColor(.white)
                     }
                 }
                 

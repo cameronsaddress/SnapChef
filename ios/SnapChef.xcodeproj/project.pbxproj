@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		029A7130FC0C91D6CAAE5A90 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24CAD8A630415C8647F25135 /* KeychainManager.swift */; };
+		07359C705510EBDD85E2824C /* LocalRecipeDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2186F45DBCD7974F4B5B5860 /* LocalRecipeDatabase.swift */; };
 		09A7E3BFA651EF24792DAE75 /* GlassmorphicComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F190CCE2F51225F63B9697D6 /* GlassmorphicComponents.swift */; };
 		0A19D54755B00F55E24F26F3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213986243A296CEDAE62DDDA /* ContentView.swift */; };
 		1522F542AF93C22294D467B0 /* ColorExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F86BA371D3D52CF301892C /* ColorExtensions.swift */; };
@@ -75,6 +76,7 @@
 		1BDD38BBCC57D0F28B462A0D /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = SnapChef/Info.plist; sourceTree = "<group>"; };
 		1F9E71E3568C5526424ED740 /* EnhancedCameraView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EnhancedCameraView.swift; path = SnapChef/Features/Camera/EnhancedCameraView.swift; sourceTree = "<group>"; };
 		213986243A296CEDAE62DDDA /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = SnapChef/App/ContentView.swift; sourceTree = "<group>"; };
+		2186F45DBCD7974F4B5B5860 /* LocalRecipeDatabase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LocalRecipeDatabase.swift; path = SnapChef/Features/AIPersonality/LocalRecipeDatabase.swift; sourceTree = "<group>"; };
 		24CAD8A630415C8647F25135 /* KeychainManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = KeychainManager.swift; path = SnapChef/Core/Utilities/KeychainManager.swift; sourceTree = "<group>"; };
 		251117D82A34A8E516FC9C56 /* SocialShareView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SocialShareView.swift; path = SnapChef/Features/Sharing/SocialShareView.swift; sourceTree = "<group>"; };
 		258CF31CFDA34009FD6ED5D8 /* fridge.jpg */ = {isa = PBXFileReference; includeInIndex = 1; name = fridge.jpg; path = SnapChef/Resources/fridge.jpg; sourceTree = "<group>"; };
@@ -173,6 +175,7 @@
 				A222D311FA8E5A63B5427FCE /* AIPersonalityManager.swift */,
 				2ABAFD32A12E2DBC4056FD0F /* AIPersonalityView.swift */,
 				E39D96ACCF5D46EE6F4094CA /* MysteryMealView.swift */,
+				2186F45DBCD7974F4B5B5860 /* LocalRecipeDatabase.swift */,
 			);
 			name = AIPersonality;
 			sourceTree = "<group>";
@@ -604,6 +607,7 @@
 				AF51A831B3A7238B0290CA00 /* SnapChefAPIManager.swift in Sources */,
 				3A18FD013F190FCDC91D85F2 /* FoodPreferencesView.swift in Sources */,
 				E0BB37B10D2994E6DA7D7614 /* PhysicsLoadingOverlay.swift in Sources */,
+				07359C705510EBDD85E2824C /* LocalRecipeDatabase.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

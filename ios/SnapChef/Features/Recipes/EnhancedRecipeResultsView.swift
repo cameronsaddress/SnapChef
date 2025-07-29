@@ -151,58 +151,8 @@ struct EnhancedRecipeResultsView: View {
 
 // MARK: - Success Header
 struct SuccessHeaderView: View {
-    @State private var sparkleRotation: Double = 0
-    @State private var pulseScale: CGFloat = 1
-    
     var body: some View {
         VStack(spacing: 20) {
-            // Animated icon
-            ZStack {
-                // Glow effect
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                Color(hex: "#43e97b").opacity(0.3),
-                                Color.clear
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 80
-                        )
-                    )
-                    .frame(width: 160, height: 160)
-                    .scaleEffect(pulseScale)
-                
-                // Success icon
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "#43e97b"),
-                                    Color(hex: "#38f9d7")
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 100, height: 100)
-                    
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 50, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                
-                // Sparkles
-                ForEach(0..<4) { index in
-                    Image(systemName: "sparkle")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(Color(hex: "#43e97b"))
-                        .offset(x: 60, y: 0)
-                        .rotationEffect(.degrees(sparkleRotation + Double(index) * 90))
-                }
-            }
             
             Text("Recipe Magic Complete!")
                 .font(.system(size: 28, weight: .bold, design: .rounded))
@@ -222,15 +172,6 @@ struct SuccessHeaderView: View {
                 .foregroundColor(.white.opacity(0.8))
         }
         .padding(.top, 40)
-        .onAppear {
-            withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
-                sparkleRotation = 360
-            }
-            
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                pulseScale = 1.2
-            }
-        }
     }
 }
 

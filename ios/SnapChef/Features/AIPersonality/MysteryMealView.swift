@@ -3,6 +3,7 @@ import SwiftUI
 struct MysteryMealView: View {
     @StateObject private var personalityManager = AIPersonalityManager.shared
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var deviceManager: DeviceManager
     @Environment(\.dismiss) var dismiss
     @State private var isGenerating = false
     @State private var generatedRecipes: [Recipe] = []
@@ -11,6 +12,9 @@ struct MysteryMealView: View {
     @State private var selectedIngredients: [String] = []
     @State private var surpriseLevel: SurpriseRecipeSettings.WildnessLevel = .medium
     @State private var showConfetti = false
+    @State private var selectedCuisine: String = ""
+    @State private var selectedRecipe: Recipe?
+    @State private var showingSaveAlert = false
     
     var body: some View {
         NavigationStack {
@@ -30,9 +34,13 @@ struct MysteryMealView: View {
                                 .frame(height: 300)
                                 .padding(.horizontal, 20)
                             
-                            // Surprise level selector
-                            SurpriseLevelSelector(selectedLevel: $surpriseLevel)
-                                .padding(.horizontal, 20)
+                            // Selected cuisine label
+                            if !selectedCuisine.isEmpty {
+                                Text("You got: \(selectedCuisine)")
+                                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .transition(.opacity.combined(with: .scale))
+                            }
                             
                             // Spin button
                             SpinWheelButton(
@@ -40,7 +48,23 @@ struct MysteryMealView: View {
                                 isSpinning: wheelRotation != 0
                             )
                             .padding(.horizontal, 40)
-                            .padding(.bottom, 40)
+                            
+                            // Recipe card
+                            if let recipe = selectedRecipe {
+                                VStack(spacing: 20) {
+                                    MysteryRecipeCard(
+                                        recipe: recipe,
+                                        onSave: saveRecipe
+                                    )
+                                    .transition(.asymmetric(
+                                        insertion: .scale.combined(with: .opacity),
+                                        removal: .opacity
+                                    ))
+                                }
+                                .padding(.horizontal, 20)
+                            }
+                            
+                            Spacer(minLength: 40)
                         }
                     }
                 } else {
@@ -72,6 +96,40 @@ struct MysteryMealView: View {
             )
         }
         .particleExplosion(trigger: $showConfetti)
+        .alert("Save Recipe", isPresented: $showingSaveAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            if deviceManager.hasUnlimitedAccess {
+                Text("Recipe saved to your collection!")
+            } else if deviceManager.freeSavesRemaining > 0 {
+                Text("Recipe saved! You have \(deviceManager.freeSavesRemaining - 1) free saves remaining.")
+            } else {
+                Text("You've used all your free saves. Upgrade to save unlimited recipes!")
+            }
+        }
+    }
+    
+    private func saveRecipe() {
+        guard let recipe = selectedRecipe else { return }
+        
+        // Check if user can save
+        if !deviceManager.hasUnlimitedAccess && deviceManager.freeSavesRemaining <= 0 {
+            showingSaveAlert = true
+            return
+        }
+        
+        // Consume a free save if not subscribed
+        if !deviceManager.hasUnlimitedAccess {
+            Task {
+                await deviceManager.consumeFreeSave()
+            }
+        }
+        
+        // Save the recipe
+        appState.addRecentRecipe(recipe)
+        appState.saveRecipeWithPhotos(recipe, beforePhoto: nil, afterPhoto: nil)
+        
+        showingSaveAlert = true
     }
     
     private func spinWheel() {
@@ -79,14 +137,31 @@ struct MysteryMealView: View {
         let generator = UIImpactFeedbackGenerator(style: .heavy)
         generator.impactOccurred()
         
+        // Calculate random spin amount
+        let randomRotation = Double.random(in: 0...360)
+        let totalRotation = 720 + randomRotation
+        
         // Spin animation
         withAnimation(.easeOut(duration: 3)) {
-            wheelRotation += 720 + Double.random(in: 0...360)
+            wheelRotation += totalRotation
         }
         
-        // Start generation after spin
+        // Determine selected cuisine after spin
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            generateMysteryMeal()
+            // Calculate which segment the wheel landed on
+            let cuisines = ["Italian 🍝", "Mexican 🌮", "Chinese 🥟", "Japanese 🍱", 
+                            "Thai 🍜", "Indian 🍛", "French 🥐", "American 🍔"]
+            let segmentAngle = 360.0 / Double(cuisines.count)
+            let finalAngle = wheelRotation.truncatingRemainder(dividingBy: 360)
+            let selectedIndex = Int((360 - finalAngle) / segmentAngle) % cuisines.count
+            
+            selectedCuisine = cuisines[selectedIndex]
+            
+            // Get a random recipe for the selected cuisine
+            if let recipe = LocalRecipeDatabase.shared.getRandomRecipe(for: selectedCuisine) {
+                selectedRecipe = recipe
+                showConfetti = true
+            }
         }
     }
     
@@ -262,41 +337,46 @@ struct FortuneWheelView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Wheel segments
-                ForEach(0..<cuisines.count) { index in
-                    WheelSegment(
-                        startAngle: Double(index) * 360 / Double(cuisines.count),
-                        endAngle: Double(index + 1) * 360 / Double(cuisines.count),
-                        text: cuisines[index],
-                        color: segmentColor(for: index)
-                    )
-                }
-                
-                // Center circle button
-                Button(action: onSpin) {
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color.white,
-                                    Color.white.opacity(0.8)
-                                ],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: 40
+                // Rotating wheel
+                ZStack {
+                    // Wheel segments
+                    ForEach(0..<cuisines.count) { index in
+                        WheelSegment(
+                            startAngle: Double(index) * 360 / Double(cuisines.count),
+                            endAngle: Double(index + 1) * 360 / Double(cuisines.count),
+                            text: cuisines[index],
+                            color: segmentColor(for: index)
+                        )
+                    }
+                    
+                    // Center circle button
+                    Button(action: onSpin) {
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        Color.white,
+                                        Color.white.opacity(0.8)
+                                    ],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: 40
+                                )
                             )
-                        )
-                        .frame(width: 80, height: 80)
-                        .overlay(
-                            Text("SPIN")
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .foregroundColor(Color(hex: "#667eea"))
-                        )
-                        .shadow(radius: 10)
+                            .frame(width: 80, height: 80)
+                            .overlay(
+                                Text("SPIN")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundColor(Color(hex: "#667eea"))
+                            )
+                            .shadow(radius: 10)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
-                .buttonStyle(PlainButtonStyle())
+                .frame(width: geometry.size.width, height: geometry.size.width)
+                .rotationEffect(.degrees(rotation))
                 
-                // Pointer on the right - positioned to slightly overlap
+                // Stationary pointer on the right - positioned to slightly overlap
                 HStack {
                     Spacer()
                     Triangle()
@@ -307,8 +387,6 @@ struct FortuneWheelView: View {
                         .offset(x: 25) // Positioned so the point barely overlaps the wheel
                 }
             }
-            .frame(width: geometry.size.width, height: geometry.size.width)
-            .rotationEffect(.degrees(rotation))
         }
     }
     
@@ -394,6 +472,115 @@ struct Triangle: Shape {
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
         path.closeSubpath()
         return path
+    }
+}
+
+// MARK: - Mystery Recipe Card
+struct MysteryRecipeCard: View {
+    let recipe: Recipe
+    let onSave: () -> Void
+    @State private var showingDetail = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(recipe.name)
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                    
+                    Text(recipe.description)
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.8))
+                        .lineLimit(2)
+                }
+                
+                Spacer()
+                
+                // Save button
+                Button(action: onSave) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            Circle()
+                                .fill(Color(hex: "#ff6b6b"))
+                        )
+                }
+            }
+            
+            // Recipe info
+            HStack(spacing: 20) {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                    Text(recipe.prepTime)
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: "flame")
+                    Text(recipe.cookTime)
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: "chart.bar")
+                    Text(recipe.difficulty.capitalized)
+                }
+            }
+            .font(.system(size: 14, weight: .medium))
+            .foregroundColor(.white.opacity(0.8))
+            
+            // Ingredients preview
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Ingredients")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Text(recipe.ingredients.prefix(3).joined(separator: ", ") + (recipe.ingredients.count > 3 ? "..." : ""))
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(2)
+            }
+            
+            // View full recipe button
+            Button(action: { showingDetail = true }) {
+                HStack {
+                    Text("View Full Recipe")
+                        .font(.system(size: 16, weight: .semibold))
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 14, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#667eea"),
+                                    Color(hex: "#764ba2")
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                )
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
+        .shadow(color: Color.black.opacity(0.1), radius: 20, y: 10)
+        .sheet(isPresented: $showingDetail) {
+            RecipeDetailView(recipe: recipe)
+        }
     }
 }
 

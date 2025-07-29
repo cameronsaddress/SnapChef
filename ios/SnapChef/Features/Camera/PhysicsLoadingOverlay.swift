@@ -96,7 +96,7 @@ struct PhysicsLoadingOverlay: View {
                     Text(emoji.emoji)
                         .font(.system(size: 32))
                         .position(emoji.position)
-                        .rotationEffect(.degrees(emoji.rotation))
+                        // No rotation - emojis fall straight down
                         .scaleEffect(emoji.scale)
                 }
             }
@@ -138,8 +138,8 @@ struct PhysicsLoadingOverlay: View {
                 y: -50
             ),
             velocity: CGVector(
-                dx: CGFloat.random(in: -2...2),
-                dy: CGFloat.random(in: 3...5)
+                dx: CGFloat.random(in: -1...1),
+                dy: CGFloat.random(in: 5...8)
             )
         )
         fallingEmojis.append(emoji)
@@ -171,15 +171,15 @@ struct PhysicsLoadingOverlay: View {
     
     private func updatePhysics(in size: CGSize) {
         for index in fallingEmojis.indices {
-            // Apply gravity
-            fallingEmojis[index].velocity.dy += 0.3
+            // Apply gravity (increased for better falling effect)
+            fallingEmojis[index].velocity.dy += 0.8
             
             // Update position
             fallingEmojis[index].position.x += fallingEmojis[index].velocity.dx
             fallingEmojis[index].position.y += fallingEmojis[index].velocity.dy
             
-            // Update rotation
-            fallingEmojis[index].rotation += Double(fallingEmojis[index].velocity.dx) * 2
+            // Update rotation (removed - emojis should fall straight)
+            // fallingEmojis[index].rotation += Double(fallingEmojis[index].velocity.dx) * 2
             
             // Check collision with letters
             for letterBound in letterBounds {

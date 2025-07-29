@@ -8,15 +8,18 @@ import AppTrackingTransparency
 class DeviceManager: ObservableObject {
     @Published var deviceId: String = ""
     @Published var freeUsesRemaining: Int = 7
+    @Published var freeSavesRemaining: Int = 5
     @Published var hasUnlimitedAccess: Bool = false
     @Published var isBlocked: Bool = false
     
     private let keychain = KeychainService()
     private let deviceIdKey = "com.snapchef.deviceId"
     private let freeUsesKey = "com.snapchef.freeUses"
+    private let freeSavesKey = "com.snapchef.freeSaves"
     
     init() {
         loadDeviceId()
+        loadFreeSaves()
     }
     
     func checkDeviceStatus() {
@@ -31,6 +34,17 @@ class DeviceManager: ObservableObject {
         } else {
             self.deviceId = generateDeviceFingerprint()
             keychain.set(deviceId, forKey: deviceIdKey)
+        }
+    }
+    
+    private func loadFreeSaves() {
+        let savedCount = UserDefaults.standard.integer(forKey: freeSavesKey)
+        if savedCount > 0 {
+            freeSavesRemaining = savedCount
+        } else {
+            // First time - set to 5 free saves
+            freeSavesRemaining = 5
+            UserDefaults.standard.set(5, forKey: freeSavesKey)
         }
     }
     
@@ -93,6 +107,31 @@ class DeviceManager: ObservableObject {
             print("Error consuming free use: \(error)")
             return false
         }
+        #endif
+    }
+    
+    func consumeFreeSave() async -> Bool {
+        guard freeSavesRemaining > 0 else { return false }
+        
+        // For development, mock the API response
+        #if DEBUG
+        // Simulate API delay
+        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        
+        // Decrement the free saves locally
+        DispatchQueue.main.async {
+            self.freeSavesRemaining -= 1
+            UserDefaults.standard.set(self.freeSavesRemaining, forKey: self.freeSavesKey)
+        }
+        
+        return true
+        #else
+        // In production, this would call the API
+        DispatchQueue.main.async {
+            self.freeSavesRemaining -= 1
+            UserDefaults.standard.set(self.freeSavesRemaining, forKey: self.freeSavesKey)
+        }
+        return true
         #endif
     }
     
