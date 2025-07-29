@@ -6,6 +6,7 @@ struct FallingEmoji: Identifiable {
     var velocity: CGVector
     let emoji: String
     var isSettled = false
+    var hasBouncedOffLetter = false
 }
 
 class EmojiAnimator: ObservableObject {
@@ -143,10 +144,10 @@ struct LaunchAnimationView: View {
                 }
             }
             
-            // After 1.5 seconds, drop all the rest
+            // After 1.5 seconds, drop all the rest (doubled to 80)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 // Create a burst of emojis
-                for _ in 0..<40 {
+                for _ in 0..<80 {
                     let emoji = FallingEmoji(
                         position: CGPoint(
                             x: CGFloat.random(in: 20...screenWidth - 20),
@@ -203,15 +204,20 @@ struct LaunchAnimationView: View {
             emojiAnimator.emojis[i].position.x += emojiAnimator.emojis[i].velocity.dx * deltaTime
             emojiAnimator.emojis[i].position.y += emojiAnimator.emojis[i].velocity.dy * deltaTime
             
-            // Check collision with letters
-            for letterBound in letterBounds {
-                if letterBound != .zero && isCollidingWithTop(emoji: emojiAnimator.emojis[i], with: letterBound) {
-                    // Bounce off top of letter
-                    emojiAnimator.emojis[i].velocity.dy = -abs(emojiAnimator.emojis[i].velocity.dy) * bounceDamping
-                    emojiAnimator.emojis[i].velocity.dx += CGFloat.random(in: -50...50) // Add some random horizontal bounce
-                    
-                    // Move emoji to top of letter
-                    emojiAnimator.emojis[i].position.y = letterBound.minY - 10
+            // Check collision with letters (only if hasn't bounced yet)
+            if !emojiAnimator.emojis[i].hasBouncedOffLetter {
+                for letterBound in letterBounds {
+                    if letterBound != .zero && isCollidingWithTop(emoji: emojiAnimator.emojis[i], with: letterBound) {
+                        // Bounce off top of letter
+                        emojiAnimator.emojis[i].velocity.dy = -abs(emojiAnimator.emojis[i].velocity.dy) * bounceDamping
+                        emojiAnimator.emojis[i].velocity.dx += CGFloat.random(in: -50...50) // Add some random horizontal bounce
+                        
+                        // Move emoji to top of letter
+                        emojiAnimator.emojis[i].position.y = letterBound.minY - 10
+                        
+                        // Mark as having bounced
+                        emojiAnimator.emojis[i].hasBouncedOffLetter = true
+                    }
                 }
             }
             

@@ -18,6 +18,14 @@ struct EnhancedHomeView: View {
                 MagicalBackground()
                     .ignoresSafeArea()
                 
+                // Falling food emojis (behind all elements except background)
+                ForEach(fallingFoodManager.emojis) { emoji in
+                    Text(emoji.emoji)
+                        .font(.system(size: 30))
+                        .opacity(0.5)  // 50% translucent
+                        .position(x: emoji.position.x, y: emoji.position.y)
+                }
+                
                 ScrollView {
                     VStack(spacing: 30) {
                         // Animated Logo
@@ -80,14 +88,6 @@ struct EnhancedHomeView: View {
                     .padding(.bottom, 120)
                 }
                 .scrollContentBackground(.hidden)
-                
-                // Falling food emojis overlay
-                ForEach(fallingFoodManager.emojis) { emoji in
-                    Text(emoji.emoji)
-                        .font(.system(size: 30))
-                        .opacity(0.5)  // 50% translucent
-                        .position(x: emoji.position.x, y: emoji.position.y)
-                }
                 
                 // Floating Action Button
                 VStack {
