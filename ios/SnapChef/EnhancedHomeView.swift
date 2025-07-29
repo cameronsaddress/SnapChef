@@ -402,8 +402,10 @@ struct HomeChallengeCard: View {
                     .scaleEffect(0.9)
             }
             .padding(30)
-        }, glowColor: Color(hex: "#f093fb"))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }, cornerRadius: 24, glowColor: Color(hex: "#f093fb"))
         .padding(.horizontal, 10)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
     }
 }
 

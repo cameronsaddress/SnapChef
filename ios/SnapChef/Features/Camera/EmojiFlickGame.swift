@@ -174,6 +174,8 @@ struct EmojiFlickGameOverlay: View {
     @State private var showShareSheet = false
     @State private var draggedEmoji: FlickableEmoji?
     @State private var messageIndex = 0
+    @State private var showGameMessage = true
+    @State private var gameMessageOpacity = 1.0
     
     let messages = [
         "Analyzing ingredients...",
@@ -212,6 +214,25 @@ struct EmojiFlickGameOverlay: View {
                     .frame(height: 100)
                     
                     Spacer()
+                    
+                    // Game instruction message
+                    if showGameMessage {
+                        Text("Play a quick game while AI does its thing!")
+                            .font(.system(size: 22, weight: .medium, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 30)
+                            .padding(.vertical, 12)
+                            .background(
+                                Capsule()
+                                    .fill(Color.black.opacity(0.3))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                            )
+                            .opacity(gameMessageOpacity)
+                            .padding(.bottom, 20)
+                    }
                     
                     // SNAPCHEF text in the center
                     ZStack {
@@ -328,8 +349,11 @@ struct EmojiFlickGameOverlay: View {
                 updatePhysics(in: geometry.size)
                 updateAnimations()
             }
-            .onReceive(Timer.publish(every: 0.8, on: .main, in: .common).autoconnect()) { _ in
-                addNewEmoji(in: geometry.size)
+            .onReceive(Timer.publish(every: 1.2, on: .main, in: .common).autoconnect()) { _ in
+                // Keep adding emojis continuously
+                if emojis.count < 15 { // Limit max emojis on screen
+                    addNewEmoji(in: geometry.size)
+                }
             }
             .onReceive(Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()) { _ in
                 withAnimation {
@@ -350,6 +374,16 @@ struct EmojiFlickGameOverlay: View {
         for _ in 0..<3 {
             addNewEmoji(in: size)
         }
+        
+        // Fade out game message after 3 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            withAnimation(.easeOut(duration: 1.0)) {
+                gameMessageOpacity = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                showGameMessage = false
+            }
+        }
     }
     
     private func addNewEmoji(in size: CGSize) {
@@ -360,8 +394,8 @@ struct EmojiFlickGameOverlay: View {
                 y: -50
             ),
             velocity: CGVector(
-                dx: CGFloat.random(in: -1...1),
-                dy: CGFloat.random(in: 5...8)
+                dx: CGFloat.random(in: -0.5...0.5),
+                dy: CGFloat.random(in: 2...4)  // Slower falling speed
             ),
             isDraggable: true
         )
@@ -380,8 +414,8 @@ struct EmojiFlickGameOverlay: View {
         for index in emojis.indices {
             guard !emojis[index].isBeingDragged else { continue }
             
-            // Apply gravity
-            emojis[index].velocity.dy += 0.8
+            // Apply gravity (reduced for slower gameplay)
+            emojis[index].velocity.dy += 0.3
             
             // Update position
             emojis[index].position.x += emojis[index].velocity.dx
