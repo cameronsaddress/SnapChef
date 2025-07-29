@@ -2,6 +2,7 @@ import SwiftUI
 
 struct EnhancedRecipeResultsView: View {
     let recipes: [Recipe]
+    let ingredients: [IngredientAPI]
     let capturedImage: UIImage?
     @Environment(\.dismiss) var dismiss
     @State private var selectedRecipe: Recipe?
@@ -16,17 +17,20 @@ struct EnhancedRecipeResultsView: View {
     enum ActiveSheet: Identifiable {
         case recipeDetail(Recipe)
         case shareGenerator(Recipe)
+        case fridgeInventory
         
         var id: String {
             switch self {
             case .recipeDetail(let recipe): return "detail_\(recipe.id)"
             case .shareGenerator(let recipe): return "share_\(recipe.id)"
+            case .fridgeInventory: return "fridge_inventory"
             }
         }
     }
     
-    init(recipes: [Recipe], capturedImage: UIImage? = nil) {
+    init(recipes: [Recipe], ingredients: [IngredientAPI] = [], capturedImage: UIImage? = nil) {
         self.recipes = recipes
+        self.ingredients = ingredients
         self.capturedImage = capturedImage
     }
     
@@ -43,6 +47,17 @@ struct EnhancedRecipeResultsView: View {
                         SuccessHeaderView()
                             .staggeredFade(index: 0, isShowing: contentVisible)
                         
+                        // In Your Fridge card
+                        if !ingredients.isEmpty {
+                            FridgeInventoryCard(
+                                ingredientCount: ingredients.count,
+                                onTap: {
+                                    activeSheet = .fridgeInventory
+                                }
+                            )
+                            .staggeredFade(index: 1, isShowing: contentVisible)
+                        }
+                        
                         // Recipe cards
                         ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                             MagicalRecipeCard(
@@ -55,7 +70,7 @@ struct EnhancedRecipeResultsView: View {
                                     activeSheet = .shareGenerator(recipe)
                                 }
                             )
-                            .staggeredFade(index: index + 1, isShowing: contentVisible)
+                            .staggeredFade(index: index + (ingredients.isEmpty ? 1 : 2), isShowing: contentVisible)
                         }
                         
                         // Viral share prompt
@@ -64,7 +79,7 @@ struct EnhancedRecipeResultsView: View {
                                 activeSheet = .shareGenerator(firstRecipe)
                             }
                         })
-                        .staggeredFade(index: recipes.count + 1, isShowing: contentVisible)
+                        .staggeredFade(index: recipes.count + (ingredients.isEmpty ? 1 : 2), isShowing: contentVisible)
                         .padding(.top, 20)
                     }
                     .padding(.horizontal, 20)
@@ -108,6 +123,11 @@ struct EnhancedRecipeResultsView: View {
                 ShareGeneratorView(
                     recipe: recipe,
                     ingredientsPhoto: capturedImage
+                )
+            case .fridgeInventory:
+                SimpleFridgeInventoryView(
+                    ingredients: ingredients,
+                    capturedImage: capturedImage
                 )
             }
         }
@@ -569,6 +589,202 @@ struct ConfettiPiece {
     var size: CGSize
     var color: Color
     var rotation: CGFloat
+}
+
+// MARK: - Fridge Inventory Card
+struct FridgeInventoryCard: View {
+    let ingredientCount: Int
+    let onTap: () -> Void
+    
+    @State private var sparkleAnimation = false
+    @State private var bounceAnimation = false
+    
+    var body: some View {
+        GlassmorphicCard(content: {
+            VStack(spacing: 20) {
+                // Icon and title
+                HStack(spacing: 20) {
+                    // Fridge icon with animation
+                    ZStack {
+                        // Background gradient circle
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#38f9d7"),
+                                        Color(hex: "#43e97b")
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 80, height: 80)
+                            .scaleEffect(bounceAnimation ? 1.1 : 1)
+                        
+                        // Fridge icon
+                        Image(systemName: "refrigerator.fill")
+                            .font(.system(size: 40, weight: .medium))
+                            .foregroundColor(.white)
+                        
+                        // Sparkles around
+                        ForEach(0..<3) { index in
+                            Image(systemName: "sparkle")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color(hex: "#ffa726"))
+                                .offset(x: 40, y: 0)
+                                .rotationEffect(.degrees(sparkleAnimation ? 360 : 0))
+                                .rotationEffect(.degrees(Double(index) * 120))
+                                .scaleEffect(sparkleAnimation ? 1.2 : 0.8)
+                                .opacity(sparkleAnimation ? 1 : 0.6)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("In Your Fridge")
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text("\(ingredientCount) ingredients detected")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "eye.fill")
+                                .font(.system(size: 14))
+                            Text("See what we found")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(Color(hex: "#38f9d7"))
+                    }
+                    
+                    Spacer()
+                    
+                    // Arrow indicator
+                    Image(systemName: "chevron.right.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor(Color(hex: "#38f9d7"))
+                        .scaleEffect(bounceAnimation ? 1.2 : 1)
+                }
+                
+                // Fun message
+                Text("🎉 We analyzed your fridge like magic!")
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.9))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(24)
+        }, glowColor: Color(hex: "#38f9d7"))
+        .onTapGesture {
+            onTap()
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+                sparkleAnimation = true
+            }
+            
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                bounceAnimation = true
+            }
+        }
+    }
+}
+
+// MARK: - Simple Fridge Inventory View
+struct SimpleFridgeInventoryView: View {
+    let ingredients: [IngredientAPI]
+    let capturedImage: UIImage?
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                MagicalBackground()
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Header
+                        VStack(spacing: 16) {
+                            Image(systemName: "refrigerator.fill")
+                                .font(.system(size: 60))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(hex: "#38f9d7"),
+                                            Color(hex: "#43e97b")
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                            
+                            Text("Found \(ingredients.count) ingredients!")
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                        }
+                        .padding(.top, 40)
+                        
+                        // Ingredients list
+                        ForEach(ingredients, id: \.name) { ingredient in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(ingredient.name)
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    
+                                    Text("\(ingredient.quantity) \(ingredient.unit)")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.white.opacity(0.8))
+                                    
+                                    HStack(spacing: 12) {
+                                        Label(ingredient.category, systemImage: "tag.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(Color(hex: "#38f9d7"))
+                                        
+                                        Label(ingredient.freshness, systemImage: "leaf.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(freshnessColor(for: ingredient.freshness))
+                                    }
+                                }
+                                
+                                Spacer()
+                            }
+                            .padding(20)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.white.opacity(0.1))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.bottom, 40)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                    .font(.system(size: 16, weight: .semibold))
+                }
+            }
+        }
+    }
+    
+    private func freshnessColor(for freshness: String) -> Color {
+        switch freshness.lowercased() {
+        case "fresh": return Color(hex: "#43e97b")
+        case "good": return Color(hex: "#38f9d7")
+        case "use soon": return Color(hex: "#ffa726")
+        default: return Color.gray
+        }
+    }
 }
 
 #Preview {

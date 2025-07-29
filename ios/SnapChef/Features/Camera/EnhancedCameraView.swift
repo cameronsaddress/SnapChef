@@ -10,6 +10,7 @@ struct EnhancedCameraView: View {
     @State private var isProcessing = false
     @State private var showingResults = false
     @State private var generatedRecipes: [Recipe] = []
+    @State private var detectedIngredients: [IngredientAPI] = []
     @State private var capturedImage: UIImage?
     @State private var showingPreview = false
     @State private var captureAnimation = false
@@ -176,6 +177,7 @@ struct EnhancedCameraView: View {
         .fullScreenCover(isPresented: $showingResults) {
             EnhancedRecipeResultsView(
                 recipes: generatedRecipes,
+                ingredients: detectedIngredients,
                 capturedImage: capturedImage
             )
             .onDisappear {
@@ -267,6 +269,7 @@ struct EnhancedCameraView: View {
                         
                         // Update state
                         self.generatedRecipes = recipes
+                        self.detectedIngredients = apiResponse.data.ingredients
                         
                         // Save recipes to app state with the captured photo
                         for recipe in recipes {
