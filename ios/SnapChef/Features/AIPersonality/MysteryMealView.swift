@@ -15,6 +15,8 @@ struct MysteryMealView: View {
     @State private var selectedCuisine: String = ""
     @State private var selectedRecipe: Recipe?
     @State private var showingSaveAlert = false
+    @State private var isSpinning = false
+    @State private var scrollProxy: ScrollViewProxy?
     
     var body: some View {
         NavigationStack {
@@ -23,7 +25,8 @@ struct MysteryMealView: View {
                     .ignoresSafeArea()
                 
                 if !isGenerating {
-                    ScrollView {
+                    ScrollViewReader { proxy in
+                        ScrollView {
                         VStack(spacing: 30) {
                             // Header
                             MysteryMealHeaderView()
@@ -42,12 +45,14 @@ struct MysteryMealView: View {
                                     .transition(.opacity.combined(with: .scale))
                             }
                             
-                            // Spin button
-                            SpinWheelButton(
-                                action: spinWheel,
-                                isSpinning: wheelRotation != 0
-                            )
-                            .padding(.horizontal, 40)
+                            // Spin button - only show if not spinning and no recipe selected
+                            if !isSpinning && selectedRecipe == nil {
+                                SpinWheelButton(
+                                    action: spinWheel,
+                                    isSpinning: false
+                                )
+                                .padding(.horizontal, 40)
+                            }
                             
                             // Recipe card
                             if let recipe = selectedRecipe {
@@ -62,10 +67,15 @@ struct MysteryMealView: View {
                                     ))
                                 }
                                 .padding(.horizontal, 20)
+                                .id("recipeCard")
                             }
                             
                             Spacer(minLength: 40)
                         }
+                        .onAppear {
+                            scrollProxy = proxy
+                        }
+                    }
                     }
                 } else {
                     // Generating view
@@ -133,34 +143,58 @@ struct MysteryMealView: View {
     }
     
     private func spinWheel() {
+        // Reset state
+        selectedRecipe = nil
+        selectedCuisine = ""
+        isSpinning = true
+        
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .heavy)
         generator.impactOccurred()
         
-        // Calculate random spin amount
-        let randomRotation = Double.random(in: 0...360)
-        let totalRotation = 720 + randomRotation
+        // Random spin parameters
+        let minRotations = Double.random(in: 3...5)
+        let randomEndAngle = Double.random(in: 0...360)
+        let totalRotation = (minRotations * 360) + randomEndAngle
+        let spinDuration = Double.random(in: 2.5...4.0)
         
-        // Spin animation
-        withAnimation(.easeOut(duration: 3)) {
+        // Spin animation with easing
+        withAnimation(.easeOut(duration: spinDuration)) {
             wheelRotation += totalRotation
         }
         
         // Determine selected cuisine after spin
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + spinDuration) {
             // Calculate which segment the wheel landed on
             let cuisines = ["Italian 🍝", "Mexican 🌮", "Chinese 🥟", "Japanese 🍱", 
                             "Thai 🍜", "Indian 🍛", "French 🥐", "American 🍔"]
             let segmentAngle = 360.0 / Double(cuisines.count)
-            let finalAngle = wheelRotation.truncatingRemainder(dividingBy: 360)
-            let selectedIndex = Int((360 - finalAngle) / segmentAngle) % cuisines.count
+            
+            // The triangle points to the right (0 degrees), so we need to account for that
+            let normalizedAngle = wheelRotation.truncatingRemainder(dividingBy: 360)
+            let adjustedAngle = normalizedAngle < 0 ? normalizedAngle + 360 : normalizedAngle
+            
+            // Calculate which segment is at the 0-degree position (right side where triangle points)
+            let selectedIndex = Int((360 - adjustedAngle) / segmentAngle) % cuisines.count
             
             selectedCuisine = cuisines[selectedIndex]
             
             // Get a random recipe for the selected cuisine
             if let recipe = LocalRecipeDatabase.shared.getRandomRecipe(for: selectedCuisine) {
-                selectedRecipe = recipe
-                showConfetti = true
+                withAnimation {
+                    selectedRecipe = recipe
+                    showConfetti = true
+                    isSpinning = false
+                }
+                
+                // Scroll to recipe card after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation {
+                        scrollProxy?.scrollTo("recipeCard", anchor: .top)
+                    }
+                }
+            } else {
+                isSpinning = false
             }
         }
     }

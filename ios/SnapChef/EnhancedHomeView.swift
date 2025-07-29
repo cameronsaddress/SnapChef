@@ -160,38 +160,62 @@ struct EnhancedHomeView: View {
 
 // MARK: - Hero Logo
 struct HeroLogoView: View {
-    @State private var textGlow: Double = 0
-    @State private var emojiShimmer: Double = 0
-    @State private var showGlow = false
+    @State private var letterOpacities: [Double] = Array(repeating: 0, count: 8)
+    @State private var letterScales: [CGFloat] = Array(repeating: 0.5, count: 8)
+    let letters = ["S", "N", "A", "P", "C", "H", "E", "F"]
     
     var body: some View {
         VStack(spacing: 16) {
             ZStack {
-                // Main text in white with larger size
-                Text("SnapChef")
-                    .font(.system(size: 72, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                    .shadow(color: Color.white.opacity(showGlow ? 0.8 : 0), radius: showGlow ? 20 : 0)
-                    .shadow(color: Color(hex: "#667eea").opacity(showGlow ? 0.6 : 0), radius: showGlow ? 30 : 0)
-                    .animation(.easeInOut(duration: 0.8), value: showGlow)
+                // Glow effect behind text
+                Text("SNAPCHEF")
+                    .font(.system(size: 60, weight: .black, design: .rounded))
+                    .foregroundColor(Color(hex: "#667eea"))
+                    .blur(radius: 20)
+                    .opacity(0.6)
                 
-                // Sparkle emoji with shimmer effect
-                ZStack {
-                    // Background sparkles
-                    ForEach(0..<3) { index in
-                        Text("✨")
-                            .font(.system(size: 48))
-                            .offset(x: 140, y: -25)
-                            .opacity(emojiShimmer)
-                            .scaleEffect(1 + CGFloat(index) * 0.3)
-                            .blur(radius: CGFloat(index) * 2)
+                // Main text with individual letter animations
+                HStack(spacing: 2) {
+                    ForEach(0..<letters.count, id: \.self) { index in
+                        Text(letters[index])
+                            .font(.system(size: 60, weight: .black, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#667eea"),
+                                        Color(hex: "#764ba2")
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .opacity(letterOpacities[index])
+                            .scaleEffect(letterScales[index])
+                            .animation(
+                                .spring(
+                                    response: 0.4,
+                                    dampingFraction: 0.7,
+                                    blendDuration: 0
+                                ).delay(Double(index) * 0.08),
+                                value: letterOpacities[index]
+                            )
                     }
-                    
-                    // Main sparkle
-                    Text("✨")
-                        .font(.system(size: 48))
-                        .offset(x: 140, y: -25)
                 }
+                
+                // Sparkle emoji
+                Text("✨")
+                    .font(.system(size: 48))
+                    .offset(x: 165, y: -25)
+                    .opacity(letterOpacities[7])
+                    .scaleEffect(letterScales[7])
+                    .animation(
+                        .spring(
+                            response: 0.4,
+                            dampingFraction: 0.7,
+                            blendDuration: 0
+                        ).delay(0.64),
+                        value: letterOpacities[7]
+                    )
             }
             
             Text("AI-powered recipes from what you already have")
@@ -202,17 +226,11 @@ struct HeroLogoView: View {
         }
         .padding(.top, 30)
         .onAppear {
-            // One-time glow effect on load
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation(.easeInOut(duration: 0.8)) {
-                    showGlow = true
-                    emojiShimmer = 0.5
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    withAnimation(.easeInOut(duration: 0.8)) {
-                        showGlow = false
-                        emojiShimmer = 0.1
-                    }
+            // Animate each letter popping in
+            for index in 0..<letters.count {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.08) {
+                    letterOpacities[index] = 1.0
+                    letterScales[index] = 1.0
                 }
             }
         }
@@ -293,25 +311,59 @@ struct FreeUsesIndicatorEnhanced: View {
 // MARK: - Viral Challenge Section
 struct ViralChallengeSection: View {
     @State private var currentChallenge = 0
-    let challenges = [
+    @State private var showingChallengeView = false
+    @State private var selectedChallenge: Challenge?
+    
+    let challengeData = [
         ("🌮", "Taco Tuesday", "Transform leftovers into tacos"),
         ("🍕", "Pizza Party", "Create pizza with pantry items"),
-        ("🥗", "Salad Spectacular", "Make amazing salads")
+        ("🥗", "Salad Spectacular", "Make amazing salads"),
+        ("🍜", "Ramen Remix", "Upgrade instant ramen to gourmet"),
+        ("🥘", "One-Pot Wonder", "Create magic in a single pot")
     ]
+    
+    var challenges: [Challenge] {
+        challengeData.map { data in
+            Challenge(
+                type: .daily,
+                title: data.1,
+                description: data.2,
+                requirement: "Create a \(data.1.lowercased()) dish and share it",
+                reward: ChallengeReward(
+                    points: 50,
+                    badge: nil,
+                    title: nil,
+                    unlockable: nil
+                ),
+                endDate: Date().addingTimeInterval(86400), // 24 hours from now
+                participants: Int.random(in: 100...500),
+                progress: 0,
+                isCompleted: false
+            )
+        }
+    }
     
     var body: some View {
         VStack(spacing: 20) {
-            Text("Today's Challenge")
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+            HStack {
+                Text("Today's Challenge")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .padding(.leading, 20)
+                Spacer()
+            }
             
             ZStack(alignment: .bottom) {
                 TabView(selection: $currentChallenge) {
-                    ForEach(0..<challenges.count, id: \.self) { index in
+                    ForEach(0..<challengeData.count, id: \.self) { index in
                         HomeChallengeCard(
-                            emoji: challenges[index].0,
-                            title: challenges[index].1,
-                            description: challenges[index].2
+                            emoji: challengeData[index].0,
+                            title: challengeData[index].1,
+                            description: challengeData[index].2,
+                            action: {
+                                selectedChallenge = challenges[index]
+                                showingChallengeView = true
+                            }
                         )
                         .tag(index)
                     }
@@ -321,7 +373,7 @@ struct ViralChallengeSection: View {
                 
                 // Custom page indicator below the card
                 HStack(spacing: 8) {
-                    ForEach(0..<challenges.count, id: \.self) { index in
+                    ForEach(0..<challengeData.count, id: \.self) { index in
                         Circle()
                             .fill(currentChallenge == index ? Color.white : Color.white.opacity(0.4))
                             .frame(width: 8, height: 8)
@@ -332,7 +384,9 @@ struct ViralChallengeSection: View {
                 .padding(.bottom, -25)
             }
         }
-        .padding(.horizontal, 20)
+        .sheet(item: $selectedChallenge) { challenge in
+            ChallengeDetailView(challenge: challenge)
+        }
     }
 }
 
@@ -340,6 +394,7 @@ struct HomeChallengeCard: View {
     let emoji: String
     let title: String
     let description: String
+    let action: () -> Void
     @State private var isPressed = false
     
     var body: some View {
@@ -356,7 +411,7 @@ struct HomeChallengeCard: View {
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white.opacity(0.8))
                 
-                MagneticButton(title: "Join Challenge", icon: "arrow.right", action: {})
+                MagneticButton(title: "Join Challenge", icon: "arrow.right", action: action)
                     .scaleEffect(0.9)
             }
             .padding(30)

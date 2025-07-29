@@ -8,7 +8,7 @@ import AppTrackingTransparency
 class DeviceManager: ObservableObject {
     @Published var deviceId: String = ""
     @Published var freeUsesRemaining: Int = 7
-    @Published var freeSavesRemaining: Int = 5
+    @Published var freeSavesRemaining: Int = 10 // Increased for testing
     @Published var hasUnlimitedAccess: Bool = false
     @Published var isBlocked: Bool = false
     
@@ -43,7 +43,7 @@ class DeviceManager: ObservableObject {
             freeSavesRemaining = savedCount
         } else {
             // First time - set to 5 free saves
-            freeSavesRemaining = 5
+            freeSavesRemaining = 10
             UserDefaults.standard.set(5, forKey: freeSavesKey)
         }
     }

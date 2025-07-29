@@ -20,7 +20,7 @@ struct LaunchAnimationView: View {
     @State private var animationComplete = false
     @State private var letterBounds: [CGRect] = Array(repeating: .zero, count: 8)
     
-    let letters = ["S", "n", "a", "p", "C", "h", "e", "f"]
+    let letters = ["S", "N", "A", "P", "C", "H", "E", "F"]
     let onAnimationComplete: () -> Void
     let gravity: Double = 600
     let bounceDamping: Double = 0.4
@@ -32,20 +32,28 @@ struct LaunchAnimationView: View {
             MagicalBackground()
                 .ignoresSafeArea()
             
-            // SnapChef letters with sparkle emoji
+            // SNAPCHEF logo matching PhysicsLoadingOverlay style
             ZStack {
+                // Glow effect behind text
+                Text("SNAPCHEF")
+                    .font(.system(size: 48, weight: .black, design: .rounded))
+                    .foregroundColor(Color(hex: "#667eea"))
+                    .blur(radius: 20)
+                    .opacity(0.6)
+                
+                // Main text with individual letter animations
                 HStack(spacing: 2) {
                     ForEach(0..<letters.count, id: \.self) { index in
                         Text(letters[index])
-                            .font(.system(size: 56, weight: .black, design: .rounded))
+                            .font(.system(size: 48, weight: .black, design: .rounded))
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [
-                                        Color.white,
-                                        Color.white.opacity(0.9)
+                                        Color(hex: "#667eea"),
+                                        Color(hex: "#764ba2")
                                     ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
                                 )
                             )
                             .opacity(letterOpacities[index])

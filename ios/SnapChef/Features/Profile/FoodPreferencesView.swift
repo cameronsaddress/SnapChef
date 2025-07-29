@@ -6,34 +6,20 @@ struct FoodPreferencesView: View {
     @State private var showSaveAnimation = false
     
     let cuisineTypes = [
+        ("Breakfast", "🥞"),
+        ("Desserts", "🍰"),
         ("Italian", "🍝"),
         ("Mexican", "🌮"),
-        ("Chinese", "🥡"),
+        ("Chinese", "🥟"),
         ("Japanese", "🍱"),
         ("Thai", "🍜"),
         ("Indian", "🍛"),
         ("American", "🍔"),
-        ("Mediterranean", "🥙"),
         ("French", "🥐"),
+        ("Mediterranean", "🥙"),
         ("Korean", "🍖"),
-        ("Vietnamese", "🍲"),
-        ("Greek", "🥗"),
-        ("Spanish", "🥘"),
-        ("Middle Eastern", "🧆"),
-        ("Caribbean", "🌴"),
-        ("African", "🍖"),
-        ("British", "🇬🇧"),
-        ("German", "🥨"),
-        ("Brazilian", "🇧🇷"),
-        ("Peruvian", "🌽"),
-        ("Vegetarian", "🥬"),
-        ("Vegan", "🌱"),
-        ("Seafood", "🦞"),
-        ("BBQ", "🔥"),
-        ("Comfort Food", "🍗"),
         ("Healthy", "🥗"),
-        ("Desserts", "🍰"),
-        ("Breakfast", "🥞")
+        ("Comfort Food", "🍗")
     ]
     
     var body: some View {

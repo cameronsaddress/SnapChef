@@ -155,6 +155,13 @@ class GamificationManager: ObservableObject {
         }
     }
     
+    func completeChallenge(challengeId: String) {
+        // Find challenge by title (used as ID in some cases)
+        if let challenge = activeChallenges.first(where: { $0.title == challengeId }) {
+            completeChallenge(challenge)
+        }
+    }
+    
     private func completeChallenge(_ challenge: Challenge) {
         var completedChallenge = challenge
         completedChallenge.isCompleted = true
