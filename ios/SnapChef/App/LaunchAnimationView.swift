@@ -5,7 +5,9 @@ struct FallingEmoji: Identifiable {
     var position: CGPoint
     var velocity: CGVector
     var rotation: Double = 0
-    var rotationSpeed: Double = Double.random(in: -360...360)
+    var rotationSpeed: Double = Double.random(in: -180...180)
+    let emoji: String
+    var isSettled = false
 }
 
 class EmojiAnimator: ObservableObject {
@@ -21,8 +23,9 @@ struct LaunchAnimationView: View {
     
     let letters = ["S", "n", "a", "p", "C", "h", "e", "f"]
     let onAnimationComplete: () -> Void
-    let gravity: Double = 400  // Reduced gravity for spark-like fall
-    let bounceDamping: Double = 0.65
+    let gravity: Double = 600
+    let bounceDamping: Double = 0.4
+    let foodEmojis = ["🍕", "🍔", "🌮", "🍜", "🍝", "🥗", "🍣", "🥘", "🍛", "🥙", "🍱", "🥪", "🌯", "🍖", "🍗", "🥓", "🧀", "🥚", "🍳", "🥞", "🧇", "🥐", "🍞", "🥖", "🥨", "🥯", "🍟", "🥔", "🌽", "🥕", "🥦", "🥒", "🥬", "🍅", "🍆", "🥑", "🌶️", "🫑", "🥭", "🍇", "🍓", "🫐", "🍒", "🍑", "🍊", "🍋", "🍌", "🍉", "🍈", "🍏", "🍎", "🍐", "🥝"]
     
     var body: some View {
         ZStack {
@@ -69,21 +72,12 @@ struct LaunchAnimationView: View {
                 }
             }
             
-            // Falling emojis
+            // Falling food emojis
             ForEach(emojiAnimator.emojis) { emoji in
-                Text("✨")
-                    .font(.system(size: 12))  // Smaller size
+                Text(emoji.emoji)
+                    .font(.system(size: 36))  // Larger but smaller than letters
                     .position(x: emoji.position.x, y: emoji.position.y)
-                    // Removed rotation to prevent circling appearance
-            }
-            
-            // Debug: Show this is LaunchAnimationView
-            VStack {
-                Spacer()
-                Text("Loading...")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
-                    .padding(.bottom, 100)
+                    .rotationEffect(.degrees(emoji.rotation))
             }
         }
         .onAppear {
@@ -116,20 +110,20 @@ struct LaunchAnimationView: View {
                 }
             }
             
-            // Continuously create emojis like falling sparks
-            emojiCreationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
-                // Create 1-3 emojis at a time
-                let count = Int.random(in: 1...3)
-                for _ in 0..<count {
+            // Create food emojis at random intervals
+            emojiCreationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                // Random chance to create emoji
+                if Double.random(in: 0...1) < 0.7 {
                     let emoji = FallingEmoji(
                         position: CGPoint(
-                            x: CGFloat.random(in: 20...screenWidth - 20),
-                            y: CGFloat.random(in: -100 ... -20)  // Start just above screen
+                            x: CGFloat.random(in: 30...screenWidth - 30),
+                            y: -50  // Start above screen
                         ),
                         velocity: CGVector(
-                            dx: CGFloat.random(in: -15...15),  // Slight horizontal drift
-                            dy: CGFloat.random(in: 60...100)  // Varied falling speeds
-                        )
+                            dx: CGFloat.random(in: -20...20),
+                            dy: CGFloat.random(in: 50...150)
+                        ),
+                        emoji: self.foodEmojis.randomElement() ?? "🍕"
                     )
                     self.emojiAnimator.emojis.append(emoji)
                 }
@@ -165,12 +159,20 @@ struct LaunchAnimationView: View {
         let screenWidth = UIScreen.main.bounds.width
         
         for i in emojiAnimator.emojis.indices {
+            // Skip if settled
+            if emojiAnimator.emojis[i].isSettled {
+                continue
+            }
+            
             // Apply gravity
             emojiAnimator.emojis[i].velocity.dy += gravity * deltaTime
             
             // Update position
             emojiAnimator.emojis[i].position.x += emojiAnimator.emojis[i].velocity.dx * deltaTime
             emojiAnimator.emojis[i].position.y += emojiAnimator.emojis[i].velocity.dy * deltaTime
+            
+            // Update rotation
+            emojiAnimator.emojis[i].rotation += emojiAnimator.emojis[i].rotationSpeed * deltaTime
             
             // Check collision with letters
             for letterBound in letterBounds {
@@ -184,15 +186,24 @@ struct LaunchAnimationView: View {
                 }
             }
             
+            // Check collision with other emojis
+            for j in emojiAnimator.emojis.indices where j != i {
+                if checkEmojiCollision(i: i, j: j) {
+                    resolveEmojiCollision(i: i, j: j)
+                }
+            }
+            
             // Check floor collision
-            if emojiAnimator.emojis[i].position.y > screenHeight - 50 {
-                emojiAnimator.emojis[i].position.y = screenHeight - 50
+            if emojiAnimator.emojis[i].position.y > screenHeight - 80 {
+                emojiAnimator.emojis[i].position.y = screenHeight - 80
                 emojiAnimator.emojis[i].velocity.dy *= -bounceDamping
-                emojiAnimator.emojis[i].velocity.dx *= 0.8 // Friction
+                emojiAnimator.emojis[i].velocity.dx *= 0.7 // Friction
                 
-                // Stop tiny bounces
-                if abs(emojiAnimator.emojis[i].velocity.dy) < 50 {
-                    emojiAnimator.emojis[i].velocity.dy = 0
+                // Settle if moving slowly
+                if abs(emojiAnimator.emojis[i].velocity.dy) < 30 && abs(emojiAnimator.emojis[i].velocity.dx) < 30 {
+                    emojiAnimator.emojis[i].velocity = .zero
+                    emojiAnimator.emojis[i].isSettled = true
+                    emojiAnimator.emojis[i].rotationSpeed = 0
                 }
             }
             
@@ -209,30 +220,51 @@ struct LaunchAnimationView: View {
     
     private func isCollidingWithTop(emoji: FallingEmoji, with rect: CGRect) -> Bool {
         // Check if emoji is within horizontal bounds of letter
-        let emojiLeft = emoji.position.x - 6
-        let emojiRight = emoji.position.x + 6
+        let emojiLeft = emoji.position.x - 18
+        let emojiRight = emoji.position.x + 18
         
         if emojiLeft < rect.maxX && emojiRight > rect.minX {
             // Check if emoji bottom is touching letter top
-            let emojiBottom = emoji.position.y + 6
-            return emojiBottom >= rect.minY && emojiBottom <= rect.minY + 20 && emoji.velocity.dy > 0
+            let emojiBottom = emoji.position.y + 18
+            return emojiBottom >= rect.minY && emojiBottom <= rect.minY + 25 && emoji.velocity.dy > 0
         }
         return false
     }
     
-    private func getBounceDirection(emoji: FallingEmoji, rect: CGRect) -> CGVector {
-        let centerX = rect.midX
-        let centerY = rect.midY
-        
-        let dx = emoji.position.x - centerX
-        let dy = emoji.position.y - centerY
-        
-        let magnitude = sqrt(dx * dx + dy * dy)
-        
-        return CGVector(
-            dx: (dx / magnitude) * 200,
-            dy: (dy / magnitude) * 200
+    private func checkEmojiCollision(i: Int, j: Int) -> Bool {
+        let distance = hypot(
+            emojiAnimator.emojis[i].position.x - emojiAnimator.emojis[j].position.x,
+            emojiAnimator.emojis[i].position.y - emojiAnimator.emojis[j].position.y
         )
+        return distance < 35 // Emoji radius ~17.5 each
+    }
+    
+    private func resolveEmojiCollision(i: Int, j: Int) {
+        let dx = emojiAnimator.emojis[i].position.x - emojiAnimator.emojis[j].position.x
+        let dy = emojiAnimator.emojis[i].position.y - emojiAnimator.emojis[j].position.y
+        let distance = hypot(dx, dy)
+        
+        if distance == 0 { return }
+        
+        // Normalize
+        let nx = dx / distance
+        let ny = dy / distance
+        
+        // Separate emojis
+        let overlap = 35 - distance
+        emojiAnimator.emojis[i].position.x += nx * overlap * 0.5
+        emojiAnimator.emojis[i].position.y += ny * overlap * 0.5
+        emojiAnimator.emojis[j].position.x -= nx * overlap * 0.5
+        emojiAnimator.emojis[j].position.y -= ny * overlap * 0.5
+        
+        // Exchange velocities (simplified)
+        let v1 = emojiAnimator.emojis[i].velocity
+        let v2 = emojiAnimator.emojis[j].velocity
+        
+        emojiAnimator.emojis[i].velocity.dx = v2.dx * 0.8
+        emojiAnimator.emojis[i].velocity.dy = v2.dy * 0.8
+        emojiAnimator.emojis[j].velocity.dx = v1.dx * 0.8
+        emojiAnimator.emojis[j].velocity.dy = v1.dy * 0.8
     }
 }
 
