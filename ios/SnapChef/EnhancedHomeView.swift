@@ -641,7 +641,6 @@ struct ShakeEffect: AnimatableModifier {
 // MARK: - Falling Food Manager
 class FallingFoodManager: ObservableObject {
     @Published var emojis: [FallingFoodEmoji] = []
-    private var timer: Timer?
     private let foodEmojis = ["🍕", "🍔", "🌮", "🍜", "🍝", "🥗", "🍣", "🥘", "🍛", "🥙", "🍱", "🥪", "🌯", "🍖", "🍗", "🥓", "🧀", "🥚", "🍳", "🥞"]
     
     struct FallingFoodEmoji: Identifiable {
@@ -652,35 +651,65 @@ class FallingFoodManager: ObservableObject {
     }
     
     func startFallingFood() {
-        // Start dropping food emojis occasionally
-        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
-            self.dropEmoji()
-        }
-        
         // Start physics update
         Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
             self.updatePhysics()
+        }
+        
+        // Start dropping food emojis with random delays
+        scheduleNextEmoji()
+    }
+    
+    private func scheduleNextEmoji() {
+        // Random delay between 2-5 seconds for more natural spacing
+        let delay = Double.random(in: 2...5)
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            self.dropEmoji()
+            self.scheduleNextEmoji() // Schedule the next one
         }
     }
     
     private func dropEmoji() {
         let screenWidth = UIScreen.main.bounds.width
         
-        // Add 1-2 emojis at a time
-        let count = Int.random(in: 1...2)
-        for _ in 0..<count {
+        // Usually drop 1, occasionally drop 2
+        let count = Double.random(in: 0...1) < 0.8 ? 1 : 2
+        
+        // If dropping 2, ensure they're spaced apart
+        var lastX: CGFloat = 0
+        
+        for i in 0..<count {
+            var x = CGFloat.random(in: 50...screenWidth - 50)
+            
+            // If this is the second emoji, ensure it's at least 100 points away from the first
+            if i == 1 && abs(x - lastX) < 100 {
+                x = lastX < screenWidth / 2 ? lastX + 100 : lastX - 100
+                // Ensure it's still within bounds
+                x = max(50, min(screenWidth - 50, x))
+            }
+            lastX = x
+            
             let emoji = FallingFoodEmoji(
                 position: CGPoint(
-                    x: CGFloat.random(in: 50...screenWidth - 50),
-                    y: -50
+                    x: x,
+                    y: CGFloat.random(in: -50 ... -30) // Slight variation in start height
                 ),
                 velocity: CGVector(
-                    dx: CGFloat.random(in: -20...20),
-                    dy: CGFloat.random(in: 100...150)
+                    dx: CGFloat.random(in: -30...30), // Wider horizontal variation
+                    dy: CGFloat.random(in: 80...120) // More variation in fall speed
                 ),
                 emoji: foodEmojis.randomElement() ?? "🍕"
             )
-            emojis.append(emoji)
+            
+            // Add a small delay between multiple emojis
+            if i == 0 {
+                emojis.append(emoji)
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.emojis.append(emoji)
+                }
+            }
         }
     }
     
