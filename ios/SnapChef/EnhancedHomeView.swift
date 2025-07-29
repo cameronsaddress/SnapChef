@@ -7,6 +7,7 @@ struct EnhancedHomeView: View {
     @State private var showingMysteryMeal = false
     @State private var particleTrigger = false
     @State private var mysteryMealAnimation = false
+    @State private var showingUpgrade = false
     
     var body: some View {
         NavigationStack {
@@ -32,7 +33,10 @@ struct EnhancedHomeView: View {
                             )
                             
                             if !deviceManager.hasUnlimitedAccess {
-                                FreeUsesIndicatorEnhanced(remaining: deviceManager.freeUsesRemaining)
+                                Button(action: { showingUpgrade = true }) {
+                                    FreeUsesIndicatorEnhanced(remaining: deviceManager.freeUsesRemaining)
+                                }
+                                .buttonStyle(PlainButtonStyle())
                             }
                         }
                         .padding(.horizontal, 30)
@@ -92,6 +96,10 @@ struct EnhancedHomeView: View {
         }
         .fullScreenCover(isPresented: $showingMysteryMeal) {
             MysteryMealView()
+        }
+        .fullScreenCover(isPresented: $showingUpgrade) {
+            SubscriptionView()
+                .environmentObject(deviceManager)
         }
     }
 }
@@ -215,7 +223,10 @@ struct FeatureCardsGrid: View {
     @State private var selectedIndex: Int? = nil
     
     var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+        LazyVGrid(columns: [
+            GridItem(.flexible(), spacing: 16),
+            GridItem(.flexible(), spacing: 16)
+        ], spacing: 16) {
             ForEach(0..<features.count, id: \.self) { index in
                 FeatureCardEnhanced(
                     emoji: features[index].0,
@@ -224,6 +235,7 @@ struct FeatureCardsGrid: View {
                     color: features[index].3,
                     isSelected: selectedIndex == index
                 )
+                .aspectRatio(1, contentMode: .fit)
                 .onTapGesture {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         selectedIndex = selectedIndex == index ? nil : index
@@ -287,18 +299,32 @@ struct ViralChallengeSection: View {
                 .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
             
-            TabView(selection: $currentChallenge) {
-                ForEach(0..<challenges.count, id: \.self) { index in
-                    HomeChallengeCard(
-                        emoji: challenges[index].0,
-                        title: challenges[index].1,
-                        description: challenges[index].2
-                    )
-                    .tag(index)
+            ZStack(alignment: .bottom) {
+                TabView(selection: $currentChallenge) {
+                    ForEach(0..<challenges.count, id: \.self) { index in
+                        HomeChallengeCard(
+                            emoji: challenges[index].0,
+                            title: challenges[index].1,
+                            description: challenges[index].2
+                        )
+                        .tag(index)
+                    }
                 }
+                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                .frame(height: 220)
+                
+                // Custom page indicator below the card
+                HStack(spacing: 8) {
+                    ForEach(0..<challenges.count, id: \.self) { index in
+                        Circle()
+                            .fill(currentChallenge == index ? Color.white : Color.white.opacity(0.4))
+                            .frame(width: 8, height: 8)
+                            .scaleEffect(currentChallenge == index ? 1.2 : 1)
+                            .animation(.spring(response: 0.3), value: currentChallenge)
+                    }
+                }
+                .padding(.bottom, -25)
             }
-            .tabViewStyle(PageTabViewStyle())
-            .frame(height: 220)
         }
         .padding(.horizontal, 20)
     }

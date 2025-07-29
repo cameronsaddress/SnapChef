@@ -72,12 +72,6 @@ struct EnhancedProfileView: View {
                     // Settings Section Enhanced
                     EnhancedSettingsSection()
                         .staggeredFade(index: 4, isShowing: contentVisible)
-                    
-                    // Sign Out Button Enhanced
-                    EnhancedSignOutButton {
-                        authManager.signOut()
-                    }
-                    .staggeredFade(index: 5, isShowing: contentVisible)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 100)
@@ -250,6 +244,8 @@ struct StatusPill: View {
 
 // MARK: - Gamification Stats
 struct GamificationStatsView: View {
+    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var deviceManager: DeviceManager
     @State private var animateValues = false
     
     var body: some View {
@@ -266,32 +262,32 @@ struct GamificationStatsView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                 AnimatedStatCard(
                     title: "Recipes Made",
-                    value: animateValues ? 247 : 0,
+                    value: animateValues ? appState.allRecipes.count : 0,
                     icon: "sparkles",
                     color: Color(hex: "#667eea"),
                     suffix: ""
                 )
                 
                 AnimatedStatCard(
-                    title: "Lives Changed",
-                    value: animateValues ? 1893 : 0,
-                    icon: "heart.fill",
+                    title: "Snaps Taken",
+                    value: animateValues ? (3 - deviceManager.freeUsesRemaining) : 0,
+                    icon: "camera.fill",
                     color: Color(hex: "#f093fb"),
-                    suffix: "+"
+                    suffix: ""
                 )
                 
                 AnimatedStatCard(
-                    title: "Time Saved",
-                    value: animateValues ? 156 : 0,
-                    icon: "clock.fill",
+                    title: "Favorites",
+                    value: animateValues ? appState.savedRecipes.count : 0,
+                    icon: "heart.fill",
                     color: Color(hex: "#4facfe"),
-                    suffix: "hrs"
+                    suffix: ""
                 )
                 
                 AnimatedStatCard(
-                    title: "XP Earned",
-                    value: animateValues ? 12500 : 0,
-                    icon: "star.fill",
+                    title: "Days Active",
+                    value: animateValues ? Calendar.current.dateComponents([.day], from: appState.userJoinDate, to: Date()).day ?? 0 : 0,
+                    icon: "flame.fill",
                     color: Color(hex: "#43e97b"),
                     suffix: ""
                 )
@@ -646,6 +642,7 @@ struct UpgradePrompt: View {
 
 // MARK: - Social Stats Card
 struct SocialStatsCard: View {
+    @EnvironmentObject var appState: AppState
     @State private var isExpanded = false
     
     var body: some View {
@@ -672,10 +669,10 @@ struct SocialStatsCard: View {
                 
                 if isExpanded {
                     VStack(spacing: 16) {
-                        SocialStatRow(icon: "person.2.fill", label: "Followers", value: "2.3K")
-                        SocialStatRow(icon: "heart.fill", label: "Likes received", value: "45.6K")
-                        SocialStatRow(icon: "bubble.left.fill", label: "Comments", value: "892")
-                        SocialStatRow(icon: "link", label: "Recipe shares", value: "1.2K")
+                        SocialStatRow(icon: "person.2.fill", label: "Followers", value: "0")
+                        SocialStatRow(icon: "heart.fill", label: "Likes received", value: "\(appState.totalLikes)")
+                        SocialStatRow(icon: "bubble.left.fill", label: "Comments", value: "0")
+                        SocialStatRow(icon: "link", label: "Recipe shares", value: "\(appState.totalShares)")
                     }
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .move(edge: .top)),
@@ -721,10 +718,7 @@ struct SocialStatRow: View {
 // MARK: - Enhanced Settings Section
 struct EnhancedSettingsSection: View {
     let settings = [
-        ("bell.badge.fill", "Smart Notifications", Color(hex: "#ffa726")),
-        ("leaf.fill", "Dietary Magic", Color(hex: "#43e97b")),
-        ("sparkles", "AI Preferences", Color(hex: "#667eea")),
-        ("shield.lefthalf.filled", "Privacy Vault", Color(hex: "#764ba2"))
+        ("sparkles", "AI Preferences", Color(hex: "#667eea"))
     ]
     
     var body: some View {

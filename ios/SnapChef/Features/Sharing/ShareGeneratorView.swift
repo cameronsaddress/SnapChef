@@ -5,23 +5,34 @@ struct ShareGeneratorView: View {
     let recipe: Recipe
     let ingredientsPhoto: UIImage?
     @State private var generatedImage: UIImage?
+    @State private var afterPhoto: UIImage?
     @State private var isGenerating = false
     @State private var shareSheet = false
-    @State private var selectedStyle: ShareStyle = .vibrant
+    @State private var showingCamera = false
+    @State private var selectedStyle: ShareStyle = .homeCook
     @State private var animationPhase = 0.0
     
     enum ShareStyle: String, CaseIterable {
-        case vibrant = "Vibrant"
-        case minimal = "Minimal"
-        case playful = "Playful"
-        case elegant = "Elegant"
+        case homeCook = "Home Cook"
+        case chefMode = "Chef Mode"
+        case foodie = "Foodie Fun"
+        case rustic = "Rustic Charm"
         
         var emoji: String {
             switch self {
-            case .vibrant: return "🎨"
-            case .minimal: return "⚪"
-            case .playful: return "🎉"
-            case .elegant: return "✨"
+            case .homeCook: return "🏠"
+            case .chefMode: return "👨‍🍳"
+            case .foodie: return "🤤"
+            case .rustic: return "🌾"
+            }
+        }
+        
+        var description: String {
+            switch self {
+            case .homeCook: return "Warm & inviting"
+            case .chefMode: return "Professional & clean"
+            case .foodie: return "Bold & exciting"
+            case .rustic: return "Natural & cozy"
             }
         }
     }
@@ -48,26 +59,23 @@ struct ShareGeneratorView: View {
                         StyleSelectorView(selectedStyle: $selectedStyle)
                             .padding(.horizontal, 20)
                         
+                        // After Photo Capture
+                        AfterPhotoCaptureView(
+                            afterPhoto: $afterPhoto,
+                            showingCamera: $showingCamera
+                        )
+                        .padding(.horizontal, 20)
+                        
                         // Challenge Text Editor
                         ChallengeTextEditor(recipe: recipe)
                             .padding(.horizontal, 20)
                         
-                        // Action Buttons
-                        VStack(spacing: 16) {
-                            MagneticButton(
-                                title: "Generate Share Image",
-                                icon: "sparkles",
-                                action: generateShareImage
-                            )
-                            
-                            if generatedImage != nil {
-                                MagneticButton(
-                                    title: "Share Now",
-                                    icon: "square.and.arrow.up",
-                                    action: { shareSheet = true }
-                                )
-                            }
-                        }
+                        // Action Button
+                        MagneticButton(
+                            title: "Generate Share Image",
+                            icon: "sparkles",
+                            action: generateShareImage
+                        )
                         .padding(.horizontal, 20)
                         .padding(.bottom, 40)
                     }
@@ -75,19 +83,24 @@ struct ShareGeneratorView: View {
             }
             .navigationTitle("Create Share")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        // Dismiss action
-                    }
-                    .foregroundColor(Color(hex: "#667eea"))
+            .navigationBarItems(trailing:
+                Button("Done") {
+                    // Dismiss action
                 }
-            }
+                .foregroundColor(Color(hex: "#667eea"))
+            )
         }
         .sheet(isPresented: $shareSheet) {
             if let image = generatedImage {
                 ShareSheet(items: [image, generateShareText()])
             }
+        }
+        .fullScreenCover(isPresented: $showingCamera) {
+            EnhancedCameraView()
+                .onDisappear {
+                    // The camera view will handle its own dismissal
+                    // We can't get the image directly from it
+                }
         }
         .onAppear {
             withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
@@ -107,6 +120,7 @@ struct ShareGeneratorView: View {
         let renderer = ImageRenderer(content: ShareImageContent(
             recipe: recipe,
             ingredientsPhoto: ingredientsPhoto,
+            afterPhoto: afterPhoto,
             style: selectedStyle
         ))
         
@@ -116,6 +130,11 @@ struct ShareGeneratorView: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                 generatedImage = uiImage
                 isGenerating = false
+            }
+            
+            // Auto-navigate to share sheet after generation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                shareSheet = true
             }
         }
     }
@@ -174,6 +193,7 @@ struct SharePreviewSection: View {
                     ShareImageContent(
                         recipe: recipe,
                         ingredientsPhoto: ingredientsPhoto,
+                        afterPhoto: nil,
                         style: selectedStyle
                     )
                     .scaleEffect(0.85)
@@ -194,45 +214,46 @@ struct SharePreviewSection: View {
 struct ShareImageContent: View {
     let recipe: Recipe
     let ingredientsPhoto: UIImage?
+    let afterPhoto: UIImage?
     let style: ShareGeneratorView.ShareStyle
     
     var backgroundGradient: LinearGradient {
         switch style {
-        case .vibrant:
+        case .homeCook:
             return LinearGradient(
                 colors: [
-                    Color(hex: "#f093fb"),
-                    Color(hex: "#f5576c")
+                    Color(hex: "#ff9966"),
+                    Color(hex: "#ff5e62")
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-        case .minimal:
+        case .chefMode:
             return LinearGradient(
                 colors: [
-                    Color(hex: "#e0e0e0"),
-                    Color(hex: "#f5f5f5")
+                    Color(hex: "#2c3e50"),
+                    Color(hex: "#34495e")
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-        case .playful:
+        case .foodie:
             return LinearGradient(
                 colors: [
-                    Color(hex: "#4facfe"),
-                    Color(hex: "#00f2fe")
+                    Color(hex: "#fc466b"),
+                    Color(hex: "#3f5efb")
+                ],
+                startPoint: .topLeading,  
+                endPoint: .bottomTrailing
+            )
+        case .rustic:
+            return LinearGradient(
+                colors: [
+                    Color(hex: "#8b6f47"),
+                    Color(hex: "#6b8e23")
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
-            )
-        case .elegant:
-            return LinearGradient(
-                colors: [
-                    Color(hex: "#667eea"),
-                    Color(hex: "#764ba2")
-                ],
-                startPoint: .top,
-                endPoint: .bottom
             )
         }
     }
@@ -326,8 +347,16 @@ struct ShareImageContent: View {
                                 )
                                 .frame(width: 140, height: 140)
                             
-                            Text(recipe.difficulty.emoji)
-                                .font(.system(size: 60))
+                            if let photo = afterPhoto {
+                                Image(uiImage: photo)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 140, height: 140)
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                            } else {
+                                Text(recipe.difficulty.emoji)
+                                    .font(.system(size: 60))
+                            }
                             
                             // Label
                             VStack {
@@ -394,8 +423,8 @@ struct ShareImageContent: View {
     
     var textColor: Color {
         switch style {
-        case .minimal:
-            return Color(hex: "#333333")
+        case .chefMode:
+            return Color(hex: "#ecf0f1")
         default:
             return .white
         }

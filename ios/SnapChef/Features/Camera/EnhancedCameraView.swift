@@ -15,6 +15,7 @@ struct EnhancedCameraView: View {
     @State private var captureAnimation = false
     @State private var scanLineOffset: CGFloat = -200
     @State private var glowIntensity: Double = 0.3
+    @State private var showingUpgrade = false
     
     var body: some View {
         ZStack {
@@ -96,6 +97,10 @@ struct EnhancedCameraView: View {
                 capturedImage: capturedImage
             )
         }
+        .fullScreenCover(isPresented: $showingUpgrade) {
+            SubscriptionView()
+                .environmentObject(deviceManager)
+        }
     }
     
     private func startScanAnimation() {
@@ -129,6 +134,23 @@ struct EnhancedCameraView: View {
         capturedImage = image // Store the captured image
         
         Task {
+            // Check if user has free uses or subscription
+            if !deviceManager.hasUnlimitedAccess && deviceManager.freeUsesRemaining <= 0 {
+                isProcessing = false
+                showingUpgrade = true
+                return
+            }
+            
+            // Consume a free use if not subscribed
+            if !deviceManager.hasUnlimitedAccess {
+                let success = await deviceManager.consumeFreeUse()
+                if !success {
+                    isProcessing = false
+                    showingUpgrade = true
+                    return
+                }
+            }
+            
             do {
                 // API call here
                 // For now, using mock data

@@ -15,6 +15,7 @@
 		1F3CC9E8D39F4DC49EDA72C5 /* MagicalTransitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A8DCF3FDF7CB6D914529906 /* MagicalTransitions.swift */; };
 		2422E5C1C7E414D8FF5A0B7C /* NetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FDC970FB5C6C618DA4E006 /* NetworkManager.swift */; };
 		311EE7B98E913822C38113B8 /* AIPersonalityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ABAFD32A12E2DBC4056FD0F /* AIPersonalityView.swift */; };
+		334B8CC90B7AB6E39FFE0A5E /* LaunchAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E808FB0C31658D7A40220ACC /* LaunchAnimationView.swift */; };
 		3D3E665FBADF8F0744D3031D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A63C4DB0B7644F30FDA29A28 /* Assets.xcassets */; };
 		3D81790B0E3132E1C3399273 /* RecipeResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CD87B67D47393360F7C5FAE /* RecipeResultsView.swift */; };
 		3E75ED08204921D61B3ADE79 /* PrintView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52A6E32DDB95BF8BEC22287B /* PrintView.swift */; };
@@ -37,6 +38,7 @@
 		AF3C8AFEFB5CA30CE60ECDCE /* EnhancedShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8103A852FBC4CF00812CAAC6 /* EnhancedShareSheet.swift */; };
 		B75CC470EA549992E359A6B7 /* Recipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32378086B26CBCDC88359BFC /* Recipe.swift */; };
 		B779654B4D028F23A7B210DB /* EnhancedHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D763DE380F1DB760696FA722 /* EnhancedHomeView.swift */; };
+		BBC21251FFCBE877CFD11EE6 /* AfterPhotoCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC6BBD0EB16E61A65980781B /* AfterPhotoCaptureView.swift */; };
 		BBD555AEE700D84C8A49E6D7 /* EnhancedRecipesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898A29268D6481A4D584E4CB /* EnhancedRecipesView.swift */; };
 		C8A055FE20B3D1AE543E0AB6 /* DeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 609B6B5762D52F8382EC3FEB /* DeviceManager.swift */; };
 		CCD9E568FEC2B2FF401120B0 /* ChallengesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 466ADFE357674E7DE0695A45 /* ChallengesView.swift */; };
@@ -99,10 +101,12 @@
 		C07A7B624E9CEDDD6FAD0A36 /* EnhancedProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EnhancedProfileView.swift; path = SnapChef/Features/Profile/EnhancedProfileView.swift; sourceTree = "<group>"; };
 		C3EE797F94908AFA8D7BA233 /* SnapChef.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = SnapChef.entitlements; path = SnapChef/SnapChef.entitlements; sourceTree = "<group>"; };
 		C4F86BA371D3D52CF301892C /* ColorExtensions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ColorExtensions.swift; path = SnapChef/Design/ColorExtensions.swift; sourceTree = "<group>"; };
+		CC6BBD0EB16E61A65980781B /* AfterPhotoCaptureView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AfterPhotoCaptureView.swift; path = SnapChef/Features/Sharing/AfterPhotoCaptureView.swift; sourceTree = "<group>"; };
 		D196EE678D8EF55E9771CC8F /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = SnapChef/Core/ViewModels/AppState.swift; sourceTree = "<group>"; };
 		D763DE380F1DB760696FA722 /* EnhancedHomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EnhancedHomeView.swift; path = SnapChef/EnhancedHomeView.swift; sourceTree = "<group>"; };
 		E39D96ACCF5D46EE6F4094CA /* MysteryMealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MysteryMealView.swift; path = SnapChef/Features/AIPersonality/MysteryMealView.swift; sourceTree = "<group>"; };
 		E4C4CDE71E399F7520469E0E /* User.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = User.swift; path = SnapChef/Core/Models/User.swift; sourceTree = "<group>"; };
+		E808FB0C31658D7A40220ACC /* LaunchAnimationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LaunchAnimationView.swift; path = SnapChef/App/LaunchAnimationView.swift; sourceTree = "<group>"; };
 		F190CCE2F51225F63B9697D6 /* GlassmorphicComponents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GlassmorphicComponents.swift; path = SnapChef/Design/GlassmorphicComponents.swift; sourceTree = "<group>"; };
 		F43329C15A8E8386F4370D4E /* SnapChefApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SnapChefApp.swift; path = SnapChef/App/SnapChefApp.swift; sourceTree = "<group>"; };
 		F704D9176B948F55CD9DC566 /* ShareSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShareSheet.swift; path = SnapChef/Features/Sharing/ShareSheet.swift; sourceTree = "<group>"; };
@@ -312,6 +316,7 @@
 				8BC1A627466226E94B006FDC /* ShareGeneratorView.swift */,
 				251117D82A34A8E516FC9C56 /* SocialShareView.swift */,
 				0CCD6FA6649726CC20EA9DE2 /* SocialShareManager.swift */,
+				CC6BBD0EB16E61A65980781B /* AfterPhotoCaptureView.swift */,
 			);
 			name = Sharing;
 			sourceTree = "<group>";
@@ -359,6 +364,7 @@
 			children = (
 				F43329C15A8E8386F4370D4E /* SnapChefApp.swift */,
 				213986243A296CEDAE62DDDA /* ContentView.swift */,
+				E808FB0C31658D7A40220ACC /* LaunchAnimationView.swift */,
 			);
 			name = App;
 			sourceTree = "<group>";
@@ -488,6 +494,8 @@
 				7833A31EF38C48FD90F49007 /* SocialShareManager.swift in Sources */,
 				CD264693E93129421C982734 /* CameraTabView.swift in Sources */,
 				4DD2E714B4CB5E39F0366453 /* CapturedImageView.swift in Sources */,
+				BBC21251FFCBE877CFD11EE6 /* AfterPhotoCaptureView.swift in Sources */,
+				334B8CC90B7AB6E39FFE0A5E /* LaunchAnimationView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

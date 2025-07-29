@@ -4,24 +4,36 @@ struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var deviceManager: DeviceManager
+    @State private var showingLaunchAnimation = true
     
     var body: some View {
         ZStack {
-            // Magical animated background
-            MagicalBackground()
-                .ignoresSafeArea()
-                .zIndex(0)
-            
-            // Main navigation on top
-            Group {
-                if appState.isFirstLaunch {
-                    OnboardingView()
-                } else {
-                    MainTabView()
+            if showingLaunchAnimation {
+                LaunchAnimationView {
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        showingLaunchAnimation = false
+                    }
                 }
+                .zIndex(3)
+            } else {
+                // Magical animated background
+                MagicalBackground()
+                    .ignoresSafeArea()
+                    .zIndex(0)
+                
+                // Main navigation on top
+                Group {
+                    if appState.isFirstLaunch {
+                        OnboardingView()
+                    } else {
+                        MainTabView()
+                    }
+                }
+                .zIndex(2)
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
-            .zIndex(2)
         }
+        .animation(.easeInOut(duration: 0.5), value: showingLaunchAnimation)
     }
 }
 

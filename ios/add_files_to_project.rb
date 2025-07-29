@@ -17,6 +17,9 @@ features_group = main_group['Features'] || main_group.new_group('Features')
 
 # Files to add organized by feature
 files_to_add = {
+  'App' => [
+    'LaunchAnimationView.swift'
+  ],
   'Camera' => [
     'CameraTabView.swift',
     'CapturedImageView.swift'
@@ -24,7 +27,8 @@ files_to_add = {
   'Sharing' => [
     'ShareGeneratorView.swift',
     'SocialShareView.swift',
-    'SocialShareManager.swift'
+    'SocialShareManager.swift',
+    'AfterPhotoCaptureView.swift'
   ],
   'Gamification' => [
     'GamificationManager.swift',
@@ -41,10 +45,14 @@ files_to_add = {
 # Add files to the project
 files_to_add.each do |feature_name, files|
   # Create or get the feature group
-  feature_group = features_group[feature_name] || features_group.new_group(feature_name)
+  if feature_name == 'App'
+    feature_group = main_group['App'] || main_group.new_group('App')
+  else
+    feature_group = features_group[feature_name] || features_group.new_group(feature_name)
+  end
   
   files.each do |filename|
-    file_path = "SnapChef/Features/#{feature_name}/#{filename}"
+    file_path = feature_name == 'App' ? "SnapChef/App/#{filename}" : "SnapChef/Features/#{feature_name}/#{filename}"
     
     # Check if file exists
     if File.exist?(file_path)

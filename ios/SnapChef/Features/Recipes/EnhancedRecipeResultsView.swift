@@ -37,6 +37,10 @@ struct EnhancedRecipeResultsView: View {
                                 onSelect: {
                                     selectedRecipe = recipe
                                     confettiTrigger = true
+                                },
+                                onShare: {
+                                    selectedRecipe = recipe
+                                    showShareGenerator = true
                                 }
                             )
                             .staggeredFade(index: index + 1, isShowing: contentVisible)
@@ -212,6 +216,7 @@ struct SuccessHeaderView: View {
 struct MagicalRecipeCard: View {
     let recipe: Recipe
     let onSelect: () -> Void
+    let onShare: () -> Void
     
     @State private var isHovered = false
     @State private var shimmerPhase: CGFloat = -1
@@ -277,7 +282,7 @@ struct MagicalRecipeCard: View {
                             title: "Share",
                             icon: "square.and.arrow.up",
                             color: Color(hex: "#4facfe"),
-                            action: {}
+                            action: onShare
                         )
                     }
                 }
