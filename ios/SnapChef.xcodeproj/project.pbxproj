@@ -16,6 +16,7 @@
 		2422E5C1C7E414D8FF5A0B7C /* NetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FDC970FB5C6C618DA4E006 /* NetworkManager.swift */; };
 		311EE7B98E913822C38113B8 /* AIPersonalityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ABAFD32A12E2DBC4056FD0F /* AIPersonalityView.swift */; };
 		334B8CC90B7AB6E39FFE0A5E /* LaunchAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E808FB0C31658D7A40220ACC /* LaunchAnimationView.swift */; };
+		3906AEEE558C136C86B73643 /* SimplePhotoCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A8A82594C8D57196A136177 /* SimplePhotoCaptureView.swift */; };
 		3D3E665FBADF8F0744D3031D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A63C4DB0B7644F30FDA29A28 /* Assets.xcassets */; };
 		3D81790B0E3132E1C3399273 /* RecipeResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CD87B67D47393360F7C5FAE /* RecipeResultsView.swift */; };
 		3E75ED08204921D61B3ADE79 /* PrintView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52A6E32DDB95BF8BEC22287B /* PrintView.swift */; };
@@ -94,6 +95,7 @@
 		8BC1A627466226E94B006FDC /* ShareGeneratorView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShareGeneratorView.swift; path = SnapChef/Features/Sharing/ShareGeneratorView.swift; sourceTree = "<group>"; };
 		8CD87B67D47393360F7C5FAE /* RecipeResultsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RecipeResultsView.swift; path = SnapChef/Features/Recipes/RecipeResultsView.swift; sourceTree = "<group>"; };
 		94CF88BBD5E77A33A82328C4 /* HapticManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HapticManager.swift; path = SnapChef/Core/Utilities/HapticManager.swift; sourceTree = "<group>"; };
+		9A8A82594C8D57196A136177 /* SimplePhotoCaptureView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SimplePhotoCaptureView.swift; path = SnapChef/Features/Camera/SimplePhotoCaptureView.swift; sourceTree = "<group>"; };
 		A222D311FA8E5A63B5427FCE /* AIPersonalityManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AIPersonalityManager.swift; path = SnapChef/Features/AIPersonality/AIPersonalityManager.swift; sourceTree = "<group>"; };
 		A4C57C769C4C623E7618C155 /* Preview Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = "Preview Assets.xcassets"; path = "SnapChef/Preview Content/Preview Assets.xcassets"; sourceTree = "<group>"; };
 		A63C4DB0B7644F30FDA29A28 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = SnapChef/Design/Assets.xcassets; sourceTree = "<group>"; };
@@ -178,6 +180,7 @@
 				1F9E71E3568C5526424ED740 /* EnhancedCameraView.swift */,
 				5A65851D9C0E10037334DCA0 /* CameraTabView.swift */,
 				402F2BF3556512A175C480AD /* CapturedImageView.swift */,
+				9A8A82594C8D57196A136177 /* SimplePhotoCaptureView.swift */,
 			);
 			name = Camera;
 			sourceTree = "<group>";
@@ -496,6 +499,7 @@
 				4DD2E714B4CB5E39F0366453 /* CapturedImageView.swift in Sources */,
 				BBC21251FFCBE877CFD11EE6 /* AfterPhotoCaptureView.swift in Sources */,
 				334B8CC90B7AB6E39FFE0A5E /* LaunchAnimationView.swift in Sources */,
+				3906AEEE558C136C86B73643 /* SimplePhotoCaptureView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

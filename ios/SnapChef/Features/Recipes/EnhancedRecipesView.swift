@@ -391,6 +391,7 @@ struct RecipeGridCard: View {
     let recipe: Recipe
     @State private var isPressed = false
     @State private var showDetail = false
+    @State private var showShareGenerator = false
     
     var body: some View {
         Button(action: {
@@ -446,6 +447,33 @@ struct RecipeGridCard: View {
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
                         }
+                        
+                        // Share button
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                showShareGenerator = true
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Text("Share")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundColor(Color(hex: "#4facfe"))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(Color(hex: "#4facfe").opacity(0.2))
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(Color(hex: "#4facfe").opacity(0.3), lineWidth: 1)
+                                        )
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
                     }
                 }
                 .padding(16)
@@ -460,6 +488,9 @@ struct RecipeGridCard: View {
         }, perform: {})
         .sheet(isPresented: $showDetail) {
             RecipeDetailView(recipe: recipe)
+        }
+        .sheet(isPresented: $showShareGenerator) {
+            ShareGeneratorView(recipe: recipe, ingredientsPhoto: nil)
         }
     }
 }

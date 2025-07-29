@@ -22,7 +22,8 @@ files_to_add = {
   ],
   'Camera' => [
     'CameraTabView.swift',
-    'CapturedImageView.swift'
+    'CapturedImageView.swift',
+    'SimplePhotoCaptureView.swift'
   ],
   'Sharing' => [
     'ShareGeneratorView.swift',

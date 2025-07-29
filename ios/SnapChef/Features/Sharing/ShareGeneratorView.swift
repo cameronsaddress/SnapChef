@@ -96,11 +96,10 @@ struct ShareGeneratorView: View {
             }
         }
         .fullScreenCover(isPresented: $showingCamera) {
-            EnhancedCameraView()
-                .onDisappear {
-                    // The camera view will handle its own dismissal
-                    // We can't get the image directly from it
-                }
+            SimplePhotoCaptureView { image in
+                afterPhoto = image
+                showingCamera = false
+            }
         }
         .onAppear {
             withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {

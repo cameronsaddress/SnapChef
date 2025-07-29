@@ -69,6 +69,19 @@ class DeviceManager: ObservableObject {
     func consumeFreeUse() async -> Bool {
         guard freeUsesRemaining > 0 else { return false }
         
+        // For development, mock the API response
+        #if DEBUG
+        // Simulate API delay
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // Decrement the free uses locally
+        DispatchQueue.main.async {
+            self.freeUsesRemaining -= 1
+            self.isBlocked = false
+        }
+        
+        return true
+        #else
         do {
             let response = try await NetworkManager.shared.consumeFreeUse(deviceId: deviceId)
             
@@ -80,6 +93,7 @@ class DeviceManager: ObservableObject {
             print("Error consuming free use: \(error)")
             return false
         }
+        #endif
     }
     
     private func fetchDeviceStatus() async {
