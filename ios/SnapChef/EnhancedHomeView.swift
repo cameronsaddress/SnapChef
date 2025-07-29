@@ -37,6 +37,7 @@ struct EnhancedHomeView: View {
                                     FreeUsesIndicatorEnhanced(remaining: deviceManager.freeUsesRemaining)
                                 }
                                 .buttonStyle(PlainButtonStyle())
+                                .padding(.top, 10) // Add 10px spacing
                             }
                         }
                         .padding(.horizontal, 30)
@@ -148,21 +149,18 @@ struct HeroLogoView: View {
         }
         .padding(.top, 60)
         .onAppear {
-            // Periodic glow effect for text
-            Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+            // One-time glow effect on load
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 withAnimation(.easeInOut(duration: 0.8)) {
                     showGlow = true
+                    emojiShimmer = 0.5
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                     withAnimation(.easeInOut(duration: 0.8)) {
                         showGlow = false
+                        emojiShimmer = 0.1
                     }
                 }
-            }
-            
-            // Shimmer effect for emoji
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                emojiShimmer = 0.3
             }
         }
     }
@@ -172,6 +170,7 @@ struct HeroLogoView: View {
 struct FreeUsesIndicatorEnhanced: View {
     let remaining: Int
     @State private var pulseScale: CGFloat = 1
+    @State private var showGlow = false
     
     var body: some View {
         GlassmorphicCard(content: {
@@ -216,7 +215,19 @@ struct FreeUsesIndicatorEnhanced: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         })
+        .shadow(color: Color(hex: "#43e97b").opacity(showGlow ? 0.6 : 0), radius: showGlow ? 20 : 0)
+        .shadow(color: Color.white.opacity(showGlow ? 0.4 : 0), radius: showGlow ? 15 : 0)
+        .animation(.easeInOut(duration: 0.8), value: showGlow)
         .onAppear {
+            // Quick glow animation on appear
+            withAnimation(.easeIn(duration: 0.3)) {
+                showGlow = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                withAnimation(.easeOut(duration: 0.5)) {
+                    showGlow = false
+                }
+            }
             // Subtle single pulse on appear
             withAnimation(.easeInOut(duration: 0.8)) {
                 pulseScale = 1.05

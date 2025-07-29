@@ -26,7 +26,7 @@ struct MysteryMealView: View {
                                 .padding(.top, 40)
                             
                             // Fortune wheel
-                            FortuneWheelView(rotation: $wheelRotation)
+                            FortuneWheelView(rotation: $wheelRotation, onSpin: spinWheel)
                                 .frame(height: 300)
                                 .padding(.horizontal, 20)
                             
@@ -255,8 +255,9 @@ struct MysteryMealHeaderView: View {
 // MARK: - Fortune Wheel
 struct FortuneWheelView: View {
     @Binding var rotation: Double
+    let onSpin: () -> Void
     let cuisines = ["Italian 🍝", "Mexican 🌮", "Chinese 🥟", "Japanese 🍱", 
-                    "Thai 🍜", "Indian 🍛", "French 🥐", "Fusion 🌍"]
+                    "Thai 🍜", "Indian 🍛", "French 🥐", "American 🍔"]
     
     var body: some View {
         GeometryReader { geometry in
@@ -271,28 +272,31 @@ struct FortuneWheelView: View {
                     )
                 }
                 
-                // Center circle
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                Color.white,
-                                Color.white.opacity(0.8)
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 40
+                // Center circle button
+                Button(action: onSpin) {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.white,
+                                    Color.white.opacity(0.8)
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 40
+                            )
                         )
-                    )
-                    .frame(width: 80, height: 80)
-                    .overlay(
-                        Text("SPIN")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundColor(Color(hex: "#667eea"))
-                    )
-                    .shadow(radius: 10)
+                        .frame(width: 80, height: 80)
+                        .overlay(
+                            Text("SPIN")
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                .foregroundColor(Color(hex: "#667eea"))
+                        )
+                        .shadow(radius: 10)
+                }
+                .buttonStyle(PlainButtonStyle())
                 
-                // Pointer on the right
+                // Pointer on the right - positioned to slightly overlap
                 HStack {
                     Spacer()
                     Triangle()
@@ -300,7 +304,7 @@ struct FortuneWheelView: View {
                         .frame(width: 40, height: 30)
                         .rotationEffect(.degrees(-90))
                         .shadow(radius: 5)
-                        .offset(x: geometry.size.width / 2 - 20)
+                        .offset(x: 25) // Positioned so the point barely overlaps the wheel
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.width)

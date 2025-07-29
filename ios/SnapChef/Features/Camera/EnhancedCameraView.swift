@@ -16,6 +16,8 @@ struct EnhancedCameraView: View {
     @State private var scanLineOffset: CGFloat = -200
     @State private var glowIntensity: Double = 0.3
     @State private var showingUpgrade = false
+    @State private var showConfetti = false
+    @State private var showWelcomeMessage = false
     
     var body: some View {
         ZStack {
@@ -76,9 +78,48 @@ struct EnhancedCameraView: View {
                 )
                 .transition(.opacity.combined(with: .scale(scale: 1.1)))
             }
+            
+            // Welcome message
+            if showWelcomeMessage {
+                VStack {
+                    Spacer()
+                    Text("Yay! This will be fun! 🎉")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 20)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color(hex: "#667eea").opacity(0.9))
+                                .shadow(radius: 20)
+                        )
+                        .transition(.asymmetric(
+                            insertion: .scale.combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
+                    Spacer()
+                }
+            }
         }
         .onAppear {
             startScanAnimation()
+            
+            // Check if this is the first time
+            let hasSeenCamera = UserDefaults.standard.bool(forKey: "hasSeenCameraView")
+            if !hasSeenCamera {
+                // First time - show confetti and message
+                showConfetti = true
+                showWelcomeMessage = true
+                UserDefaults.standard.set(true, forKey: "hasSeenCameraView")
+                
+                // Hide message after 2 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        showWelcomeMessage = false
+                    }
+                }
+            }
+            
             // Request permission and setup camera with delay
             Task {
                 // Small delay to ensure view is fully loaded
@@ -88,6 +129,7 @@ struct EnhancedCameraView: View {
                 }
             }
         }
+        .particleExplosion(trigger: $showConfetti)
         .onDisappear {
             cameraModel.stopSession()
         }
