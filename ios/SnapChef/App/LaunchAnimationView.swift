@@ -8,17 +8,21 @@ struct FallingEmoji: Identifiable {
     var rotationSpeed: Double = Double.random(in: -360...360)
 }
 
+class EmojiAnimator: ObservableObject {
+    @Published var emojis: [FallingEmoji] = []
+}
+
 struct LaunchAnimationView: View {
     @State private var letterOpacities: [Double] = Array(repeating: 0, count: 8)
     @State private var letterScales: [CGFloat] = Array(repeating: 0.5, count: 8)
-    @State private var fallingEmojis: [FallingEmoji] = []
+    @StateObject private var emojiAnimator = EmojiAnimator()
     @State private var animationComplete = false
     @State private var letterBounds: [CGRect] = Array(repeating: .zero, count: 8)
     
     let letters = ["S", "n", "a", "p", "C", "h", "e", "f"]
     let onAnimationComplete: () -> Void
-    let gravity: Double = 500
-    let bounceDamping: Double = 0.7
+    let gravity: Double = 300
+    let bounceDamping: Double = 0.6
     
     var body: some View {
         ZStack {
@@ -73,10 +77,10 @@ struct LaunchAnimationView: View {
             }
             
             // Falling emojis
-            ForEach(fallingEmojis) { emoji in
+            ForEach(emojiAnimator.emojis) { emoji in
                 Text("✨")
                     .font(.system(size: 20))
-                    .position(emoji.position)
+                    .position(x: emoji.position.x, y: emoji.position.y)
                     .rotationEffect(.degrees(emoji.rotation))
             }
         }
@@ -99,46 +103,42 @@ struct LaunchAnimationView: View {
     private func startFallingEmojis() {
         // Wait for letters to appear
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            // Create 20 falling emojis
+            // Create 20 falling emojis spread across the animation time
             let screenWidth = UIScreen.main.bounds.width
             for i in 0..<20 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.1) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
                     let emoji = FallingEmoji(
                         position: CGPoint(
                             x: CGFloat.random(in: 50...screenWidth - 50),
-                            y: -50
+                            y: -100 - CGFloat.random(in: 0...50)
                         ),
                         velocity: CGVector(
-                            dx: CGFloat.random(in: -50...50),
-                            dy: 0
+                            dx: CGFloat.random(in: -20...20),
+                            dy: CGFloat.random(in: 0...50)
                         )
                     )
-                    fallingEmojis.append(emoji)
+                    emojiAnimator.emojis.append(emoji)
                 }
             }
             
             // Start physics animation
-            Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { timer in
-                updatePhysics()
+            let animationTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
+                DispatchQueue.main.async {
+                    updatePhysics()
+                }
+            }
+            
+            // End animation after exactly 3 seconds total (0.8s delay + 2.2s animation)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                animationTimer.invalidate()
                 
-                // Check if all emojis have settled
-                let allSettled = fallingEmojis.allSatisfy { emoji in
-                    emoji.position.y > UIScreen.main.bounds.height - 100 &&
-                    abs(emoji.velocity.dy) < 10
+                withAnimation(.easeOut(duration: 0.3)) {
+                    animationComplete = true
                 }
                 
-                if allSettled {
-                    timer.invalidate()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            animationComplete = true
-                        }
-                        
-                        // Notify completion
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            onAnimationComplete()
-                        }
-                    }
+                // Notify completion
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    onAnimationComplete()
                 }
             }
         }
@@ -149,49 +149,49 @@ struct LaunchAnimationView: View {
         let screenHeight = UIScreen.main.bounds.height
         let screenWidth = UIScreen.main.bounds.width
         
-        for i in fallingEmojis.indices {
+        for i in emojiAnimator.emojis.indices {
             // Apply gravity
-            fallingEmojis[i].velocity.dy += gravity * deltaTime
+            emojiAnimator.emojis[i].velocity.dy += gravity * deltaTime
             
             // Update position
-            fallingEmojis[i].position.x += fallingEmojis[i].velocity.dx * deltaTime
-            fallingEmojis[i].position.y += fallingEmojis[i].velocity.dy * deltaTime
+            emojiAnimator.emojis[i].position.x += emojiAnimator.emojis[i].velocity.dx * deltaTime
+            emojiAnimator.emojis[i].position.y += emojiAnimator.emojis[i].velocity.dy * deltaTime
             
             // Update rotation
-            fallingEmojis[i].rotation += fallingEmojis[i].rotationSpeed * deltaTime
+            emojiAnimator.emojis[i].rotation += emojiAnimator.emojis[i].rotationSpeed * deltaTime
             
             // Check collision with letters
             for letterBound in letterBounds {
-                if letterBound != .zero && isColliding(emoji: fallingEmojis[i], with: letterBound) {
+                if letterBound != .zero && isColliding(emoji: emojiAnimator.emojis[i], with: letterBound) {
                     // Bounce off letter
-                    let bounceDirection = getBounceDirection(emoji: fallingEmojis[i], rect: letterBound)
-                    fallingEmojis[i].velocity.dx = bounceDirection.dx * bounceDamping
-                    fallingEmojis[i].velocity.dy = abs(bounceDirection.dy) * bounceDamping * -1
+                    let bounceDirection = getBounceDirection(emoji: emojiAnimator.emojis[i], rect: letterBound)
+                    emojiAnimator.emojis[i].velocity.dx = bounceDirection.dx * bounceDamping
+                    emojiAnimator.emojis[i].velocity.dy = abs(bounceDirection.dy) * bounceDamping * -1
                     
                     // Move emoji outside collision
-                    fallingEmojis[i].position.y = letterBound.minY - 20
+                    emojiAnimator.emojis[i].position.y = letterBound.minY - 20
                 }
             }
             
             // Check floor collision
-            if fallingEmojis[i].position.y > screenHeight - 50 {
-                fallingEmojis[i].position.y = screenHeight - 50
-                fallingEmojis[i].velocity.dy *= -bounceDamping
-                fallingEmojis[i].velocity.dx *= 0.8 // Friction
+            if emojiAnimator.emojis[i].position.y > screenHeight - 50 {
+                emojiAnimator.emojis[i].position.y = screenHeight - 50
+                emojiAnimator.emojis[i].velocity.dy *= -bounceDamping
+                emojiAnimator.emojis[i].velocity.dx *= 0.8 // Friction
                 
                 // Stop tiny bounces
-                if abs(fallingEmojis[i].velocity.dy) < 50 {
-                    fallingEmojis[i].velocity.dy = 0
+                if abs(emojiAnimator.emojis[i].velocity.dy) < 50 {
+                    emojiAnimator.emojis[i].velocity.dy = 0
                 }
             }
             
             // Keep within screen bounds
-            if fallingEmojis[i].position.x < 20 {
-                fallingEmojis[i].position.x = 20
-                fallingEmojis[i].velocity.dx *= -bounceDamping
-            } else if fallingEmojis[i].position.x > screenWidth - 20 {
-                fallingEmojis[i].position.x = screenWidth - 20
-                fallingEmojis[i].velocity.dx *= -bounceDamping
+            if emojiAnimator.emojis[i].position.x < 20 {
+                emojiAnimator.emojis[i].position.x = 20
+                emojiAnimator.emojis[i].velocity.dx *= -bounceDamping
+            } else if emojiAnimator.emojis[i].position.x > screenWidth - 20 {
+                emojiAnimator.emojis[i].position.x = screenWidth - 20
+                emojiAnimator.emojis[i].velocity.dx *= -bounceDamping
             }
         }
     }
