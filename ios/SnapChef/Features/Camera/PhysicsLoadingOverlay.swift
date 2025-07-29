@@ -219,14 +219,13 @@ struct PhysicsLoadingOverlay: View {
 
 // MARK: - Integration with MagicalProcessingOverlay
 struct MagicalProcessingOverlay: View {
-    @State private var usePhysicsAnimation = true
+    @State private var useGameMode = true
     
     var body: some View {
-        if usePhysicsAnimation {
-            PhysicsLoadingOverlay()
+        if useGameMode {
+            EmojiFlickGameOverlay()
         } else {
-            // Original implementation as fallback
-            OriginalProcessingOverlay()
+            PhysicsLoadingOverlay()
         }
     }
 }

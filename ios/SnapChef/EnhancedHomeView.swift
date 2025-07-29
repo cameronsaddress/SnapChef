@@ -356,6 +356,7 @@ struct ViralChallengeSection: View {
                 }
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                 .frame(height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
                 
                 // Custom page indicator below the card
                 HStack(spacing: 8) {

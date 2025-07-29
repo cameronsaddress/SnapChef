@@ -170,12 +170,14 @@ struct MysteryMealView: View {
                             "Thai 🍜", "Indian 🍛", "French 🥐", "American 🍔"]
             let segmentAngle = 360.0 / Double(cuisines.count)
             
-            // The triangle points to the right (0 degrees), so we need to account for that
+            // The triangle points to the right (0 degrees)
+            // We need to find which segment is at the right side after rotation
             let normalizedAngle = wheelRotation.truncatingRemainder(dividingBy: 360)
             let adjustedAngle = normalizedAngle < 0 ? normalizedAngle + 360 : normalizedAngle
             
-            // Calculate which segment is at the 0-degree position (right side where triangle points)
-            let selectedIndex = Int((360 - adjustedAngle) / segmentAngle) % cuisines.count
+            // Since the wheel rotates and triangle is fixed at right (0 degrees),
+            // we need to find which segment is now at position 0
+            let selectedIndex = Int(adjustedAngle / segmentAngle) % cuisines.count
             
             selectedCuisine = cuisines[selectedIndex]
             
@@ -493,6 +495,7 @@ struct WheelSegment: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
                     .shadow(radius: 2)
+                    .rotationEffect(.degrees(midAngle))  // Rotate text to align with segment
                     .position(
                         x: geometry.size.width / 2 + xOffset,
                         y: geometry.size.height / 2 + yOffset
