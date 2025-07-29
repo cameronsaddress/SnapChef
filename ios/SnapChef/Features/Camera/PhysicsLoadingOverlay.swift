@@ -1,7 +1,7 @@
 import SwiftUI
 
 // MARK: - Falling Emoji Model
-struct FallingEmoji: Identifiable {
+struct PhysicsFallingEmoji: Identifiable {
     let id = UUID()
     let emoji: String
     var position: CGPoint
@@ -18,7 +18,7 @@ struct LetterBounds {
 
 // MARK: - Physics Loading Overlay
 struct PhysicsLoadingOverlay: View {
-    @State private var fallingEmojis: [FallingEmoji] = []
+    @State private var fallingEmojis: [PhysicsFallingEmoji] = []
     @State private var letterBounds: [LetterBounds] = []
     @State private var messageIndex = 0
     @State private var textOpacity = 0.0
@@ -131,7 +131,7 @@ struct PhysicsLoadingOverlay: View {
     }
     
     private func addNewEmoji(in size: CGSize) {
-        let emoji = FallingEmoji(
+        let emoji = PhysicsFallingEmoji(
             emoji: foodEmojis.randomElement()!,
             position: CGPoint(
                 x: CGFloat.random(in: 50...(size.width - 50)),
@@ -179,7 +179,7 @@ struct PhysicsLoadingOverlay: View {
             fallingEmojis[index].position.y += fallingEmojis[index].velocity.dy
             
             // Update rotation
-            fallingEmojis[index].rotation += fallingEmojis[index].velocity.dx * 2
+            fallingEmojis[index].rotation += Double(fallingEmojis[index].velocity.dx) * 2
             
             // Check collision with letters
             for letterBound in letterBounds {

@@ -89,12 +89,12 @@ struct OnboardingView: View {
                 .padding(.bottom, 50)
             }
         }
-        .onChange(of: showingFoodPreferences) { newValue in
-            if newValue {
-                // For now, just complete onboarding
-                // TODO: Show FoodPreferencesView when it's properly added to the project
-                completeOnboarding()
-            }
+        .fullScreenCover(isPresented: $showingFoodPreferences) {
+            FoodPreferencesView()
+                .onDisappear {
+                    // Complete onboarding after preferences are set
+                    completeOnboarding()
+                }
         }
     }
     

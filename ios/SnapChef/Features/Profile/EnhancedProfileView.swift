@@ -1139,12 +1139,12 @@ struct FoodPreferencesCard: View {
                 isAnimating = true
             }
         }
-        .onChange(of: showingPreferencesView) { newValue in
-            if newValue {
-                // TODO: Show FoodPreferencesView when it's properly added to the project
-                // For now, just dismiss
-                showingPreferencesView = false
-            }
+        .fullScreenCover(isPresented: $showingPreferencesView) {
+            FoodPreferencesView()
+                .onDisappear {
+                    // Refresh preferences after dismissal
+                    selectedPreferences = UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? []
+                }
         }
     }
 }

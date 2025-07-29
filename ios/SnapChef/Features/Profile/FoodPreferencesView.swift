@@ -113,7 +113,8 @@ struct FoodPreferencesView: View {
                             
                             Image(systemName: showSaveAnimation ? "checkmark.circle.fill" : "arrow.right.circle.fill")
                                 .font(.system(size: 24))
-                                .symbolEffect(.bounce, value: showSaveAnimation)
+                                .scaleEffect(showSaveAnimation ? 1.2 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: showSaveAnimation)
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
