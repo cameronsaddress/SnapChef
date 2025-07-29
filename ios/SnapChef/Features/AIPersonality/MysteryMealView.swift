@@ -516,15 +516,15 @@ struct MysteryRecipeCard: View {
             HStack(spacing: 20) {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
-                    Text(recipe.prepTime)
+                    Text("\(recipe.prepTime) min")
                 }
                 HStack(spacing: 4) {
                     Image(systemName: "flame")
-                    Text(recipe.cookTime)
+                    Text("\(recipe.cookTime) min")
                 }
                 HStack(spacing: 4) {
                     Image(systemName: "chart.bar")
-                    Text(recipe.difficulty.capitalized)
+                    Text(recipe.difficulty.rawValue.capitalized)
                 }
             }
             .font(.system(size: 14, weight: .medium))
@@ -536,7 +536,7 @@ struct MysteryRecipeCard: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.white)
                 
-                Text(recipe.ingredients.prefix(3).joined(separator: ", ") + (recipe.ingredients.count > 3 ? "..." : ""))
+                Text(recipe.ingredients.prefix(3).map { $0.name }.joined(separator: ", ") + (recipe.ingredients.count > 3 ? "..." : ""))
                     .font(.system(size: 14))
                     .foregroundColor(.white.opacity(0.7))
                     .lineLimit(2)
