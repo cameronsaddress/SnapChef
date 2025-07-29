@@ -4,8 +4,6 @@ struct FallingEmoji: Identifiable {
     let id = UUID()
     var position: CGPoint
     var velocity: CGVector
-    var rotation: Double = 0
-    var rotationSpeed: Double = Double.random(in: -180...180)
     let emoji: String
     var isSettled = false
 }
@@ -77,7 +75,7 @@ struct LaunchAnimationView: View {
                 Text(emoji.emoji)
                     .font(.system(size: 36))  // Larger but smaller than letters
                     .position(x: emoji.position.x, y: emoji.position.y)
-                    .rotationEffect(.degrees(emoji.rotation))
+                    // No rotation - emojis fall straight down
             }
         }
         .onAppear {
@@ -188,9 +186,6 @@ struct LaunchAnimationView: View {
             emojiAnimator.emojis[i].position.x += emojiAnimator.emojis[i].velocity.dx * deltaTime
             emojiAnimator.emojis[i].position.y += emojiAnimator.emojis[i].velocity.dy * deltaTime
             
-            // Update rotation
-            emojiAnimator.emojis[i].rotation += emojiAnimator.emojis[i].rotationSpeed * deltaTime
-            
             // Check collision with letters
             for letterBound in letterBounds {
                 if letterBound != .zero && isCollidingWithTop(emoji: emojiAnimator.emojis[i], with: letterBound) {
@@ -220,7 +215,6 @@ struct LaunchAnimationView: View {
                 if abs(emojiAnimator.emojis[i].velocity.dy) < 30 && abs(emojiAnimator.emojis[i].velocity.dx) < 30 {
                     emojiAnimator.emojis[i].velocity = .zero
                     emojiAnimator.emojis[i].isSettled = true
-                    emojiAnimator.emojis[i].rotationSpeed = 0
                 }
             }
             
