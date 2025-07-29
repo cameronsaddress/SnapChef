@@ -7,7 +7,7 @@ import AppTrackingTransparency
 @MainActor
 class DeviceManager: ObservableObject {
     @Published var deviceId: String = ""
-    @Published var freeUsesRemaining: Int = 7
+    @Published var freeUsesRemaining: Int = 10 // Increased for testing
     @Published var freeSavesRemaining: Int = 10 // Increased for testing
     @Published var hasUnlimitedAccess: Bool = false
     @Published var isBlocked: Bool = false
@@ -42,9 +42,9 @@ class DeviceManager: ObservableObject {
         if savedCount > 0 {
             freeSavesRemaining = savedCount
         } else {
-            // First time - set to 5 free saves
+            // First time - set to 10 free saves for testing
             freeSavesRemaining = 10
-            UserDefaults.standard.set(5, forKey: freeSavesKey)
+            UserDefaults.standard.set(10, forKey: freeSavesKey)
         }
     }
     
@@ -139,11 +139,14 @@ class DeviceManager: ObservableObject {
         do {
             let status = try await NetworkManager.shared.getDeviceStatus(deviceId: deviceId)
             
-            self.freeUsesRemaining = status.freeUsesRemaining
+            // For testing, override with 10 free uses
+            self.freeUsesRemaining = 10
             self.isBlocked = status.isBlocked
             self.hasUnlimitedAccess = status.hasSubscription
         } catch {
             print("Error fetching device status: \(error)")
+            // If network fails, ensure we have 10 free uses for testing
+            self.freeUsesRemaining = 10
         }
     }
     

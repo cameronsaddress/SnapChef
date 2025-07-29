@@ -253,12 +253,20 @@ struct EnhancedCameraView: View {
             // Get food preferences from UserDefaults
             let foodPreferences = UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? []
             
+            // If user has food preferences but no specific food type selected, use preferences
+            let effectiveFoodType: String? = if !foodPreferences.isEmpty && selectedFoodType == nil {
+                // Join preferences into a string for the foodType parameter
+                foodPreferences.joined(separator: ", ")
+            } else {
+                selectedFoodType
+            }
+            
             // Call the API
             SnapChefAPIManager.shared.sendImageForRecipeGeneration(
                 image: image,
                 sessionId: sessionId,
                 dietaryRestrictions: currentDietaryRestrictions,
-                foodType: selectedFoodType,
+                foodType: effectiveFoodType,
                 difficultyPreference: selectedDifficulty,
                 healthPreference: selectedHealthPreference,
                 mealType: selectedMealType,

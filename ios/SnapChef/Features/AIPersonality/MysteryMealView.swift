@@ -374,7 +374,7 @@ struct FortuneWheelView: View {
                 // Rotating wheel
                 ZStack {
                     // Wheel segments
-                    ForEach(0..<cuisines.count) { index in
+                    ForEach(cuisines.indices, id: \.self) { index in
                         WheelSegment(
                             startAngle: Double(index) * 360 / Double(cuisines.count),
                             endAngle: Double(index + 1) * 360 / Double(cuisines.count),
@@ -483,14 +483,19 @@ struct WheelSegment: View {
                     .stroke(Color.white.opacity(0.3), lineWidth: 2)
                 )
                 
-                // Text
+                // Text - positioned at the middle of the segment
+                let midAngle = (startAngle + endAngle) / 2
+                let angleInRadians = (midAngle - 90) * .pi / 180
+                let xOffset = cos(angleInRadians) * geometry.size.width * 0.32
+                let yOffset = sin(angleInRadians) * geometry.size.height * 0.32
+                
                 Text(text)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
-                    .rotationEffect(.degrees((startAngle + endAngle) / 2))
-                    .offset(
-                        x: cos((startAngle + endAngle) / 2 * .pi / 180) * geometry.size.width * 0.3,
-                        y: sin((startAngle + endAngle) / 2 * .pi / 180) * geometry.size.height * 0.3
+                    .shadow(radius: 2)
+                    .position(
+                        x: geometry.size.width / 2 + xOffset,
+                        y: geometry.size.height / 2 + yOffset
                     )
             }
         }

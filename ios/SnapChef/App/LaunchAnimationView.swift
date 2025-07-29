@@ -80,20 +80,6 @@ struct LaunchAnimationView: View {
                     }
                 }
                 
-                // Sparkle emoji
-                Text("✨")
-                    .font(.system(size: 36))
-                    .offset(x: 110, y: -20)
-                    .opacity(letterOpacities[7])
-                    .scaleEffect(letterScales[7])
-                    .animation(
-                        .spring(
-                            response: 0.4,
-                            dampingFraction: 0.7,
-                            blendDuration: 0
-                        ).delay(0.64),
-                        value: letterOpacities[7]
-                    )
             }
             
             // Falling food emojis

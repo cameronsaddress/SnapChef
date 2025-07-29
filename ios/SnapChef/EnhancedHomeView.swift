@@ -202,20 +202,6 @@ struct HeroLogoView: View {
                     }
                 }
                 
-                // Sparkle emoji
-                Text("✨")
-                    .font(.system(size: 48))
-                    .offset(x: 165, y: -25)
-                    .opacity(letterOpacities[7])
-                    .scaleEffect(letterScales[7])
-                    .animation(
-                        .spring(
-                            response: 0.4,
-                            dampingFraction: 0.7,
-                            blendDuration: 0
-                        ).delay(0.64),
-                        value: letterOpacities[7]
-                    )
             }
             
             Text("AI-powered recipes from what you already have")
