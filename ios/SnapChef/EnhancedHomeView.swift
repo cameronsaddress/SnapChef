@@ -108,7 +108,6 @@ struct EnhancedHomeView: View {
 struct HeroLogoView: View {
     @State private var shimmerPhase: CGFloat = 0
     @State private var sparkleScale: CGFloat = 1
-    @State private var sparkleRotation: Double = 0
     @State private var sparkleOpacity: Double = 1
     
     var body: some View {
@@ -146,12 +145,11 @@ struct HeroLogoView: View {
                         }
                     )
                 
-                // Sparkle emoji with animation
+                // Sparkle emoji with sparkle animation
                 Text("✨")
                     .font(.system(size: 48))
                     .offset(x: 140, y: -25)
                     .scaleEffect(sparkleScale)
-                    .rotationEffect(.degrees(sparkleRotation))
                     .opacity(sparkleOpacity)
             }
             
@@ -169,14 +167,9 @@ struct HeroLogoView: View {
             }
             
             // Sparkle pulse animation
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                sparkleScale = 1.3
-                sparkleOpacity = 0.7
-            }
-            
-            // Sparkle rotation
-            withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
-                sparkleRotation = 360
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                sparkleScale = 1.4
+                sparkleOpacity = 0.5
             }
         }
     }

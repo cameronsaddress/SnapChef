@@ -21,21 +21,14 @@ struct LaunchAnimationView: View {
     
     let letters = ["S", "n", "a", "p", "C", "h", "e", "f"]
     let onAnimationComplete: () -> Void
-    let gravity: Double = 300
-    let bounceDamping: Double = 0.6
+    let gravity: Double = 800  // Increased gravity for faster fall
+    let bounceDamping: Double = 0.7
     
     var body: some View {
         ZStack {
-            // Background gradient
-            LinearGradient(
-                colors: [
-                    Color(hex: "#667eea"),
-                    Color(hex: "#764ba2")
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            // Match MagicalBackground from EnhancedHomeView
+            MagicalBackground()
+                .ignoresSafeArea()
             
             // SnapChef letters
             HStack(spacing: 2) {
@@ -103,22 +96,23 @@ struct LaunchAnimationView: View {
     private func startFallingEmojis() {
         // Wait for letters to appear
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            // Create 20 falling emojis spread across the animation time
+            // Create emojis all at once, spread across the screen width
             let screenWidth = UIScreen.main.bounds.width
-            for i in 0..<20 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
-                    let emoji = FallingEmoji(
-                        position: CGPoint(
-                            x: CGFloat.random(in: 50...screenWidth - 50),
-                            y: -100 - CGFloat.random(in: 0...50)
-                        ),
-                        velocity: CGVector(
-                            dx: CGFloat.random(in: -20...20),
-                            dy: CGFloat.random(in: 0...50)
-                        )
+            let emojiCount = 30
+            
+            // Create all emojis at once to simulate bucket dump
+            for i in 0..<emojiCount {
+                let emoji = FallingEmoji(
+                    position: CGPoint(
+                        x: CGFloat.random(in: 20...screenWidth - 20),
+                        y: CGFloat.random(in: -200 ... -50)  // Start above screen
+                    ),
+                    velocity: CGVector(
+                        dx: CGFloat.random(in: -10...10),  // Minimal horizontal movement
+                        dy: CGFloat.random(in: 100...150)  // Strong downward velocity
                     )
-                    emojiAnimator.emojis.append(emoji)
-                }
+                )
+                emojiAnimator.emojis.append(emoji)
             }
             
             // Start physics animation
