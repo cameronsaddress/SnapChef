@@ -121,7 +121,9 @@ class SnapChefAPIManager {
         healthPreference: String?,
         mealType: String?,
         cookingTimePreference: String?,
-        numberOfRecipes: Int?
+        numberOfRecipes: Int?,
+        existingRecipeNames: [String],
+        foodPreferences: [String]
     ) -> URLRequest? {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -177,6 +179,26 @@ class SnapChefAPIManager {
         if let numberOfRecipes = numberOfRecipes {
             appendFormField(name: "number_of_recipes", value: String(numberOfRecipes))
         }
+        
+        // Append existing recipe names to avoid duplicates
+        if !existingRecipeNames.isEmpty {
+            guard let existingRecipesData = try? JSONSerialization.data(withJSONObject: existingRecipeNames, options: []) else {
+                print("Failed to serialize existing recipe names")
+                return nil
+            }
+            let existingRecipesString = String(data: existingRecipesData, encoding: .utf8)!
+            appendFormField(name: "existing_recipe_names", value: existingRecipesString)
+        }
+        
+        // Append food preferences
+        if !foodPreferences.isEmpty {
+            guard let preferencesData = try? JSONSerialization.data(withJSONObject: foodPreferences, options: []) else {
+                print("Failed to serialize food preferences")
+                return nil
+            }
+            let preferencesString = String(data: preferencesData, encoding: .utf8)!
+            appendFormField(name: "food_preferences", value: preferencesString)
+        }
 
         // Append image_file
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
@@ -207,6 +229,8 @@ class SnapChefAPIManager {
         mealType: String? = nil,
         cookingTimePreference: String? = nil,
         numberOfRecipes: Int? = nil,
+        existingRecipeNames: [String] = [],
+        foodPreferences: [String] = [],
         completion: @escaping (Result<APIResponse, Error>) -> Void
     ) {
         guard let url = URL(string: "\(serverBaseURL)/analyze_fridge_image") else {
@@ -224,7 +248,9 @@ class SnapChefAPIManager {
             healthPreference: healthPreference,
             mealType: mealType,
             cookingTimePreference: cookingTimePreference,
-            numberOfRecipes: numberOfRecipes
+            numberOfRecipes: numberOfRecipes,
+            existingRecipeNames: existingRecipeNames,
+            foodPreferences: foodPreferences
         ) else {
             completion(.failure(APIError.invalidRequestData))
             return

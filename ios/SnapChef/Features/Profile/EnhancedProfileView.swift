@@ -199,6 +199,10 @@ struct EnhancedProfileHeader: View {
                     StatusPill(text: "🔥 7 day streak", color: Color(hex: "#f093fb"))
                     StatusPill(text: "⚡ Power user", color: Color(hex: "#4facfe"))
                 }
+                
+                // Food Preferences Card
+                FoodPreferencesCard()
+                    .padding(.top, 16)
             }
         }
         .padding(.top, 40)
@@ -1032,6 +1036,115 @@ struct ImagePicker: UIViewControllerRepresentable {
         
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.dismiss()
+        }
+    }
+}
+
+// MARK: - Food Preferences Card
+struct FoodPreferencesCard: View {
+    @State private var selectedPreferences: [String] = UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? []
+    @State private var showingPreferencesView = false
+    @State private var isAnimating = false
+    
+    var body: some View {
+        Button(action: {
+            showingPreferencesView = true
+        }) {
+            HStack(spacing: 16) {
+                // Animated food icon
+                ZStack {
+                    // Glow effect
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(hex: "#ffa726").opacity(0.3),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 30
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+                        .scaleEffect(isAnimating ? 1.2 : 1)
+                    
+                    Text("🍽")
+                        .font(.system(size: 36))
+                        .scaleEffect(isAnimating ? 1.1 : 1)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Food Preferences")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#ffa726"),
+                                    Color(hex: "#ff7043")
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    
+                    if selectedPreferences.isEmpty {
+                        Text("Tap to select your favorites!")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                    } else {
+                        Text("\(selectedPreferences.count) cuisines selected")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+                
+                Spacer()
+                
+                // Arrow
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(Color(hex: "#ffa726"))
+                    .offset(x: isAnimating ? 5 : 0)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#ffa726").opacity(0.5),
+                                        Color(hex: "#ff7043").opacity(0.5)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                    )
+            )
+            .shadow(
+                color: Color(hex: "#ffa726").opacity(0.3),
+                radius: isAnimating ? 20 : 10,
+                y: isAnimating ? 10 : 5
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                isAnimating = true
+            }
+        }
+        .onChange(of: showingPreferencesView) { newValue in
+            if newValue {
+                // TODO: Show FoodPreferencesView when it's properly added to the project
+                // For now, just dismiss
+                showingPreferencesView = false
+            }
         }
     }
 }

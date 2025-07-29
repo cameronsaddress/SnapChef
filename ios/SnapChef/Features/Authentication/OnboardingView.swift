@@ -3,6 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     @EnvironmentObject var appState: AppState
     @State private var currentPage = 0
+    @State private var showingFoodPreferences = false
     
     let pages = [
         OnboardingPage(
@@ -66,7 +67,8 @@ struct OnboardingView: View {
                             currentPage += 1
                         }
                     } else {
-                        completeOnboarding()
+                        // Show food preferences before completing onboarding
+                        showingFoodPreferences = true
                     }
                 }) {
                     Text(currentPage == pages.count - 1 ? "Get Started" : "Next")
@@ -85,6 +87,13 @@ struct OnboardingView: View {
                 }
                 .padding(.horizontal, 40)
                 .padding(.bottom, 50)
+            }
+        }
+        .onChange(of: showingFoodPreferences) { newValue in
+            if newValue {
+                // For now, just complete onboarding
+                // TODO: Show FoodPreferencesView when it's properly added to the project
+                completeOnboarding()
             }
         }
     }

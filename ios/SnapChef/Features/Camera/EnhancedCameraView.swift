@@ -27,7 +27,7 @@ struct EnhancedCameraView: View {
     @State private var selectedHealthPreference: String?
     @State private var selectedMealType: String?
     @State private var selectedCookingTime: String?
-    @State private var numberOfRecipes: Int = 3
+    @State private var numberOfRecipes: Int = 5
     
     // Error handling
     @State private var showingAlert = false
@@ -247,6 +247,12 @@ struct EnhancedCameraView: View {
             // Generate session ID
             let sessionId = UUID().uuidString
             
+            // Get existing recipe names to avoid duplicates
+            let existingRecipeNames = appState.allRecipes.map { $0.name }
+            
+            // Get food preferences from UserDefaults
+            let foodPreferences = UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? []
+            
             // Call the API
             SnapChefAPIManager.shared.sendImageForRecipeGeneration(
                 image: image,
@@ -257,7 +263,9 @@ struct EnhancedCameraView: View {
                 healthPreference: selectedHealthPreference,
                 mealType: selectedMealType,
                 cookingTimePreference: selectedCookingTime,
-                numberOfRecipes: numberOfRecipes
+                numberOfRecipes: numberOfRecipes,
+                existingRecipeNames: existingRecipeNames,
+                foodPreferences: foodPreferences
             ) { result in
                 Task { @MainActor in
                     switch result {
