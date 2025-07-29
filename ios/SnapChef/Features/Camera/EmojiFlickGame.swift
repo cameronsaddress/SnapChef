@@ -276,12 +276,14 @@ struct EmojiFlickGameOverlay: View {
                         .position(emoji.position)
                         .opacity(emoji.hasBeenFlicked ? 0.8 : 1.0)
                         .gesture(
-                            DragGesture()
+                            DragGesture(coordinateSpace: .named("gameSpace"))
                                 .onChanged { value in
                                     if emoji.isDraggable && !emoji.hasBeenFlicked {
                                         if let index = emojis.firstIndex(where: { $0.id == emoji.id }) {
+                                            // Update position to follow finger
                                             emojis[index].position = value.location
                                             emojis[index].isBeingDragged = true
+                                            emojis[index].velocity = .zero // Stop falling while dragging
                                             draggedEmoji = emojis[index]
                                             
                                             // Hide tutorial on first drag
@@ -293,20 +295,17 @@ struct EmojiFlickGameOverlay: View {
                                 }
                                 .onEnded { value in
                                     if let index = emojis.firstIndex(where: { $0.id == emoji.id }) {
-                                        // Calculate flick velocity
+                                        // Calculate flick velocity based on gesture speed
+                                        let translation = value.translation
                                         let velocity = CGVector(
-                                            dx: value.predictedEndLocation.x - value.location.x,
-                                            dy: value.predictedEndLocation.y - value.location.y
+                                            dx: translation.width / 10,  // Scale down for realistic physics
+                                            dy: translation.height / 10
                                         )
                                         
-                                        // Apply flick physics
-                                        emojis[index].velocity = CGVector(
-                                            dx: velocity.dx * 0.1,
-                                            dy: velocity.dy * 0.1
-                                        )
+                                        // Apply flick physics with momentum
+                                        emojis[index].velocity = velocity
                                         emojis[index].isBeingDragged = false
                                         emojis[index].hasBeenFlicked = true
-                                        emojis[index].isDraggable = false
                                         
                                         // Award point for flicking
                                         addScore(1, at: emojis[index].position)
@@ -349,9 +348,9 @@ struct EmojiFlickGameOverlay: View {
                 updatePhysics(in: geometry.size)
                 updateAnimations()
             }
-            .onReceive(Timer.publish(every: 1.2, on: .main, in: .common).autoconnect()) { _ in
+            .onReceive(Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()) { _ in
                 // Keep adding emojis continuously
-                if emojis.count < 15 { // Limit max emojis on screen
+                if emojis.count < 20 { // Higher limit for continuous gameplay
                     addNewEmoji(in: geometry.size)
                 }
             }
@@ -364,6 +363,7 @@ struct EmojiFlickGameOverlay: View {
                 GameShareSheet(score: highScore)
             }
         }
+        .coordinateSpace(name: "gameSpace")
     }
     
     private func startGame(in size: CGSize) {
