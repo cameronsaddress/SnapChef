@@ -7,7 +7,7 @@ import AppTrackingTransparency
 @MainActor
 class DeviceManager: ObservableObject {
     @Published var deviceId: String = ""
-    @Published var freeUsesRemaining: Int = 3
+    @Published var freeUsesRemaining: Int = 7
     @Published var hasUnlimitedAccess: Bool = false
     @Published var isBlocked: Bool = false
     
