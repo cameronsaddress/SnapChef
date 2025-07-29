@@ -21,8 +21,8 @@ struct LaunchAnimationView: View {
     
     let letters = ["S", "n", "a", "p", "C", "h", "e", "f"]
     let onAnimationComplete: () -> Void
-    let gravity: Double = 800  // Increased gravity for faster fall
-    let bounceDamping: Double = 0.7
+    let gravity: Double = 400  // Reduced gravity for spark-like fall
+    let bounceDamping: Double = 0.65
     
     var body: some View {
         ZStack {
@@ -105,34 +105,39 @@ struct LaunchAnimationView: View {
     private func startFallingEmojis() {
         // Wait for letters to appear
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            // Create emojis all at once, spread across the screen width
             let screenWidth = UIScreen.main.bounds.width
-            let emojiCount = 60  // Doubled from 30
-            
-            // Create all emojis at once to simulate bucket dump
-            for _ in 0..<emojiCount {
-                let emoji = FallingEmoji(
-                    position: CGPoint(
-                        x: CGFloat.random(in: 20...screenWidth - 20),
-                        y: CGFloat.random(in: -300 ... -50)  // Start higher above screen
-                    ),
-                    velocity: CGVector(
-                        dx: CGFloat.random(in: -10...10),  // Minimal horizontal movement
-                        dy: CGFloat.random(in: 80...120)  // Slightly slower for 4 second animation
-                    )
-                )
-                emojiAnimator.emojis.append(emoji)
-            }
+            var emojiCreationTimer: Timer?
             
             // Start physics animation
             let animationTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
                 DispatchQueue.main.async {
                     self.updatePhysics()
+                    self.removeOffscreenEmojis()
+                }
+            }
+            
+            // Continuously create emojis like falling sparks
+            emojiCreationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+                // Create 1-3 emojis at a time
+                let count = Int.random(in: 1...3)
+                for _ in 0..<count {
+                    let emoji = FallingEmoji(
+                        position: CGPoint(
+                            x: CGFloat.random(in: 20...screenWidth - 20),
+                            y: CGFloat.random(in: -100 ... -20)  // Start just above screen
+                        ),
+                        velocity: CGVector(
+                            dx: CGFloat.random(in: -15...15),  // Slight horizontal drift
+                            dy: CGFloat.random(in: 60...100)  // Varied falling speeds
+                        )
+                    )
+                    self.emojiAnimator.emojis.append(emoji)
                 }
             }
             
             // End animation after exactly 4 seconds total (0.8s delay + 3.2s animation)
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
+                emojiCreationTimer?.invalidate()
                 animationTimer.invalidate()
                 
                 withAnimation(.easeOut(duration: 0.3)) {
@@ -144,6 +149,13 @@ struct LaunchAnimationView: View {
                     onAnimationComplete()
                 }
             }
+        }
+    }
+    
+    private func removeOffscreenEmojis() {
+        let screenHeight = UIScreen.main.bounds.height
+        emojiAnimator.emojis.removeAll { emoji in
+            emoji.position.y > screenHeight + 50
         }
     }
     
@@ -162,14 +174,13 @@ struct LaunchAnimationView: View {
             
             // Check collision with letters
             for letterBound in letterBounds {
-                if letterBound != .zero && isColliding(emoji: emojiAnimator.emojis[i], with: letterBound) {
-                    // Bounce off letter
-                    let bounceDirection = getBounceDirection(emoji: emojiAnimator.emojis[i], rect: letterBound)
-                    emojiAnimator.emojis[i].velocity.dx = bounceDirection.dx * bounceDamping
-                    emojiAnimator.emojis[i].velocity.dy = abs(bounceDirection.dy) * bounceDamping * -1
+                if letterBound != .zero && isCollidingWithTop(emoji: emojiAnimator.emojis[i], with: letterBound) {
+                    // Bounce off top of letter
+                    emojiAnimator.emojis[i].velocity.dy = -abs(emojiAnimator.emojis[i].velocity.dy) * bounceDamping
+                    emojiAnimator.emojis[i].velocity.dx += CGFloat.random(in: -50...50) // Add some random horizontal bounce
                     
-                    // Move emoji outside collision
-                    emojiAnimator.emojis[i].position.y = letterBound.minY - 20
+                    // Move emoji to top of letter
+                    emojiAnimator.emojis[i].position.y = letterBound.minY - 10
                 }
             }
             
@@ -196,14 +207,17 @@ struct LaunchAnimationView: View {
         }
     }
     
-    private func isColliding(emoji: FallingEmoji, with rect: CGRect) -> Bool {
-        let emojiRect = CGRect(
-            x: emoji.position.x - 10,
-            y: emoji.position.y - 10,
-            width: 20,
-            height: 20
-        )
-        return emojiRect.intersects(rect)
+    private func isCollidingWithTop(emoji: FallingEmoji, with rect: CGRect) -> Bool {
+        // Check if emoji is within horizontal bounds of letter
+        let emojiLeft = emoji.position.x - 6
+        let emojiRight = emoji.position.x + 6
+        
+        if emojiLeft < rect.maxX && emojiRight > rect.minX {
+            // Check if emoji bottom is touching letter top
+            let emojiBottom = emoji.position.y + 6
+            return emojiBottom >= rect.minY && emojiBottom <= rect.minY + 20 && emoji.velocity.dy > 0
+        }
+        return false
     }
     
     private func getBounceDirection(emoji: FallingEmoji, rect: CGRect) -> CGVector {

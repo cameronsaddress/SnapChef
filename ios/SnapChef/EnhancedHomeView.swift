@@ -17,12 +17,16 @@ struct EnhancedHomeView: View {
                     .ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 40) {
+                    VStack(spacing: 30) {
                         // Animated Logo
                         HeroLogoView()
                         
-                        // Main CTA
-                        VStack(spacing: 20) {
+                        // Main CTA Section with prominent spacing
+                        VStack(spacing: 0) {
+                            // Equal spacing above button
+                            Spacer()
+                                .frame(height: 50)
+                            
                             MagneticButton(
                                 title: "Snap Your Fridge",
                                 icon: "camera.fill",
@@ -31,16 +35,21 @@ struct EnhancedHomeView: View {
                                     particleTrigger = true
                                 }
                             )
+                            .padding(.horizontal, 30)
+                            
+                            // Equal spacing below button
+                            Spacer()
+                                .frame(height: 50)
                             
                             if !deviceManager.hasUnlimitedAccess {
                                 Button(action: { showingUpgrade = true }) {
                                     FreeUsesIndicatorEnhanced(remaining: deviceManager.freeUsesRemaining)
                                 }
                                 .buttonStyle(PlainButtonStyle())
-                                .padding(.top, 10) // Add 10px spacing
+                                .padding(.horizontal, 30)
+                                .padding(.bottom, 30)
                             }
                         }
-                        .padding(.horizontal, 30)
                         
                         // Feature Cards
                         FeatureCardsGrid()
