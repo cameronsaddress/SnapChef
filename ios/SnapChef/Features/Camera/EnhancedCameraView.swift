@@ -19,6 +19,19 @@ struct EnhancedCameraView: View {
     @State private var showConfetti = false
     @State private var showWelcomeMessage = false
     
+    // User preferences for API
+    @State private var selectedFoodType: String?
+    @State private var selectedDifficulty: String?
+    @State private var currentDietaryRestrictions: [String] = []
+    @State private var selectedHealthPreference: String?
+    @State private var selectedMealType: String?
+    @State private var selectedCookingTime: String?
+    @State private var numberOfRecipes: Int = 3
+    
+    // Error handling
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
+    
     var body: some View {
         ZStack {
             // Camera preview (bottom layer)
@@ -147,6 +160,11 @@ struct EnhancedCameraView: View {
             SubscriptionView()
                 .environmentObject(deviceManager)
         }
+        .alert("Error", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
+        }
     }
     
     private func startScanAnimation() {
@@ -197,26 +215,52 @@ struct EnhancedCameraView: View {
                 }
             }
             
-            do {
-                // API call here
-                // For now, using mock data
-                try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
-                
-                let recipes = MockDataProvider.shared.mockRecipeResponse().recipes ?? []
-                generatedRecipes = recipes
-                
-                // Save recipes to app state with the captured photo
-                await MainActor.run {
-                    for recipe in recipes {
-                        appState.addRecentRecipe(recipe)
-                        appState.saveRecipeWithPhotos(recipe, beforePhoto: image, afterPhoto: nil)
+            // Generate session ID
+            let sessionId = UUID().uuidString
+            
+            // Call the API
+            SnapChefAPIManager.shared.sendImageForRecipeGeneration(
+                image: image,
+                sessionId: sessionId,
+                dietaryRestrictions: currentDietaryRestrictions,
+                foodType: selectedFoodType,
+                difficultyPreference: selectedDifficulty,
+                healthPreference: selectedHealthPreference,
+                mealType: selectedMealType,
+                cookingTimePreference: selectedCookingTime,
+                numberOfRecipes: numberOfRecipes
+            ) { result in
+                Task { @MainActor in
+                    switch result {
+                    case .success(let apiResponse):
+                        // Convert API recipes to app recipes
+                        let recipes = apiResponse.data.recipes.map { apiRecipe in
+                            SnapChefAPIManager.shared.convertAPIRecipeToAppRecipe(apiRecipe)
+                        }
+                        
+                        // Update state
+                        self.generatedRecipes = recipes
+                        
+                        // Save recipes to app state with the captured photo
+                        for recipe in recipes {
+                            self.appState.addRecentRecipe(recipe)
+                            self.appState.saveRecipeWithPhotos(recipe, beforePhoto: image, afterPhoto: nil)
+                        }
+                        
+                        self.showingResults = true
+                        self.isProcessing = false
+                        
+                    case .failure(let error):
+                        self.isProcessing = false
+                        self.alertMessage = error.localizedDescription
+                        self.showingAlert = true
+                        
+                        // If it's an authentication error, you might want to handle it specially
+                        if case APIError.authenticationError = error {
+                            print("Authentication failed - check API key")
+                        }
                     }
                 }
-                
-                showingResults = true
-                isProcessing = false
-            } catch {
-                isProcessing = false
             }
         }
     }

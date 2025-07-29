@@ -24,6 +24,9 @@ struct SnapChefApp: App {
         configureTableView()
         configureWindow()
         
+        // Ensure API key is securely stored in Keychain
+        KeychainManager.shared.ensureAPIKeyExists()
+        
         // Initialize services
         NetworkManager.shared.configure()
         
