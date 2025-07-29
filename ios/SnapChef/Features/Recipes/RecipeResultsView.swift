@@ -73,7 +73,7 @@ struct RecipeResultsView: View {
         }
         .sheet(isPresented: $showingShareSheet) {
             if recipes.indices.contains(selectedRecipeIndex) {
-                ShareSheet(recipe: recipes[selectedRecipeIndex])
+                SimpleShareSheet(recipe: recipes[selectedRecipeIndex])
             }
         }
         .sheet(isPresented: $showingPrintView) {

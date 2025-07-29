@@ -28,7 +28,10 @@ class CameraModel: NSObject, ObservableObject {
             print("Camera already authorized")
             DispatchQueue.main.async { [weak self] in
                 self?.isCameraAuthorized = true
-                self?.setupCamera()
+                // Delay setup to ensure view is ready
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self?.setupCamera()
+                }
             }
         case .notDetermined:
             print("Camera permission not determined, requesting...")
@@ -37,7 +40,10 @@ class CameraModel: NSObject, ObservableObject {
                 DispatchQueue.main.async {
                     self?.isCameraAuthorized = granted
                     if granted {
-                        self?.setupCamera()
+                        // Delay setup to ensure view is ready
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            self?.setupCamera()
+                        }
                     }
                 }
             }
@@ -60,6 +66,15 @@ class CameraModel: NSObject, ObservableObject {
     
     func setupCamera() {
         print("Setting up camera...")
+        
+        // Ensure we're on main thread for UI updates
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.setupCamera()
+            }
+            return
+        }
+        
         session.beginConfiguration()
         
         // Remove existing inputs and outputs
@@ -74,6 +89,7 @@ class CameraModel: NSObject, ObservableObject {
         guard let camera = camera else {
             print("No camera available")
             session.commitConfiguration()
+            isSessionReady = false
             return
         }
         
@@ -91,12 +107,13 @@ class CameraModel: NSObject, ObservableObject {
             
             if session.canAddOutput(output) {
                 session.addOutput(output)
-                // Use maxPhotoDimensions for iOS 16+
-                if #available(iOS 16.0, *) {
-                    output.maxPhotoDimensions = CMVideoDimensions(width: 4032, height: 3024) // iPhone default max
+                // Configure photo output
+                output.isHighResolutionCaptureEnabled = true
+                // Only set quality prioritization for iOS 13+
+                if #available(iOS 13.0, *) {
+                    output.maxPhotoQualityPrioritization = .quality
                 }
-                output.maxPhotoQualityPrioritization = .quality
-                print("Added photo output")
+                print("Added photo output with high resolution enabled")
             } else {
                 print("Cannot add photo output")
             }
@@ -111,10 +128,14 @@ class CameraModel: NSObject, ObservableObject {
             Task {
                 await withCheckedContinuation { continuation in
                     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                        print("Starting camera session...")
                         captureSession.startRunning()
-                        print("Camera session started: \(captureSession.isRunning)")
-                        DispatchQueue.main.async {
-                            self?.isSessionReady = true
+                        
+                        // Wait a moment to ensure session is fully started
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            let isRunning = captureSession.isRunning
+                            print("Camera session running status: \(isRunning)")
+                            self?.isSessionReady = isRunning
                             continuation.resume()
                         }
                     }
@@ -144,15 +165,18 @@ class CameraModel: NSObject, ObservableObject {
         
         photoCompletion = completion
         
-        // High quality settings - use HEVC if available
-        let settings: AVCapturePhotoSettings
-        if output.availablePhotoCodecTypes.contains(.hevc) {
-            settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
-        } else {
-            settings = AVCapturePhotoSettings()
-        }
-        settings.flashMode = .off
+        // Use simple photo settings for compatibility
+        let settings = AVCapturePhotoSettings()
         
+        // Enable high resolution if supported
+        settings.isHighResolutionPhotoEnabled = output.isHighResolutionCaptureEnabled
+        
+        // Set flash mode
+        if output.supportedFlashModes.contains(.off) {
+            settings.flashMode = .off
+        }
+        
+        print("Capturing photo with settings: highRes=\(settings.isHighResolutionPhotoEnabled)")
         output.capturePhoto(with: settings, delegate: self)
     }
     

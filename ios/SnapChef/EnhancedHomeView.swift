@@ -4,9 +4,9 @@ struct EnhancedHomeView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
     @State private var showingCamera = false
-    @State private var logoScale: CGFloat = 0
-    @State private var contentVisible = false
+    @State private var showingMysteryMeal = false
     @State private var particleTrigger = false
+    @State private var mysteryMealAnimation = false
     
     var body: some View {
         NavigationStack {
@@ -19,7 +19,6 @@ struct EnhancedHomeView: View {
                     VStack(spacing: 40) {
                         // Animated Logo
                         HeroLogoView()
-                            .scaleEffect(logoScale)
                         
                         // Main CTA
                         VStack(spacing: 20) {
@@ -31,11 +30,9 @@ struct EnhancedHomeView: View {
                                     particleTrigger = true
                                 }
                             )
-                            .staggeredFade(index: 0, isShowing: contentVisible)
                             
                             if !deviceManager.hasUnlimitedAccess {
                                 FreeUsesIndicatorEnhanced(remaining: deviceManager.freeUsesRemaining)
-                                    .staggeredFade(index: 1, isShowing: contentVisible)
                             }
                         }
                         .padding(.horizontal, 30)
@@ -43,16 +40,23 @@ struct EnhancedHomeView: View {
                         // Feature Cards
                         FeatureCardsGrid()
                             .padding(.horizontal, 20)
-                            .staggeredFade(index: 2, isShowing: contentVisible)
+                        
+                        // Mystery Meal Button
+                        MysteryMealButton(
+                            isAnimating: $mysteryMealAnimation,
+                            action: {
+                                showingMysteryMeal = true
+                                particleTrigger = true
+                            }
+                        )
+                        .padding(.horizontal, 30)
                         
                         // Viral Section
                         ViralChallengeSection()
-                            .staggeredFade(index: 3, isShowing: contentVisible)
                         
                         // Recent Recipes
                         if !appState.recentRecipes.isEmpty {
                             EnhancedRecipesSection(recipes: appState.recentRecipes)
-                                .staggeredFade(index: 4, isShowing: contentVisible)
                         }
                     }
                     .padding(.bottom, 120)
@@ -76,71 +80,54 @@ struct EnhancedHomeView: View {
             .particleExplosion(trigger: $particleTrigger)
         }
         .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.6)) {
-                logoScale = 1
-            }
-            
-            withAnimation(.easeOut(duration: 0.5).delay(0.3)) {
-                contentVisible = true
+            // Simple fade in for mystery meal animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    mysteryMealAnimation = true
+                }
             }
         }
         .fullScreenCover(isPresented: $showingCamera) {
             EnhancedCameraView()
+        }
+        .fullScreenCover(isPresented: $showingMysteryMeal) {
+            MysteryMealView()
         }
     }
 }
 
 // MARK: - Hero Logo
 struct HeroLogoView: View {
-    @State private var shimmer: CGFloat = -1
-    @State private var glow = false
+    @State private var shimmerPhase: CGFloat = -1
     
     var body: some View {
         VStack(spacing: 16) {
             ZStack {
-                // Glow effect
+                // Main text in white with larger size
                 Text("SnapChef")
-                    .font(.system(size: 56, weight: .black, design: .rounded))
-                    .foregroundColor(Color(hex: "#667eea"))
-                    .blur(radius: glow ? 30 : 10)
-                    .scaleEffect(glow ? 1.2 : 1)
-                
-                // Main text with gradient
-                Text("SnapChef")
-                    .font(.system(size: 56, weight: .black, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "#667eea"),
-                                Color(hex: "#764ba2"),
-                                Color(hex: "#f093fb")
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .font(.system(size: 72, weight: .black, design: .rounded))
+                    .foregroundColor(.white)
                     .overlay(
-                        // Shimmer effect
+                        // Shimmer effect on edges
                         LinearGradient(
                             colors: [
                                 Color.clear,
                                 Color.white.opacity(0.8),
                                 Color.clear
                             ],
-                            startPoint: UnitPoint(x: shimmer - 0.3, y: 0),
-                            endPoint: UnitPoint(x: shimmer + 0.3, y: 1)
+                            startPoint: UnitPoint(x: shimmerPhase - 0.3, y: 0),
+                            endPoint: UnitPoint(x: shimmerPhase + 0.3, y: 1)
                         )
                         .mask(
                             Text("SnapChef")
-                                .font(.system(size: 56, weight: .black, design: .rounded))
+                                .font(.system(size: 72, weight: .black, design: .rounded))
                         )
                     )
                 
                 // Sparkle emoji
                 Text("✨")
-                    .font(.system(size: 42))
-                    .offset(x: 110, y: -20)
-                    .rotationEffect(.degrees(glow ? 360 : 0))
+                    .font(.system(size: 48))
+                    .offset(x: 140, y: -25)
             }
             
             Text("AI-powered recipes from what you already have")
@@ -151,12 +138,9 @@ struct HeroLogoView: View {
         }
         .padding(.top, 60)
         .onAppear {
-            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                shimmer = 2
-            }
-            
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                glow = true
+            // Single shimmer pass on appear
+            withAnimation(.linear(duration: 2)) {
+                shimmerPhase = 2
             }
         }
     }
@@ -211,8 +195,9 @@ struct FreeUsesIndicatorEnhanced: View {
             .padding(.vertical, 16)
         })
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                pulseScale = 1.1
+            // Subtle single pulse on appear
+            withAnimation(.easeInOut(duration: 0.8)) {
+                pulseScale = 1.05
             }
         }
     }
@@ -222,7 +207,7 @@ struct FreeUsesIndicatorEnhanced: View {
 struct FeatureCardsGrid: View {
     let features = [
         ("🤖", "AI Magic", "Smart recipe generation", Color(hex: "#667eea")),
-        ("⚡", "Instant", "Results in seconds", Color(hex: "#f093fb")),
+        ("⚡", "Instant", "Results in seconds, meals in minutes", Color(hex: "#f093fb")),
         ("🎯", "Personal", "Tailored to you", Color(hex: "#4facfe")),
         ("🌟", "Share", "Go viral instantly", Color(hex: "#43e97b"))
     ]
@@ -304,7 +289,7 @@ struct ViralChallengeSection: View {
             
             TabView(selection: $currentChallenge) {
                 ForEach(0..<challenges.count, id: \.self) { index in
-                    ChallengeCard(
+                    HomeChallengeCard(
                         emoji: challenges[index].0,
                         title: challenges[index].1,
                         description: challenges[index].2
@@ -313,13 +298,13 @@ struct ViralChallengeSection: View {
                 }
             }
             .tabViewStyle(PageTabViewStyle())
-            .frame(height: 180)
+            .frame(height: 220)
         }
         .padding(.horizontal, 20)
     }
 }
 
-struct ChallengeCard: View {
+struct HomeChallengeCard: View {
     let emoji: String
     let title: String
     let description: String
@@ -435,6 +420,109 @@ struct EnhancedRecipeCard: View {
             
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.impactOccurred()
+        }
+    }
+}
+
+// MARK: - Mystery Meal Button
+struct MysteryMealButton: View {
+    @Binding var isAnimating: Bool
+    let action: () -> Void
+    @State private var diceRotation = 0.0
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                // Animated dice icon
+                ZStack {
+                    // Glow effect
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(hex: "#f093fb").opacity(0.3),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 30
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+                        .scaleEffect(isAnimating ? 1.2 : 1)
+                    
+                    Text("🎲")
+                        .font(.system(size: 36))
+                        .rotationEffect(.degrees(diceRotation))
+                        .scaleEffect(isAnimating ? 1.1 : 1)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Mystery Meal")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#f093fb"),
+                                    Color(hex: "#f5576c")
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    
+                    Text("Surprise me!")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+                Spacer()
+                
+                // Arrow
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(Color(hex: "#f093fb"))
+                    .offset(x: isAnimating ? 5 : 0)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#f093fb").opacity(0.5),
+                                        Color(hex: "#f5576c").opacity(0.5)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                    )
+            )
+            .shadow(
+                color: Color(hex: "#f093fb").opacity(0.3),
+                radius: isAnimating ? 20 : 10,
+                y: isAnimating ? 10 : 5
+            )
+            .scaleEffect(isPressed ? 0.95 : 1)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = pressing
+            }
+        }, perform: {})
+        .onAppear {
+            // Single rotation on appear
+            withAnimation(.easeInOut(duration: 1.2)) {
+                diceRotation = 360
+            }
         }
     }
 }

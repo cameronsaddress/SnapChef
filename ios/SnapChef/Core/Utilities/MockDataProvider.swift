@@ -173,4 +173,41 @@ class MockDataProvider {
             lastLoginAt: Date()
         )
     }
+    
+    func mockRecipe() -> Recipe {
+        return Recipe(
+            id: UUID(),
+            name: "Garden Fresh Salad",
+            description: "A colorful and nutritious salad with fresh vegetables",
+            ingredients: [
+                Ingredient(id: UUID(), name: "Mixed greens", quantity: "4", unit: "cups", isAvailable: true),
+                Ingredient(id: UUID(), name: "Cherry tomatoes", quantity: "1", unit: "cup", isAvailable: true),
+                Ingredient(id: UUID(), name: "Cucumber", quantity: "1", unit: "medium", isAvailable: true),
+                Ingredient(id: UUID(), name: "Red onion", quantity: "1/4", unit: "cup", isAvailable: true),
+                Ingredient(id: UUID(), name: "Feta cheese", quantity: "1/2", unit: "cup", isAvailable: false)
+            ],
+            instructions: [
+                "Wash and dry the mixed greens thoroughly",
+                "Cut cherry tomatoes in half",
+                "Dice the cucumber into small cubes",
+                "Thinly slice the red onion",
+                "Combine all vegetables in a large bowl"
+            ],
+            cookTime: 0,
+            prepTime: 15,
+            servings: 4,
+            difficulty: .easy,
+            nutrition: Nutrition(
+                calories: 180,
+                protein: 6,
+                carbs: 12,
+                fat: 14,
+                fiber: 4,
+                sugar: 6,
+                sodium: 320
+            ),
+            imageURL: nil,
+            createdAt: Date()
+        )
+    }
 }

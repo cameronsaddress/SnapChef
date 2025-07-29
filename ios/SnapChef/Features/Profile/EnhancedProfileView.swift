@@ -653,7 +653,7 @@ struct SocialStatsCard: View {
             VStack(spacing: 20) {
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Social Impact")
+                        Text("Social")
                             .font(.system(size: 20, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                         

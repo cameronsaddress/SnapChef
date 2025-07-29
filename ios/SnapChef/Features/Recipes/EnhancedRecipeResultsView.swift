@@ -2,11 +2,20 @@ import SwiftUI
 
 struct EnhancedRecipeResultsView: View {
     let recipes: [Recipe]
+    let capturedImage: UIImage?
     @Environment(\.dismiss) var dismiss
     @State private var selectedRecipe: Recipe?
     @State private var showShareSheet = false
+    @State private var showShareGenerator = false
+    @State private var showSocialShare = false
+    @State private var generatedShareImage: UIImage?
     @State private var confettiTrigger = false
     @State private var contentVisible = false
+    
+    init(recipes: [Recipe], capturedImage: UIImage? = nil) {
+        self.recipes = recipes
+        self.capturedImage = capturedImage
+    }
     
     var body: some View {
         NavigationStack {
@@ -35,7 +44,7 @@ struct EnhancedRecipeResultsView: View {
                         
                         // Viral share prompt
                         ViralSharePrompt(action: {
-                            showShareSheet = true
+                            showShareGenerator = true
                         })
                         .staggeredFade(index: recipes.count + 1, isShowing: contentVisible)
                         .padding(.top, 20)
@@ -50,7 +59,7 @@ struct EnhancedRecipeResultsView: View {
                     HStack {
                         Spacer()
                         ShareFloatingButton {
-                            showShareSheet = true
+                            showShareGenerator = true
                         }
                         .padding(30)
                     }
@@ -87,6 +96,24 @@ struct EnhancedRecipeResultsView: View {
         }
         .sheet(item: $selectedRecipe) { recipe in
             RecipeDetailView(recipe: recipe)
+        }
+        .sheet(isPresented: $showShareGenerator) {
+            if let recipe = selectedRecipe ?? recipes.first {
+                ShareGeneratorView(
+                    recipe: recipe,
+                    ingredientsPhoto: capturedImage
+                )
+            }
+        }
+        .sheet(isPresented: $showSocialShare) {
+            if let recipe = selectedRecipe ?? recipes.first,
+               let shareImage = generatedShareImage {
+                SocialShareView(
+                    image: shareImage,
+                    text: "Just turned my fridge into \(recipe.name)! 🔥",
+                    recipe: recipe
+                )
+            }
         }
         .sheet(isPresented: $showShareSheet) {
             if let recipe = recipes.first {

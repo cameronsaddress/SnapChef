@@ -10,6 +10,8 @@ struct EnhancedCameraView: View {
     @State private var isProcessing = false
     @State private var showingResults = false
     @State private var generatedRecipes: [Recipe] = []
+    @State private var capturedImage: UIImage?
+    @State private var showingPreview = false
     @State private var captureAnimation = false
     @State private var scanLineOffset: CGFloat = -200
     @State private var glowIntensity: Double = 0.3
@@ -30,44 +32,69 @@ struct EnhancedCameraView: View {
             }
             
             // Scanning overlay
-            if !isProcessing {
+            if !isProcessing && !showingPreview {
                 ScanningOverlay(scanLineOffset: $scanLineOffset)
                     .ignoresSafeArea()
             }
             
             // UI overlay
-            VStack {
-                // Top bar
-                CameraTopBar(dismiss: dismiss)
-                
-                Spacer()
-                
-                // Bottom controls
-                CameraControlsEnhanced(
-                    cameraModel: cameraModel,
-                    capturePhoto: capturePhoto,
-                    isProcessing: isProcessing,
-                    captureAnimation: $captureAnimation
-                )
+            if !showingPreview {
+                VStack {
+                    // Top bar
+                    CameraTopBar(dismiss: dismiss)
+                    
+                    Spacer()
+                    
+                    // Bottom controls
+                    CameraControlsEnhanced(
+                        cameraModel: cameraModel,
+                        capturePhoto: capturePhoto,
+                        isProcessing: isProcessing,
+                        captureAnimation: $captureAnimation
+                    )
+                }
             }
             
             // Processing overlay
             if isProcessing {
                 MagicalProcessingOverlay()
             }
+            
+            // Captured image preview
+            if showingPreview, let image = capturedImage {
+                CapturedImageView(
+                    image: image,
+                    onRetake: {
+                        showingPreview = false
+                        capturedImage = nil
+                    },
+                    onConfirm: {
+                        showingPreview = false
+                        processImage(image)
+                    }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 1.1)))
+            }
         }
         .onAppear {
             startScanAnimation()
-            // Request permission and setup camera
+            // Request permission and setup camera with delay
             Task {
-                cameraModel.requestCameraPermission()
+                // Small delay to ensure view is fully loaded
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                await MainActor.run {
+                    cameraModel.requestCameraPermission()
+                }
             }
         }
         .onDisappear {
             cameraModel.stopSession()
         }
         .fullScreenCover(isPresented: $showingResults) {
-            EnhancedRecipeResultsView(recipes: generatedRecipes)
+            EnhancedRecipeResultsView(
+                recipes: generatedRecipes,
+                capturedImage: capturedImage
+            )
         }
     }
     
@@ -90,12 +117,16 @@ struct EnhancedCameraView: View {
         generator.impactOccurred()
         
         cameraModel.capturePhoto { image in
-            processImage(image)
+            capturedImage = image
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                showingPreview = true
+            }
         }
     }
     
     private func processImage(_ image: UIImage) {
         isProcessing = true
+        capturedImage = image // Store the captured image
         
         Task {
             do {

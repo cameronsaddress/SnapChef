@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ShareSheet: View {
+struct SimpleShareSheet: View {
     let recipe: Recipe
     @Environment(\.dismiss) var dismiss
     @State private var shareMessage = ""
@@ -14,7 +14,7 @@ struct ShareSheet: View {
                 
                 VStack(spacing: 24) {
                     // Preview card
-                    SharePreviewCard(recipe: recipe)
+                    SimpleSharePreviewCard(recipe: recipe)
                         .padding(.horizontal, 20)
                     
                     // Share message
@@ -132,7 +132,7 @@ struct ShareSheet: View {
     }
 }
 
-struct SharePreviewCard: View {
+struct SimpleSharePreviewCard: View {
     let recipe: Recipe
     
     var body: some View {
@@ -332,7 +332,7 @@ struct ShareTextFieldStyle: TextFieldStyle {
 }
 
 #Preview {
-    ShareSheet(recipe: Recipe(
+    SimpleShareSheet(recipe: Recipe(
         id: UUID(),
         name: "Chicken Stir Fry",
         description: "A quick and healthy dish",

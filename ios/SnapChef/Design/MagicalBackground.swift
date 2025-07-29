@@ -3,69 +3,76 @@ import CoreMotion
 
 // MARK: - Magical Animated Background
 struct MagicalBackground: View {
-    @State private var phase: CGFloat = 0
-    @State private var breathe: CGFloat = 0
-    @State private var shimmer: CGFloat = 0
-    @State private var particleSystem = ParticleSystem()
-    
-    // Motion manager for parallax effect
-    @StateObject private var motionManager = MotionObserver()
-    
     var body: some View {
         ZStack {
-            // Layer 1: Animated Mesh Gradient
-            MeshGradientLayer(phase: phase, breathe: breathe)
-                .ignoresSafeArea()
+            // Simple static gradient background
+            LinearGradient(
+                colors: [
+                    Color(hex: "#667eea").opacity(0.3),
+                    Color(hex: "#764ba2").opacity(0.2),
+                    Color(hex: "#f093fb").opacity(0.1),
+                    Color(hex: "#4facfe").opacity(0.1)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
             
-            // Layer 2: Aurora Borealis Effect
-            AuroraLayer(shimmer: shimmer)
+            // Subtle mesh gradient overlay
+            StaticMeshGradientLayer()
                 .ignoresSafeArea()
-                .blendMode(.screen)
-                .opacity(0.3)
-            
-            // Layer 3: Floating Orbs
-            FloatingOrbsLayer(phase: phase)
-                .ignoresSafeArea()
-                .blendMode(.plusLighter)
-            
-            // Layer 4: Particle System
-            ParticleSystemView(system: particleSystem)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-            
-            // Layer 5: Interactive Ripples
-            RippleEffectLayer()
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
+                .opacity(0.5)
         }
-        .modifier(ParallaxEffect(motion: motionManager))
-        .onAppear {
-            startAnimations()
-        }
-    }
-    
-    private func startAnimations() {
-        // Main phase animation
-        withAnimation(.easeInOut(duration: 20).repeatForever(autoreverses: false)) {
-            phase = .pi * 2
-        }
-        
-        // Breathing animation
-        withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
-            breathe = 1
-        }
-        
-        // Shimmer animation
-        withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
-            shimmer = 1
-        }
-        
-        // Start particle system
-        particleSystem.start()
     }
 }
 
-// MARK: - Mesh Gradient Layer
+// MARK: - Static Mesh Gradient Layer
+struct StaticMeshGradientLayer: View {
+    var body: some View {
+        Canvas { context, size in
+            let colors: [Color] = [
+                Color(hex: "#667eea").opacity(0.2),
+                Color(hex: "#764ba2").opacity(0.2),
+                Color(hex: "#f093fb").opacity(0.2),
+                Color(hex: "#4facfe").opacity(0.2),
+                Color(hex: "#43e97b").opacity(0.2)
+            ]
+            
+            // Create static mesh points
+            let cols = 3
+            let rows = 3
+            
+            for row in 0..<rows {
+                for col in 0..<cols {
+                    let x = (size.width / CGFloat(cols - 1)) * CGFloat(col)
+                    let y = (size.height / CGFloat(rows - 1)) * CGFloat(row)
+                    
+                    let center = CGPoint(x: x, y: y)
+                    let radius: CGFloat = 300
+                    
+                    let gradient = Gradient(colors: [colors[(col + row) % colors.count], Color.clear])
+                    
+                    context.fill(
+                        Circle().path(in: CGRect(
+                            x: center.x - radius,
+                            y: center.y - radius,
+                            width: radius * 2,
+                            height: radius * 2
+                        )),
+                        with: .radialGradient(
+                            gradient,
+                            center: center,
+                            startRadius: 0,
+                            endRadius: radius
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Original Mesh Gradient Layer (keeping for reference)
 struct MeshGradientLayer: View {
     let phase: CGFloat
     let breathe: CGFloat
