@@ -47,6 +47,7 @@ struct EnhancedHomeView: View {
                                 }
                                 .buttonStyle(PlainButtonStyle())
                                 .padding(.horizontal, 30)
+                                .padding(.top, 20)  // Add more space above
                                 .padding(.bottom, 30)
                             }
                         }

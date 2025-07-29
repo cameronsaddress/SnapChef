@@ -100,7 +100,6 @@ struct LaunchAnimationView: View {
         // Wait for letters to appear
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             let screenWidth = UIScreen.main.bounds.width
-            var emojiCreationTimer: Timer?
             
             // Start physics animation
             let animationTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
@@ -110,14 +109,14 @@ struct LaunchAnimationView: View {
                 }
             }
             
-            // Create food emojis at random intervals
-            emojiCreationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                // Random chance to create emoji
-                if Double.random(in: 0...1) < 0.7 {
+            // Drop first 3 emojis randomly within 1.5 seconds
+            for _ in 0..<3 {
+                let delay = Double.random(in: 0...1.5)
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                     let emoji = FallingEmoji(
                         position: CGPoint(
                             x: CGFloat.random(in: 30...screenWidth - 30),
-                            y: -50  // Start above screen
+                            y: -50
                         ),
                         velocity: CGVector(
                             dx: CGFloat.random(in: -20...20),
@@ -129,9 +128,27 @@ struct LaunchAnimationView: View {
                 }
             }
             
+            // After 1.5 seconds, drop all the rest
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                // Create a burst of emojis
+                for _ in 0..<40 {
+                    let emoji = FallingEmoji(
+                        position: CGPoint(
+                            x: CGFloat.random(in: 20...screenWidth - 20),
+                            y: CGFloat.random(in: -200 ... -50)
+                        ),
+                        velocity: CGVector(
+                            dx: CGFloat.random(in: -30...30),
+                            dy: CGFloat.random(in: 100...200)
+                        ),
+                        emoji: self.foodEmojis.randomElement() ?? "🍕"
+                    )
+                    self.emojiAnimator.emojis.append(emoji)
+                }
+            }
+            
             // End animation after exactly 4 seconds total (0.8s delay + 3.2s animation)
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
-                emojiCreationTimer?.invalidate()
                 animationTimer.invalidate()
                 
                 withAnimation(.easeOut(duration: 0.3)) {
