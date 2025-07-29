@@ -57,18 +57,6 @@ struct EnhancedRecipeResultsView: View {
                     .padding(.bottom, 100)
                 }
                 
-                // Floating share button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        ShareFloatingButton {
-                            showShareGenerator = true
-                        }
-                        .padding(30)
-                    }
-                }
-                
                 // Confetti effect
                 if confettiTrigger {
                     ConfettiView()

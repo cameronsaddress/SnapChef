@@ -8,47 +8,73 @@ struct SimplePhotoCaptureView: View {
     
     @State private var capturedImage: UIImage?
     @State private var showingPreview = false
+    @State private var captureAnimation = false
+    @State private var scanLineOffset: CGFloat = -200
+    @State private var glowIntensity: Double = 0.3
     
     var body: some View {
         ZStack {
-            // Camera preview
+            // Camera preview (bottom layer)
             if cameraModel.isCameraAuthorized {
                 CameraPreview(cameraModel: cameraModel)
                     .ignoresSafeArea()
-                    .opacity(showingPreview ? 0 : 1)
+                    .opacity(cameraModel.isSessionReady ? 1 : 0)
+                    .animation(.easeIn(duration: 0.3), value: cameraModel.isSessionReady)
             } else {
-                // Fallback background
+                // Fallback background when camera not available
                 MagicalBackground()
                     .ignoresSafeArea()
                     .overlay(Color.black.opacity(0.3))
             }
             
+            // Scanning overlay
+            if !showingPreview {
+                ScanningOverlay(scanLineOffset: $scanLineOffset)
+                    .ignoresSafeArea()
+            }
+            
             // UI overlay
             if !showingPreview {
                 VStack {
-                    // Top bar
+                    // Top bar with custom title
                     HStack {
                         Button(action: { dismiss() }) {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 32, weight: .medium))
-                                .foregroundColor(.white)
-                                .background(Circle().fill(Color.black.opacity(0.5)))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color.white, Color.white.opacity(0.8)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .background(
+                                    Circle()
+                                        .fill(Color.black.opacity(0.3))
+                                        .blur(radius: 10)
+                                )
                         }
-                        .padding()
                         
                         Spacer()
                         
-                        Text("Take After Photo")
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                        VStack(spacing: 4) {
+                            Text("After Photo")
+                                .font(.system(size: 20, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            Text("Show your masterpiece!")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
                         
                         Spacer()
                         
-                        // Placeholder for balance
+                        // Balance spacer
                         Color.clear
                             .frame(width: 32, height: 32)
-                            .padding()
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 60)
+                    .padding(.bottom, 20)
                     .background(
                         LinearGradient(
                             colors: [Color.black.opacity(0.6), Color.clear],
@@ -61,115 +87,71 @@ struct SimplePhotoCaptureView: View {
                     
                     Spacer()
                     
-                    // Capture button
-                    VStack(spacing: 20) {
-                        Text("Show your finished dish!")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 40)
-                            .multilineTextAlignment(.center)
-                        
-                        Button(action: capturePhoto) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 70, height: 70)
-                                
-                                Circle()
-                                    .stroke(Color.white, lineWidth: 3)
-                                    .frame(width: 80, height: 80)
-                            }
-                        }
-                        .padding(.bottom, 50)
-                    }
-                    .background(
-                        LinearGradient(
-                            colors: [Color.clear, Color.black.opacity(0.8)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 200)
-                        .ignoresSafeArea()
+                    // Bottom controls
+                    CameraControlsEnhanced(
+                        cameraModel: cameraModel,
+                        capturePhoto: capturePhoto,
+                        isProcessing: false,
+                        captureAnimation: $captureAnimation
                     )
                 }
             }
             
-            // Preview overlay
+            // Captured image preview
             if showingPreview, let image = capturedImage {
-                ZStack {
-                    Color.black.ignoresSafeArea()
-                    
-                    VStack(spacing: 30) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: UIScreen.main.bounds.height * 0.6)
-                            .cornerRadius(20)
-                            .shadow(radius: 20)
-                        
-                        HStack(spacing: 40) {
-                            Button(action: retakePhoto) {
-                                VStack(spacing: 8) {
-                                    Image(systemName: "arrow.counterclockwise")
-                                        .font(.system(size: 24, weight: .medium))
-                                    Text("Retake")
-                                        .font(.system(size: 16, weight: .medium))
-                                }
-                                .foregroundColor(.white)
-                                .padding()
-                                .background(
-                                    Circle()
-                                        .fill(Color.white.opacity(0.2))
-                                        .frame(width: 80, height: 80)
-                                )
-                            }
-                            
-                            Button(action: usePhoto) {
-                                VStack(spacing: 8) {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 24, weight: .bold))
-                                    Text("Use Photo")
-                                        .font(.system(size: 16, weight: .medium))
-                                }
-                                .foregroundColor(.black)
-                                .padding()
-                                .background(
-                                    Circle()
-                                        .fill(Color.white)
-                                        .frame(width: 80, height: 80)
-                                )
-                            }
-                        }
+                CapturedImageView(
+                    image: image,
+                    onRetake: {
+                        showingPreview = false
+                        capturedImage = nil
+                    },
+                    onConfirm: {
+                        onCapture(image)
+                        dismiss()
                     }
-                    .padding()
-                }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 1.1)))
             }
         }
         .onAppear {
-            cameraModel.requestCameraPermission()
+            startScanAnimation()
+            // Request permission and setup camera with delay
+            Task {
+                // Small delay to ensure view is fully loaded
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                await MainActor.run {
+                    cameraModel.requestCameraPermission()
+                }
+            }
+        }
+        .onDisappear {
+            cameraModel.stopSession()
+        }
+    }
+    
+    private func startScanAnimation() {
+        withAnimation(.linear(duration: 2).repeatForever(autoreverses: true)) {
+            scanLineOffset = 200
+        }
+        
+        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+            glowIntensity = 0.8
         }
     }
     
     private func capturePhoto() {
+        // Trigger capture animation
+        captureAnimation = true
+        
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .heavy)
+        generator.impactOccurred()
+        
         cameraModel.capturePhoto { image in
             capturedImage = image
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 showingPreview = true
             }
-        }
-    }
-    
-    private func retakePhoto() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            showingPreview = false
-            capturedImage = nil
-        }
-    }
-    
-    private func usePhoto() {
-        if let image = capturedImage {
-            onCapture(image)
-            dismiss()
         }
     }
 }

@@ -106,7 +106,10 @@ struct EnhancedHomeView: View {
 
 // MARK: - Hero Logo
 struct HeroLogoView: View {
-    @State private var shimmerPhase: CGFloat = -1
+    @State private var shimmerPhase: CGFloat = 0
+    @State private var sparkleScale: CGFloat = 1
+    @State private var sparkleRotation: Double = 0
+    @State private var sparkleOpacity: Double = 1
     
     var body: some View {
         VStack(spacing: 16) {
@@ -116,26 +119,40 @@ struct HeroLogoView: View {
                     .font(.system(size: 72, weight: .black, design: .rounded))
                     .foregroundColor(.white)
                     .overlay(
-                        // Shimmer effect on edges
-                        LinearGradient(
-                            colors: [
-                                Color.clear,
-                                Color.white.opacity(0.8),
-                                Color.clear
-                            ],
-                            startPoint: UnitPoint(x: shimmerPhase - 0.3, y: 0),
-                            endPoint: UnitPoint(x: shimmerPhase + 0.3, y: 1)
-                        )
-                        .mask(
-                            Text("SnapChef")
-                                .font(.system(size: 72, weight: .black, design: .rounded))
-                        )
+                        // Circular shimmer effect
+                        GeometryReader { geometry in
+                            Circle()
+                                .fill(
+                                    AngularGradient(
+                                        gradient: Gradient(colors: [
+                                            Color.clear,
+                                            Color.white.opacity(0.6),
+                                            Color.white.opacity(0.8),
+                                            Color.white.opacity(0.6),
+                                            Color.clear
+                                        ]),
+                                        center: .center,
+                                        startAngle: .degrees(shimmerPhase),
+                                        endAngle: .degrees(shimmerPhase + 90)
+                                    )
+                                )
+                                .scaleEffect(1.5)
+                                .blur(radius: 8)
+                                .mask(
+                                    Text("SnapChef")
+                                        .font(.system(size: 72, weight: .black, design: .rounded))
+                                )
+                                .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                        }
                     )
                 
-                // Sparkle emoji
+                // Sparkle emoji with animation
                 Text("✨")
                     .font(.system(size: 48))
                     .offset(x: 140, y: -25)
+                    .scaleEffect(sparkleScale)
+                    .rotationEffect(.degrees(sparkleRotation))
+                    .opacity(sparkleOpacity)
             }
             
             Text("AI-powered recipes from what you already have")
@@ -146,9 +163,20 @@ struct HeroLogoView: View {
         }
         .padding(.top, 60)
         .onAppear {
-            // Single shimmer pass on appear
-            withAnimation(.linear(duration: 2)) {
-                shimmerPhase = 2
+            // Continuous circular shimmer
+            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+                shimmerPhase = 360
+            }
+            
+            // Sparkle pulse animation
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                sparkleScale = 1.3
+                sparkleOpacity = 0.7
+            }
+            
+            // Sparkle rotation
+            withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
+                sparkleRotation = 360
             }
         }
     }

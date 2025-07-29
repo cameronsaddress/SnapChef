@@ -49,6 +49,7 @@ struct ShareGeneratorView: View {
                         SharePreviewSection(
                             recipe: recipe,
                             ingredientsPhoto: ingredientsPhoto,
+                            afterPhoto: afterPhoto,
                             selectedStyle: selectedStyle,
                             animationPhase: animationPhase
                         )
@@ -159,6 +160,7 @@ struct ShareGeneratorView: View {
 struct SharePreviewSection: View {
     let recipe: Recipe
     let ingredientsPhoto: UIImage?
+    let afterPhoto: UIImage?
     let selectedStyle: ShareGeneratorView.ShareStyle
     let animationPhase: Double
     
@@ -192,7 +194,7 @@ struct SharePreviewSection: View {
                     ShareImageContent(
                         recipe: recipe,
                         ingredientsPhoto: ingredientsPhoto,
-                        afterPhoto: nil,
+                        afterPhoto: afterPhoto,
                         style: selectedStyle
                     )
                     .scaleEffect(0.85)

@@ -394,12 +394,12 @@ struct RecipeGridCard: View {
     @State private var showShareGenerator = false
     
     var body: some View {
-        Button(action: {
-            showDetail = true
-        }) {
-            GlassmorphicCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Image placeholder
+        GlassmorphicCard {
+            VStack(alignment: .leading, spacing: 12) {
+                // Image placeholder
+                Button(action: {
+                    showDetail = true
+                }) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(
@@ -427,9 +427,11 @@ struct RecipeGridCard: View {
                             Spacer()
                         }
                     }
-                    
-                    // Content
-                    VStack(alignment: .leading, spacing: 8) {
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Content
+                VStack(alignment: .leading, spacing: 8) {
                         Text(recipe.name)
                             .font(.system(size: 18, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
@@ -475,11 +477,9 @@ struct RecipeGridCard: View {
                             .buttonStyle(PlainButtonStyle())
                         }
                     }
-                }
-                .padding(16)
             }
+            .padding(16)
         }
-        .buttonStyle(PlainButtonStyle())
         .scaleEffect(isPressed ? 0.95 : 1)
         .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
             withAnimation(.easeInOut(duration: 0.1)) {
