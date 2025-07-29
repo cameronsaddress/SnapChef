@@ -73,7 +73,7 @@ struct ShareGeneratorView: View {
                         
                         // Action Button
                         MagneticButton(
-                            title: "Generate Share Image",
+                            title: "Share for Credits",
                             icon: "sparkles",
                             action: generateShareImage
                         )
@@ -116,25 +116,29 @@ struct ShareGeneratorView: View {
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
         
-        // Create the share image
-        let renderer = ImageRenderer(content: ShareImageContent(
-            recipe: recipe,
-            ingredientsPhoto: ingredientsPhoto,
-            afterPhoto: afterPhoto,
-            style: selectedStyle
-        ))
-        
-        renderer.scale = 3.0 // High quality
-        
-        if let uiImage = renderer.uiImage {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                generatedImage = uiImage
-                isGenerating = false
-            }
+        // Delay to ensure view is properly laid out
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // Create the share image
+            let shareContent = ShareImageContent(
+                recipe: recipe,
+                ingredientsPhoto: ingredientsPhoto,
+                afterPhoto: afterPhoto,
+                style: selectedStyle
+            )
             
-            // Auto-navigate to share sheet after generation
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                shareSheet = true
+            let renderer = ImageRenderer(content: shareContent)
+            renderer.scale = 3.0 // High quality
+            
+            if let uiImage = renderer.uiImage {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    generatedImage = uiImage
+                    isGenerating = false
+                }
+                
+                // Auto-navigate to share sheet after generation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    shareSheet = true
+                }
             }
         }
     }
@@ -355,8 +359,9 @@ struct ShareImageContent: View {
                                     .frame(width: 140, height: 140)
                                     .clipShape(RoundedRectangle(cornerRadius: 16))
                             } else {
-                                Text(recipe.difficulty.emoji)
+                                Image(systemName: "camera.fill")
                                     .font(.system(size: 60))
+                                    .foregroundColor(.white.opacity(0.5))
                             }
                             
                             // Label

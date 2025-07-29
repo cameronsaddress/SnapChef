@@ -11,6 +11,19 @@ struct EnhancedRecipeResultsView: View {
     @State private var generatedShareImage: UIImage?
     @State private var confettiTrigger = false
     @State private var contentVisible = false
+    @State private var activeSheet: ActiveSheet?
+    
+    enum ActiveSheet: Identifiable {
+        case recipeDetail(Recipe)
+        case shareGenerator(Recipe)
+        
+        var id: String {
+            switch self {
+            case .recipeDetail(let recipe): return "detail_\(recipe.id)"
+            case .shareGenerator(let recipe): return "share_\(recipe.id)"
+            }
+        }
+    }
     
     init(recipes: [Recipe], capturedImage: UIImage? = nil) {
         self.recipes = recipes
@@ -35,12 +48,11 @@ struct EnhancedRecipeResultsView: View {
                             MagicalRecipeCard(
                                 recipe: recipe,
                                 onSelect: {
-                                    selectedRecipe = recipe
+                                    activeSheet = .recipeDetail(recipe)
                                     confettiTrigger = true
                                 },
                                 onShare: {
-                                    selectedRecipe = recipe
-                                    showShareGenerator = true
+                                    activeSheet = .shareGenerator(recipe)
                                 }
                             )
                             .staggeredFade(index: index + 1, isShowing: contentVisible)
@@ -48,7 +60,9 @@ struct EnhancedRecipeResultsView: View {
                         
                         // Viral share prompt
                         ViralSharePrompt(action: {
-                            showShareGenerator = true
+                            if let firstRecipe = recipes.first {
+                                activeSheet = .shareGenerator(firstRecipe)
+                            }
                         })
                         .staggeredFade(index: recipes.count + 1, isShowing: contentVisible)
                         .padding(.top, 20)
@@ -86,11 +100,11 @@ struct EnhancedRecipeResultsView: View {
                 contentVisible = true
             }
         }
-        .sheet(item: $selectedRecipe) { recipe in
-            RecipeDetailView(recipe: recipe)
-        }
-        .sheet(isPresented: $showShareGenerator) {
-            if let recipe = selectedRecipe ?? recipes.first {
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .recipeDetail(let recipe):
+                RecipeDetailView(recipe: recipe)
+            case .shareGenerator(let recipe):
                 ShareGeneratorView(
                     recipe: recipe,
                     ingredientsPhoto: capturedImage
@@ -210,74 +224,79 @@ struct MagicalRecipeCard: View {
     @State private var shimmerPhase: CGFloat = -1
     
     var body: some View {
-        Button(action: onSelect) {
-            GlassmorphicCard(content: {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Header with image
-                    HStack(spacing: 20) {
-                        // Recipe image placeholder
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(hex: "#667eea"),
-                                            Color(hex: "#764ba2")
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
+        GlassmorphicCard(content: {
+            VStack(alignment: .leading, spacing: 20) {
+                // Header with image
+                HStack(spacing: 20) {
+                    // Recipe image placeholder
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#667eea"),
+                                        Color(hex: "#764ba2")
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
                                 )
-                                .frame(width: 100, height: 100)
-                            
-                            Text(recipe.difficulty.emoji)
-                                .font(.system(size: 40))
-                        }
+                            )
+                            .frame(width: 100, height: 100)
                         
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(recipe.name)
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                                .lineLimit(2)
-                            
-                            HStack(spacing: 16) {
-                                TimeIndicator(minutes: recipe.prepTime + recipe.cookTime)
-                                CalorieIndicator(calories: recipe.nutrition.calories)
-                            }
-                            
-                            DifficultyBadge(difficulty: recipe.difficulty)
-                        }
-                        
-                        Spacer()
+                        Text(recipe.difficulty.emoji)
+                            .font(.system(size: 40))
                     }
                     
-                    // Description
-                    Text(recipe.description)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                        .lineLimit(2)
-                    
-                    // Action buttons
-                    HStack(spacing: 12) {
-                        ActionButton(
-                            title: "Cook Now",
-                            icon: "flame.fill",
-                            color: Color(hex: "#f093fb"),
-                            action: onSelect
-                        )
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(recipe.name)
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
                         
-                        ActionButton(
-                            title: "Share",
-                            icon: "square.and.arrow.up",
-                            color: Color(hex: "#4facfe"),
-                            action: onShare
-                        )
+                        HStack(spacing: 16) {
+                            TimeIndicator(minutes: recipe.prepTime + recipe.cookTime)
+                            CalorieIndicator(calories: recipe.nutrition.calories)
+                        }
+                        
+                        DifficultyBadge(difficulty: recipe.difficulty)
                     }
+                    
+                    Spacer()
                 }
-                .padding(24)
-            }, glowColor: Color(hex: "#667eea"))
-        }
-        .buttonStyle(PlainButtonStyle())
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onSelect()
+                }
+                
+                // Description
+                Text(recipe.description)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(2)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onSelect()
+                    }
+                
+                // Action buttons
+                HStack(spacing: 12) {
+                    ActionButton(
+                        title: "Cook Now",
+                        icon: "flame.fill",
+                        color: Color(hex: "#f093fb"),
+                        action: onSelect
+                    )
+                    
+                    ActionButton(
+                        title: "Share",
+                        icon: "square.and.arrow.up",
+                        color: Color(hex: "#4facfe"),
+                        action: onShare
+                    )
+                }
+            }
+            .padding(24)
+        }, glowColor: Color(hex: "#667eea"))
         .scaleEffect(isHovered ? 1.02 : 1)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
         .onHover { hovering in

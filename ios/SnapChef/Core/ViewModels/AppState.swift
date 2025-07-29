@@ -11,6 +11,7 @@ class AppState: ObservableObject {
     @Published var freeUsesRemaining: Int = 3
     @Published var allRecipes: [Recipe] = []
     @Published var savedRecipes: [Recipe] = []
+    @Published var savedRecipesWithPhotos: [SavedRecipe] = []
     @Published var totalLikes: Int = 0
     @Published var totalShares: Int = 0
     @Published var userJoinDate: Date = Date()
@@ -18,6 +19,7 @@ class AppState: ObservableObject {
     private let userDefaults = UserDefaults.standard
     private let firstLaunchKey = "hasLaunchedBefore"
     private let userJoinDateKey = "userJoinDate"
+    private let savedRecipesKey = "savedRecipesWithPhotos"
     
     init() {
         self.isFirstLaunch = !userDefaults.bool(forKey: firstLaunchKey)
@@ -28,6 +30,9 @@ class AppState: ObservableObject {
         } else {
             userDefaults.set(Date(), forKey: userJoinDateKey)
         }
+        
+        // Load saved recipes
+        loadSavedRecipes()
     }
     
     func completeOnboarding() {
@@ -67,6 +72,32 @@ class AppState: ObservableObject {
     
     func clearError() {
         error = nil
+    }
+    
+    func saveRecipeWithPhotos(_ recipe: Recipe, beforePhoto: UIImage?, afterPhoto: UIImage?) {
+        let savedRecipe = SavedRecipe(recipe: recipe, beforePhoto: beforePhoto, afterPhoto: afterPhoto)
+        savedRecipesWithPhotos.append(savedRecipe)
+        saveToDisk()
+        
+        // Also update the simple lists
+        if !savedRecipes.contains(where: { $0.id == recipe.id }) {
+            savedRecipes.append(recipe)
+        }
+    }
+    
+    private func loadSavedRecipes() {
+        if let data = userDefaults.data(forKey: savedRecipesKey),
+           let decoded = try? JSONDecoder().decode([SavedRecipe].self, from: data) {
+            savedRecipesWithPhotos = decoded
+            savedRecipes = decoded.map { $0.recipe }
+            allRecipes = decoded.map { $0.recipe }
+        }
+    }
+    
+    private func saveToDisk() {
+        if let encoded = try? JSONEncoder().encode(savedRecipesWithPhotos) {
+            userDefaults.set(encoded, forKey: savedRecipesKey)
+        }
     }
 }
 

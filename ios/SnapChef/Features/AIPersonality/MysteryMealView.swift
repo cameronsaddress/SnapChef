@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MysteryMealView: View {
     @StateObject private var personalityManager = AIPersonalityManager.shared
+    @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
     @State private var isGenerating = false
     @State private var generatedRecipes: [Recipe] = []
@@ -27,10 +28,6 @@ struct MysteryMealView: View {
                             // Fortune wheel
                             FortuneWheelView(rotation: $wheelRotation)
                                 .frame(height: 300)
-                                .padding(.horizontal, 20)
-                            
-                            // Ingredient selector (optional)
-                            IngredientHintsCard(selectedIngredients: $selectedIngredients)
                                 .padding(.horizontal, 20)
                             
                             // Surprise level selector
@@ -106,6 +103,13 @@ struct MysteryMealView: View {
             
             await MainActor.run {
                 generatedRecipes = mockRecipes
+                
+                // Save recipes to app state
+                for recipe in mockRecipes {
+                    appState.addRecentRecipe(recipe)
+                    appState.saveRecipeWithPhotos(recipe, beforePhoto: nil, afterPhoto: nil)
+                }
+                
                 showingResults = true
                 isGenerating = false
             }
@@ -288,15 +292,15 @@ struct FortuneWheelView: View {
                     )
                     .shadow(radius: 10)
                 
-                // Pointer
-                VStack {
+                // Pointer on the right
+                HStack {
+                    Spacer()
                     Triangle()
                         .fill(Color(hex: "#ef5350"))
-                        .frame(width: 30, height: 40)
+                        .frame(width: 40, height: 30)
+                        .rotationEffect(.degrees(-90))
                         .shadow(radius: 5)
-                        .offset(y: -geometry.size.height / 2 + 20)
-                    
-                    Spacer()
+                        .offset(x: geometry.size.width / 2 - 20)
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.width)

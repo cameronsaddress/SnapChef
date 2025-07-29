@@ -156,7 +156,17 @@ struct EnhancedCameraView: View {
                 // For now, using mock data
                 try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
                 
-                generatedRecipes = MockDataProvider.shared.mockRecipeResponse().recipes ?? []
+                let recipes = MockDataProvider.shared.mockRecipeResponse().recipes ?? []
+                generatedRecipes = recipes
+                
+                // Save recipes to app state with the captured photo
+                await MainActor.run {
+                    for recipe in recipes {
+                        appState.addRecentRecipe(recipe)
+                        appState.saveRecipeWithPhotos(recipe, beforePhoto: image, afterPhoto: nil)
+                    }
+                }
+                
                 showingResults = true
                 isProcessing = false
             } catch {
