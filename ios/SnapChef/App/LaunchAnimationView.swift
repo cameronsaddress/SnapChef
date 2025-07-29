@@ -74,7 +74,16 @@ struct LaunchAnimationView: View {
                 Text("✨")
                     .font(.system(size: 20))
                     .position(x: emoji.position.x, y: emoji.position.y)
-                    .rotationEffect(.degrees(emoji.rotation))
+                    // Removed rotation to prevent circling appearance
+            }
+            
+            // Debug: Show this is LaunchAnimationView
+            VStack {
+                Spacer()
+                Text("Loading...")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+                    .padding(.bottom, 100)
             }
         }
         .onAppear {
@@ -101,7 +110,7 @@ struct LaunchAnimationView: View {
             let emojiCount = 30
             
             // Create all emojis at once to simulate bucket dump
-            for i in 0..<emojiCount {
+            for _ in 0..<emojiCount {
                 let emoji = FallingEmoji(
                     position: CGPoint(
                         x: CGFloat.random(in: 20...screenWidth - 20),
@@ -118,7 +127,7 @@ struct LaunchAnimationView: View {
             // Start physics animation
             let animationTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
                 DispatchQueue.main.async {
-                    updatePhysics()
+                    self.updatePhysics()
                 }
             }
             
@@ -150,9 +159,6 @@ struct LaunchAnimationView: View {
             // Update position
             emojiAnimator.emojis[i].position.x += emojiAnimator.emojis[i].velocity.dx * deltaTime
             emojiAnimator.emojis[i].position.y += emojiAnimator.emojis[i].velocity.dy * deltaTime
-            
-            // Update rotation
-            emojiAnimator.emojis[i].rotation += emojiAnimator.emojis[i].rotationSpeed * deltaTime
             
             // Check collision with letters
             for letterBound in letterBounds {
