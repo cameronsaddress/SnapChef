@@ -106,9 +106,9 @@ struct EnhancedHomeView: View {
 
 // MARK: - Hero Logo
 struct HeroLogoView: View {
-    @State private var shimmerPhase: CGFloat = 0
-    @State private var sparkleScale: CGFloat = 1
-    @State private var sparkleOpacity: Double = 1
+    @State private var textGlow: Double = 0
+    @State private var emojiShimmer: Double = 0
+    @State private var showGlow = false
     
     var body: some View {
         VStack(spacing: 16) {
@@ -117,40 +117,27 @@ struct HeroLogoView: View {
                 Text("SnapChef")
                     .font(.system(size: 72, weight: .black, design: .rounded))
                     .foregroundColor(.white)
-                    .overlay(
-                        // Circular shimmer effect
-                        GeometryReader { geometry in
-                            Circle()
-                                .fill(
-                                    AngularGradient(
-                                        gradient: Gradient(colors: [
-                                            Color.clear,
-                                            Color.white.opacity(0.6),
-                                            Color.white.opacity(0.8),
-                                            Color.white.opacity(0.6),
-                                            Color.clear
-                                        ]),
-                                        center: .center,
-                                        startAngle: .degrees(shimmerPhase),
-                                        endAngle: .degrees(shimmerPhase + 90)
-                                    )
-                                )
-                                .scaleEffect(1.5)
-                                .blur(radius: 8)
-                                .mask(
-                                    Text("SnapChef")
-                                        .font(.system(size: 72, weight: .black, design: .rounded))
-                                )
-                                .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
-                        }
-                    )
+                    .shadow(color: Color.white.opacity(showGlow ? 0.8 : 0), radius: showGlow ? 20 : 0)
+                    .shadow(color: Color(hex: "#667eea").opacity(showGlow ? 0.6 : 0), radius: showGlow ? 30 : 0)
+                    .animation(.easeInOut(duration: 0.8), value: showGlow)
                 
-                // Sparkle emoji with sparkle animation
-                Text("✨")
-                    .font(.system(size: 48))
-                    .offset(x: 140, y: -25)
-                    .scaleEffect(sparkleScale)
-                    .opacity(sparkleOpacity)
+                // Sparkle emoji with shimmer effect
+                ZStack {
+                    // Background sparkles
+                    ForEach(0..<3) { index in
+                        Text("✨")
+                            .font(.system(size: 48))
+                            .offset(x: 140, y: -25)
+                            .opacity(emojiShimmer)
+                            .scaleEffect(1 + CGFloat(index) * 0.3)
+                            .blur(radius: CGFloat(index) * 2)
+                    }
+                    
+                    // Main sparkle
+                    Text("✨")
+                        .font(.system(size: 48))
+                        .offset(x: 140, y: -25)
+                }
             }
             
             Text("AI-powered recipes from what you already have")
@@ -161,15 +148,21 @@ struct HeroLogoView: View {
         }
         .padding(.top, 60)
         .onAppear {
-            // Continuous circular shimmer
-            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
-                shimmerPhase = 360
+            // Periodic glow effect for text
+            Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    showGlow = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    withAnimation(.easeInOut(duration: 0.8)) {
+                        showGlow = false
+                    }
+                }
             }
             
-            // Sparkle pulse animation
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                sparkleScale = 1.4
-                sparkleOpacity = 0.5
+            // Shimmer effect for emoji
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                emojiShimmer = 0.3
             }
         }
     }

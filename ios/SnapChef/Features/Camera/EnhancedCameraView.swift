@@ -96,6 +96,10 @@ struct EnhancedCameraView: View {
                 recipes: generatedRecipes,
                 capturedImage: capturedImage
             )
+            .onDisappear {
+                // When recipe results are dismissed, also dismiss the camera
+                dismiss()
+            }
         }
         .fullScreenCover(isPresented: $showingUpgrade) {
             SubscriptionView()

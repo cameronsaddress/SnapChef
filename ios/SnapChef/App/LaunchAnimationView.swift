@@ -72,7 +72,7 @@ struct LaunchAnimationView: View {
             // Falling emojis
             ForEach(emojiAnimator.emojis) { emoji in
                 Text("✨")
-                    .font(.system(size: 20))
+                    .font(.system(size: 12))  // Smaller size
                     .position(x: emoji.position.x, y: emoji.position.y)
                     // Removed rotation to prevent circling appearance
             }
@@ -107,18 +107,18 @@ struct LaunchAnimationView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             // Create emojis all at once, spread across the screen width
             let screenWidth = UIScreen.main.bounds.width
-            let emojiCount = 30
+            let emojiCount = 60  // Doubled from 30
             
             // Create all emojis at once to simulate bucket dump
             for _ in 0..<emojiCount {
                 let emoji = FallingEmoji(
                     position: CGPoint(
                         x: CGFloat.random(in: 20...screenWidth - 20),
-                        y: CGFloat.random(in: -200 ... -50)  // Start above screen
+                        y: CGFloat.random(in: -300 ... -50)  // Start higher above screen
                     ),
                     velocity: CGVector(
                         dx: CGFloat.random(in: -10...10),  // Minimal horizontal movement
-                        dy: CGFloat.random(in: 100...150)  // Strong downward velocity
+                        dy: CGFloat.random(in: 80...120)  // Slightly slower for 4 second animation
                     )
                 )
                 emojiAnimator.emojis.append(emoji)
@@ -131,8 +131,8 @@ struct LaunchAnimationView: View {
                 }
             }
             
-            // End animation after exactly 3 seconds total (0.8s delay + 2.2s animation)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+            // End animation after exactly 4 seconds total (0.8s delay + 3.2s animation)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
                 animationTimer.invalidate()
                 
                 withAnimation(.easeOut(duration: 0.3)) {
