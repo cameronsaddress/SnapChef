@@ -8,6 +8,8 @@ struct EnhancedHomeView: View {
     @State private var particleTrigger = false
     @State private var mysteryMealAnimation = false
     @State private var showingUpgrade = false
+    @StateObject private var fallingFoodManager = FallingFoodManager()
+    @State private var buttonShake = false
     
     var body: some View {
         NavigationStack {
@@ -36,6 +38,7 @@ struct EnhancedHomeView: View {
                                 }
                             )
                             .padding(.horizontal, 30)
+                            .modifier(ShakeEffect(shakeNumber: buttonShake ? 2 : 0))
                             
                             // Equal spacing below button
                             Spacer()
@@ -48,7 +51,7 @@ struct EnhancedHomeView: View {
                                 .buttonStyle(PlainButtonStyle())
                                 .padding(.horizontal, 30)
                                 .padding(.top, 20)  // Add more space above
-                                .padding(.bottom, 30)
+                                .padding(.bottom, 15)
                             }
                         }
                         
@@ -78,6 +81,14 @@ struct EnhancedHomeView: View {
                 }
                 .scrollContentBackground(.hidden)
                 
+                // Falling food emojis overlay
+                ForEach(fallingFoodManager.emojis) { emoji in
+                    Text(emoji.emoji)
+                        .font(.system(size: 30))
+                        .opacity(0.5)  // 50% translucent
+                        .position(x: emoji.position.x, y: emoji.position.y)
+                }
+                
                 // Floating Action Button
                 VStack {
                     Spacer()
@@ -101,6 +112,14 @@ struct EnhancedHomeView: View {
                     mysteryMealAnimation = true
                 }
             }
+            
+            // Start button shake after 3 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                startButtonShake()
+            }
+            
+            // Start falling food animation
+            fallingFoodManager.startFallingFood()
         }
         .fullScreenCover(isPresented: $showingCamera) {
             EnhancedCameraView()
@@ -111,6 +130,22 @@ struct EnhancedHomeView: View {
         .fullScreenCover(isPresented: $showingUpgrade) {
             SubscriptionView()
                 .environmentObject(deviceManager)
+        }
+    }
+    
+    private func startButtonShake() {
+        // Subtle shake effect
+        withAnimation(.default) {
+            buttonShake = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            buttonShake = false
+            
+            // Repeat every 8-12 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double.random(in: 8...12)) {
+                startButtonShake()
+            }
         }
     }
 }
@@ -157,7 +192,7 @@ struct HeroLogoView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
         }
-        .padding(.top, 60)
+        .padding(.top, 30)
         .onAppear {
             // One-time glow effect on load
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -584,6 +619,88 @@ struct MysteryMealButton: View {
             withAnimation(.easeInOut(duration: 1.2)) {
                 diceRotation = 360
             }
+        }
+    }
+}
+
+// MARK: - Shake Effect
+struct ShakeEffect: AnimatableModifier {
+    var shakeNumber: CGFloat = 0
+    
+    var animatableData: CGFloat {
+        get { shakeNumber }
+        set { shakeNumber = newValue }
+    }
+    
+    func body(content: Content) -> some View {
+        content
+            .offset(x: sin(shakeNumber * .pi * 2) * 5)
+    }
+}
+
+// MARK: - Falling Food Manager
+class FallingFoodManager: ObservableObject {
+    @Published var emojis: [FallingFoodEmoji] = []
+    private var timer: Timer?
+    private let foodEmojis = ["🍕", "🍔", "🌮", "🍜", "🍝", "🥗", "🍣", "🥘", "🍛", "🥙", "🍱", "🥪", "🌯", "🍖", "🍗", "🥓", "🧀", "🥚", "🍳", "🥞"]
+    
+    struct FallingFoodEmoji: Identifiable {
+        let id = UUID()
+        var position: CGPoint
+        var velocity: CGVector
+        let emoji: String
+    }
+    
+    func startFallingFood() {
+        // Start dropping food emojis occasionally
+        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+            self.dropEmoji()
+        }
+        
+        // Start physics update
+        Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
+            self.updatePhysics()
+        }
+    }
+    
+    private func dropEmoji() {
+        let screenWidth = UIScreen.main.bounds.width
+        
+        // Add 1-2 emojis at a time
+        let count = Int.random(in: 1...2)
+        for _ in 0..<count {
+            let emoji = FallingFoodEmoji(
+                position: CGPoint(
+                    x: CGFloat.random(in: 50...screenWidth - 50),
+                    y: -50
+                ),
+                velocity: CGVector(
+                    dx: CGFloat.random(in: -20...20),
+                    dy: CGFloat.random(in: 100...150)
+                ),
+                emoji: foodEmojis.randomElement() ?? "🍕"
+            )
+            emojis.append(emoji)
+        }
+    }
+    
+    private func updatePhysics() {
+        let deltaTime = 0.016
+        let gravity: Double = 400
+        let screenHeight = UIScreen.main.bounds.height
+        
+        for i in emojis.indices {
+            // Apply gravity
+            emojis[i].velocity.dy += gravity * deltaTime
+            
+            // Update position
+            emojis[i].position.x += emojis[i].velocity.dx * deltaTime
+            emojis[i].position.y += emojis[i].velocity.dy * deltaTime
+        }
+        
+        // Remove emojis that have fallen off screen
+        emojis.removeAll { emoji in
+            emoji.position.y > screenHeight + 50
         }
     }
 }

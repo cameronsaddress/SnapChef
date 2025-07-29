@@ -31,43 +31,60 @@ struct LaunchAnimationView: View {
             MagicalBackground()
                 .ignoresSafeArea()
             
-            // SnapChef letters
-            HStack(spacing: 2) {
-                ForEach(0..<letters.count, id: \.self) { index in
-                    Text(letters[index])
-                        .font(.system(size: 56, weight: .black, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color.white,
-                                    Color.white.opacity(0.9)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
+            // SnapChef letters with sparkle emoji
+            ZStack {
+                HStack(spacing: 2) {
+                    ForEach(0..<letters.count, id: \.self) { index in
+                        Text(letters[index])
+                            .font(.system(size: 56, weight: .black, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white,
+                                        Color.white.opacity(0.9)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
                             )
-                        )
-                        .opacity(letterOpacities[index])
-                        .scaleEffect(letterScales[index])
-                        .animation(
-                            .spring(
-                                response: 0.4,
-                                dampingFraction: 0.7,
-                                blendDuration: 0
-                            ).delay(Double(index) * 0.08),
-                            value: letterOpacities[index]
-                        )
-                        .background(
-                            GeometryReader { geometry in
-                                Color.clear
-                                    .onAppear {
-                                        letterBounds[index] = geometry.frame(in: .global)
-                                    }
-                                    .onChange(of: geometry.frame(in: .global)) { newFrame in
-                                        letterBounds[index] = newFrame
-                                    }
-                            }
-                        )
+                            .opacity(letterOpacities[index])
+                            .scaleEffect(letterScales[index])
+                            .animation(
+                                .spring(
+                                    response: 0.4,
+                                    dampingFraction: 0.7,
+                                    blendDuration: 0
+                                ).delay(Double(index) * 0.08),
+                                value: letterOpacities[index]
+                            )
+                            .background(
+                                GeometryReader { geometry in
+                                    Color.clear
+                                        .onAppear {
+                                            letterBounds[index] = geometry.frame(in: .global)
+                                        }
+                                        .onChange(of: geometry.frame(in: .global)) { newFrame in
+                                            letterBounds[index] = newFrame
+                                        }
+                                }
+                            )
+                    }
                 }
+                
+                // Sparkle emoji
+                Text("✨")
+                    .font(.system(size: 36))
+                    .offset(x: 110, y: -20)
+                    .opacity(letterOpacities[7])
+                    .scaleEffect(letterScales[7])
+                    .animation(
+                        .spring(
+                            response: 0.4,
+                            dampingFraction: 0.7,
+                            blendDuration: 0
+                        ).delay(0.64),
+                        value: letterOpacities[7]
+                    )
             }
             
             // Falling food emojis
@@ -205,9 +222,9 @@ struct LaunchAnimationView: View {
                 }
             }
             
-            // Check floor collision
-            if emojiAnimator.emojis[i].position.y > screenHeight - 80 {
-                emojiAnimator.emojis[i].position.y = screenHeight - 80
+            // Check floor collision - allow emojis to fall to the very bottom
+            if emojiAnimator.emojis[i].position.y > screenHeight - 20 {
+                emojiAnimator.emojis[i].position.y = screenHeight - 20
                 emojiAnimator.emojis[i].velocity.dy *= -bounceDamping
                 emojiAnimator.emojis[i].velocity.dx *= 0.7 // Friction
                 
