@@ -52,6 +52,7 @@
 		D5296EC2BD7B9A08680A303B /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 551177DC825C128B2758E6F7 /* OnboardingView.swift */; };
 		D70FECD900324338A0B7BE21 /* SocialShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 251117D82A34A8E516FC9C56 /* SocialShareView.swift */; };
 		D7DDB514CF8700C81F77F1B7 /* LeaderboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D442A0968AD8CC730708E9A /* LeaderboardView.swift */; };
+		DD5120E2956062E461518E24 /* fridge.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 258CF31CFDA34009FD6ED5D8 /* fridge.jpg */; };
 		DFB0D378B249D5BAE00DA67D /* SnapChefApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43329C15A8E8386F4370D4E /* SnapChefApp.swift */; };
 		E4B11BA2E8CB07091D558EE1 /* CameraModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73E54B598DC94C797BD5CA6A /* CameraModel.swift */; };
 		F357D17F294D0A0C0C42B4A0 /* MagicalBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 336E44F1C05F96398737E9E4 /* MagicalBackground.swift */; };
@@ -74,6 +75,7 @@
 		213986243A296CEDAE62DDDA /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = SnapChef/App/ContentView.swift; sourceTree = "<group>"; };
 		24CAD8A630415C8647F25135 /* KeychainManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = KeychainManager.swift; path = SnapChef/Core/Utilities/KeychainManager.swift; sourceTree = "<group>"; };
 		251117D82A34A8E516FC9C56 /* SocialShareView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SocialShareView.swift; path = SnapChef/Features/Sharing/SocialShareView.swift; sourceTree = "<group>"; };
+		258CF31CFDA34009FD6ED5D8 /* fridge.jpg */ = {isa = PBXFileReference; includeInIndex = 1; name = fridge.jpg; path = SnapChef/Resources/fridge.jpg; sourceTree = "<group>"; };
 		290835ADFEFAD30086886F24 /* RecipeDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RecipeDetailView.swift; path = SnapChef/Features/Recipes/RecipeDetailView.swift; sourceTree = "<group>"; };
 		2ABAFD32A12E2DBC4056FD0F /* AIPersonalityView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AIPersonalityView.swift; path = SnapChef/Features/AIPersonality/AIPersonalityView.swift; sourceTree = "<group>"; };
 		32378086B26CBCDC88359BFC /* Recipe.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Recipe.swift; path = SnapChef/Core/Models/Recipe.swift; sourceTree = "<group>"; };
@@ -173,6 +175,7 @@
 		33732196C1E7BBD9AED65598 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				258CF31CFDA34009FD6ED5D8 /* fridge.jpg */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -453,6 +456,7 @@
 			files = (
 				3D3E665FBADF8F0744D3031D /* Assets.xcassets in Resources */,
 				D3E8EEB197F2EC734C562F2A /* Preview Assets.xcassets in Resources */,
+				DD5120E2956062E461518E24 /* fridge.jpg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

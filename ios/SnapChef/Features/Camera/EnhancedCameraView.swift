@@ -62,12 +62,39 @@ struct EnhancedCameraView: View {
                     Spacer()
                     
                     // Bottom controls
-                    CameraControlsEnhanced(
-                        cameraModel: cameraModel,
-                        capturePhoto: capturePhoto,
-                        isProcessing: isProcessing,
-                        captureAnimation: $captureAnimation
-                    )
+                    VStack(spacing: 16) {
+                        // TEMPORARY TEST BUTTON
+                        Button(action: {
+                            processTestImage()
+                        }) {
+                            HStack {
+                                Image(systemName: "photo.on.rectangle")
+                                    .font(.system(size: 18, weight: .medium))
+                                Text("Test with Fridge Image")
+                                    .font(.system(size: 16, weight: .medium))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                Capsule()
+                                    .fill(Color.orange.opacity(0.8))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .disabled(isProcessing)
+                        .opacity(isProcessing ? 0.5 : 1)
+                        
+                        CameraControlsEnhanced(
+                            cameraModel: cameraModel,
+                            capturePhoto: capturePhoto,
+                            isProcessing: isProcessing,
+                            captureAnimation: $captureAnimation
+                        )
+                    }
                 }
             }
             
@@ -263,6 +290,17 @@ struct EnhancedCameraView: View {
                 }
             }
         }
+    }
+    
+    private func processTestImage() {
+        // Load the test fridge image from bundle
+        guard let testImage = UIImage(named: "fridge.jpg") else {
+            print("Failed to load test fridge image")
+            return
+        }
+        
+        // Process it the same way as a captured photo
+        processImage(testImage)
     }
 }
 
