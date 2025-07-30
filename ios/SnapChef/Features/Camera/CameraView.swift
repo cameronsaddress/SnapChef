@@ -12,6 +12,7 @@ struct CameraView: View {
     @State private var generatedRecipes: [Recipe] = []
     @State private var detectedIngredients: [IngredientAPI] = []
     @State private var capturedImage: UIImage?
+    @State private var resultsPreloaded = false
     @State private var showingPreview = false
     @State private var captureAnimation = false
     @State private var scanLineOffset: CGFloat = -200
@@ -287,14 +288,29 @@ struct CameraView: View {
                         self.generatedRecipes = recipes
                         self.detectedIngredients = apiResponse.data.ingredients
                         
-                        // Save recipes to app state with the captured photo
-                        for recipe in recipes {
-                            self.appState.addRecentRecipe(recipe)
-                            self.appState.saveRecipeWithPhotos(recipe, beforePhoto: image, afterPhoto: nil)
+                        // Preload the data on a background queue
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            // Save recipes to app state with the captured photo
+                            for recipe in recipes {
+                                self.appState.addRecentRecipe(recipe)
+                                self.appState.saveRecipeWithPhotos(recipe, beforePhoto: image, afterPhoto: nil)
+                            }
+                            
+                            DispatchQueue.main.async {
+                                // Update UI on main thread
+                                self.generatedRecipes = recipes
+                                self.detectedIngredients = apiResponse.data.ingredients
+                                self.resultsPreloaded = true
+                                
+                                // Dismiss processing overlay first
+                                self.isProcessing = false
+                                
+                                // Small delay to ensure smooth transition
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    self.showingResults = true
+                                }
+                            }
                         }
-                        
-                        self.showingResults = true
-                        self.isProcessing = false
                         
                     case .failure(let error):
                         self.isProcessing = false

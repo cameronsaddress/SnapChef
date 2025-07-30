@@ -217,6 +217,36 @@ struct PhysicsLoadingOverlay: View {
     }
 }
 
+// MARK: - Emoji Flick Game Overlay
+struct EmojiFlickGameOverlay: View {
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.85)
+                .ignoresSafeArea()
+            
+            VStack {
+                Text("Play a game while AI scans your food")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .padding(.top, 50)
+                
+                Spacer()
+                
+                // Embed the emoji flick game
+                EmojiFlickGame()
+                    .frame(maxHeight: .infinity)
+                
+                Spacer()
+                
+                Text("Flick the falling ingredients!")
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding(.bottom, 50)
+            }
+        }
+    }
+}
+
 // MARK: - Integration with MagicalProcessingOverlay
 struct MagicalProcessingOverlay: View {
     @State private var useGameMode = true

@@ -86,17 +86,40 @@ class AppState: ObservableObject {
     }
     
     private func loadSavedRecipes() {
-        if let data = userDefaults.data(forKey: savedRecipesKey),
+        // Load from documents directory instead of UserDefaults
+        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let filePath = documentsPath.appendingPathComponent("savedRecipes.json")
+        
+        if let data = try? Data(contentsOf: filePath),
            let decoded = try? JSONDecoder().decode([SavedRecipe].self, from: data) {
             savedRecipesWithPhotos = decoded
             savedRecipes = decoded.map { $0.recipe }
             allRecipes = decoded.map { $0.recipe }
+        } else {
+            // Try to migrate from old UserDefaults storage
+            if let data = userDefaults.data(forKey: savedRecipesKey),
+               let decoded = try? JSONDecoder().decode([SavedRecipe].self, from: data) {
+                savedRecipesWithPhotos = decoded
+                savedRecipes = decoded.map { $0.recipe }
+                allRecipes = decoded.map { $0.recipe }
+                
+                // Save to new location and remove from UserDefaults
+                saveToDisk()
+                userDefaults.removeObject(forKey: savedRecipesKey)
+            }
         }
     }
     
     private func saveToDisk() {
+        // Save to documents directory instead of UserDefaults to avoid size limits
+        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let filePath = documentsPath.appendingPathComponent("savedRecipes.json")
+        
         if let encoded = try? JSONEncoder().encode(savedRecipesWithPhotos) {
-            userDefaults.set(encoded, forKey: savedRecipesKey)
+            try? encoded.write(to: filePath)
+            
+            // Save just a flag in UserDefaults to indicate we have saved recipes
+            userDefaults.set(true, forKey: "hasSavedRecipes")
         }
     }
 }
