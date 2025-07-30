@@ -106,9 +106,14 @@ class SnapChefAPIManager {
     static let shared = SnapChefAPIManager() // Singleton instance
     
     private let serverBaseURL = "https://snapchef-server.onrender.com"
-    private let session = URLSession.shared
+    private let session: URLSession
 
-    private init() {} // Private initializer for singleton
+    private init() {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 120 // 2 minutes timeout
+        configuration.timeoutIntervalForResource = 120
+        self.session = URLSession(configuration: configuration)
+    } // Private initializer for singleton
 
     /// Creates a multipart/form-data URLRequest for the API.
     private func createMultipartRequest(
@@ -237,6 +242,9 @@ class SnapChefAPIManager {
             completion(.failure(APIError.invalidURL))
             return
         }
+        
+        print("📡 API Request to: \(url.absoluteString)")
+        print("📡 API Key: \(KeychainManager.shared.getAPIKey() ?? FALLBACK_API_KEY)")
 
         guard let request = createMultipartRequest(
             url: url,
@@ -256,16 +264,36 @@ class SnapChefAPIManager {
             return
         }
 
-        session.dataTask(with: request) { data, response, error in
+        print("📡 Sending request with session ID: \(sessionId)")
+        print("📡 Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        
+        let startTime = Date()
+        let task = session.dataTask(with: request) { data, response, error in
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("📡 Request completed in \(String(format: "%.2f", elapsed)) seconds")
+            
             if let error = error {
-                completion(.failure(error))
+                print("❌ API Error: \(error.localizedDescription)")
+                print("❌ Error details: \(error)")
+                
+                // Check if it's a timeout error
+                if (error as NSError).code == NSURLErrorTimedOut {
+                    print("❌ Request timed out after \(elapsed) seconds")
+                    completion(.failure(APIError.serverError(statusCode: -1, message: "Request timed out. The server may be slow or unresponsive.")))
+                } else {
+                    completion(.failure(error))
+                }
                 return
             }
 
             guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ Invalid response type")
                 completion(.failure(APIError.noData))
                 return
             }
+            
+            print("📡 Response status code: \(httpResponse.statusCode)")
+            print("📡 Response headers: \(httpResponse.allHeaderFields)")
 
             // Handle authentication failure specifically
             if httpResponse.statusCode == 401 {
@@ -286,11 +314,14 @@ class SnapChefAPIManager {
 
             do {
                 let apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
+                print("✅ Successfully decoded API response")
+                print("✅ Found \(apiResponse.data.recipes.count) recipes")
+                print("✅ Found \(apiResponse.data.ingredients.count) ingredients")
                 completion(.success(apiResponse))
             } catch {
-                print("Decoding Error: \(error)")
+                print("❌ Decoding Error: \(error)")
                 if let responseString = String(data: data, encoding: .utf8) {
-                    print("Raw response: \(responseString)")
+                    print("❌ Raw response: \(responseString)")
                 }
                 completion(.failure(APIError.decodingError(error.localizedDescription)))
             }

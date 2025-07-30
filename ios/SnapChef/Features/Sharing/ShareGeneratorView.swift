@@ -61,11 +61,14 @@ struct ShareGeneratorView: View {
                             .padding(.horizontal, 20)
                         
                         // After Photo Capture
+                        // TODO: AfterPhotoCaptureView was moved to archive
+                        /*
                         AfterPhotoCaptureView(
                             afterPhoto: $afterPhoto,
                             showingCamera: $showingCamera
                         )
                         .padding(.horizontal, 20)
+                        */
                         
                         // Challenge Text Editor
                         ChallengeTextEditor(recipe: recipe)
@@ -96,12 +99,15 @@ struct ShareGeneratorView: View {
                 ShareSheet(items: [image, generateShareText()])
             }
         }
+        // TODO: SimplePhotoCaptureView was moved to archive
+        /*
         .fullScreenCover(isPresented: $showingCamera) {
             SimplePhotoCaptureView { image in
                 afterPhoto = image
                 showingCamera = false
             }
         }
+        */
         .onAppear {
             withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
                 animationPhase = 1

@@ -59,7 +59,7 @@ struct CameraTabView: View {
             .navigationBarHidden(true)
         }
         .fullScreenCover(isPresented: $showingCamera) {
-            EnhancedCameraView()
+            CameraView()
         }
     }
 }

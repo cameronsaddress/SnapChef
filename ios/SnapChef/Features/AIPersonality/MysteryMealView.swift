@@ -100,7 +100,7 @@ struct MysteryMealView: View {
             .navigationBarHidden(true)
         }
         .fullScreenCover(isPresented: $showingResults) {
-            EnhancedRecipeResultsView(
+            RecipeResultsView(
                 recipes: generatedRecipes,
                 capturedImage: nil
             )

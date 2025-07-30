@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct EnhancedHomeView: View {
+struct HomeView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
     @State private var showingCamera = false
@@ -126,7 +126,7 @@ struct EnhancedHomeView: View {
             fallingFoodManager.startFallingFood()
         }
         .fullScreenCover(isPresented: $showingCamera) {
-            EnhancedCameraView()
+            CameraView()
         }
         .fullScreenCover(isPresented: $showingMysteryMeal) {
             MysteryMealView()
@@ -732,7 +732,7 @@ class FallingFoodManager: ObservableObject {
 }
 
 #Preview {
-    EnhancedHomeView()
+    HomeView()
         .environmentObject(AppState())
         .environmentObject(DeviceManager())
 }

@@ -46,7 +46,7 @@ struct MainTabView: View {
             Group {
                 switch selectedTab {
                 case 0:
-                    EnhancedHomeView()
+                    HomeView()
                         .transition(.asymmetric(
                             insertion: .opacity.combined(with: .scale(scale: 0.98)),
                             removal: .opacity.combined(with: .scale(scale: 1.02))
@@ -58,19 +58,19 @@ struct MainTabView: View {
                             removal: .opacity.combined(with: .scale(scale: 1.02))
                         ))
                 case 2:
-                    EnhancedRecipesView()
+                    RecipesView()
                         .transition(.asymmetric(
                             insertion: .opacity.combined(with: .scale(scale: 0.98)),
                             removal: .opacity.combined(with: .scale(scale: 1.02))
                         ))
                 case 3:
-                    EnhancedProfileView()
+                    ProfileView()
                         .transition(.asymmetric(
                             insertion: .opacity.combined(with: .scale(scale: 0.98)),
                             removal: .opacity.combined(with: .scale(scale: 1.02))
                         ))
                 default:
-                    EnhancedHomeView()
+                    HomeView()
                 }
             }
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
