@@ -3,7 +3,7 @@ import SwiftUI
 
 // MARK: - AI Chef Persona
 struct AIChefPersona: Identifiable, Codable {
-    let id = UUID()
+    let id: UUID
     let name: String
     let emoji: String
     let personality: PersonalityType
@@ -110,6 +110,7 @@ class AIPersonalityManager: ObservableObject {
         // Initialize all personas
         allPersonas = [
             AIChefPersona(
+                id: UUID(),
                 name: "Chef Gordon",
                 emoji: "👨‍🍳",
                 personality: .gordon,
@@ -125,6 +126,7 @@ class AIPersonalityManager: ObservableObject {
                 isUnlocked: true
             ),
             AIChefPersona(
+                id: UUID(),
                 name: "Chef Julia",
                 emoji: "👩‍🍳",
                 personality: .julia,
@@ -140,6 +142,7 @@ class AIPersonalityManager: ObservableObject {
                 isUnlocked: true
             ),
             AIChefPersona(
+                id: UUID(),
                 name: "Salt Master",
                 emoji: "🧂",
                 personality: .salt,
@@ -156,6 +159,7 @@ class AIPersonalityManager: ObservableObject {
                 unlockRequirement: "Create 50 recipes"
             ),
             AIChefPersona(
+                id: UUID(),
                 name: "Chef Bob",
                 emoji: "🎨",
                 personality: .bob,
@@ -172,6 +176,7 @@ class AIPersonalityManager: ObservableObject {
                 unlockRequirement: "7-day streak"
             ),
             AIChefPersona(
+                id: UUID(),
                 name: "Grandma Rose",
                 emoji: "👵",
                 personality: .grandma,
@@ -188,6 +193,7 @@ class AIPersonalityManager: ObservableObject {
                 unlockRequirement: "Complete 'Family Feast' challenge"
             ),
             AIChefPersona(
+                id: UUID(),
                 name: "ChefBot 3000",
                 emoji: "🤖",
                 personality: .robot,
@@ -204,6 +210,7 @@ class AIPersonalityManager: ObservableObject {
                 unlockRequirement: "Reach level 10"
             ),
             AIChefPersona(
+                id: UUID(),
                 name: "Captain Cook",
                 emoji: "🏴‍☠️",
                 personality: .pirate,
@@ -220,6 +227,7 @@ class AIPersonalityManager: ObservableObject {
                 unlockRequirement: "Share 25 recipes"
             ),
             AIChefPersona(
+                id: UUID(),
                 name: "Merlin the Mixer",
                 emoji: "🧙‍♂️",
                 personality: .wizard,

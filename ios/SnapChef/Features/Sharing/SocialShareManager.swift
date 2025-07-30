@@ -244,7 +244,7 @@ class SocialShareManager: ObservableObject {
         try imageData?.write(to: tempURL)
         
         // Create TikTok share URL with hashtags
-        let hashtags = "#FridgeChallenge #SnapChef #CookingMagic #\(recipe.difficulty.rawValue)Recipe"
+        _ = "#FridgeChallenge #SnapChef #CookingMagic #\(recipe.difficulty.rawValue)Recipe"
         
         // Note: Real TikTok integration would use their SDK
         // For now, open the app with a deep link

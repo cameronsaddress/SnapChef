@@ -268,7 +268,7 @@ class SnapChefAPIManager {
         print("📡 Request headers: \(request.allHTTPHeaderFields ?? [:])")
         
         let startTime = Date()
-        let task = session.dataTask(with: request) { data, response, error in
+        session.dataTask(with: request) { data, response, error in
             let elapsed = Date().timeIntervalSince(startTime)
             print("📡 Request completed in \(String(format: "%.2f", elapsed)) seconds")
             

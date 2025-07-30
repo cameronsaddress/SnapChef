@@ -108,9 +108,15 @@ class CameraModel: NSObject, ObservableObject {
             if session.canAddOutput(output) {
                 session.addOutput(output)
                 // Configure photo output
-                output.isHighResolutionCaptureEnabled = true
-                // Only set quality prioritization for iOS 13+
-                if #available(iOS 13.0, *) {
+                if #available(iOS 16.0, *) {
+                    // Use maxPhotoDimensions for iOS 16+
+                    if let maxDimensions = camera.activeFormat.supportedMaxPhotoDimensions.last {
+                        output.maxPhotoDimensions = maxDimensions
+                    }
+                    output.maxPhotoQualityPrioritization = .quality
+                } else {
+                    // Fallback for iOS 15 and earlier
+                    output.isHighResolutionCaptureEnabled = true
                     output.maxPhotoQualityPrioritization = .quality
                 }
                 print("Added photo output with high resolution enabled")
@@ -169,14 +175,27 @@ class CameraModel: NSObject, ObservableObject {
         let settings = AVCapturePhotoSettings()
         
         // Enable high resolution if supported
-        settings.isHighResolutionPhotoEnabled = output.isHighResolutionCaptureEnabled
+        if #available(iOS 16.0, *) {
+            // For iOS 16+, maxPhotoDimensions is already set on the output
+            let maxDimensions = output.maxPhotoDimensions
+            if maxDimensions.width > 0 && maxDimensions.height > 0 {
+                settings.maxPhotoDimensions = maxDimensions
+            }
+        } else {
+            // Fallback for iOS 15 and earlier
+            settings.isHighResolutionPhotoEnabled = output.isHighResolutionCaptureEnabled
+        }
         
         // Set flash mode
         if output.supportedFlashModes.contains(.off) {
             settings.flashMode = .off
         }
         
-        print("Capturing photo with settings: highRes=\(settings.isHighResolutionPhotoEnabled)")
+        if #available(iOS 16.0, *) {
+            print("Capturing photo with maxPhotoDimensions: \(settings.maxPhotoDimensions)")
+        } else {
+            print("Capturing photo with settings: highRes=\(settings.isHighResolutionPhotoEnabled)")
+        }
         output.capturePhoto(with: settings, delegate: self)
     }
     
