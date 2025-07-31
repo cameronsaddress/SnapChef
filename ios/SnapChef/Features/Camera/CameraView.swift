@@ -329,6 +329,9 @@ struct CameraView: View {
                 selectedFoodType
             }
             
+            // Get selected LLM provider from UserDefaults
+            let llmProvider = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "grok"
+            
             // Call the API
             SnapChefAPIManager.shared.sendImageForRecipeGeneration(
                 image: image,
@@ -341,7 +344,8 @@ struct CameraView: View {
                 cookingTimePreference: selectedCookingTime,
                 numberOfRecipes: numberOfRecipes,
                 existingRecipeNames: existingRecipeNames,
-                foodPreferences: foodPreferences
+                foodPreferences: foodPreferences,
+                llmProvider: llmProvider
             ) { result in
                 Task { @MainActor in
                     switch result {

@@ -160,7 +160,8 @@ class SnapChefAPIManager {
         cookingTimePreference: String?,
         numberOfRecipes: Int?,
         existingRecipeNames: [String],
-        foodPreferences: [String]
+        foodPreferences: [String],
+        llmProvider: String? = nil
     ) -> URLRequest? {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -215,6 +216,9 @@ class SnapChefAPIManager {
         }
         if let numberOfRecipes = numberOfRecipes {
             appendFormField(name: "number_of_recipes", value: String(numberOfRecipes))
+        }
+        if let llmProvider = llmProvider {
+            appendFormField(name: "llm_provider", value: llmProvider)
         }
         
         // Append existing recipe names to avoid duplicates
@@ -279,6 +283,7 @@ class SnapChefAPIManager {
         numberOfRecipes: Int? = nil,
         existingRecipeNames: [String] = [],
         foodPreferences: [String] = [],
+        llmProvider: String? = nil,
         completion: @escaping (Result<APIResponse, Error>) -> Void
     ) {
         guard let url = URL(string: "\(serverBaseURL)/analyze_fridge_image") else {
@@ -301,7 +306,8 @@ class SnapChefAPIManager {
             cookingTimePreference: cookingTimePreference,
             numberOfRecipes: numberOfRecipes,
             existingRecipeNames: existingRecipeNames,
-            foodPreferences: foodPreferences
+            foodPreferences: foodPreferences,
+            llmProvider: llmProvider
         ) else {
             completion(.failure(APIError.invalidRequestData))
             return

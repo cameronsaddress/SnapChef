@@ -800,6 +800,8 @@ struct SocialStatRow: View {
 
 // MARK: - Enhanced Settings Section
 struct EnhancedSettingsSection: View {
+    @State private var showingAISettings = false
+    
     let settings = [
         ("sparkles", "AI Preferences", Color(hex: "#667eea"))
     ]
@@ -810,9 +812,17 @@ struct EnhancedSettingsSection: View {
                 EnhancedSettingsRow(
                     icon: settings[index].0,
                     title: settings[index].1,
-                    color: settings[index].2
+                    color: settings[index].2,
+                    action: {
+                        if index == 0 {
+                            showingAISettings = true
+                        }
+                    }
                 )
             }
+        }
+        .sheet(isPresented: $showingAISettings) {
+            AISettingsView()
         }
     }
 }
@@ -821,11 +831,12 @@ struct EnhancedSettingsRow: View {
     let icon: String
     let title: String
     let color: Color
+    var action: (() -> Void)? = nil
     
     @State private var isPressed = false
     
     var body: some View {
-        Button(action: {}) {
+        Button(action: { action?() }) {
             GlassmorphicCard(content: {
                 HStack(spacing: 16) {
                     // Animated icon
@@ -1345,6 +1356,166 @@ struct FoodPreferencesCard: View {
                     selectedPreferences = UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? []
                 }
         }
+    }
+}
+
+// MARK: - AI Settings View
+struct AISettingsView: View {
+    @State private var selectedProvider: String = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "grok"
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                MagicalBackground()
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 30) {
+                        // LLM Provider Section
+                        VStack(alignment: .leading, spacing: 20) {
+                            Text("AI Model Provider")
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            
+                            Text("Choose which AI model to use for recipe generation")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                            
+                            VStack(spacing: 16) {
+                                // Grok Option
+                                ProviderOptionCard(
+                                    name: "Grok",
+                                    description: "Advanced vision AI with culinary expertise",
+                                    icon: "brain",
+                                    color: Color(hex: "#667eea"),
+                                    isSelected: selectedProvider == "grok",
+                                    action: {
+                                        selectedProvider = "grok"
+                                        UserDefaults.standard.set("grok", forKey: "SelectedLLMProvider")
+                                    }
+                                )
+                                
+                                // Gemini Option
+                                ProviderOptionCard(
+                                    name: "Gemini",
+                                    description: "Google's multimodal AI for creative recipes",
+                                    icon: "sparkles",
+                                    color: Color(hex: "#43e97b"),
+                                    isSelected: selectedProvider == "gemini",
+                                    action: {
+                                        selectedProvider = "gemini"
+                                        UserDefaults.standard.set("gemini", forKey: "SelectedLLMProvider")
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        // Performance Note
+                        VStack(spacing: 12) {
+                            Image(systemName: "info.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(Color(hex: "#4facfe"))
+                            
+                            Text("Performance may vary between providers. Try both to see which works best for your cooking style!")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.horizontal, 30)
+                        .padding(.top, 20)
+                    }
+                    .padding(.vertical, 30)
+                }
+            }
+            .navigationTitle("AI Preferences")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(Color(hex: "#667eea"))
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Provider Option Card
+struct ProviderOptionCard: View {
+    let name: String
+    let description: String
+    let icon: String
+    let color: Color
+    let isSelected: Bool
+    let action: () -> Void
+    
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: {
+            action()
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+        }) {
+            HStack(spacing: 20) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.2))
+                        .frame(width: 60, height: 60)
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundColor(color)
+                }
+                
+                // Content
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(name)
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(Color(hex: "#43e97b"))
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                    }
+                    
+                    Text(description)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(2)
+                }
+                
+                Spacer()
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(isSelected ? color.opacity(0.15) : Color.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(
+                                isSelected ? color : Color.white.opacity(0.1),
+                                lineWidth: isSelected ? 2 : 1
+                            )
+                    )
+            )
+            .scaleEffect(isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = pressing
+            }
+        }, perform: {})
     }
 }
 
