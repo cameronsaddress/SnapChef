@@ -12,9 +12,8 @@ struct HomeView: View {
     @State private var buttonShake = false
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Full screen animated background
+        ZStack {
+            // Full screen animated background
                 MagicalBackground()
                     .ignoresSafeArea()
                 
@@ -115,10 +114,9 @@ struct HomeView: View {
                     }
                 }
             }
-            .navigationBarHidden(true)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .particleExplosion(trigger: $particleTrigger)
-        }
+        .navigationBarHidden(true)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .particleExplosion(trigger: $particleTrigger)
         .onAppear {
             // Simple fade in for mystery meal animation
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

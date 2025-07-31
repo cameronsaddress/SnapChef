@@ -172,11 +172,18 @@ struct MagneticButton: View {
 // MARK: - Floating Action Button
 struct FloatingActionButton: View {
     let icon: String
+    let badge: String?
     let action: () -> Void
     
     @State private var rotation: Double = 0
     @State private var scale: CGFloat = 1
     @State private var showRipple = false
+    
+    init(icon: String, badge: String? = nil, action: @escaping () -> Void) {
+        self.icon = icon
+        self.badge = badge
+        self.action = action
+    }
     
     var body: some View {
         Button(action: {
@@ -209,6 +216,29 @@ struct FloatingActionButton: View {
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(.white)
                     .rotationEffect(.degrees(rotation))
+                
+                // Badge
+                if let badge = badge {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Circle()
+                                .fill(Color(hex: "#667eea"))
+                                .frame(width: 24, height: 24)
+                                .overlay(
+                                    Text(badge)
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(.white)
+                                )
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 2)
+                                )
+                        }
+                        Spacer()
+                    }
+                    .offset(x: 5, y: -5)
+                }
             }
             .frame(width: 60, height: 60)
             .scaleEffect(scale)

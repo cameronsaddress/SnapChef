@@ -31,8 +31,9 @@ struct CameraView: View {
     @State private var numberOfRecipes: Int = 5
     
     // Error handling
-    @State private var showingAlert = false
-    @State private var alertMessage = ""
+    @State private var currentError: SnapChefError?
+    @State private var showSuccess = false
+    @State private var successMessage = ""
     
     var body: some View {
         ZStack {
@@ -195,11 +196,23 @@ struct CameraView: View {
             SubscriptionView()
                 .environmentObject(deviceManager)
         }
-        .alert("Error", isPresented: $showingAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(alertMessage)
+        .errorAlert($currentError) {
+            // Handle retry for network errors
+            if case .networkError = currentError {
+                // Retry last action
+            }
         }
+        .overlay(
+            VStack {
+                if showSuccess {
+                    SuccessToast(message: successMessage) {
+                        showSuccess = false
+                    }
+                    .padding(.top, 50)
+                }
+                Spacer()
+            }
+        )
     }
     
     private func startScanAnimation() {
@@ -322,16 +335,18 @@ struct CameraView: View {
                         
                     case .failure(let error):
                         self.isProcessing = false
-                        self.alertMessage = error.localizedDescription
-                        self.showingAlert = true
+                        
+                        // Convert API errors to user-friendly errors
+                        if case APIError.authenticationError = error {
+                            self.currentError = .authenticationError("Authentication failed")
+                        } else if case APIError.serverError(let statusCode, let message) = error {
+                            self.currentError = .apiError("Server error: \(message)")
+                        } else {
+                            self.currentError = .unknown(error.localizedDescription)
+                        }
                         
                         // Restart camera session on error
                         self.cameraModel.requestCameraPermission()
-                        
-                        // If it's an authentication error, you might want to handle it specially
-                        if case APIError.authenticationError = error {
-                            print("Authentication failed - check API key")
-                        }
                     }
                 }
             }

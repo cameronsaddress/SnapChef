@@ -41,53 +41,57 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     
     var body: some View {
-        ZStack {
-            // Content based on selected tab
-            Group {
-                switch selectedTab {
-                case 0:
-                    HomeView()
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                            removal: .opacity.combined(with: .scale(scale: 1.02))
-                        ))
-                case 1:
-                    CameraView()
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                            removal: .opacity.combined(with: .scale(scale: 1.02))
-                        ))
-                case 2:
-                    RecipesView()
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                            removal: .opacity.combined(with: .scale(scale: 1.02))
-                        ))
-                case 3:
-                    ProfileView()
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                            removal: .opacity.combined(with: .scale(scale: 1.02))
-                        ))
-                default:
-                    HomeView()
+        // Single NavigationStack at the root level
+        NavigationStack {
+            ZStack {
+                // Content based on selected tab
+                Group {
+                    switch selectedTab {
+                    case 0:
+                        HomeView()
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                                removal: .opacity.combined(with: .scale(scale: 1.02))
+                            ))
+                    case 1:
+                        CameraView()
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                                removal: .opacity.combined(with: .scale(scale: 1.02))
+                            ))
+                    case 2:
+                        RecipesView()
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                                removal: .opacity.combined(with: .scale(scale: 1.02))
+                            ))
+                    case 3:
+                        ProfileView()
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                                removal: .opacity.combined(with: .scale(scale: 1.02))
+                            ))
+                    default:
+                        HomeView()
+                    }
+                }
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
+                
+                // Custom morphing tab bar
+                VStack {
+                    Spacer()
+                    
+                    MorphingTabBar(selectedTab: $selectedTab)
+                        .padding(.horizontal, 30)
+                        .padding(.bottom, 30)
+                        .shadow(
+                            color: Color.black.opacity(0.2),
+                            radius: 20,
+                            y: 10
+                        )
                 }
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
-            
-            // Custom morphing tab bar
-            VStack {
-                Spacer()
-                
-                MorphingTabBar(selectedTab: $selectedTab)
-                    .padding(.horizontal, 30)
-                    .padding(.bottom, 30)
-                    .shadow(
-                        color: Color.black.opacity(0.2),
-                        radius: 20,
-                        y: 10
-                    )
-            }
+            .navigationBarHidden(true) // Hide the default navigation bar
         }
     }
 }

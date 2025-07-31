@@ -35,13 +35,12 @@ struct ProfileView: View {
     @State private var profileImageScale: CGFloat = 0
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Full screen animated background
-                MagicalBackground()
-                    .ignoresSafeArea()
-                
-                ScrollView {
+        ZStack {
+            // Full screen animated background
+            MagicalBackground()
+                .ignoresSafeArea()
+            
+            ScrollView {
                 VStack(spacing: 30) {
                     // Enhanced Profile Header
                     EnhancedProfileHeader(user: authManager.currentUser)
@@ -78,10 +77,9 @@ struct ProfileView: View {
                 .padding(.top, 20)
             }
             .scrollContentBackground(.hidden)
-            }
-            .navigationBarHidden(true)
-            .toolbarBackground(.hidden, for: .navigationBar)
         }
+        .navigationBarHidden(true)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
                 profileImageScale = 1
@@ -1011,6 +1009,35 @@ struct EditProfileView: View {
                     }
                     .padding(.horizontal, 30)
                     
+                    // Additional Options
+                    VStack(spacing: 20) {
+                        NavigationLink(destination: FoodPreferencesView()) {
+                            ProfileOptionRow(
+                                icon: "fork.knife",
+                                title: "Your Food Types",
+                                subtitle: "Update cuisine preferences"
+                            )
+                        }
+                        
+                        NavigationLink(destination: NotificationSettingsView()) {
+                            ProfileOptionRow(
+                                icon: "bell",
+                                title: "Notifications",
+                                subtitle: "Manage alerts & reminders"
+                            )
+                        }
+                        
+                        NavigationLink(destination: PrivacySettingsView()) {
+                            ProfileOptionRow(
+                                icon: "lock.shield",
+                                title: "Privacy",
+                                subtitle: "Control your data"
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 30)
+                    .padding(.top, 20)
+                    
                     Spacer()
                 }
                 .padding(.top, 30)
@@ -1052,6 +1079,123 @@ struct EditProfileView: View {
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(selectedImage: $selectedImage)
         }
+    }
+}
+
+// MARK: - Profile Option Row
+struct ProfileOptionRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 24, weight: .medium))
+                .foregroundColor(Color(hex: "#667eea"))
+                .frame(width: 50, height: 50)
+                .background(
+                    Circle()
+                        .fill(Color.white.opacity(0.1))
+                )
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Text(subtitle)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.white.opacity(0.5))
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
+    }
+}
+
+// MARK: - Notification Settings View
+struct NotificationSettingsView: View {
+    @State private var dailyReminders = true
+    @State private var challengeAlerts = true
+    @State private var recipeRecommendations = false
+    @State private var socialUpdates = true
+    
+    var body: some View {
+        ZStack {
+            MagicalBackground()
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 20) {
+                    NeumorphicToggle(isOn: $dailyReminders, label: "Daily Cooking Reminders")
+                    NeumorphicToggle(isOn: $challengeAlerts, label: "Challenge Notifications")
+                    NeumorphicToggle(isOn: $recipeRecommendations, label: "Recipe Recommendations")
+                    NeumorphicToggle(isOn: $socialUpdates, label: "Social Updates")
+                }
+                .padding(20)
+            }
+        }
+        .navigationTitle("Notifications")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Privacy Settings View
+struct PrivacySettingsView: View {
+    @State private var shareAnalytics = true
+    @State private var personalizedAds = false
+    @State private var publicProfile = true
+    
+    var body: some View {
+        ZStack {
+            MagicalBackground()
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 20) {
+                    NeumorphicToggle(isOn: $shareAnalytics, label: "Share Analytics")
+                    NeumorphicToggle(isOn: $personalizedAds, label: "Personalized Recommendations")
+                    NeumorphicToggle(isOn: $publicProfile, label: "Public Profile")
+                    
+                    // Delete Account Button
+                    Button(action: {
+                        // Show delete account confirmation
+                    }) {
+                        HStack {
+                            Image(systemName: "trash")
+                                .font(.system(size: 18, weight: .medium))
+                            Text("Delete Account")
+                                .font(.system(size: 18, weight: .medium))
+                        }
+                        .foregroundColor(.red)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.red.opacity(0.5), lineWidth: 1)
+                        )
+                    }
+                    .padding(.top, 40)
+                }
+                .padding(20)
+            }
+        }
+        .navigationTitle("Privacy")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

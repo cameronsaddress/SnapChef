@@ -7,16 +7,21 @@ struct RecipesView: View {
     @State private var contentVisible = false
     @State private var showingFilters = false
     
+    // Filter states
+    @State private var selectedDifficulty: Recipe.Difficulty?
+    @State private var maxCookTime: Double = 120
+    @State private var maxCalories: Double = 2000
+    @State private var dietaryRestrictions: Set<String> = []
+    
     let categories = ["All", "Quick", "Healthy", "Comfort", "Dessert", "Trending"]
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Full screen animated background
-                MagicalBackground()
-                    .ignoresSafeArea()
-                
-                ScrollView {
+        ZStack {
+            // Full screen animated background
+            MagicalBackground()
+                .ignoresSafeArea()
+            
+            ScrollView {
                     VStack(spacing: 30) {
                         // Header
                         EnhancedRecipesHeader()
@@ -75,31 +80,100 @@ struct RecipesView: View {
                     Spacer()
                     HStack {
                         Spacer()
-                        FloatingActionButton(icon: "slider.horizontal.3") {
+                        FloatingActionButton(
+                            icon: "slider.horizontal.3",
+                            badge: activeFilterCount > 0 ? "\(activeFilterCount)" : nil
+                        ) {
                             showingFilters = true
                         }
                         .padding(30)
                     }
                 }
             }
-            .navigationBarHidden(true)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .onAppear {
-                withAnimation(.easeOut(duration: 0.5)) {
-                    contentVisible = true
-                }
+        .navigationBarHidden(true)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.5)) {
+                contentVisible = true
             }
         }
         .sheet(isPresented: $showingFilters) {
-            RecipeFiltersView()
+            RecipeFiltersView(
+                selectedDifficulty: $selectedDifficulty,
+                maxCookTime: $maxCookTime,
+                maxCalories: $maxCalories,
+                dietaryRestrictions: $dietaryRestrictions
+            )
         }
+    }
+    
+    var activeFilterCount: Int {
+        var count = 0
+        if selectedDifficulty != nil { count += 1 }
+        if maxCookTime < 120 { count += 1 }
+        if maxCalories < 2000 { count += 1 }
+        if !dietaryRestrictions.isEmpty { count += 1 }
+        return count
     }
     
     var filteredRecipes: [Recipe] {
         appState.recentRecipes.filter { recipe in
-            (searchText.isEmpty || recipe.name.localizedCaseInsensitiveContains(searchText)) &&
-            (selectedCategory == "All" || matchesCategory(recipe, category: selectedCategory))
+            // Search filter
+            let matchesSearch = searchText.isEmpty || 
+                recipe.name.localizedCaseInsensitiveContains(searchText) ||
+                recipe.description.localizedCaseInsensitiveContains(searchText) ||
+                recipe.ingredients.contains { $0.name.localizedCaseInsensitiveContains(searchText) }
+            
+            // Category filter
+            let matchesCategory = selectedCategory == "All" || self.matchesCategory(recipe, category: selectedCategory)
+            
+            // Difficulty filter
+            let matchesDifficulty = selectedDifficulty == nil || recipe.difficulty == selectedDifficulty
+            
+            // Cook time filter
+            let matchesCookTime = Double(recipe.prepTime + recipe.cookTime) <= maxCookTime
+            
+            // Calories filter
+            let matchesCalories = Double(recipe.nutrition.calories) <= maxCalories
+            
+            // Dietary restrictions filter
+            let matchesDietary = dietaryRestrictions.isEmpty || checkDietaryRestrictions(recipe)
+            
+            return matchesSearch && matchesCategory && matchesDifficulty && 
+                   matchesCookTime && matchesCalories && matchesDietary
         }
+    }
+    
+    private func checkDietaryRestrictions(_ recipe: Recipe) -> Bool {
+        // This is a simplified check - in production, you'd have more detailed ingredient data
+        for restriction in dietaryRestrictions {
+            switch restriction {
+            case "Vegetarian", "Vegan":
+                let meatKeywords = ["meat", "chicken", "beef", "pork", "fish", "seafood", "bacon", "ham"]
+                if recipe.ingredients.contains(where: { ingredient in
+                    meatKeywords.contains { ingredient.name.localizedCaseInsensitiveContains($0) }
+                }) {
+                    return false
+                }
+            case "Gluten-Free":
+                let glutenKeywords = ["flour", "bread", "pasta", "wheat", "barley", "rye"]
+                if recipe.ingredients.contains(where: { ingredient in
+                    glutenKeywords.contains { ingredient.name.localizedCaseInsensitiveContains($0) }
+                }) {
+                    return false
+                }
+            case "Dairy-Free":
+                let dairyKeywords = ["milk", "cheese", "butter", "cream", "yogurt"]
+                if recipe.ingredients.contains(where: { ingredient in
+                    dairyKeywords.contains { ingredient.name.localizedCaseInsensitiveContains($0) }
+                }) {
+                    return false
+                }
+            default:
+                break
+            }
+        }
+        return true
     }
     
     func matchesCategory(_ recipe: Recipe, category: String) -> Bool {
@@ -392,6 +466,9 @@ struct RecipeGridCard: View {
     @State private var isPressed = false
     @State private var showDetail = false
     @State private var showShareGenerator = false
+    @State private var showDeleteAlert = false
+    @State private var deleteOffset: CGFloat = 0
+    @EnvironmentObject var appState: AppState
     
     var body: some View {
         GlassmorphicCard {
@@ -486,12 +563,51 @@ struct RecipeGridCard: View {
                 isPressed = pressing
             }
         }, perform: {})
+        .contextMenu {
+            Button(action: {
+                showDetail = true
+            }) {
+                Label("View Details", systemImage: "eye")
+            }
+            
+            Button(action: {
+                showShareGenerator = true
+            }) {
+                Label("Share Recipe", systemImage: "square.and.arrow.up")
+            }
+            
+            Divider()
+            
+            Button(role: .destructive, action: {
+                showDeleteAlert = true
+            }) {
+                Label("Delete Recipe", systemImage: "trash")
+            }
+        }
         .sheet(isPresented: $showDetail) {
             RecipeDetailView(recipe: recipe)
         }
         .sheet(isPresented: $showShareGenerator) {
             ShareGeneratorView(recipe: recipe, ingredientsPhoto: nil)
         }
+        .alert("Delete Recipe?", isPresented: $showDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteRecipe()
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(recipe.name)\"? This action cannot be undone.")
+        }
+    }
+    
+    private func deleteRecipe() {
+        withAnimation(.easeOut(duration: 0.3)) {
+            appState.deleteRecipe(recipe)
+        }
+        
+        // Haptic feedback
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
     }
 }
 
@@ -552,10 +668,10 @@ struct EmptyRecipesView: View {
 // MARK: - Recipe Filters View
 struct RecipeFiltersView: View {
     @Environment(\.dismiss) var dismiss
-    @State private var selectedDifficulty: Recipe.Difficulty?
-    @State private var maxCookTime: Double = 60
-    @State private var maxCalories: Double = 1000
-    @State private var dietaryRestrictions: Set<String> = []
+    @Binding var selectedDifficulty: Recipe.Difficulty?
+    @Binding var maxCookTime: Double
+    @Binding var maxCalories: Double
+    @Binding var dietaryRestrictions: Set<String>
     
     let restrictions = ["Vegetarian", "Vegan", "Gluten-Free", "Dairy-Free", "Keto", "Paleo"]
     

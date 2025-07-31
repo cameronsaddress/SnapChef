@@ -85,6 +85,17 @@ class AppState: ObservableObject {
         }
     }
     
+    func deleteRecipe(_ recipe: Recipe) {
+        // Remove from all arrays
+        recentRecipes.removeAll { $0.id == recipe.id }
+        savedRecipes.removeAll { $0.id == recipe.id }
+        allRecipes.removeAll { $0.id == recipe.id }
+        savedRecipesWithPhotos.removeAll { $0.recipe.id == recipe.id }
+        
+        // Save changes to disk
+        saveToDisk()
+    }
+    
     private func loadSavedRecipes() {
         // Load from documents directory instead of UserDefaults
         guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
