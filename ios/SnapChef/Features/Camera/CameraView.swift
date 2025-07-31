@@ -37,7 +37,7 @@ struct CameraView: View {
     var body: some View {
         ZStack {
             // Camera preview (bottom layer)
-            if cameraModel.isCameraAuthorized {
+            if cameraModel.isCameraAuthorized && !isProcessing {
                 CameraPreview(cameraModel: cameraModel)
                     .ignoresSafeArea()
                     .opacity(cameraModel.isSessionReady ? 1 : 0)
@@ -186,7 +186,12 @@ struct CameraView: View {
                 dismiss()
             }
         }
-        .fullScreenCover(isPresented: $showingUpgrade) {
+        .fullScreenCover(isPresented: $showingUpgrade, onDismiss: {
+            // Restart camera when returning from upgrade screen
+            if !isProcessing {
+                cameraModel.requestCameraPermission()
+            }
+        }) {
             SubscriptionView()
                 .environmentObject(deviceManager)
         }
@@ -226,6 +231,9 @@ struct CameraView: View {
     private func processImage(_ image: UIImage) {
         isProcessing = true
         capturedImage = image // Store the captured image
+        
+        // Stop camera session to save resources while processing
+        cameraModel.stopSession()
         
         Task {
             // Check if user has free uses or subscription
@@ -316,6 +324,9 @@ struct CameraView: View {
                         self.isProcessing = false
                         self.alertMessage = error.localizedDescription
                         self.showingAlert = true
+                        
+                        // Restart camera session on error
+                        self.cameraModel.requestCameraPermission()
                         
                         // If it's an authentication error, you might want to handle it specially
                         if case APIError.authenticationError = error {
