@@ -166,10 +166,6 @@ struct SuccessHeaderView: View {
                         endPoint: .trailing
                     )
                 )
-            
-            Text("We found \(3) delicious recipes")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(.white.opacity(0.8))
         }
         .padding(.top, 40)
     }
@@ -187,6 +183,13 @@ struct MagicalRecipeCard: View {
     var body: some View {
         GlassmorphicCard(content: {
             VStack(alignment: .leading, spacing: 20) {
+                // Recipe title at top
+                Text(recipe.name)
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                
                 // Header with image
                 HStack(spacing: 20) {
                     // Recipe image placeholder
@@ -209,17 +212,14 @@ struct MagicalRecipeCard: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(recipe.name)
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .lineLimit(2)
-                        
                         HStack(spacing: 16) {
                             TimeIndicator(minutes: recipe.prepTime + recipe.cookTime)
                             CalorieIndicator(calories: recipe.nutrition.calories)
                         }
                         
                         DifficultyBadge(difficulty: recipe.difficulty)
+                        
+                        Spacer()
                     }
                     
                     Spacer()
@@ -581,9 +581,10 @@ struct FridgeInventoryCard: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("In Your Fridge")
+                        Text("Here's what is\nin your fridge")
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
+                            .lineLimit(2)
                         
                         Text("\(ingredientCount) ingredients detected")
                             .font(.system(size: 16, weight: .medium))

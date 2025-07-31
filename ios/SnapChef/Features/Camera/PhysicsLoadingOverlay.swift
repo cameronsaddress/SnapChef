@@ -220,6 +220,7 @@ struct PhysicsLoadingOverlay: View {
 // MARK: - Emoji Flick Game Overlay
 struct EmojiFlickGameOverlay: View {
     let capturedImage: UIImage?
+    @State private var progress: CGFloat = 0.0
     
     var body: some View {
         ZStack {
@@ -227,10 +228,39 @@ struct EmojiFlickGameOverlay: View {
                 .ignoresSafeArea()
             
             VStack {
-                Text("Play a game while AI scans your food")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.top, 50)
+                // AI Analyzing indicator with progress bar
+                ZStack {
+                    // Progress bar background
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(Color.white.opacity(0.1))
+                            .frame(height: 4)
+                            .position(x: geometry.size.width / 2, y: 30)
+                        
+                        // Progress bar
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#667eea"),
+                                        Color(hex: "#764ba2"),
+                                        Color(hex: "#f093fb")
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geometry.size.width * progress, height: 4)
+                            .position(x: (geometry.size.width * progress) / 2, y: 30)
+                            .animation(.linear(duration: 0.5), value: progress)
+                    }
+                    
+                    // AI Analyzing indicator
+                    AIAnalyzingIndicator()
+                        .position(x: UIScreen.main.bounds.width / 2, y: 30)
+                }
+                .frame(height: 60)
+                .padding(.top, 50)
                 
                 Spacer()
                 
@@ -244,6 +274,12 @@ struct EmojiFlickGameOverlay: View {
                     .font(.system(size: 16, weight: .medium, design: .rounded))
                     .foregroundColor(.white.opacity(0.8))
                     .padding(.bottom, 50)
+            }
+        }
+        .onAppear {
+            // Animate progress bar over 60 seconds
+            withAnimation(.linear(duration: 60)) {
+                progress = 1.0
             }
         }
     }

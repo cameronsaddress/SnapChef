@@ -51,7 +51,7 @@ struct EmojiFlickGame: View {
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: geometry.size.width, height: geometry.size.height)
-                        .opacity(0.3)
+                        .opacity(0.375) // 25% less transparent (was 0.3, now 0.375)
                         .blur(radius: 5)
                         .clipped()
                         .ignoresSafeArea()
@@ -140,9 +140,6 @@ struct EmojiFlickGame: View {
                 .offset(x: screenShake)
                 .animation(.spring(response: 0.2, dampingFraction: 0.3), value: screenShake)
                 
-                // AI Analyzing indicator at top
-                AIAnalyzingIndicator()
-                    .position(x: geometry.size.width / 2, y: 30)
                 
                 // Animated scoreboard at bottom left
                 AnimatedScoreboard(gameState: gameState)
