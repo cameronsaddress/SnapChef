@@ -1111,7 +1111,7 @@ struct FoodPreferencesCard: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    Color(hex: "#ffa726").opacity(0.3),
+                                    Color(hex: "#667eea").opacity(0.3),
                                     Color.clear
                                 ],
                                 center: .center,
@@ -1128,13 +1128,13 @@ struct FoodPreferencesCard: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Food Preferences")
+                    Text("Your Food Types")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [
-                                    Color(hex: "#ffa726"),
-                                    Color(hex: "#ff7043")
+                                    Color(hex: "#667eea"),
+                                    Color(hex: "#764ba2")
                                 ],
                                 startPoint: .leading,
                                 endPoint: .trailing
@@ -1157,7 +1157,7 @@ struct FoodPreferencesCard: View {
                 // Arrow
                 Image(systemName: "arrow.right")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(Color(hex: "#ffa726"))
+                    .foregroundColor(Color(hex: "#667eea"))
                     .offset(x: isAnimating ? 5 : 0)
             }
             .padding(.horizontal, 24)
@@ -1170,8 +1170,8 @@ struct FoodPreferencesCard: View {
                             .stroke(
                                 LinearGradient(
                                     colors: [
-                                        Color(hex: "#ffa726").opacity(0.5),
-                                        Color(hex: "#ff7043").opacity(0.5)
+                                        Color(hex: "#667eea").opacity(0.5),
+                                        Color(hex: "#764ba2").opacity(0.5)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -1181,7 +1181,7 @@ struct FoodPreferencesCard: View {
                     )
             )
             .shadow(
-                color: Color(hex: "#ffa726").opacity(0.3),
+                color: Color(hex: "#667eea").opacity(0.3),
                 radius: isAnimating ? 20 : 10,
                 y: isAnimating ? 10 : 5
             )

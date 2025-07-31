@@ -75,6 +75,11 @@ struct HomeView: View {
                         InfluencerCarousel()
                             .padding(.top, 10)
                         
+                        // Food Preferences Card
+                        FoodPreferencesCard()
+                            .padding(.horizontal, 30)
+                            .padding(.top, 20)
+                        
                         // Mystery Meal Button
                         MysteryMealButton(
                             isAnimating: $mysteryMealAnimation,
@@ -400,7 +405,7 @@ struct ViralChallengeSection: View {
                         }
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                    .frame(height: 460)
+                    .frame(height: 500)
                     
                     // Page indicators
                     HStack(spacing: 6) {
@@ -414,7 +419,7 @@ struct ViralChallengeSection: View {
                     .padding(.bottom, 20)
                 }
             }
-            .frame(height: 460)
+            .frame(height: 500)
         }
         .onAppear {
             sparkleAnimation = true
@@ -594,7 +599,7 @@ struct EnhancedChallengeCard: View {
             }
             .padding(.horizontal, 30)
             .padding(.top, 30)
-            .padding(.bottom, 40)
+            .padding(.bottom, 60)
         }
         .background(
             RoundedRectangle(cornerRadius: 24)
@@ -618,6 +623,7 @@ struct EnhancedChallengeCard: View {
                         .fill(.ultraThinMaterial)
                 )
         )
+        .clipShape(RoundedRectangle(cornerRadius: 24))
         .padding(.horizontal, 20)
         .shadow(color: Color.black.opacity(0.3), radius: 20, y: 10)
         .onAppear {

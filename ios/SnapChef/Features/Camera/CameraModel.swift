@@ -81,8 +81,9 @@ class CameraModel: NSObject, ObservableObject {
         session.inputs.forEach { session.removeInput($0) }
         session.outputs.forEach { session.removeOutput($0) }
         
-        // Setup camera input - try rear camera first, then any available
-        let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+        // Setup camera input - try ultra-wide rear camera first for better fridge shots
+        let camera = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back)
+            ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
             ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
             ?? AVCaptureDevice.default(for: .video)
         
