@@ -400,7 +400,7 @@ struct ViralChallengeSection: View {
                         }
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                    .frame(height: 420)
+                    .frame(height: 460)
                     
                     // Page indicators
                     HStack(spacing: 6) {
@@ -414,7 +414,7 @@ struct ViralChallengeSection: View {
                     .padding(.bottom, 20)
                 }
             }
-            .frame(height: 420)
+            .frame(height: 460)
         }
         .onAppear {
             sparkleAnimation = true
@@ -592,7 +592,9 @@ struct EnhancedChallengeCard: View {
                     }
                 }, perform: {})
             }
-            .padding(30)
+            .padding(.horizontal, 30)
+            .padding(.top, 30)
+            .padding(.bottom, 40)
         }
         .background(
             RoundedRectangle(cornerRadius: 24)

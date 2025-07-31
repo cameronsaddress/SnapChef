@@ -104,6 +104,59 @@ struct EnhancedProfileHeader: View {
     @State private var showingEditProfile = false
     @State private var customName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
     @State private var customPhotoData: Data? = UserDefaults.standard.data(forKey: "CustomChefPhoto")
+    @EnvironmentObject var appState: AppState
+    
+    private func calculateStreak() -> Int {
+        // Get all recipe creation dates
+        let recipeDates = appState.allRecipes.map { $0.createdAt }
+        
+        // Calculate based on consecutive days with recipes
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var streak = 0
+        var checkDate = today
+        
+        // Check backwards from today
+        while streak < 365 { // Limit check to last 365 days
+            let hasRecipeOnDate = recipeDates.contains { date in
+                calendar.isDate(date, inSameDayAs: checkDate)
+            }
+            
+            if hasRecipeOnDate {
+                streak += 1
+                checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate) ?? checkDate
+            } else if streak > 0 {
+                // If we've started counting and there's a gap, stop
+                break
+            } else {
+                // If we haven't found any recipes yet, keep looking back
+                checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate) ?? checkDate
+                
+                // Stop if we've gone back more than 30 days without finding anything
+                if calendar.dateComponents([.day], from: checkDate, to: today).day ?? 0 > 30 {
+                    break
+                }
+            }
+        }
+        
+        return streak
+    }
+    
+    private func calculateUserStatus() -> String {
+        let recipeCount = appState.allRecipes.count
+        
+        if recipeCount >= 50 {
+            return "⚡ Master Chef"
+        } else if recipeCount >= 20 {
+            return "🌟 Pro Chef"
+        } else if recipeCount >= 10 {
+            return "💫 Rising Star"
+        } else if recipeCount >= 5 {
+            return "🔥 Home Cook"
+        } else {
+            return "🌱 Beginner"
+        }
+    }
     
     var body: some View {
         VStack(spacing: 20) {
@@ -196,8 +249,8 @@ struct EnhancedProfileHeader: View {
                 
                 // Status pills
                 HStack(spacing: 12) {
-                    StatusPill(text: "🔥 7 day streak", color: Color(hex: "#f093fb"))
-                    StatusPill(text: "⚡ Power user", color: Color(hex: "#4facfe"))
+                    StatusPill(text: "🔥 \(calculateStreak()) day streak", color: Color(hex: "#f093fb"))
+                    StatusPill(text: calculateUserStatus(), color: Color(hex: "#4facfe"))
                 }
                 
                 // Food Preferences Card
