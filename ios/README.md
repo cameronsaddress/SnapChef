@@ -2,6 +2,14 @@
 
 SnapChef is a magical iOS app that transforms photos of your fridge and pantry into personalized recipe suggestions using AI. With its whimsical design, gamification elements, and social sharing features, SnapChef makes cooking fun and accessible.
 
+## 📚 Documentation
+
+- **[APP_ARCHITECTURE_DOCUMENTATION.md](APP_ARCHITECTURE_DOCUMENTATION.md)** - Complete system architecture and data flow
+- **[COMPONENT_REFERENCE.md](COMPONENT_REFERENCE.md)** - Detailed component documentation
+- **[DEVELOPER_QUICK_REFERENCE.md](DEVELOPER_QUICK_REFERENCE.md)** - Quick commands and tips
+- **[CLAUDE.md](CLAUDE.md)** - AI assistant guidance and recent updates
+- **[PROJECT_BRIEF.md](PROJECT_BRIEF.md)** - Original project specifications
+
 ## 📱 App Overview
 
 - **Bundle ID**: com.snapchef.app
@@ -258,10 +266,24 @@ The app requests:
 - AR ingredient recognition
 - Community recipe sharing
 
+## 🔄 Recent Updates (January 31, 2025)
+
+### UI/UX Improvements
+- **Emoji Flick Game**: Enhanced visibility with 25% less transparent background
+- **Recipe Results**: Cleaner layout with better text positioning
+- **Share Generator**: Simplified workflow with one-click photo capture
+- **Performance**: Optimized animations for smoother 60fps experience
+
+### Documentation
+- Added comprehensive architecture documentation
+- Created detailed component reference guide
+- Updated developer quick reference
+- Enhanced inline code comments
+
 ## 👥 Contributing
 
 See the main repository README for contribution guidelines.
 
 ## 📄 License
 
-Copyright © 2024 SnapChef. All rights reserved.
+Copyright © 2024-2025 SnapChef. All rights reserved.

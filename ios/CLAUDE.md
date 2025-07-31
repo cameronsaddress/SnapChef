@@ -5,6 +5,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 SnapChef is an iOS app that transforms fridge/pantry photos into personalized recipes using AI (Grok Vision API), with built-in social sharing and gamification features.
 
+### Latest Updates (Jan 31, 2025)
+- Enhanced emoji flick game with improved UI
+- Updated recipe results view with better text layout
+- Improved share generator with simplified workflow
+- Comprehensive documentation added
+
+### Documentation
+- **APP_ARCHITECTURE_DOCUMENTATION.md** - Complete system overview
+- **COMPONENT_REFERENCE.md** - Detailed component guide
+- **PROJECT_BRIEF.md** - Original project specifications
+
 ## Key Commands
 
 ### Development
@@ -33,9 +44,11 @@ swift-format -i -r SnapChef/
 ### Core Components
 1. **SnapChefApp.swift** - App entry point and scene configuration
 2. **Core/Networking/SnapChefAPIManager.swift** - Grok Vision API integration
-3. **Features/Camera/CameraView.swift** - Main camera interface
-4. **Features/Recipes/RecipeResultsView.swift** - Recipe display
+3. **Features/Camera/CameraView.swift** - Main camera interface with emoji game
+4. **Features/Recipes/RecipeResultsView.swift** - Recipe display with enhanced cards
 5. **Core/ViewModels/AppState.swift** - Global app state management
+6. **Features/Sharing/ShareGeneratorView.swift** - Social media share creation
+7. **Features/Gamification/EnhancedGamificationManager.swift** - Points and badges
 
 ### API Integration
 
@@ -177,6 +190,26 @@ struct RecipeAPI {
 - Reduce particle count
 - Use .drawingGroup() modifier
 - Profile with Instruments
+
+## Recent UI/UX Improvements
+
+### Emoji Flick Game
+- Fridge background opacity increased to 0.375 (25% less transparent)
+- Removed instructional text, moved AI indicator to top
+- Added 60-second progress bar with gradient theme
+
+### Recipe Results
+- Removed "we found X recipes" text for cleaner UI
+- Updated fridge inventory to "Here's what is in your fridge" (multi-line)
+- Recipe titles moved to top of cards (2 lines max)
+- Calorie container widened with minWidth: 40
+
+### Share Generator
+- Changed from infinite spin to single 15° rotation
+- Made after photo area clickable
+- Added "Take your after photo" button with status indicator
+- Removed challenge text editor section
+- Moved "Share for Credits" below style selector
 
 ## Server Repository
 The FastAPI backend code is located at: https://github.com/cameronsaddress/snapchef-server
