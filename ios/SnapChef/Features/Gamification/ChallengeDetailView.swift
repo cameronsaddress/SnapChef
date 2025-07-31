@@ -17,9 +17,6 @@ struct ChallengeDetailView: View {
                 
                 ScrollView {
                     VStack(spacing: 30) {
-                        // Challenge icon
-                        ChallengeIconView(type: challenge.type)
-                        
                         // Title and description
                         VStack(spacing: 16) {
                             Text(challenge.title)
