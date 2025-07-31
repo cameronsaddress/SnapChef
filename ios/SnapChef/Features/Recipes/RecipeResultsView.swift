@@ -297,9 +297,10 @@ struct CalorieIndicator: View {
                 .font(.system(size: 14, weight: .semibold))
             Text("\(calories)")
                 .font(.system(size: 14, weight: .semibold))
+                .frame(minWidth: 40)
         }
         .foregroundColor(Color(hex: "#f093fb"))
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 16)
         .padding(.vertical, 6)
         .background(
             Capsule()
@@ -543,7 +544,15 @@ struct FridgeInventoryCard: View {
     var body: some View {
         GlassmorphicCard(content: {
             VStack(spacing: 20) {
-                // Icon and title
+                // Title at top
+                Text("Here's what is\nin your fridge")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // Icon and content
                 HStack(spacing: 20) {
                     // Fridge icon with animation
                     ZStack {
@@ -581,11 +590,6 @@ struct FridgeInventoryCard: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Here's what is\nin your fridge")
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .lineLimit(2)
-                        
                         Text("\(ingredientCount) ingredients detected")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white.opacity(0.8))

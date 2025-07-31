@@ -49,9 +49,10 @@ struct ShareGeneratorView: View {
                         SharePreviewSection(
                             recipe: recipe,
                             ingredientsPhoto: ingredientsPhoto,
-                            afterPhoto: afterPhoto,
+                            afterPhoto: $afterPhoto,
                             selectedStyle: selectedStyle,
-                            animationPhase: animationPhase
+                            animationPhase: animationPhase,
+                            showingCamera: $showingCamera
                         )
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
@@ -60,26 +61,45 @@ struct ShareGeneratorView: View {
                         StyleSelectorView(selectedStyle: $selectedStyle)
                             .padding(.horizontal, 20)
                         
-                        // After Photo Capture
-                        // TODO: AfterPhotoCaptureView was moved to archive
-                        /*
-                        AfterPhotoCaptureView(
-                            afterPhoto: $afterPhoto,
-                            showingCamera: $showingCamera
-                        )
-                        .padding(.horizontal, 20)
-                        */
-                        
-                        // Challenge Text Editor
-                        ChallengeTextEditor(recipe: recipe)
-                            .padding(.horizontal, 20)
-                        
-                        // Action Button
+                        // Action Button - moved below style selector
                         MagneticButton(
                             title: "Share for Credits",
                             icon: "sparkles",
                             action: generateShareImage
                         )
+                        .padding(.horizontal, 20)
+                        
+                        // Take After Photo Button
+                        Button(action: {
+                            showingCamera = true
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                
+                                Text("Take your after photo")
+                                    .font(.system(size: 16, weight: .semibold))
+                                
+                                Spacer()
+                                
+                                if afterPhoto != nil {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(Color(hex: "#43e97b"))
+                                }
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.white.opacity(0.1))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                            )
+                        }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 40)
                     }
@@ -109,8 +129,8 @@ struct ShareGeneratorView: View {
         }
         */
         .onAppear {
-            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
-                animationPhase = 1
+            withAnimation(.easeInOut(duration: 1.5)) {
+                animationPhase = 0.0417 // 15 degrees / 360 degrees = 0.0417
             }
         }
     }
@@ -170,9 +190,10 @@ struct ShareGeneratorView: View {
 struct SharePreviewSection: View {
     let recipe: Recipe
     let ingredientsPhoto: UIImage?
-    let afterPhoto: UIImage?
+    @Binding var afterPhoto: UIImage?
     let selectedStyle: ShareGeneratorView.ShareStyle
     let animationPhase: Double
+    @Binding var showingCamera: Bool
     
     var body: some View {
         VStack(spacing: 20) {
@@ -209,10 +230,15 @@ struct SharePreviewSection: View {
                     )
                     .scaleEffect(0.85)
                     .rotation3DEffect(
-                        .degrees(animationPhase * 360),
+                        .degrees(animationPhase * 360), // Will be 15 degrees when animationPhase = 0.0417
                         axis: (x: 0, y: 1, z: 0),
                         perspective: 0.5
                     )
+                    .onTapGesture {
+                        // Check if tap is on the after photo area
+                        // For simplicity, just open camera when tapping anywhere on preview
+                        showingCamera = true
+                    }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.width * 1.4)
             }
@@ -577,98 +603,6 @@ struct StyleOptionCard: View {
     }
 }
 
-// MARK: - Challenge Text Editor
-struct ChallengeTextEditor: View {
-    let recipe: Recipe
-    @State private var challengeText = ""
-    @State private var selectedTemplate = 0
-    
-    let templates = [
-        "Just turned my sad fridge into a gourmet meal! 🔥",
-        "Who says you need a full pantry to cook amazing food? 👨‍🍳",
-        "From empty fridge to THIS masterpiece! Can you beat it? 💪",
-        "Plot twist: My fridge scraps became a 5-star meal! ⭐"
-    ]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Add Your Challenge")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-            
-            // Template selector
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(0..<templates.count, id: \.self) { index in
-                        TemplateChip(
-                            text: "Template \(index + 1)",
-                            isSelected: selectedTemplate == index,
-                            action: {
-                                selectedTemplate = index
-                                challengeText = templates[index]
-                            }
-                        )
-                    }
-                }
-            }
-            
-            // Text editor
-            GlassmorphicCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    TextEditor(text: $challengeText)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 100)
-                        .onAppear {
-                            challengeText = templates[0]
-                        }
-                    
-                    HStack {
-                        Spacer()
-                        Text("\(challengeText.count)/280")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                }
-                .padding(20)
-            }
-        }
-    }
-}
-
-// MARK: - Template Chip
-struct TemplateChip: View {
-    let text: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(text)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(isSelected ? .white : .white.opacity(0.8))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(
-                            isSelected
-                                ? Color(hex: "#4facfe")
-                                : Color.white.opacity(0.2)
-                        )
-                        .overlay(
-                            Capsule()
-                                .stroke(
-                                    isSelected ? Color.clear : Color.white.opacity(0.3),
-                                    lineWidth: 1
-                                )
-                        )
-                )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
 
 // MARK: - Share Sheet
 struct ShareSheet: UIViewControllerRepresentable {
