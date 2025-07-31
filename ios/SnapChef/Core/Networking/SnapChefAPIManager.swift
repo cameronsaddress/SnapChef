@@ -1,7 +1,39 @@
 // SnapChefAPIManager.swift
 
 import Foundation
-import UIKit // For UIImage
+import UIKit
+
+// MARK: - UIImage Extension for Resizing
+extension UIImage {
+    /// Resizes the image to fit within the specified maximum dimension while maintaining aspect ratio
+    func resized(withMaxDimension maxDimension: CGFloat) -> UIImage {
+        let size = self.size
+        
+        // If image is already smaller than max dimension, return original
+        if size.width <= maxDimension && size.height <= maxDimension {
+            return self
+        }
+        
+        // Calculate the scaling factor
+        let widthRatio = maxDimension / size.width
+        let heightRatio = maxDimension / size.height
+        let scaleFactor = min(widthRatio, heightRatio)
+        
+        // Calculate new size
+        let newSize = CGSize(
+            width: size.width * scaleFactor,
+            height: size.height * scaleFactor
+        )
+        
+        // Create resized image
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resizedImage = renderer.image { _ in
+            self.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        
+        return resizedImage
+    }
+} // For UIImage
 
 // MARK: - API Key
 // The API key is now securely stored in the Keychain
@@ -205,11 +237,22 @@ class SnapChefAPIManager {
             appendFormField(name: "food_preferences", value: preferencesString)
         }
 
-        // Append image_file
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+        // Resize image to max 2048x2048 to reduce file size while maintaining quality
+        let resizedImage = image.resized(withMaxDimension: 2048)
+        
+        // Log original and resized dimensions
+        print("Original image size: \(image.size.width)x\(image.size.height)")
+        print("Resized image size: \(resizedImage.size.width)x\(resizedImage.size.height)")
+        
+        // Append image_file with 80% JPEG compression
+        guard let imageData = resizedImage.jpegData(compressionQuality: 0.8) else {
             print("Failed to get JPEG data from image")
             return nil
         }
+        
+        // Log final file size
+        let fileSizeMB = Double(imageData.count) / (1024 * 1024)
+        print("Final image file size: \(String(format: "%.2f", fileSizeMB)) MB")
         httpBody.append("--\(boundary)\r\n")
         httpBody.append("Content-Disposition: form-data; name=\"image_file\"; filename=\"photo.jpg\"\r\n")
         httpBody.append("Content-Type: image/jpeg\r\n\r\n")
