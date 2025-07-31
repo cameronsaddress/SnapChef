@@ -245,12 +245,12 @@ class SubscriptionManager: ObservableObject {
         let recipeCount = UserDefaults.standard.integer(forKey: "dailyRecipeCount")
         
         if Calendar.current.isDate(lastResetDate, inSameDayAs: today) {
-            return max(0, 3 - recipeCount) // 3 free recipes per day
+            return max(0, 10 - recipeCount) // 10 free recipes per day (for testing)
         } else {
             // Reset count for new day
             UserDefaults.standard.set(today, forKey: "lastRecipeResetDate")
             UserDefaults.standard.set(0, forKey: "dailyRecipeCount")
-            return 3
+            return 10
         }
     }
     

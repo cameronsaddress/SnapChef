@@ -8,7 +8,7 @@ class AppState: ObservableObject {
     @Published var error: AppError?
     @Published var selectedRecipe: Recipe?
     @Published var recentRecipes: [Recipe] = []
-    @Published var freeUsesRemaining: Int = 3
+    @Published var freeUsesRemaining: Int = 10 // For testing
     @Published var subscriptionManager = SubscriptionManager.shared
     @Published var allRecipes: [Recipe] = []
     @Published var savedRecipes: [Recipe] = []
