@@ -57,44 +57,46 @@ struct InfluencerCarousel: View {
                 }
                 .padding(.horizontal, 20)
                 .offset(x: -CGFloat(currentIndex) * (geometry.size.width - 20) + dragOffset)
-                .gesture(
-                    DragGesture(minimumDistance: 10)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 30)
                         .onChanged { value in
-                            // Only respond to horizontal swipes
+                            // Only respond to clearly horizontal swipes
                             let horizontalAmount = abs(value.translation.width)
                             let verticalAmount = abs(value.translation.height)
                             
-                            // If vertical movement is greater, ignore the gesture
-                            if verticalAmount > horizontalAmount {
-                                return
+                            // Only process if horizontal movement is significantly greater
+                            if horizontalAmount > verticalAmount * 2 {
+                                isDragging = true
+                                dragOffset = value.translation.width
+                                stopAutoScroll()
                             }
-                            
-                            isDragging = true
-                            dragOffset = value.translation.width
-                            stopAutoScroll()
                         }
                         .onEnded { value in
-                            // Only process horizontal swipes
+                            // Only process clearly horizontal swipes
                             let horizontalAmount = abs(value.translation.width)
                             let verticalAmount = abs(value.translation.height)
                             
-                            if verticalAmount > horizontalAmount {
-                                return
-                            }
-                            
-                            isDragging = false
-                            let threshold: CGFloat = 50
-                            
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                if value.translation.width > threshold && currentIndex > 0 {
-                                    currentIndex -= 1
-                                } else if value.translation.width < -threshold && currentIndex < influencers.count - 1 {
-                                    currentIndex += 1
+                            if horizontalAmount > verticalAmount * 2 {
+                                isDragging = false
+                                let threshold: CGFloat = 50
+                                
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    if value.translation.width > threshold && currentIndex > 0 {
+                                        currentIndex -= 1
+                                    } else if value.translation.width < -threshold && currentIndex < influencers.count - 1 {
+                                        currentIndex += 1
+                                    }
+                                    dragOffset = 0
                                 }
-                                dragOffset = 0
+                                
+                                startAutoScroll()
+                            } else {
+                                // Reset if it wasn't a valid horizontal swipe
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    dragOffset = 0
+                                }
+                                isDragging = false
                             }
-                            
-                            startAutoScroll()
                         }
                 )
             }

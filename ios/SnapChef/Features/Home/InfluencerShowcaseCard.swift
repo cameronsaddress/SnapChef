@@ -171,13 +171,7 @@ struct SliderHandleView: View {
                     )
             )
             .offset(x: imageOffset)
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        imageOffset = max(-geometry.size.width/2 + 20, 
-                                         min(geometry.size.width/2 - 20, value.translation.width))
-                    }
-            )
+            // Gesture disabled for better UX
     }
 }
 
