@@ -607,6 +607,29 @@ struct RecipeGridCard: View {
                 Label("Delete Recipe", systemImage: "trash")
             }
         }
+        .offset(x: deleteOffset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    if value.translation.width < -50 {
+                        withAnimation(.spring()) {
+                            deleteOffset = -60
+                        }
+                    } else if value.translation.width > 50 {
+                        withAnimation(.spring()) {
+                            deleteOffset = 0
+                        }
+                    }
+                }
+                .onEnded { value in
+                    if value.translation.width < -100 {
+                        showDeleteAlert = true
+                    }
+                    withAnimation(.spring()) {
+                        deleteOffset = 0
+                    }
+                }
+        )
         .sheet(isPresented: $showDetail) {
             RecipeDetailView(recipe: recipe)
         }
@@ -616,7 +639,9 @@ struct RecipeGridCard: View {
         .alert("Delete Recipe?", isPresented: $showDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
-                deleteRecipe()
+                withAnimation(.spring()) {
+                    appState.deleteRecipe(recipe)
+                }
             }
         } message: {
             Text("Are you sure you want to delete \"\(recipe.name)\"? This action cannot be undone.")

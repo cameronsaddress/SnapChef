@@ -5,6 +5,7 @@ struct RecipeResultsView: View {
     let ingredients: [IngredientAPI]
     let capturedImage: UIImage?
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var appState: AppState
     @State private var selectedRecipe: Recipe?
     @State private var showShareSheet = false
     @State private var showShareGenerator = false
@@ -13,6 +14,8 @@ struct RecipeResultsView: View {
     @State private var confettiTrigger = false
     @State private var contentVisible = false
     @State private var activeSheet: ActiveSheet?
+    @State private var savedRecipeIds: Set<UUID> = []
+    @State private var showingExitConfirmation = false
     
     enum ActiveSheet: Identifiable {
         case recipeDetail(Recipe)
@@ -62,12 +65,16 @@ struct RecipeResultsView: View {
                         ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                             MagicalRecipeCard(
                                 recipe: recipe,
+                                isSaved: savedRecipeIds.contains(recipe.id),
                                 onSelect: {
                                     activeSheet = .recipeDetail(recipe)
                                     confettiTrigger = true
                                 },
                                 onShare: {
                                     activeSheet = .shareGenerator(recipe)
+                                },
+                                onSave: {
+                                    saveRecipe(recipe)
                                 }
                             )
                             .staggeredFade(index: index + (ingredients.isEmpty ? 1 : 2), isShowing: contentVisible)
@@ -95,7 +102,13 @@ struct RecipeResultsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
+                    Button(action: { 
+                        if savedRecipeIds.isEmpty && !recipes.isEmpty {
+                            showingExitConfirmation = true
+                        } else {
+                            dismiss()
+                        }
+                    }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 24))
                             .foregroundColor(.white)
@@ -146,6 +159,25 @@ struct RecipeResultsView: View {
                 EnhancedShareSheet(recipe: recipe)
             }
         }
+        .alert("Exit Without Saving?", isPresented: $showingExitConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Exit", role: .destructive) {
+                dismiss()
+            }
+        } message: {
+            Text("You haven't saved any recipes yet. They will be lost if you exit now.")
+        }
+    }
+    
+    private func saveRecipe(_ recipe: Recipe) {
+        // Save the recipe with the captured image
+        appState.addRecentRecipe(recipe)
+        appState.saveRecipeWithPhotos(recipe, beforePhoto: capturedImage, afterPhoto: nil)
+        savedRecipeIds.insert(recipe.id)
+        
+        // Haptic feedback
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
     }
 }
 
@@ -174,8 +206,10 @@ struct SuccessHeaderView: View {
 // MARK: - Magical Recipe Card
 struct MagicalRecipeCard: View {
     let recipe: Recipe
+    let isSaved: Bool
     let onSelect: () -> Void
     let onShare: () -> Void
+    let onSave: () -> Void
     
     @State private var isHovered = false
     @State private var shimmerPhase: CGFloat = -1
@@ -242,7 +276,15 @@ struct MagicalRecipeCard: View {
                 // Action buttons
                 HStack(spacing: 12) {
                     ActionButton(
-                        title: "Cook Now",
+                        title: isSaved ? "Saved" : "Save",
+                        icon: isSaved ? "checkmark.circle.fill" : "bookmark.fill",
+                        color: isSaved ? Color(hex: "#43e97b") : Color(hex: "#667eea"),
+                        action: onSave
+                    )
+                    .disabled(isSaved)
+                    
+                    ActionButton(
+                        title: "Cook",
                         icon: "flame.fill",
                         color: Color(hex: "#f093fb"),
                         action: onSelect
