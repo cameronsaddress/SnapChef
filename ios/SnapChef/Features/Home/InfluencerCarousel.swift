@@ -58,13 +58,30 @@ struct InfluencerCarousel: View {
                 .padding(.horizontal, 20)
                 .offset(x: -CGFloat(currentIndex) * (geometry.size.width - 20) + dragOffset)
                 .gesture(
-                    DragGesture()
+                    DragGesture(minimumDistance: 10)
                         .onChanged { value in
+                            // Only respond to horizontal swipes
+                            let horizontalAmount = abs(value.translation.width)
+                            let verticalAmount = abs(value.translation.height)
+                            
+                            // If vertical movement is greater, ignore the gesture
+                            if verticalAmount > horizontalAmount {
+                                return
+                            }
+                            
                             isDragging = true
                             dragOffset = value.translation.width
                             stopAutoScroll()
                         }
                         .onEnded { value in
+                            // Only process horizontal swipes
+                            let horizontalAmount = abs(value.translation.width)
+                            let verticalAmount = abs(value.translation.height)
+                            
+                            if verticalAmount > horizontalAmount {
+                                return
+                            }
+                            
                             isDragging = false
                             let threshold: CGFloat = 50
                             

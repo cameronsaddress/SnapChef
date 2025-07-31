@@ -71,6 +71,10 @@ struct HomeView: View {
                             }
                         }
                         
+                        // Celebrity Kitchens Carousel
+                        InfluencerCarousel()
+                            .padding(.top, 10)
+                        
                         // Mystery Meal Button
                         MysteryMealButton(
                             isAnimating: $mysteryMealAnimation,
@@ -80,10 +84,7 @@ struct HomeView: View {
                             }
                         )
                         .padding(.horizontal, 30)
-                        
-                        // Celebrity Kitchens Carousel
-                        InfluencerCarousel()
-                            .padding(.top, 10)
+                        .padding(.top, 20)
                         
                         // Viral Section
                         ViralChallengeSection()
@@ -303,13 +304,15 @@ struct ViralChallengeSection: View {
     @State private var currentChallenge = 0
     @State private var showingChallengeView = false
     @State private var selectedChallenge: Challenge?
+    @State private var autoTimer: Timer?
+    @State private var sparkleAnimation = false
     
     let challengeData = [
-        ("🌮", "Taco Tuesday", "Transform leftovers into tacos"),
-        ("🍕", "Pizza Party", "Create pizza with pantry items"),
-        ("🥗", "Salad Spectacular", "Make amazing salads"),
-        ("🍜", "Ramen Remix", "Upgrade instant ramen to gourmet"),
-        ("🥘", "One-Pot Wonder", "Create magic in a single pot")
+        ("🌮", "Taco Tuesday", "Transform leftovers into tacos", "2.3K chefs", "500", Color(hex: "#f093fb")),
+        ("🍕", "Pizza Party", "Create pizza with pantry items", "1.8K chefs", "450", Color(hex: "#667eea")),
+        ("🥗", "Salad Spectacular", "Make amazing salads", "956 chefs", "300", Color(hex: "#43e97b")),
+        ("🍜", "Ramen Remix", "Upgrade instant ramen to gourmet", "3.1K chefs", "600", Color(hex: "#ffa726")),
+        ("🥘", "One-Pot Wonder", "Create magic in a single pot", "1.2K chefs", "400", Color(hex: "#f5576c"))
     ]
     
     var challenges: [Challenge] {
@@ -320,7 +323,7 @@ struct ViralChallengeSection: View {
                 description: data.2,
                 requirement: "Create a \(data.1.lowercased()) dish and share it",
                 reward: ChallengeReward(
-                    points: 50,
+                    points: Int(data.4) ?? 50,
                     badge: nil,
                     title: nil,
                     unlockable: nil
@@ -334,82 +337,306 @@ struct ViralChallengeSection: View {
     }
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 0) {
+            // Header
             HStack {
-                Text("Today's Challenge")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.leading, 20)
-                Spacer()
-            }
-            
-            ZStack(alignment: .bottom) {
-                TabView(selection: $currentChallenge) {
-                    ForEach(0..<challengeData.count, id: \.self) { index in
-                        HomeChallengeCard(
-                            emoji: challengeData[index].0,
-                            title: challengeData[index].1,
-                            description: challengeData[index].2,
-                            action: {
-                                selectedChallenge = challenges[index]
-                                showingChallengeView = true
-                            }
-                        )
-                        .tag(index)
-                    }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Today's Challenge")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    Text("Join thousands of home chefs")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
                 }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                .frame(height: 220)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
                 
-                // Custom page indicator below the card
-                HStack(spacing: 8) {
-                    ForEach(0..<challengeData.count, id: \.self) { index in
-                        Circle()
-                            .fill(currentChallenge == index ? Color.white : Color.white.opacity(0.4))
-                            .frame(width: 8, height: 8)
-                            .scaleEffect(currentChallenge == index ? 1.2 : 1)
-                            .animation(.spring(response: 0.3), value: currentChallenge)
-                    }
+                Spacer()
+                
+                // Live indicator
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.red.opacity(0.3), lineWidth: 8)
+                                .scaleEffect(sparkleAnimation ? 2 : 1)
+                                .opacity(sparkleAnimation ? 0 : 1)
+                                .animation(.easeOut(duration: 1.5).repeatForever(autoreverses: false), value: sparkleAnimation)
+                        )
+                    
+                    Text("LIVE")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
                 }
-                .padding(.bottom, -25)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.red.opacity(0.2))
+                )
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+            
+            // Carousel
+            GeometryReader { geometry in
+                ZStack(alignment: .bottom) {
+                    TabView(selection: $currentChallenge) {
+                        ForEach(0..<challengeData.count, id: \.self) { index in
+                            EnhancedChallengeCard(
+                                emoji: challengeData[index].0,
+                                title: challengeData[index].1,
+                                description: challengeData[index].2,
+                                participants: challengeData[index].3,
+                                points: challengeData[index].4,
+                                color: challengeData[index].5,
+                                action: {
+                                    selectedChallenge = challenges[index]
+                                    showingChallengeView = true
+                                }
+                            )
+                            .tag(index)
+                        }
+                    }
+                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                    .frame(height: 420)
+                    
+                    // Page indicators
+                    HStack(spacing: 6) {
+                        ForEach(0..<challengeData.count, id: \.self) { index in
+                            Capsule()
+                                .fill(currentChallenge == index ? Color.white : Color.white.opacity(0.3))
+                                .frame(width: currentChallenge == index ? 24 : 8, height: 8)
+                                .animation(.spring(response: 0.3), value: currentChallenge)
+                        }
+                    }
+                    .padding(.bottom, 20)
+                }
+            }
+            .frame(height: 420)
+        }
+        .onAppear {
+            sparkleAnimation = true
+            startAutoScroll()
+        }
+        .onDisappear {
+            stopAutoScroll()
         }
         .sheet(item: $selectedChallenge) { challenge in
             ChallengeDetailView(challenge: challenge)
         }
     }
+    
+    private func startAutoScroll() {
+        autoTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { _ in
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                currentChallenge = (currentChallenge + 1) % challengeData.count
+            }
+        }
+    }
+    
+    private func stopAutoScroll() {
+        autoTimer?.invalidate()
+        autoTimer = nil
+    }
 }
 
-struct HomeChallengeCard: View {
+struct EnhancedChallengeCard: View {
     let emoji: String
     let title: String
     let description: String
+    let participants: String
+    let points: String
+    let color: Color
     let action: () -> Void
+    
     @State private var isPressed = false
+    @State private var particleAnimation = false
     
     var body: some View {
-        GlassmorphicCard(content: {
-            VStack(spacing: 16) {
-                Text(emoji)
-                    .font(.system(size: 50))
+        VStack(spacing: 0) {
+            // Main content
+            VStack(spacing: 20) {
+                // Trophy and points
+                ZStack {
+                    // Animated glow
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [color.opacity(0.5), Color.clear],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 60
+                            )
+                        )
+                        .frame(width: 120, height: 120)
+                        .scaleEffect(particleAnimation ? 1.2 : 1)
+                        .opacity(particleAnimation ? 0.5 : 0.8)
+                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: particleAnimation)
+                    
+                    VStack(spacing: 8) {
+                        Text(emoji)
+                            .font(.system(size: 60))
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color(hex: "#ffa726"))
+                            Text(points + " pts")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.2))
+                        )
+                    }
+                }
                 
-                Text(title)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                // Challenge info
+                VStack(spacing: 12) {
+                    Text(title)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    Text(description)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .multilineTextAlignment(.center)
+                    
+                    // Participants
+                    HStack(spacing: 8) {
+                        // Profile stack
+                        ZStack {
+                            ForEach(0..<3) { index in
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 30, height: 30)
+                                    .overlay(
+                                        Text(["JD", "AS", "MK"][index])
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundColor(.white)
+                                    )
+                                    .offset(x: CGFloat(index * 20))
+                            }
+                        }
+                        .frame(width: 80, height: 30, alignment: .leading)
+                        
+                        Text(participants + " joining")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+                
+                // Timer countdown
+                VStack(spacing: 8) {
+                    Text("Ends in")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    HStack(spacing: 12) {
+                        TimeUnit(value: "18", unit: "HRS")
+                        Text(":")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white.opacity(0.5))
+                        TimeUnit(value: "42", unit: "MIN")
+                        Text(":")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white.opacity(0.5))
+                        TimeUnit(value: "37", unit: "SEC")
+                    }
+                }
+                .padding(.vertical, 16)
+                .padding(.horizontal, 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.black.opacity(0.2))
+                )
+                
+                // CTA Button
+                Button(action: action) {
+                    HStack {
+                        Text("Join Challenge")
+                            .font(.system(size: 18, weight: .semibold))
+                        Image(systemName: "arrow.right.circle.fill")
+                            .font(.system(size: 18))
+                    }
                     .foregroundColor(.white)
-                
-                Text(description)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
-                
-                MagneticButton(title: "Join Challenge", icon: "arrow.right", action: action)
-                    .scaleEffect(0.9)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [color, color.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                    )
+                    .shadow(color: color.opacity(0.5), radius: 15, y: 5)
+                }
+                .scaleEffect(isPressed ? 0.95 : 1)
+                .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        isPressed = pressing
+                    }
+                }, perform: {})
             }
             .padding(30)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }, cornerRadius: 24, glowColor: Color(hex: "#f093fb"))
-        .padding(.horizontal, 10)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color.black.opacity(0.2))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.3),
+                                    Color.white.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+                .background(
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(.ultraThinMaterial)
+                )
+        )
+        .padding(.horizontal, 20)
+        .shadow(color: Color.black.opacity(0.3), radius: 20, y: 10)
+        .onAppear {
+            particleAnimation = true
+        }
+    }
+}
+
+struct TimeUnit: View {
+    let value: String
+    let unit: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+            Text(unit)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.white.opacity(0.6))
+        }
     }
 }
 
@@ -627,6 +854,9 @@ class FallingFoodManager: ObservableObject {
     @Published var emojis: [FallingFoodEmoji] = []
     private let foodEmojis = ["🍕", "🍔", "🌮", "🍜", "🍝", "🥗", "🍣", "🥘", "🍛", "🥙", "🍱", "🥪", "🌯", "🍖", "🍗", "🥓", "🧀", "🥚", "🍳", "🥞"]
     private var buttonFrames: [CGRect] = []
+    private var displayLink: CADisplayLink?
+    private var lastDropTime: TimeInterval = 0
+    private var nextDropDelay: TimeInterval = 0
     
     struct FallingFoodEmoji: Identifiable {
         let id = UUID()
@@ -641,23 +871,28 @@ class FallingFoodManager: ObservableObject {
     }
     
     func startFallingFood() {
-        // Start physics update
-        Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
-            self.updatePhysics()
-        }
+        // Use CADisplayLink for smooth animation that doesn't pause during scrolling
+        displayLink = CADisplayLink(target: self, selector: #selector(updateAnimation))
+        displayLink?.add(to: .current, forMode: .common) // .common mode ensures it runs during scrolling
         
-        // Start dropping food emojis with random delays
-        scheduleNextEmoji()
+        // Set initial drop delay
+        nextDropDelay = Double.random(in: 0.5...3)
     }
     
-    private func scheduleNextEmoji() {
-        // Random delay between 0.5-3 seconds, ensuring minimum 0.5s spacing
-        let delay = Double.random(in: 0.5...3)
+    @objc private func updateAnimation() {
+        updatePhysics()
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            self.dropEmoji()
-            self.scheduleNextEmoji() // Schedule the next one
+        // Handle emoji dropping
+        let currentTime = CACurrentMediaTime()
+        if currentTime - lastDropTime >= nextDropDelay {
+            dropEmoji()
+            lastDropTime = currentTime
+            nextDropDelay = Double.random(in: 0.5...3)
         }
+    }
+    
+    deinit {
+        displayLink?.invalidate()
     }
     
     private func dropEmoji() {
