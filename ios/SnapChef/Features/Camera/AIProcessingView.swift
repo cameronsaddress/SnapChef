@@ -71,23 +71,14 @@ struct AIProcessingView: View {
                 
                 // Text content
                 VStack(spacing: 20) {
-                    Text("Our awesome AI is now")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                    Text("Our awesome AI is now scanning for all food items, quantity, and freshness.")
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
                         .opacity(textOpacity)
-                    
-                    VStack(spacing: 8) {
-                        Text("✨ Scanning for all food items")
-                        Text("📊 Analyzing quantity and freshness")
-                        Text("👨‍🍳 Crafting perfect recipes")
-                    }
-                    .font(.system(size: 18, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.9))
-                    .opacity(textOpacity)
-                    .animation(.easeInOut(duration: 0.5).delay(0.3), value: textOpacity)
+                        .lineSpacing(4)
                     
                     Text("While he cooks, here's a fun game on us!")
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
                         .foregroundColor(Color(hex: "#f093fb"))
                         .padding(.top, 10)
                         .opacity(textOpacity)

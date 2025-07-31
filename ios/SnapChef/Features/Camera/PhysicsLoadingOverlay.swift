@@ -219,6 +219,8 @@ struct PhysicsLoadingOverlay: View {
 
 // MARK: - Emoji Flick Game Overlay
 struct EmojiFlickGameOverlay: View {
+    let capturedImage: UIImage?
+    
     var body: some View {
         ZStack {
             Color.black.opacity(0.85)
@@ -233,7 +235,7 @@ struct EmojiFlickGameOverlay: View {
                 Spacer()
                 
                 // Embed the emoji flick game
-                EmojiFlickGame()
+                EmojiFlickGame(backgroundImage: capturedImage)
                     .frame(maxHeight: .infinity)
                 
                 Spacer()
@@ -249,6 +251,7 @@ struct EmojiFlickGameOverlay: View {
 
 // MARK: - Integration with MagicalProcessingOverlay
 struct MagicalProcessingOverlay: View {
+    let capturedImage: UIImage?
     @State private var useGameMode = true
     @State private var showAIProcessingView = true
     
@@ -265,7 +268,7 @@ struct MagicalProcessingOverlay: View {
                         }
                     }
             } else {
-                EmojiFlickGameOverlay()
+                EmojiFlickGameOverlay(capturedImage: capturedImage)
             }
         } else {
             PhysicsLoadingOverlay()

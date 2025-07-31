@@ -116,7 +116,7 @@ struct CameraView: View {
             
             // Processing overlay
             if isProcessing {
-                MagicalProcessingOverlay()
+                MagicalProcessingOverlay(capturedImage: capturedImage)
             }
             
             // Captured image preview

@@ -3,6 +3,8 @@ import AVFoundation
 
 // MARK: - Emoji Flick Game
 struct EmojiFlickGame: View {
+    let backgroundImage: UIImage?
+    
     @State private var gameState = GameState()
     @State private var emojis: [GameEmoji] = []
     @State private var particles: [GameParticle] = []
@@ -15,6 +17,10 @@ struct EmojiFlickGame: View {
     @State private var tutorialOpacity: Double = 1.0
     @State private var tutorialFingerPosition = CGPoint(x: 100, y: 300)
     // Haptic feedback is handled via static methods
+    
+    init(backgroundImage: UIImage? = nil) {
+        self.backgroundImage = backgroundImage
+    }
     
     // Special effects
     @State private var magneticFieldActive = false
@@ -38,6 +44,18 @@ struct EmojiFlickGame: View {
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
+                
+                // Captured fridge image as transparent background
+                if let backgroundImage = backgroundImage {
+                    Image(uiImage: backgroundImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .opacity(0.3)
+                        .blur(radius: 5)
+                        .clipped()
+                        .ignoresSafeArea()
+                }
                 
                 // Ambient particles
                 ForEach(particles.filter { $0.type == .ambient }) { particle in
@@ -627,7 +645,7 @@ struct EmojiFlickGame: View {
                 emoji.position.y >= targetMinY && emoji.position.y <= targetMaxY && !emoji.isFlicked
             }
             
-            guard readyEmojis.count >= 3 else { return }
+            guard readyEmojis.count > 0 else { return }
             
             timer.invalidate()
             

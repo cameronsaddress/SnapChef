@@ -46,6 +46,13 @@ class AppState: ObservableObject {
         
         // Load total snaps taken
         self.totalSnapsTaken = userDefaults.integer(forKey: totalSnapsTakenKey)
+        
+        // DEBUG: Clear recipes for testing - remove this in production
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" {
+            clearAllRecipes()
+        }
+        #endif
     }
     
     func completeOnboarding() {
@@ -129,6 +136,23 @@ class AppState: ObservableObject {
         
         // Save changes to disk
         saveToDisk()
+    }
+    
+    func clearAllRecipes() {
+        recentRecipes.removeAll()
+        savedRecipes.removeAll()
+        allRecipes.removeAll()
+        savedRecipesWithPhotos.removeAll()
+        favoritedRecipeIds.removeAll()
+        
+        // Clear from disk
+        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let filePath = documentsPath.appendingPathComponent("savedRecipes.json")
+        try? FileManager.default.removeItem(at: filePath)
+        
+        // Clear from UserDefaults
+        userDefaults.removeObject(forKey: "hasSavedRecipes")
+        userDefaults.removeObject(forKey: favoritedRecipesKey)
     }
     
     private func loadSavedRecipes() {
