@@ -350,7 +350,7 @@ struct EmojiFlickGame: View {
         }
     }
     
-    private func createExplosion(at position: CGPoint, intensity: ExplosionIntensity) {
+    private func createExplosion(at position: CGPoint, intensity: GameExplosionIntensity) {
         let particleCount = intensity.particleCount
         for _ in 0..<particleCount {
             let angle = CGFloat.random(in: 0...(2 * .pi))
@@ -779,7 +779,7 @@ struct SwipeTrail: Identifiable {
     var color: Color = .white
 }
 
-enum ExplosionIntensity {
+enum GameExplosionIntensity {
     case small, medium, large, mega
     
     var particleCount: Int {

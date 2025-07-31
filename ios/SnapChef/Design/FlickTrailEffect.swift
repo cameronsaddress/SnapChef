@@ -78,8 +78,8 @@ class FlickTrailManager: ObservableObject {
             
             let particle = TrailParticle(
                 position: CGPoint(
-                    x: position.x + cos(offsetAngle) * offsetDistance,
-                    y: position.y + sin(offsetAngle) * offsetDistance
+                    x: position.x + CGFloat(cos(offsetAngle)) * offsetDistance,
+                    y: position.y + CGFloat(sin(offsetAngle)) * offsetDistance
                 ),
                 velocity: CGVector(
                     dx: velocity.dx * 0.1 + CGFloat.random(in: -10...10),
@@ -163,7 +163,12 @@ struct FlickTrailView: View {
                 height: particle.size * layerScale
             )
             
-            context.fill(Ellipse().path(in: rect), with: .radialGradient(gradient))
+            context.fill(Ellipse().path(in: rect), with: .radialGradient(
+                Gradient(colors: [particle.color.opacity(0.6), particle.color.opacity(0)]),
+                center: CGPoint(x: rect.midX, y: rect.midY),
+                startRadius: 0,
+                endRadius: particle.size * layerScale / 2
+            ))
         }
         
         context.transform = .identity
@@ -260,7 +265,7 @@ struct TrailPathView: View {
                         endPoint: trail.last ?? .zero
                     ),
                     style: StrokeStyle(
-                        lineWidth: width * (1 + speed / 500),
+                        lineWidth: width * (1.0 + speed / 500.0),
                         lineCap: .round,
                         lineJoin: .round
                     )

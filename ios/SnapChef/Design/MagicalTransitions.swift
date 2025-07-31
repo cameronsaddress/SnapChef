@@ -54,7 +54,7 @@ struct LiquidMask: View {
 struct ParticleExplosion: ViewModifier {
     @Binding var trigger: Bool
     
-    @State private var particles: [ExplosionParticle] = []
+    @State private var particles: [TransitionExplosionParticle] = []
     
     func body(content: Content) -> some View {
         content
@@ -95,7 +95,7 @@ struct ParticleExplosion: ViewModifier {
         ]
         
         particles = (0..<50).map { _ in
-            ExplosionParticle(
+            TransitionExplosionParticle(
                 position: CGPoint(
                     x: UIScreen.main.bounds.width / 2,
                     y: UIScreen.main.bounds.height / 2
@@ -134,7 +134,7 @@ struct ParticleExplosion: ViewModifier {
     }
 }
 
-struct ExplosionParticle {
+struct TransitionExplosionParticle {
     var position: CGPoint
     var velocity: CGVector
     var size: CGFloat

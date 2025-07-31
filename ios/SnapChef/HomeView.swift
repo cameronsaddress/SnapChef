@@ -81,6 +81,10 @@ struct HomeView: View {
                         )
                         .padding(.horizontal, 30)
                         
+                        // Celebrity Kitchens Carousel
+                        InfluencerCarousel()
+                            .padding(.top, 10)
+                        
                         // Viral Section
                         ViralChallengeSection()
                         

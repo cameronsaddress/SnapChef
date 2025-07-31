@@ -396,17 +396,6 @@ struct ExplosionEffectView: View {
                 let scale = 1.0 + CGFloat(i) * 0.5
                 let opacity = particle.opacity / CGFloat(i + 1)
                 
-                let gradient = RadialGradient(
-                    colors: [
-                        particle.color.opacity(opacity),
-                        particle.color.opacity(opacity * 0.3),
-                        Color.clear
-                    ],
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: particle.size * scale
-                )
-                
                 let rect = CGRect(
                     x: -particle.size * scale / 2,
                     y: -particle.size * scale / 2,
@@ -414,7 +403,16 @@ struct ExplosionEffectView: View {
                     height: particle.size * scale
                 )
                 
-                context.fill(Circle().path(in: rect), with: .radialGradient(gradient))
+                context.fill(Circle().path(in: rect), with: .radialGradient(
+                    Gradient(colors: [
+                        particle.color.opacity(opacity),
+                        particle.color.opacity(opacity * 0.3),
+                        Color.clear
+                    ]),
+                    center: CGPoint(x: rect.midX, y: rect.midY),
+                    startRadius: 0,
+                    endRadius: particle.size * scale
+                ))
             }
         } else {
             // Regular particle
@@ -433,8 +431,8 @@ struct ExplosionEffectView: View {
                     let angle = (Double(i) / Double(points)) * 2 * .pi
                     let radius = particle.size / 2 * CGFloat.random(in: 0.7...1.0)
                     let point = CGPoint(
-                        x: cos(angle) * radius,
-                        y: sin(angle) * radius
+                        x: CGFloat(cos(angle)) * radius,
+                        y: CGFloat(sin(angle)) * radius
                     )
                     if i == 0 {
                         path.move(to: point)

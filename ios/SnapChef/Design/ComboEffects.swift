@@ -205,17 +205,6 @@ struct ParticleVortex: View {
                 let x = center.x + cos(particle.angle + rotation) * particle.radius
                 let y = center.y + sin(particle.angle + rotation) * particle.radius * 0.5 - particle.height
                 
-                let gradient = RadialGradient(
-                    colors: [
-                        particle.color,
-                        particle.color.opacity(0.5),
-                        Color.clear
-                    ],
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: particle.size
-                )
-                
                 let rect = CGRect(
                     x: x - particle.size / 2,
                     y: y - particle.size / 2,
@@ -224,7 +213,16 @@ struct ParticleVortex: View {
                 )
                 
                 context.opacity = 1.0 - (particle.height / 200)
-                context.fill(Ellipse().path(in: rect), with: .radialGradient(gradient))
+                context.fill(Ellipse().path(in: rect), with: .radialGradient(
+                    Gradient(colors: [
+                        particle.color,
+                        particle.color.opacity(0.5),
+                        Color.clear
+                    ]),
+                    center: CGPoint(x: rect.midX, y: rect.midY),
+                    startRadius: 0,
+                    endRadius: particle.size
+                ))
             }
         }
         .onAppear {
@@ -352,8 +350,8 @@ class ComboEffectManager: ObservableObject {
                     y: position.y
                 ),
                 velocity: CGVector(
-                    dx: cos(angle) * speed,
-                    dy: sin(angle) * speed
+                    dx: CGFloat(cos(angle)) * speed,
+                    dy: CGFloat(sin(angle)) * speed
                 ),
                 color: .white,
                 temperature: 1.0,
@@ -375,8 +373,8 @@ class ComboEffectManager: ObservableObject {
             
             let particle = RainbowTrailParticle(
                 position: CGPoint(
-                    x: position.x + cos(angle) * radius,
-                    y: position.y + sin(angle) * radius
+                    x: position.x + CGFloat(cos(angle)) * radius,
+                    y: position.y + CGFloat(sin(angle)) * radius
                 ),
                 hue: Double(i) / Double(particleCount),
                 size: CGFloat.random(in: 6...12),
@@ -453,17 +451,6 @@ struct ComboEffectView: View {
             let scale = 1.0 + CGFloat(i) * 0.5
             let opacity = particle.opacity / CGFloat(i + 1)
             
-            let gradient = RadialGradient(
-                colors: [
-                    particle.fireColor.opacity(opacity),
-                    particle.fireColor.opacity(opacity * 0.5),
-                    Color.clear
-                ],
-                center: .center,
-                startRadius: 0,
-                endRadius: particle.size * scale
-            )
-            
             let rect = CGRect(
                 x: particle.position.x - particle.size * scale / 2,
                 y: particle.position.y - particle.size * scale / 2,
@@ -471,23 +458,21 @@ struct ComboEffectView: View {
                 height: particle.size * scale
             )
             
-            context.fill(Ellipse().path(in: rect), with: .radialGradient(gradient))
+            context.fill(Ellipse().path(in: rect), with: .radialGradient(
+                Gradient(colors: [
+                    particle.fireColor.opacity(opacity),
+                    particle.fireColor.opacity(opacity * 0.5),
+                    Color.clear
+                ]),
+                center: CGPoint(x: rect.midX, y: rect.midY),
+                startRadius: 0,
+                endRadius: particle.size * scale
+            ))
         }
     }
     
     private func drawRainbowParticle(_ particle: RainbowTrailParticle, in context: inout GraphicsContext) {
         context.opacity = particle.opacity
-        
-        let gradient = RadialGradient(
-            colors: [
-                particle.color,
-                particle.color.opacity(0.5),
-                Color.clear
-            ],
-            center: .center,
-            startRadius: 0,
-            endRadius: particle.size
-        )
         
         let rect = CGRect(
             x: particle.position.x - particle.size / 2,
@@ -496,7 +481,16 @@ struct ComboEffectView: View {
             height: particle.size
         )
         
-        context.fill(Circle().path(in: rect), with: .radialGradient(gradient))
+        context.fill(Circle().path(in: rect), with: .radialGradient(
+            Gradient(colors: [
+                particle.color,
+                particle.color.opacity(0.5),
+                Color.clear
+            ]),
+            center: CGPoint(x: rect.midX, y: rect.midY),
+            startRadius: 0,
+            endRadius: particle.size
+        ))
     }
 }
 
