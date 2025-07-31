@@ -10,6 +10,16 @@
 
 ## Common Tasks
 
+### 🏗️ Multi-Repository Setup
+```bash
+# Clone iOS app
+git clone https://github.com/cameronsaddress/snapchef.git
+cd snapchef/ios
+
+# Clone server (separate repository)
+git clone https://github.com/cameronsaddress/snapchef-server.git
+```
+
 ### 🚀 Run the App
 ```bash
 # Open in Xcode
@@ -79,6 +89,11 @@ Features/Gamification/Models/Quest.swift # Challenge models
 let baseURL = "https://snapchef-server.onrender.com"
 let analyzeEndpoint = "/analyze_fridge_image"
 ```
+
+### Server Repository
+- **Source Code**: https://github.com/cameronsaddress/snapchef-server
+- **Main Files**: `main.py`, `prompt.py`
+- **Deployment**: Render.com
 
 ### Request Headers
 ```swift
@@ -289,7 +304,27 @@ if let image = renderer.uiImage {
 }
 ```
 
+## Repository Structure
+
+### iOS App (This Repository)
+```
+/Users/cameronanderson/SnapChef/snapchef/ios/
+├── SnapChef.xcodeproj
+├── SnapChef/
+├── README.md
+└── Documentation files
+```
+
+### FastAPI Server (Separate Repository)
+```
+/Users/cameronanderson/snapchef-server/snapchef-server/
+├── main.py           # API endpoints
+├── prompt.py         # AI prompts
+├── requirements.txt  # Python dependencies
+└── dockerfile        # Deployment config
+```
+
 ---
 
 Last Updated: January 31, 2025
-Quick Reference v1.0
+Quick Reference v1.1

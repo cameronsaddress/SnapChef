@@ -18,7 +18,15 @@ SnapChef is a magical iOS app that transforms photos of your fridge and pantry i
 - **Architecture**: SwiftUI + MVVM
 - **Backend**: FastAPI server with Grok Vision API integration
 
-## 🏗️ Project Structure
+## 🏗️ Multi-Repository Structure
+
+SnapChef is split into two repositories:
+- **iOS App**: https://github.com/cameronsaddress/snapchef (this repo)
+- **FastAPI Server**: https://github.com/cameronsaddress/snapchef-server
+
+See [WORKSPACE_STRUCTURE.md](WORKSPACE_STRUCTURE.md) for detailed multi-repo workflow.
+
+## 📱 iOS Project Structure
 
 ```
 SnapChef/
@@ -118,6 +126,7 @@ SnapChef/
 - Twitter/X sharing
 - Custom recipe cards with branding
 - Print-friendly layouts
+- Share for credits system
 
 ### 6. **User Features**
 - Profile management
@@ -157,6 +166,7 @@ MainTabView
 - **Base URL**: https://snapchef-server.onrender.com
 - **Authentication**: X-App-API-Key header
 - **Main Endpoint**: `/analyze_fridge_image`
+- **Server Repository**: https://github.com/cameronsaddress/snapchef-server
 
 ### Request Format
 ```swift
@@ -235,7 +245,7 @@ Optional:
 
 ### Build & Run
 ```bash
-# Clone the repository
+# Clone the iOS repository
 git clone https://github.com/cameronsaddress/snapchef.git
 
 # Navigate to iOS directory
@@ -245,6 +255,14 @@ cd snapchef/ios
 open SnapChef.xcodeproj
 
 # Build and run (Cmd+R)
+```
+
+### Working with Server Code
+```bash
+# Clone the server repository (separate)
+git clone https://github.com/cameronsaddress/snapchef-server.git
+
+# See server repository README for setup instructions
 ```
 
 ### Environment Variables
@@ -273,12 +291,15 @@ The app requests:
 - **Recipe Results**: Cleaner layout with better text positioning
 - **Share Generator**: Simplified workflow with one-click photo capture
 - **Performance**: Optimized animations for smoother 60fps experience
+- **AI Processing View**: Moved scanning circle to top with larger text
 
-### Documentation
+### Documentation & Structure
 - Added comprehensive architecture documentation
 - Created detailed component reference guide
 - Updated developer quick reference
 - Enhanced inline code comments
+- **NEW**: Separated server code into dedicated repository
+- **NEW**: Added multi-repository workspace documentation
 
 ## 👥 Contributing
 

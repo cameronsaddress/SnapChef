@@ -4,6 +4,8 @@
 
 SnapChef uses a FastAPI backend hosted on Render that integrates with the Grok Vision API for intelligent recipe generation from food photos.
 
+**Server Repository**: The FastAPI server code is maintained separately at https://github.com/cameronsaddress/snapchef-server
+
 ## Base Configuration
 
 ### Server Details
@@ -11,6 +13,7 @@ SnapChef uses a FastAPI backend hosted on Render that integrates with the Grok V
 - **Development URL**: `https://api-dev.snapchef.app`
 - **API Version**: v1
 - **Protocol**: HTTPS only
+- **Source Code**: https://github.com/cameronsaddress/snapchef-server
 
 ### Authentication
 All API requests require authentication via API key:
@@ -312,6 +315,7 @@ private func createMultipartFormData(
 ### Test Endpoints
 - Development server: `https://api-dev.snapchef.app`
 - Use test API key for development
+- Server deployment via Render (see server repository for details)
 
 ### Mock Responses
 The iOS app includes `MockDataProvider` for offline testing and UI development.
@@ -337,3 +341,10 @@ The iOS app includes `MockDataProvider` for offline testing and UI development.
 - Average response time: < 3 seconds
 - Image upload time: < 5 seconds
 - Success rate target: > 95%
+
+## Server Implementation Details
+
+For server-side implementation, deployment, and API endpoint code, see:
+- **Repository**: https://github.com/cameronsaddress/snapchef-server
+- **Main Files**: `main.py`, `prompt.py`
+- **Deployment**: Render.com with environment variables

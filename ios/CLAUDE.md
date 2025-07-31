@@ -10,11 +10,14 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 - Updated recipe results view with better text layout
 - Improved share generator with simplified workflow
 - Comprehensive documentation added
+- Separated server code into dedicated repository
+- Removed server-main.py and server-prompt.py from iOS repo
 
 ### Documentation
 - **APP_ARCHITECTURE_DOCUMENTATION.md** - Complete system overview
 - **COMPONENT_REFERENCE.md** - Detailed component guide
 - **PROJECT_BRIEF.md** - Original project specifications
+- **WORKSPACE_STRUCTURE.md** - Multi-repository workflow guide
 
 ## Key Commands
 
@@ -205,11 +208,28 @@ struct RecipeAPI {
 - Calorie container widened with minWidth: 40
 
 ### Share Generator
-- Changed from infinite spin to single 15° rotation
+- Changed from infinite spin to single 30° rotation
 - Made after photo area clickable
 - Added "Take your after photo" button with status indicator
 - Removed challenge text editor section
-- Moved "Share for Credits" below style selector
+- Removed style selector, uses random style
 
-## Server Repository
-The FastAPI backend code is located at: https://github.com/cameronsaddress/snapchef-server
+### AI Processing View
+- Moved scanning circle to top with 60px spacing
+- Increased text size from 22px to 44px for better visibility
+
+## Multi-Repository Structure
+
+### iOS App (This Repository)
+- **Location**: `/Users/cameronanderson/SnapChef/snapchef/ios/`
+- **GitHub**: https://github.com/cameronsaddress/snapchef
+- **Purpose**: iOS mobile application
+
+### FastAPI Server (Separate Repository)
+- **Location**: `/Users/cameronanderson/snapchef-server/snapchef-server/`
+- **GitHub**: https://github.com/cameronsaddress/snapchef-server
+- **Purpose**: Backend API server
+- **Files**: `main.py`, `prompt.py`, `requirements.txt`
+
+### Working with Multiple Repositories
+See [WORKSPACE_STRUCTURE.md](WORKSPACE_STRUCTURE.md) for detailed instructions on managing both repositories.
