@@ -9,7 +9,7 @@ struct ShareGeneratorView: View {
     @State private var isGenerating = false
     @State private var shareSheet = false
     @State private var showingCamera = false
-    @State private var selectedStyle: ShareStyle = .homeCook
+    @State private var selectedStyle: ShareStyle = ShareStyle.allCases.randomElement() ?? .homeCook
     @State private var animationPhase = 0.0
     
     enum ShareStyle: String, CaseIterable {
@@ -57,49 +57,22 @@ struct ShareGeneratorView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
                         
-                        // Style Selector
-                        StyleSelectorView(selectedStyle: $selectedStyle)
-                            .padding(.horizontal, 20)
+                        // Take After Photo Button - styled like MagneticButton
+                        MagneticButton(
+                            title: afterPhoto != nil ? "Update after photo ✓" : "Take your after photo",
+                            icon: "camera.fill",
+                            action: {
+                                showingCamera = true
+                            }
+                        )
+                        .padding(.horizontal, 20)
                         
-                        // Action Button - moved below style selector
+                        // Share for Credits Button
                         MagneticButton(
                             title: "Share for Credits",
                             icon: "sparkles",
                             action: generateShareImage
                         )
-                        .padding(.horizontal, 20)
-                        
-                        // Take After Photo Button
-                        Button(action: {
-                            showingCamera = true
-                        }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 16, weight: .semibold))
-                                
-                                Text("Take your after photo")
-                                    .font(.system(size: 16, weight: .semibold))
-                                
-                                Spacer()
-                                
-                                if afterPhoto != nil {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(Color(hex: "#43e97b"))
-                                }
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color.white.opacity(0.1))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                                    )
-                            )
-                        }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 40)
                     }
@@ -129,8 +102,9 @@ struct ShareGeneratorView: View {
         }
         */
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.5)) {
-                animationPhase = 0.0417 // 15 degrees / 360 degrees = 0.0417
+            // Fast spin that slows down to 30 degrees
+            withAnimation(.easeOut(duration: 1.0)) {
+                animationPhase = 0.0833 // 30 degrees / 360 degrees = 0.0833
             }
         }
     }

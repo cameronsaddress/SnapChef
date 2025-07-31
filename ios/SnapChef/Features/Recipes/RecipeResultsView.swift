@@ -212,7 +212,7 @@ struct MagicalRecipeCard: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 16) {
+                        HStack(spacing: 8) {
                             TimeIndicator(minutes: recipe.prepTime + recipe.cookTime)
                             CalorieIndicator(calories: recipe.nutrition.calories)
                         }
@@ -271,14 +271,15 @@ struct TimeIndicator: View {
     let minutes: Int
     
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             Image(systemName: "clock")
                 .font(.system(size: 14, weight: .semibold))
             Text("\(minutes)m")
                 .font(.system(size: 14, weight: .semibold))
+                .fixedSize() // Prevent text wrapping
         }
         .foregroundColor(Color(hex: "#4facfe"))
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
             Capsule()

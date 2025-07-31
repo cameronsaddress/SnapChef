@@ -11,8 +11,11 @@ struct AIProcessingView: View {
             Color.black.opacity(0.85)
                 .ignoresSafeArea()
             
-            VStack(spacing: 40) {
-                // Animated AI Icon
+            VStack(spacing: 50) {
+                Spacer()
+                    .frame(height: 60)
+                
+                // Animated AI Icon at top
                 ZStack {
                     // Glow effect
                     Circle()
@@ -69,23 +72,25 @@ struct AIProcessingView: View {
                         .scaleEffect(sparkleScale)
                 }
                 
-                // Text content
-                VStack(spacing: 20) {
+                // Text content with doubled size
+                VStack(spacing: 30) {
                     Text("Our awesome AI is now scanning for all food items, quantity, and freshness.")
-                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                        .font(.system(size: 44, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
                         .opacity(textOpacity)
-                        .lineSpacing(4)
+                        .lineSpacing(8)
                     
                     Text("While he cooks, here's a fun game on us!")
-                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                        .font(.system(size: 44, weight: .semibold, design: .rounded))
                         .foregroundColor(Color(hex: "#f093fb"))
-                        .padding(.top, 10)
+                        .padding(.top, 20)
                         .opacity(textOpacity)
                         .animation(.easeInOut(duration: 0.5).delay(0.6), value: textOpacity)
                 }
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
+                
+                Spacer()
             }
         }
         .onAppear {
