@@ -342,7 +342,7 @@ struct GamificationStatsView: View {
             
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                 AnimatedStatCard(
-                    title: "Recipes Made",
+                    title: "Your Recipes",
                     value: animateValues ? appState.allRecipes.count : 0,
                     icon: "sparkles",
                     color: Color(hex: "#667eea"),
@@ -351,7 +351,7 @@ struct GamificationStatsView: View {
                 
                 AnimatedStatCard(
                     title: "Snaps Taken",
-                    value: animateValues ? (3 - deviceManager.freeUsesRemaining) : 0,
+                    value: animateValues ? appState.totalSnapsTaken : 0,
                     icon: "camera.fill",
                     color: Color(hex: "#f093fb"),
                     suffix: ""
@@ -359,7 +359,7 @@ struct GamificationStatsView: View {
                 
                 AnimatedStatCard(
                     title: "Favorites",
-                    value: animateValues ? appState.savedRecipes.count : 0,
+                    value: animateValues ? appState.favoritedRecipeIds.count : 0,
                     icon: "heart.fill",
                     color: Color(hex: "#4facfe"),
                     suffix: ""
@@ -612,21 +612,23 @@ struct EnhancedSubscriptionCard: View {
                         UnlimitedBenefits()
                     } else {
                         UpgradePrompt()
-                            .overlay(
-                                LinearGradient(
-                                    colors: [
-                                        Color.clear,
-                                        Color.white.opacity(0.4),
-                                        Color.clear
-                                    ],
-                                    startPoint: UnitPoint(x: shimmerPhase - 0.3, y: 0),
-                                    endPoint: UnitPoint(x: shimmerPhase + 0.3, y: 1)
-                                )
-                                .allowsHitTesting(false)
-                            )
                     }
                 }
                 .padding(24)
+                .overlay(
+                    tier != .premium ? 
+                    LinearGradient(
+                        colors: [
+                            Color.clear,
+                            Color.white.opacity(0.4),
+                            Color.clear
+                        ],
+                        startPoint: UnitPoint(x: shimmerPhase - 0.3, y: 0),
+                        endPoint: UnitPoint(x: shimmerPhase + 0.3, y: 1)
+                    )
+                    .allowsHitTesting(false)
+                    : nil
+                )
             }, glowColor: tier == .premium ? Color(hex: "#43e97b") : Color(hex: "#f093fb"))
         }
         .buttonStyle(PlainButtonStyle())

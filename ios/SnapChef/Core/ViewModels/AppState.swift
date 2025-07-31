@@ -12,14 +12,18 @@ class AppState: ObservableObject {
     @Published var allRecipes: [Recipe] = []
     @Published var savedRecipes: [Recipe] = []
     @Published var savedRecipesWithPhotos: [SavedRecipe] = []
+    @Published var favoritedRecipeIds: Set<UUID> = []
     @Published var totalLikes: Int = 0
     @Published var totalShares: Int = 0
+    @Published var totalSnapsTaken: Int = 0
     @Published var userJoinDate: Date = Date()
     
     private let userDefaults = UserDefaults.standard
     private let firstLaunchKey = "hasLaunchedBefore"
     private let userJoinDateKey = "userJoinDate"
     private let savedRecipesKey = "savedRecipesWithPhotos"
+    private let favoritedRecipesKey = "favoritedRecipeIds"
+    private let totalSnapsTakenKey = "totalSnapsTaken"
     
     init() {
         self.isFirstLaunch = !userDefaults.bool(forKey: firstLaunchKey)
@@ -33,6 +37,15 @@ class AppState: ObservableObject {
         
         // Load saved recipes
         loadSavedRecipes()
+        
+        // Load favorited recipe IDs
+        if let favoritedData = userDefaults.data(forKey: favoritedRecipesKey),
+           let favoritedIds = try? JSONDecoder().decode(Set<UUID>.self, from: favoritedData) {
+            self.favoritedRecipeIds = favoritedIds
+        }
+        
+        // Load total snaps taken
+        self.totalSnapsTaken = userDefaults.integer(forKey: totalSnapsTakenKey)
     }
     
     func completeOnboarding() {
@@ -70,8 +83,30 @@ class AppState: ObservableObject {
         totalLikes += 1
     }
     
+    func incrementSnapsTaken() {
+        totalSnapsTaken += 1
+        userDefaults.set(totalSnapsTaken, forKey: totalSnapsTakenKey)
+    }
+    
     func clearError() {
         error = nil
+    }
+    
+    func toggleFavorite(_ recipeId: UUID) {
+        if favoritedRecipeIds.contains(recipeId) {
+            favoritedRecipeIds.remove(recipeId)
+        } else {
+            favoritedRecipeIds.insert(recipeId)
+        }
+        
+        // Save to UserDefaults
+        if let encoded = try? JSONEncoder().encode(favoritedRecipeIds) {
+            userDefaults.set(encoded, forKey: favoritedRecipesKey)
+        }
+    }
+    
+    func isFavorited(_ recipeId: UUID) -> Bool {
+        return favoritedRecipeIds.contains(recipeId)
     }
     
     func saveRecipeWithPhotos(_ recipe: Recipe, beforePhoto: UIImage?, afterPhoto: UIImage?) {

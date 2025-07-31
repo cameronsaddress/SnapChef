@@ -341,6 +341,7 @@ struct CategoryPill: View {
 struct FeaturedRecipeCard: View {
     let recipe: Recipe
     @State private var isAnimating = false
+    @State private var showDetail = false
     
     var body: some View {
         GlassmorphicCard(content: {
@@ -424,7 +425,9 @@ struct FeaturedRecipeCard: View {
                 MagneticButton(
                     title: "Cook This Now",
                     icon: "arrow.right",
-                    action: {}
+                    action: {
+                        showDetail = true
+                    }
                 )
             }
             .padding(24)
@@ -433,6 +436,9 @@ struct FeaturedRecipeCard: View {
             withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
                 isAnimating = true
             }
+        }
+        .sheet(isPresented: $showDetail) {
+            RecipeDetailView(recipe: recipe)
         }
     }
 }
@@ -494,13 +500,30 @@ struct RecipeGridCard: View {
                         Text(recipe.difficulty.emoji)
                             .font(.system(size: 40))
                         
-                        // Difficulty badge
+                        // Difficulty badge and favorite button
                         VStack {
                             HStack {
+                                // Favorite button
+                                Button(action: {
+                                    appState.toggleFavorite(recipe.id)
+                                    let generator = UIImpactFeedbackGenerator(style: .light)
+                                    generator.impactOccurred()
+                                }) {
+                                    Image(systemName: appState.isFavorited(recipe.id) ? "heart.fill" : "heart")
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundColor(appState.isFavorited(recipe.id) ? Color(hex: "#ff6b6b") : .white)
+                                        .padding(8)
+                                        .background(
+                                            Circle()
+                                                .fill(Color.black.opacity(0.3))
+                                        )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                
                                 Spacer()
                                 DifficultyBadge(difficulty: recipe.difficulty)
-                                    .padding(8)
                             }
+                            .padding(8)
                             Spacer()
                         }
                     }

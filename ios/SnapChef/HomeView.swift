@@ -181,41 +181,50 @@ struct HeroLogoView: View {
                 // Glow effect behind text
                 Text("SNAPCHEF")
                     .font(.system(size: 60, weight: .black, design: .rounded))
-                    .foregroundColor(Color(hex: "#667eea"))
+                    .foregroundColor(.white)
                     .blur(radius: 20)
-                    .opacity(0.6)
+                    .opacity(0.3)
                 
                 // Main text with individual letter animations
                 HStack(spacing: 2) {
                     ForEach(0..<letters.count, id: \.self) { index in
-                        Text(letters[index])
-                            .font(.system(size: 60, weight: .black, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#667eea"),
-                                        Color(hex: "#764ba2")
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .opacity(letterOpacities[index])
-                            .scaleEffect(letterScales[index])
-                            .animation(
-                                .spring(
-                                    response: 0.4,
-                                    dampingFraction: 0.7,
-                                    blendDuration: 0
-                                ).delay(Double(index) * 0.08),
-                                value: letterOpacities[index]
-                            )
+                        if index == 7 { // Letter "F"
+                            ZStack(alignment: .top) {
+                                Text(letters[index])
+                                    .font(.system(size: 60, weight: .black, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .opacity(letterOpacities[index])
+                                    .scaleEffect(letterScales[index])
+                                
+                                // Chef hat on F
+                                Text("👨‍🍳")
+                                    .font(.system(size: 30))
+                                    .offset(x: 8, y: -20)
+                                    .rotationEffect(.degrees(15))
+                                    .opacity(letterOpacities[index])
+                                    .scaleEffect(letterScales[index])
+                            }
+                        } else {
+                            Text(letters[index])
+                                .font(.system(size: 60, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
+                                .opacity(letterOpacities[index])
+                                .scaleEffect(letterScales[index])
+                        }
                     }
+                    .animation(
+                        .spring(
+                            response: 0.4,
+                            dampingFraction: 0.7,
+                            blendDuration: 0
+                        ).delay(Double(0) * 0.08),
+                        value: letterOpacities[0]
+                    )
                 }
                 
             }
             
-            Text("AI-powered recipes from what you already have")
+            Text("AI-powered recipes\nfrom what you already have")
                 .font(.system(size: 18, weight: .medium, design: .rounded))
                 .foregroundColor(.white.opacity(0.9))
                 .multilineTextAlignment(.center)

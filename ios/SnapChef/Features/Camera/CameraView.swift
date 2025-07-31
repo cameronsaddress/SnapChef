@@ -322,6 +322,9 @@ struct CameraView: View {
                         self.generatedRecipes = recipes
                         self.detectedIngredients = apiResponse.data.ingredients
                         
+                        // Increment snaps taken counter
+                        self.appState.incrementSnapsTaken()
+                        
                         // Preload the data on a background queue
                         DispatchQueue.global(qos: .userInitiated).async {
                             // Save recipes to app state with the captured photo
@@ -372,6 +375,9 @@ struct CameraView: View {
             print("Failed to load test fridge image")
             return
         }
+        
+        // Increment snap counter for test button too
+        appState.incrementSnapsTaken()
         
         // Process it the same way as a captured photo
         processImage(testImage)
