@@ -277,9 +277,11 @@ struct EmojiFlickGameOverlay: View {
             }
         }
         .onAppear {
-            // Animate progress bar over 60 seconds
-            withAnimation(.linear(duration: 60)) {
-                progress = 1.0
+            // Start progress animation immediately
+            DispatchQueue.main.async {
+                withAnimation(.linear(duration: 60)) {
+                    progress = 1.0
+                }
             }
         }
     }

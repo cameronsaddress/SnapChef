@@ -1059,24 +1059,28 @@ struct ComboIndicator: View {
     }
     
     var body: some View {
-        VStack(spacing: 4) {
-            Text("\(combo)")
-                .font(.system(size: 48, weight: .black, design: .rounded))
-                .foregroundColor(.white)
-            
-            Text("×\(multiplier)")
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundColor(comboColor)
-        }
-        .padding(16)
-        .background(
+        ZStack {
+            // Background circle
             Circle()
                 .fill(.ultraThinMaterial)
                 .overlay(
                     Circle()
                         .stroke(comboColor, lineWidth: 3)
                 )
-        )
+                .frame(width: 80, height: 80)
+            
+            // Combo number in the center
+            Text("\(combo)")
+                .font(.system(size: 48, weight: .black, design: .rounded))
+                .foregroundColor(.white)
+                .offset(y: 0) // Center of circle
+            
+            // Multiplier below the circle
+            Text("×\(multiplier)")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundColor(comboColor)
+                .offset(y: 55) // Below the circle
+        }
         .scaleEffect(scale)
         .rotationEffect(.degrees(rotation))
         .shadow(color: comboColor.opacity(0.6), radius: 20)

@@ -545,10 +545,10 @@ struct FridgeInventoryCard: View {
         GlassmorphicCard(content: {
             VStack(spacing: 20) {
                 // Title at top
-                Text("Here's what is\nin your fridge")
+                Text("Here's what's in your fridge")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
