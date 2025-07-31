@@ -35,6 +35,19 @@ struct CameraView: View {
     @State private var showSuccess = false
     @State private var successMessage = ""
     
+    var flashIcon: String {
+        switch cameraModel.flashMode {
+        case .off:
+            return "bolt.slash.fill"
+        case .on:
+            return "bolt.fill"
+        case .auto:
+            return "bolt.badge.automatic.fill"
+        @unknown default:
+            return "bolt.slash.fill"
+        }
+    }
+    
     var body: some View {
         ZStack {
             // Camera preview (bottom layer)
@@ -389,18 +402,6 @@ struct CameraTopBar: View {
             AIAssistantIndicator()
             
             Spacer()
-            
-            // Settings
-            Button(action: {}) {
-                ZStack {
-                    BlurredCircle()
-                    
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-                .frame(width: 44, height: 44)
-            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 60)
@@ -600,8 +601,8 @@ struct CameraControlsEnhanced: View {
             // Bottom controls
             HStack(spacing: 40) {
                 // Flash
-                Button(action: {}) {
-                    Image(systemName: "bolt.slash.fill")
+                Button(action: { cameraModel.toggleFlash() }) {
+                    Image(systemName: flashIcon)
                         .font(.system(size: 24, weight: .medium))
                         .foregroundColor(.white)
                         .frame(width: 50, height: 50)
@@ -612,18 +613,6 @@ struct CameraControlsEnhanced: View {
                 }
                 
                 Spacer()
-                
-                // Switch camera
-                Button(action: { cameraModel.flipCamera() }) {
-                    Image(systemName: "camera.rotate")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(.white)
-                        .frame(width: 50, height: 50)
-                        .background(
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                        )
-                }
             }
             .padding(.horizontal, 50)
         }

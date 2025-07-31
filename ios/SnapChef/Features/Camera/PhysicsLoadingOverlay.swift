@@ -250,10 +250,23 @@ struct EmojiFlickGameOverlay: View {
 // MARK: - Integration with MagicalProcessingOverlay
 struct MagicalProcessingOverlay: View {
     @State private var useGameMode = true
+    @State private var showAIProcessingView = true
     
     var body: some View {
         if useGameMode {
-            EmojiFlickGameOverlay()
+            if showAIProcessingView {
+                AIProcessingView()
+                    .onAppear {
+                        // Hide AI processing view after 4 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                            withAnimation(.easeOut(duration: 0.5)) {
+                                showAIProcessingView = false
+                            }
+                        }
+                    }
+            } else {
+                EmojiFlickGameOverlay()
+            }
         } else {
             PhysicsLoadingOverlay()
         }

@@ -11,6 +11,7 @@ class CameraModel: NSObject, ObservableObject {
     @Published var isCameraAuthorized = false
     @Published var currentPosition: AVCaptureDevice.Position = .back
     @Published var isSessionReady = false
+    @Published var flashMode: AVCaptureDevice.FlashMode = .off
     
     private var photoCompletion: ((UIImage) -> Void)?
     
@@ -164,6 +165,21 @@ class CameraModel: NSObject, ObservableObject {
         setupCamera()
     }
     
+    func toggleFlash() {
+        HapticManager.impact(.light)
+        
+        switch flashMode {
+        case .off:
+            flashMode = .on
+        case .on:
+            flashMode = .auto
+        case .auto:
+            flashMode = .off
+        @unknown default:
+            flashMode = .off
+        }
+    }
+    
     func capturePhoto(completion: @escaping (UIImage) -> Void) {
         guard isSessionReady else {
             print("Camera session not ready")
@@ -188,7 +204,9 @@ class CameraModel: NSObject, ObservableObject {
         }
         
         // Set flash mode
-        if output.supportedFlashModes.contains(.off) {
+        if output.supportedFlashModes.contains(flashMode) {
+            settings.flashMode = flashMode
+        } else {
             settings.flashMode = .off
         }
         

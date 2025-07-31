@@ -92,6 +92,7 @@ struct HomeView: View {
                         
                         // Viral Section
                         ViralChallengeSection()
+                            .padding(.vertical, 20)
                         
                         // Recent Recipes
                         if !appState.recentRecipes.isEmpty {

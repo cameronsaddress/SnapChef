@@ -627,7 +627,7 @@ struct EmojiFlickGame: View {
                 emoji.position.y >= targetMinY && emoji.position.y <= targetMaxY && !emoji.isFlicked
             }
             
-            guard readyEmojis.count >= 2 else { return }
+            guard readyEmojis.count >= 3 else { return }
             
             timer.invalidate()
             
@@ -679,8 +679,34 @@ struct EmojiFlickGame: View {
                 }
             }
             
+            // Flick third emoji
+            if readyEmojis.count >= 3 {
+                let thirdEmoji = readyEmojis[2]
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        self.tutorialFingerPosition = CGPoint(
+                            x: thirdEmoji.position.x - 50,
+                            y: thirdEmoji.position.y
+                        )
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            self.tutorialFingerPosition = CGPoint(
+                                x: thirdEmoji.position.x + 100,
+                                y: thirdEmoji.position.y - 50
+                            )
+                        }
+                        
+                        let velocity = CGVector(dx: 300, dy: -150)
+                        self.handleEmojiFlick(emoji: thirdEmoji, velocity: velocity, position: thirdEmoji.position)
+                    }
+                }
+            }
+            
             // Fade out tutorial
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.3) {
                 withAnimation(.easeOut(duration: 0.3)) {
                     self.tutorialOpacity = 0
                 }
