@@ -14,27 +14,28 @@ target = project.targets.first
 
 # Files to add with their group paths
 files_to_add = {
-  'Design/Components' => [
-    'Design/Components/MagicalBackground.swift',
-    'Design/Components/GlassmorphicComponents.swift',
-    'Design/Components/MorphingTabBar.swift',
-    'Design/Components/MagicalTransitions.swift'
+  'Core/Services' => [
+    'SnapChef/Core/Services/SubscriptionManager.swift',
+    'SnapChef/Core/Services/AnalyticsManager.swift'
   ],
-  'Features/Home' => [
-    'Features/Home/EnhancedHomeView.swift'
+  'Features/Authentication' => [
+    'SnapChef/Features/Authentication/PremiumUpgradePrompt.swift',
+    'SnapChef/Features/Authentication/SubscriptionView.swift'
   ],
-  'Features/Camera' => [
-    'Features/Camera/EnhancedCameraView.swift'
+  'Design' => [
+    'SnapChef/Design/SnapchefLogo.swift'
   ],
-  'Features/Recipes' => [
-    'Features/Recipes/EnhancedRecipesView.swift',
-    'Features/Recipes/EnhancedRecipeResultsView.swift'
-  ],
-  'Features/Profile' => [
-    'Features/Profile/EnhancedProfileView.swift'
-  ],
-  'Features/Share' => [
-    'Features/Share/EnhancedShareSheet.swift'
+  'Resources' => [
+    'SnapChef/Resources/fridge1.jpg',
+    'SnapChef/Resources/fridge2.jpg',
+    'SnapChef/Resources/fridge3.jpg',
+    'SnapChef/Resources/fridge4.jpg',
+    'SnapChef/Resources/fridge5.jpg',
+    'SnapChef/Resources/meal1.jpg',
+    'SnapChef/Resources/meal2.jpg',
+    'SnapChef/Resources/meal3.jpg',
+    'SnapChef/Resources/meal4.jpg',
+    'SnapChef/Resources/meal5.jpg'
   ]
 }
 
@@ -70,10 +71,14 @@ files_to_add.each do |group_path, files|
         # Add file reference
         file_ref = group.new_file(file_path)
         
-        # Add to target
-        target.source_build_phase.add_file_reference(file_ref)
-        
-        puts "Added: #{file_path}"
+        # Add to target - check if it's a resource or source file
+        if file_path.end_with?('.jpg', '.png', '.jpeg', '.gif', '.pdf', '.json')
+          target.resources_build_phase.add_file_reference(file_ref)
+          puts "Added to resources: #{file_path}"
+        else
+          target.source_build_phase.add_file_reference(file_ref)
+          puts "Added to sources: #{file_path}"
+        end
       else
         puts "Already exists: #{file_path}"
       end

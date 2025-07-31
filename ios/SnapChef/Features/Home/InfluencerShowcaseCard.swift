@@ -75,6 +75,7 @@ struct SparkleAnimationView: View {
 }
 
 struct BeforeAfterSliderView: View {
+    let influencer: InfluencerRecipe
     @State private var imageOffset: CGFloat = 0
     
     var body: some View {
@@ -83,46 +84,62 @@ struct BeforeAfterSliderView: View {
                 // Before image (left side)
                 HStack(spacing: 0) {
                     // Fridge photo
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay(
-                            VStack {
-                                Image(systemName: "refrigerator.fill")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.white.opacity(0.8))
-                                Text("BEFORE")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.7))
-                            }
-                        )
-                        .frame(width: geometry.size.width / 2)
+                    Group {
+                        if let uiImage = UIImage(named: influencer.beforeImageName) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                        }
+                    }
+                    .frame(width: geometry.size.width / 2, height: 200)
+                    .clipped()
+                    .overlay(
+                        VStack {
+                            Spacer()
+                            Text("BEFORE")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.6))
+                                )
+                                .padding(.bottom, 8)
+                        }
+                    )
                     
                     // After photo
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(hex: "#f093fb"), Color(hex: "#f5576c")],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay(
-                            VStack {
-                                Image(systemName: "fork.knife")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.white.opacity(0.8))
-                                Text("AFTER")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.7))
-                            }
-                        )
-                        .frame(width: geometry.size.width / 2)
+                    Group {
+                        if let uiImage = UIImage(named: influencer.afterImageName) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                        }
+                    }
+                    .frame(width: geometry.size.width / 2, height: 200)
+                    .clipped()
+                    .overlay(
+                        VStack {
+                            Spacer()
+                            Text("AFTER")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.6))
+                                )
+                                .padding(.bottom, 8)
+                        }
+                    )
                 }
                 
                 // Sliding divider
@@ -285,7 +302,7 @@ struct InfluencerShowcaseCard: View {
                 .padding(.bottom, 16)
             
             // Before/After showcase
-            BeforeAfterSliderView()
+            BeforeAfterSliderView(influencer: influencer)
             
             // Recipe name and stats
             RecipeStatsView(influencer: influencer, onTap: onTap)

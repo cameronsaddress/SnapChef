@@ -54,7 +54,7 @@ struct MainTabView: View {
                                 removal: .opacity.combined(with: .scale(scale: 1.02))
                             ))
                     case 1:
-                        CameraView()
+                        CameraView(selectedTab: $selectedTab)
                             .transition(.asymmetric(
                                 insertion: .opacity.combined(with: .scale(scale: 0.98)),
                                 removal: .opacity.combined(with: .scale(scale: 1.02))
@@ -77,18 +77,21 @@ struct MainTabView: View {
                 }
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
                 
-                // Custom morphing tab bar
-                VStack {
-                    Spacer()
-                    
-                    MorphingTabBar(selectedTab: $selectedTab)
-                        .padding(.horizontal, 30)
-                        .padding(.bottom, 30)
-                        .shadow(
-                            color: Color.black.opacity(0.2),
-                            radius: 20,
-                            y: 10
-                        )
+                // Custom morphing tab bar (hide when camera is selected)
+                if selectedTab != 1 {
+                    VStack {
+                        Spacer()
+                        
+                        MorphingTabBar(selectedTab: $selectedTab)
+                            .padding(.horizontal, 30)
+                            .padding(.bottom, 30)
+                            .shadow(
+                                color: Color.black.opacity(0.2),
+                                radius: 20,
+                                y: 10
+                            )
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .navigationBarHidden(true) // Hide the default navigation bar

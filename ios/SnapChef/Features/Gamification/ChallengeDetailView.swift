@@ -91,7 +91,6 @@ struct ChallengeDetailView: View {
 // MARK: - Challenge Icon View
 struct ChallengeIconView: View {
     let type: ChallengeType
-    @State private var rotationAngle = 0.0
     
     var body: some View {
         ZStack {
@@ -130,11 +129,6 @@ struct ChallengeIconView: View {
             Image(systemName: type.icon)
                 .font(.system(size: 50, weight: .medium))
                 .foregroundColor(.white)
-                .rotationEffect(.degrees(rotationAngle))
-                .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: rotationAngle)
-        }
-        .onAppear {
-            rotationAngle = 10
         }
     }
 }

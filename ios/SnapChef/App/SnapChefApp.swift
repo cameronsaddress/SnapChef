@@ -12,6 +12,7 @@ struct SnapChefApp: App {
                 .environmentObject(appState)
                 .environmentObject(authManager)
                 .environmentObject(deviceManager)
+                .preferredColorScheme(.dark) // Force dark mode
                 .onAppear {
                     setupApp()
                 }

@@ -7,6 +7,11 @@ struct CameraView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
     @Environment(\.dismiss) var dismiss
+    @Binding var selectedTab: Int
+    
+    init(selectedTab: Binding<Int>? = nil) {
+        self._selectedTab = selectedTab ?? .constant(0)
+    }
     
     @State private var isProcessing = false
     @State private var showingResults = false
@@ -76,12 +81,32 @@ struct CameraView: View {
             if !showingPreview {
                 VStack {
                     // Top bar
-                    CameraTopBar(dismiss: dismiss)
+                    CameraTopBar(onClose: { 
+                        // Try dismiss first (for modal presentation)
+                        dismiss()
+                        // Also set tab to 0 (for tab presentation)
+                        selectedTab = 0
+                    })
                     
                     Spacer()
                     
-                    // Bottom controls
-                    VStack(spacing: 16) {
+                    // Instructions
+                    CameraControlsEnhanced(
+                        cameraModel: cameraModel,
+                        capturePhoto: capturePhoto,
+                        isProcessing: isProcessing,
+                        captureAnimation: $captureAnimation
+                    )
+                    
+                    // Bottom controls with capture button and test button
+                    VStack(spacing: 20) {
+                        // Capture button
+                        CaptureButtonEnhanced(
+                            action: capturePhoto,
+                            isDisabled: isProcessing || !cameraModel.isSessionReady,
+                            triggerAnimation: $captureAnimation
+                        )
+                        
                         // TEMPORARY TEST BUTTON
                         Button(action: {
                             processTestImage()
@@ -106,14 +131,8 @@ struct CameraView: View {
                         }
                         .disabled(isProcessing)
                         .opacity(isProcessing ? 0.5 : 1)
-                        
-                        CameraControlsEnhanced(
-                            cameraModel: cameraModel,
-                            capturePhoto: capturePhoto,
-                            isProcessing: isProcessing,
-                            captureAnimation: $captureAnimation
-                        )
                     }
+                    .padding(.bottom, 50)
                 }
             }
             
@@ -240,6 +259,9 @@ struct CameraView: View {
                 }
             }
         )
+        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
     }
     
     private func startScanAnimation() {
@@ -283,7 +305,7 @@ struct CameraView: View {
                     isProcessing = false
                     premiumPromptReason = .dailyLimitReached
                     showPremiumPrompt = true
-                    cameraModel.restartSession()
+                    cameraModel.requestCameraPermission()
                     return
                 }
             }
@@ -402,12 +424,12 @@ struct CameraView: View {
 
 // MARK: - Camera Top Bar
 struct CameraTopBar: View {
-    let dismiss: DismissAction
+    let onClose: () -> Void
     
     var body: some View {
         HStack {
             // Close button
-            Button(action: { dismiss() }) {
+            Button(action: { onClose() }) {
                 ZStack {
                     BlurredCircle()
                     
@@ -594,64 +616,24 @@ struct CameraControlsEnhanced: View {
     let isProcessing: Bool
     @Binding var captureAnimation: Bool
     
-    var flashIcon: String {
-        switch cameraModel.flashMode {
-        case .off:
-            return "bolt.slash.fill"
-        case .on:
-            return "bolt.fill"
-        case .auto:
-            return "bolt.badge.automatic.fill"
-        @unknown default:
-            return "bolt.slash.fill"
-        }
-    }
-    
     var body: some View {
-        VStack(spacing: 30) {
-            // Instructions
-            if !isProcessing {
-                Text(cameraModel.isSessionReady ? "Point at your fridge or pantry" : "Initializing camera...")
-                    .font(.system(size: 20, weight: .medium, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 12)
-                    .background(
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                            )
-                    )
-            }
-            
-            // Capture button
-            CaptureButtonEnhanced(
-                action: capturePhoto,
-                isDisabled: isProcessing || !cameraModel.isSessionReady,
-                triggerAnimation: $captureAnimation
-            )
-            
-            // Bottom controls
-            HStack(spacing: 40) {
-                // Flash
-                Button(action: { cameraModel.toggleFlash() }) {
-                    Image(systemName: flashIcon)
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(.white)
-                        .frame(width: 50, height: 50)
-                        .background(
-                            Circle()
-                                .fill(.ultraThinMaterial)
+        // Instructions only
+        if !isProcessing {
+            Text(cameraModel.isSessionReady ? "Point at your fridge or pantry" : "Initializing camera...")
+                .font(.system(size: 20, weight: .medium, design: .rounded))
+                .foregroundColor(.white)
+                .padding(.horizontal, 40)
+                .padding(.vertical, 12)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
                         )
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal, 50)
+                )
+                .padding(.bottom, 30) // Add spacing below instructions
         }
-        .padding(.bottom, 50)
     }
 }
 

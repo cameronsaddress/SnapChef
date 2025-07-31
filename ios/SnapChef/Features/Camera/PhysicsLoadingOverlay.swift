@@ -10,16 +10,10 @@ struct PhysicsFallingEmoji: Identifiable {
     var scale: CGFloat = 1.0
 }
 
-// MARK: - Letter Bounds for Collision Detection
-struct LetterBounds {
-    let character: Character
-    let frame: CGRect
-}
 
 // MARK: - Physics Loading Overlay
 struct PhysicsLoadingOverlay: View {
     @State private var fallingEmojis: [PhysicsFallingEmoji] = []
-    @State private var letterBounds: [LetterBounds] = []
     @State private var messageIndex = 0
     @State private var textOpacity = 0.0
     @State private var textScale: CGFloat = 0.8
@@ -44,39 +38,10 @@ struct PhysicsLoadingOverlay: View {
                 VStack(spacing: 50) {
                     Spacer()
                     
-                    // SnapChef text in the center
-                    ZStack {
-                        // Glow effect behind text
-                        Text("SNAPCHEF")
-                            .font(.system(size: 48, weight: .black, design: .rounded))
-                            .foregroundColor(Color(hex: "#667eea"))
-                            .blur(radius: 20)
-                            .opacity(0.6)
-                        
-                        // Main text
-                        Text("SNAPCHEF")
-                            .font(.system(size: 48, weight: .black, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#667eea"),
-                                        Color(hex: "#764ba2")
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .scaleEffect(textScale)
-                            .opacity(textOpacity)
-                            .background(
-                                GeometryReader { textGeometry in
-                                    Color.clear
-                                        .onAppear {
-                                            calculateLetterBounds(textGeometry: textGeometry)
-                                        }
-                                }
-                            )
-                    }
+                    // SnapChef logo in the center
+                    SnapchefLogo()
+                        .scaleEffect(textScale)
+                        .opacity(textOpacity)
                     
                     // Animated loading message
                     Text(messages[messageIndex])
@@ -148,27 +113,6 @@ struct PhysicsLoadingOverlay: View {
         fallingEmojis.removeAll { $0.position.y > size.height + 100 }
     }
     
-    private func calculateLetterBounds(textGeometry: GeometryProxy) {
-        // Approximate letter positions for collision detection
-        let text = "SNAPCHEF"
-        let totalWidth = textGeometry.size.width
-        let letterWidth = totalWidth / CGFloat(text.count)
-        let startX = textGeometry.frame(in: .global).minX
-        let y = textGeometry.frame(in: .global).midY
-        
-        letterBounds = text.enumerated().map { index, character in
-            LetterBounds(
-                character: character,
-                frame: CGRect(
-                    x: startX + CGFloat(index) * letterWidth,
-                    y: y - 20,
-                    width: letterWidth,
-                    height: 40
-                )
-            )
-        }
-    }
-    
     private func updatePhysics(in size: CGSize) {
         for index in fallingEmojis.indices {
             // Apply gravity (increased for better falling effect)
@@ -181,30 +125,6 @@ struct PhysicsLoadingOverlay: View {
             // Update rotation (removed - emojis should fall straight)
             // fallingEmojis[index].rotation += Double(fallingEmojis[index].velocity.dx) * 2
             
-            // Check collision with letters
-            for letterBound in letterBounds {
-                if letterBound.frame.contains(fallingEmojis[index].position) {
-                    // Bounce off letter
-                    fallingEmojis[index].velocity.dy = -abs(fallingEmojis[index].velocity.dy) * 0.7
-                    fallingEmojis[index].velocity.dx += CGFloat.random(in: -3...3)
-                    
-                    // Add some visual feedback
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                        fallingEmojis[index].scale = 1.3
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        withAnimation {
-                            if index < fallingEmojis.count {
-                                fallingEmojis[index].scale = 1.0
-                            }
-                        }
-                    }
-                    
-                    // Haptic feedback
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                }
-            }
             
             // Bounce off walls
             if fallingEmojis[index].position.x < 20 || fallingEmojis[index].position.x > size.width - 20 {

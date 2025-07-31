@@ -62,17 +62,22 @@ class SubscriptionManager: ObservableObject {
         
         do {
             // Fetch products from App Store
+            print("Attempting to load products with IDs: \(productIDs)")
             products = try await Product.products(for: Set(productIDs))
             print("Loaded \(products.count) products")
+            for product in products {
+                print("Product loaded: \(product.id) - \(product.displayName) - \(product.displayPrice)")
+            }
         } catch {
             print("Failed to load products: \(error)")
+            print("Error details: \(error.localizedDescription)")
         }
         
         isLoading = false
     }
     
     // MARK: - Purchase
-    func purchase(_ product: Product) async throws -> Transaction? {
+    func purchase(_ product: Product) async throws -> StoreKit.Transaction? {
         // Attempt purchase
         let result = try await product.purchase()
         
@@ -118,16 +123,16 @@ class SubscriptionManager: ObservableObject {
     
     // MARK: - Update Subscription Status
     func updateSubscriptionStatus() async {
-        var highestStatus: Status?
+        var highestStatus: Product.SubscriptionInfo.Status?
         var highestProduct: Product?
         
         // Check all subscription statuses
         for product in products {
-            guard let status = await product.subscription?.status.first else { continue }
+            guard let status = try? await product.subscription?.status.first else { continue }
             
             switch status.state {
             case .subscribed, .inGracePeriod:
-                if highestStatus == nil || status.renewalInfo?.expirationDate ?? Date() > highestStatus?.renewalInfo?.expirationDate ?? Date() {
+                if highestStatus == nil {
                     highestStatus = status
                     highestProduct = product
                 }
@@ -142,7 +147,7 @@ class SubscriptionManager: ObservableObject {
             case .subscribed:
                 subscriptionStatus = .active(
                     product: product,
-                    expirationDate: status.renewalInfo?.expirationDate
+                    expirationDate: nil // Will be set from transaction
                 )
                 isPremium = true
                 
@@ -164,12 +169,16 @@ class SubscriptionManager: ObservableObject {
         }
         
         // Update purchased subscriptions
-        purchasedSubscriptions = products.filter { product in
-            Task {
-                await product.subscription?.status.contains { status in
-                    status.state == .subscribed || status.state == .inGracePeriod
-                } ?? false
-            }.value
+        purchasedSubscriptions = []
+        for product in products {
+            if let statuses = try? await product.subscription?.status {
+                for status in statuses {
+                    if status.state == .subscribed || status.state == .inGracePeriod {
+                        purchasedSubscriptions.append(product)
+                        break
+                    }
+                }
+            }
         }
         
         print("Subscription status updated: \(subscriptionStatus)")
@@ -179,7 +188,7 @@ class SubscriptionManager: ObservableObject {
     private func listenForTransactions() -> Task<Void, Error> {
         return Task.detached {
             // Listen for transactions
-            for await result in Transaction.updates {
+            for await result in StoreKit.Transaction.updates {
                 do {
                     let transaction = try await self.checkVerified(result)
                     
@@ -259,11 +268,9 @@ class SubscriptionManager: ObservableObject {
         guard let intro = product.subscription?.introductoryOffer else { return nil }
         
         switch intro.type {
-        case .freeTrial:
+        case .introductory:
             return "\(intro.period.value) \(intro.period.unit) free trial"
-        case .payAsYouGo:
-            return intro.displayPrice
-        case .payUpFront:
+        case .promotional:
             return intro.displayPrice
         default:
             return nil

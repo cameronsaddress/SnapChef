@@ -15,13 +15,9 @@ class EmojiAnimator: ObservableObject {
 }
 
 struct LaunchAnimationView: View {
-    @State private var letterOpacities: [Double] = Array(repeating: 0, count: 8)
-    @State private var letterScales: [CGFloat] = Array(repeating: 0.5, count: 8)
     @StateObject private var emojiAnimator = EmojiAnimator()
     @State private var animationComplete = false
-    @State private var letterBounds: [CGRect] = Array(repeating: .zero, count: 8)
     
-    let letters = ["S", "N", "A", "P", "C", "H", "E", "F"]
     let onAnimationComplete: () -> Void
     let gravity: Double = 600
     let bounceDamping: Double = 0.4
@@ -33,66 +29,22 @@ struct LaunchAnimationView: View {
             MagicalBackground()
                 .ignoresSafeArea()
             
-            // SNAPCHEF logo matching PhysicsLoadingOverlay style
-            ZStack {
-                // Glow effect behind text
-                Text("SNAPCHEF")
-                    .font(.system(size: 48, weight: .black, design: .rounded))
-                    .foregroundColor(Color(hex: "#667eea"))
-                    .blur(radius: 20)
-                    .opacity(0.6)
-                
-                // Main text with individual letter animations
-                HStack(spacing: 2) {
-                    ForEach(0..<letters.count, id: \.self) { index in
-                        Text(letters[index])
-                            .font(.system(size: 48, weight: .black, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#667eea"),
-                                        Color(hex: "#764ba2")
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .opacity(letterOpacities[index])
-                            .scaleEffect(letterScales[index])
-                            .animation(
-                                .spring(
-                                    response: 0.4,
-                                    dampingFraction: 0.7,
-                                    blendDuration: 0
-                                ).delay(Double(index) * 0.08),
-                                value: letterOpacities[index]
-                            )
-                            .background(
-                                GeometryReader { geometry in
-                                    Color.clear
-                                        .onAppear {
-                                            letterBounds[index] = geometry.frame(in: .global)
-                                        }
-                                        .onChange(of: geometry.frame(in: .global)) { newFrame in
-                                            letterBounds[index] = newFrame
-                                        }
-                                }
-                            )
-                    }
-                }
-                
-            }
+            // SNAPCHEF logo
+            SnapchefLogo()
+                .opacity(animationComplete ? 0 : 1)
+                .animation(.easeOut(duration: 0.3), value: animationComplete)
             
             // Falling food emojis
             ForEach(emojiAnimator.emojis) { emoji in
                 Text(emoji.emoji)
                     .font(.system(size: 36))  // Larger but smaller than letters
                     .position(x: emoji.position.x, y: emoji.position.y)
+                    .opacity(animationComplete ? 0 : 1)
+                    .animation(.easeOut(duration: 0.3), value: animationComplete)
                     // No rotation - emojis fall straight down
             }
         }
         .onAppear {
-            animateLetters()
             startFallingEmojis()
         }
         .onTapGesture {
@@ -101,84 +53,48 @@ struct LaunchAnimationView: View {
         }
     }
     
-    private func animateLetters() {
-        // Animate each letter popping in
-        for index in 0..<letters.count {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.08) {
-                letterOpacities[index] = 1.0
-                letterScales[index] = 1.0
+    private func startFallingEmojis() {
+        let screenWidth = UIScreen.main.bounds.width
+        
+        // Start physics animation immediately
+        let animationTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
+            DispatchQueue.main.async {
+                self.updatePhysics()
+                self.removeOffscreenEmojis()
             }
         }
-    }
-    
-    private func startFallingEmojis() {
-        // Wait for letters to appear
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            let screenWidth = UIScreen.main.bounds.width
+        
+        // Drop 10 emojis total with staggered timing
+        for i in 0..<10 {
+            let delay = Double(i) * 0.3 // Stagger by 0.3 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                let emoji = FallingEmoji(
+                    position: CGPoint(
+                        x: CGFloat.random(in: 30...screenWidth - 30),
+                        y: -50
+                    ),
+                    velocity: CGVector(
+                        dx: CGFloat.random(in: -20...20),
+                        dy: CGFloat.random(in: 50...150)
+                    ),
+                    emoji: self.foodEmojis.randomElement() ?? "🍕",
+                    shouldBounce: false
+                )
+                self.emojiAnimator.emojis.append(emoji)
+            }
+        }
+        
+        // End animation after 3 seconds total
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            animationTimer.invalidate()
             
-            // Start physics animation
-            let animationTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
-                DispatchQueue.main.async {
-                    self.updatePhysics()
-                    self.removeOffscreenEmojis()
-                }
+            withAnimation(.easeOut(duration: 0.3)) {
+                animationComplete = true
             }
             
-            // Drop first 3 emojis randomly within 1.5 seconds
-            for _ in 0..<3 {
-                let delay = Double.random(in: 0...1.5)
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                    let emoji = FallingEmoji(
-                        position: CGPoint(
-                            x: CGFloat.random(in: 30...screenWidth - 30),
-                            y: -50
-                        ),
-                        velocity: CGVector(
-                            dx: CGFloat.random(in: -20...20),
-                            dy: CGFloat.random(in: 50...150)
-                        ),
-                        emoji: self.foodEmojis.randomElement() ?? "🍕",
-                        shouldBounce: true // First 3 emojis will bounce
-                    )
-                    self.emojiAnimator.emojis.append(emoji)
-                }
-            }
-            
-            // After 1.5 seconds, drop all the rest (doubled to 80)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                // Create a burst of emojis
-                for _ in 0..<80 {
-                    // Only about 10% of emojis will bounce
-                    let shouldBounce = CGFloat.random(in: 0...1) < 0.1
-                    
-                    let emoji = FallingEmoji(
-                        position: CGPoint(
-                            x: CGFloat.random(in: 20...screenWidth - 20),
-                            y: CGFloat.random(in: -200 ... -50)
-                        ),
-                        velocity: CGVector(
-                            dx: CGFloat.random(in: -30...30),
-                            dy: CGFloat.random(in: 100...200)
-                        ),
-                        emoji: self.foodEmojis.randomElement() ?? "🍕",
-                        shouldBounce: shouldBounce
-                    )
-                    self.emojiAnimator.emojis.append(emoji)
-                }
-            }
-            
-            // End animation after 3 seconds total (0.8s delay + 2.2s animation)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-                animationTimer.invalidate()
-                
-                withAnimation(.easeOut(duration: 0.3)) {
-                    animationComplete = true
-                }
-                
-                // Notify completion
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    onAnimationComplete()
-                }
+            // Notify completion
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                onAnimationComplete()
             }
         }
     }
@@ -206,22 +122,6 @@ struct LaunchAnimationView: View {
             emojiAnimator.emojis[i].position.x += emojiAnimator.emojis[i].velocity.dx * deltaTime
             emojiAnimator.emojis[i].position.y += emojiAnimator.emojis[i].velocity.dy * deltaTime
             
-            // Check collision with letters (only if emoji should bounce and hasn't bounced yet)
-            if emojiAnimator.emojis[i].shouldBounce && !emojiAnimator.emojis[i].hasBouncedOffLetter {
-                for letterBound in letterBounds {
-                    if letterBound != .zero && isCollidingWithTop(emoji: emojiAnimator.emojis[i], with: letterBound) {
-                        // Bounce off top of letter
-                        emojiAnimator.emojis[i].velocity.dy = -abs(emojiAnimator.emojis[i].velocity.dy) * bounceDamping
-                        emojiAnimator.emojis[i].velocity.dx += CGFloat.random(in: -50...50) // Add some random horizontal bounce
-                        
-                        // Move emoji to top of letter
-                        emojiAnimator.emojis[i].position.y = letterBound.minY - 10
-                        
-                        // Mark as having bounced
-                        emojiAnimator.emojis[i].hasBouncedOffLetter = true
-                    }
-                }
-            }
             
             // Check collision with other emojis
             for j in emojiAnimator.emojis.indices where j != i {
@@ -252,19 +152,6 @@ struct LaunchAnimationView: View {
                 emojiAnimator.emojis[i].velocity.dx *= -bounceDamping
             }
         }
-    }
-    
-    private func isCollidingWithTop(emoji: FallingEmoji, with rect: CGRect) -> Bool {
-        // Check if emoji is within horizontal bounds of letter
-        let emojiLeft = emoji.position.x - 18
-        let emojiRight = emoji.position.x + 18
-        
-        if emojiLeft < rect.maxX && emojiRight > rect.minX {
-            // Check if emoji bottom is touching letter top
-            let emojiBottom = emoji.position.y + 18
-            return emojiBottom >= rect.minY && emojiBottom <= rect.minY + 25 && emoji.velocity.dy > 0
-        }
-        return false
     }
     
     private func checkEmojiCollision(i: Int, j: Int) -> Bool {

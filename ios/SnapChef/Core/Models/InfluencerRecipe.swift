@@ -28,14 +28,14 @@ struct InfluencerRecipe: Identifiable {
 // Mock data for celebrity mom influencers
 extension InfluencerRecipe {
     static let mockInfluencers: [InfluencerRecipe] = [
-        // Kylie Jenner
+        // Sarah Johnson
         InfluencerRecipe(
-            influencerName: "Kylie Jenner",
-            influencerHandle: "@kyliejenner",
+            influencerName: "Sarah Johnson",
+            influencerHandle: "@sarahcooks",
             profileImageName: "kylie_profile",
-            quote: "Stormi loves when I make this! It's our go-to after-school snack 💕",
-            beforeImageName: "kylie_fridge",
-            afterImageName: "kylie_result",
+            quote: "My daughter loves when I make this! It's our go-to after-school snack 💕",
+            beforeImageName: "fridge1.jpg",
+            afterImageName: "meal1.jpg",
             recipe: InfluencerShowcaseRecipe(
                 recipe: Recipe(
                     id: UUID(),
@@ -94,14 +94,14 @@ extension InfluencerRecipe {
             shares: 287_000
         ),
         
-        // Chrissy Teigen
+        // Emma Chen
         InfluencerRecipe(
-            influencerName: "Chrissy Teigen",
-            influencerHandle: "@chrissyteigen",
+            influencerName: "Emma Chen",
+            influencerHandle: "@emmaeats",
             profileImageName: "chrissy_profile",
-            quote: "Luna and Miles destroyed this in 5 minutes flat! Mom win 🙌",
-            beforeImageName: "chrissy_fridge",
-            afterImageName: "chrissy_result",
+            quote: "My kids destroyed this in 5 minutes flat! Mom win 🙌",
+            beforeImageName: "fridge2.jpg",
+            afterImageName: "meal2.jpg",
             recipe: InfluencerShowcaseRecipe(
                 recipe: Recipe(
                     id: UUID(),
@@ -164,14 +164,14 @@ extension InfluencerRecipe {
             shares: 45_000
         ),
         
-        // Blake Lively
+        // Jessica Martinez
         InfluencerRecipe(
-            influencerName: "Blake Lively",
-            influencerHandle: "@blakelively",
+            influencerName: "Jessica Martinez",
+            influencerHandle: "@jessicacooks",
             profileImageName: "blake_profile",
-            quote: "Ryan said this is better than craft services. I'll take it! 🎬✨",
-            beforeImageName: "blake_fridge",
-            afterImageName: "blake_result",
+            quote: "My husband said this is better than takeout. I'll take it! 🎬✨",
+            beforeImageName: "fridge3.jpg",
+            afterImageName: "meal3.jpg",
             recipe: InfluencerShowcaseRecipe(
                 recipe: Recipe(
                     id: UUID(),
@@ -233,14 +233,14 @@ extension InfluencerRecipe {
             shares: 98_000
         ),
         
-        // Reese Witherspoon
+        // Rachel Thompson
         InfluencerRecipe(
-            influencerName: "Reese Witherspoon",
-            influencerHandle: "@reesewitherspoon",
+            influencerName: "Rachel Thompson",
+            influencerHandle: "@rachelthompson",
             profileImageName: "reese_profile",
-            quote: "Y'all, this Southern girl's smoothie bowl will change your morning! 🍑",
-            beforeImageName: "reese_fridge",
-            afterImageName: "reese_result",
+            quote: "Y'all, this smoothie bowl will change your morning! 🍑",
+            beforeImageName: "fridge4.jpg",
+            afterImageName: "meal4.jpg",
             recipe: InfluencerShowcaseRecipe(
                 recipe: Recipe(
                     id: UUID(),
@@ -300,14 +300,14 @@ extension InfluencerRecipe {
             shares: 72_000
         ),
         
-        // Kourtney Kardashian
+        // Lisa Anderson
         InfluencerRecipe(
-            influencerName: "Kourtney Kardashian",
-            influencerHandle: "@kourtneykardash",
+            influencerName: "Lisa Anderson",
+            influencerHandle: "@lisahealthy",
             profileImageName: "kourtney_profile",
             quote: "My kids beg for these! Proof that healthy can be delicious 🌱",
-            beforeImageName: "kourtney_fridge",
-            afterImageName: "kourtney_result",
+            beforeImageName: "fridge5.jpg",
+            afterImageName: "meal5.jpg",
             recipe: InfluencerShowcaseRecipe(
                 recipe: Recipe(
                     id: UUID(),

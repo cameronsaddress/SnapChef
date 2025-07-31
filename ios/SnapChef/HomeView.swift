@@ -28,7 +28,16 @@ struct HomeView: View {
                 ScrollView {
                     VStack(spacing: 30) {
                         // Animated Logo
-                        HeroLogoView()
+                        VStack(spacing: 16) {
+                            SnapchefLogo()
+                            
+                            Text("AI-powered recipes\nfrom what you already have")
+                                .font(.system(size: 18, weight: .medium, design: .rounded))
+                                .foregroundColor(.white.opacity(0.9))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
+                        .padding(.top, 30)
                         
                         // Main CTA Section with prominent spacing
                         VStack(spacing: 0) {
@@ -97,7 +106,7 @@ struct HomeView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             .padding(.horizontal, 30)
-                            .padding(.top, 30)
+                            .padding(.top, 20)
                             .padding(.bottom, 40)
                         }
                     }
@@ -169,70 +178,6 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Hero Logo
-struct HeroLogoView: View {
-    @State private var letterOpacities: [Double] = Array(repeating: 0, count: 8)
-    @State private var letterScales: [CGFloat] = Array(repeating: 0.5, count: 8)
-    let letters = ["S", "N", "A", "P", "C", "H", "E", "F"]
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                // Glow effect behind text - matching loading animation
-                Text("SNAPCHEF")
-                    .font(.system(size: 60, weight: .black, design: .rounded))
-                    .foregroundColor(Color(hex: "#667eea"))
-                    .blur(radius: 20)
-                    .opacity(0.6)
-                
-                // Main text with individual letter animations - matching loading animation style
-                HStack(spacing: 2) {
-                    ForEach(0..<letters.count, id: \.self) { index in
-                        Text(letters[index])
-                            .font(.system(size: 60, weight: .black, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#667eea"),
-                                        Color(hex: "#764ba2")
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .opacity(letterOpacities[index])
-                            .scaleEffect(letterScales[index])
-                    }
-                    .animation(
-                        .spring(
-                            response: 0.4,
-                            dampingFraction: 0.7,
-                            blendDuration: 0
-                        ).delay(Double(0) * 0.08),
-                        value: letterOpacities[0]
-                    )
-                }
-                
-            }
-            
-            Text("AI-powered recipes\nfrom what you already have")
-                .font(.system(size: 18, weight: .medium, design: .rounded))
-                .foregroundColor(.white.opacity(0.9))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-        }
-        .padding(.top, 30)
-        .onAppear {
-            // Animate each letter popping in
-            for index in 0..<letters.count {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.08) {
-                    letterOpacities[index] = 1.0
-                    letterScales[index] = 1.0
-                }
-            }
-        }
-    }
-}
 
 // MARK: - Free Uses Indicator Enhanced
 struct FreeUsesIndicatorEnhanced: View {
