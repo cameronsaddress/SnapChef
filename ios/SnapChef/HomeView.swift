@@ -178,39 +178,30 @@ struct HeroLogoView: View {
     var body: some View {
         VStack(spacing: 16) {
             ZStack {
-                // Glow effect behind text
+                // Glow effect behind text - matching loading animation
                 Text("SNAPCHEF")
                     .font(.system(size: 60, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color(hex: "#667eea"))
                     .blur(radius: 20)
-                    .opacity(0.3)
+                    .opacity(0.6)
                 
-                // Main text with individual letter animations
+                // Main text with individual letter animations - matching loading animation style
                 HStack(spacing: 2) {
                     ForEach(0..<letters.count, id: \.self) { index in
-                        if index == 7 { // Letter "F"
-                            ZStack(alignment: .top) {
-                                Text(letters[index])
-                                    .font(.system(size: 60, weight: .black, design: .rounded))
-                                    .foregroundColor(.white)
-                                    .opacity(letterOpacities[index])
-                                    .scaleEffect(letterScales[index])
-                                
-                                // Chef hat on F
-                                Text("👨‍🍳")
-                                    .font(.system(size: 30))
-                                    .offset(x: 8, y: -20)
-                                    .rotationEffect(.degrees(15))
-                                    .opacity(letterOpacities[index])
-                                    .scaleEffect(letterScales[index])
-                            }
-                        } else {
-                            Text(letters[index])
-                                .font(.system(size: 60, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
-                                .opacity(letterOpacities[index])
-                                .scaleEffect(letterScales[index])
-                        }
+                        Text(letters[index])
+                            .font(.system(size: 60, weight: .black, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#667eea"),
+                                        Color(hex: "#764ba2")
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .opacity(letterOpacities[index])
+                            .scaleEffect(letterScales[index])
                     }
                     .animation(
                         .spring(

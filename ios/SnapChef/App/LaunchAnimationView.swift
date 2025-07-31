@@ -7,6 +7,7 @@ struct FallingEmoji: Identifiable {
     let emoji: String
     var isSettled = false
     var hasBouncedOffLetter = false
+    let shouldBounce: Bool // Only some emojis will bounce
 }
 
 class EmojiAnimator: ObservableObject {
@@ -94,6 +95,10 @@ struct LaunchAnimationView: View {
             animateLetters()
             startFallingEmojis()
         }
+        .onTapGesture {
+            // Skip animation on tap
+            onAnimationComplete()
+        }
     }
     
     private func animateLetters() {
@@ -132,7 +137,8 @@ struct LaunchAnimationView: View {
                             dx: CGFloat.random(in: -20...20),
                             dy: CGFloat.random(in: 50...150)
                         ),
-                        emoji: self.foodEmojis.randomElement() ?? "🍕"
+                        emoji: self.foodEmojis.randomElement() ?? "🍕",
+                        shouldBounce: true // First 3 emojis will bounce
                     )
                     self.emojiAnimator.emojis.append(emoji)
                 }
@@ -142,6 +148,9 @@ struct LaunchAnimationView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 // Create a burst of emojis
                 for _ in 0..<80 {
+                    // Only about 10% of emojis will bounce
+                    let shouldBounce = CGFloat.random(in: 0...1) < 0.1
+                    
                     let emoji = FallingEmoji(
                         position: CGPoint(
                             x: CGFloat.random(in: 20...screenWidth - 20),
@@ -151,14 +160,15 @@ struct LaunchAnimationView: View {
                             dx: CGFloat.random(in: -30...30),
                             dy: CGFloat.random(in: 100...200)
                         ),
-                        emoji: self.foodEmojis.randomElement() ?? "🍕"
+                        emoji: self.foodEmojis.randomElement() ?? "🍕",
+                        shouldBounce: shouldBounce
                     )
                     self.emojiAnimator.emojis.append(emoji)
                 }
             }
             
-            // End animation after exactly 8 seconds total (0.8s delay + 7.2s animation)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 7.2) {
+            // End animation after 3 seconds total (0.8s delay + 2.2s animation)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
                 animationTimer.invalidate()
                 
                 withAnimation(.easeOut(duration: 0.3)) {
@@ -174,10 +184,8 @@ struct LaunchAnimationView: View {
     }
     
     private func removeOffscreenEmojis() {
-        let screenHeight = UIScreen.main.bounds.height
-        emojiAnimator.emojis.removeAll { emoji in
-            emoji.position.y > screenHeight + 50
-        }
+        // Don't remove emojis - let them continue falling during entire animation
+        // This creates a continuous rain effect
     }
     
     private func updatePhysics() {
@@ -198,8 +206,8 @@ struct LaunchAnimationView: View {
             emojiAnimator.emojis[i].position.x += emojiAnimator.emojis[i].velocity.dx * deltaTime
             emojiAnimator.emojis[i].position.y += emojiAnimator.emojis[i].velocity.dy * deltaTime
             
-            // Check collision with letters (only if hasn't bounced yet)
-            if !emojiAnimator.emojis[i].hasBouncedOffLetter {
+            // Check collision with letters (only if emoji should bounce and hasn't bounced yet)
+            if emojiAnimator.emojis[i].shouldBounce && !emojiAnimator.emojis[i].hasBouncedOffLetter {
                 for letterBound in letterBounds {
                     if letterBound != .zero && isCollidingWithTop(emoji: emojiAnimator.emojis[i], with: letterBound) {
                         // Bounce off top of letter
