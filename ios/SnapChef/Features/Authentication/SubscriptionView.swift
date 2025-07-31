@@ -3,8 +3,10 @@ import StoreKit
 
 struct SubscriptionView: View {
     @Environment(\.dismiss) var dismiss
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @State private var selectedPlan: SubscriptionPlan = .monthly
     @State private var isProcessing = false
+    @State private var errorMessage: String?
     
     enum SubscriptionPlan: String, CaseIterable {
         case monthly = "com.snapchef.premium.monthly"
@@ -130,7 +132,23 @@ struct SubscriptionView: View {
                             .padding(.top, 8)
                         }
                         .padding(.bottom, 40)
+                        
+                        // Error message
+                        if let errorMessage = errorMessage {
+                            Text(errorMessage)
+                                .font(.system(size: 14))
+                                .foregroundColor(.red)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                                .padding(.bottom, 20)
+                        }
                     }
+                }
+            }
+            .onAppear {
+                // Load products when view appears
+                Task {
+                    await subscriptionManager.loadProducts()
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -150,46 +168,28 @@ struct SubscriptionView: View {
     
     private func subscribe() {
         isProcessing = true
+        errorMessage = nil
         
         Task {
             do {
-                // Request product from App Store
-                let products = try await Product.products(for: [selectedPlan.rawValue])
-                
-                guard let product = products.first else {
+                // Find the product
+                guard let product = subscriptionManager.products.first(where: { $0.id == selectedPlan.rawValue }) else {
+                    errorMessage = "Product not found. Please try again."
                     isProcessing = false
                     return
                 }
                 
-                // Purchase product
-                let result = try await product.purchase()
-                
-                switch result {
-                case .success(let verification):
-                    // Verify purchase
-                    switch verification {
-                    case .verified(let transaction):
-                        // Update subscription status
-                        await transaction.finish()
-                        dismiss()
-                    case .unverified:
-                        // Handle unverified transaction
-                        print("Unverified transaction")
-                    }
-                    
-                case .userCancelled:
-                    // User cancelled
-                    break
-                    
-                case .pending:
-                    // Transaction pending
-                    break
-                    
-                @unknown default:
-                    break
+                // Purchase through SubscriptionManager
+                if let transaction = try await subscriptionManager.purchase(product) {
+                    // Success - dismiss view
+                    dismiss()
+                } else {
+                    // User cancelled or pending
+                    errorMessage = nil
                 }
                 
             } catch {
+                errorMessage = "Purchase failed: \(error.localizedDescription)"
                 print("Purchase error: \(error)")
             }
             
@@ -198,22 +198,20 @@ struct SubscriptionView: View {
     }
     
     private func restorePurchases() {
+        isProcessing = true
+        errorMessage = nil
+        
         Task {
-            do {
-                try await AppStore.sync()
-                // Check for active subscriptions
-                for await result in Transaction.currentEntitlements {
-                    switch result {
-                    case .verified(let transaction):
-                        // Restore subscription
-                        await transaction.finish()
-                    case .unverified:
-                        break
-                    }
-                }
-            } catch {
-                print("Restore error: \(error)")
+            await subscriptionManager.restorePurchases()
+            
+            // Check if subscription was restored
+            if subscriptionManager.isPremium {
+                dismiss()
+            } else {
+                errorMessage = "No active subscription found"
             }
+            
+            isProcessing = false
         }
     }
     

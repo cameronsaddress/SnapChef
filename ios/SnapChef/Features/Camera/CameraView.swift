@@ -3,6 +3,7 @@ import AVFoundation
 
 struct CameraView: View {
     @StateObject private var cameraModel = CameraModel()
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
     @Environment(\.dismiss) var dismiss
@@ -34,6 +35,8 @@ struct CameraView: View {
     @State private var currentError: SnapChefError?
     @State private var showSuccess = false
     @State private var successMessage = ""
+    @State private var showPremiumPrompt = false
+    @State private var premiumPromptReason: PremiumUpgradePrompt.UpgradeReason = .dailyLimitReached
     
     var flashIcon: String {
         switch cameraModel.flashMode {
@@ -226,6 +229,17 @@ struct CameraView: View {
                 Spacer()
             }
         )
+        .overlay(
+            // Premium upgrade prompt
+            Group {
+                if showPremiumPrompt {
+                    PremiumUpgradePrompt(
+                        isPresented: $showPremiumPrompt,
+                        reason: premiumPromptReason
+                    )
+                }
+            }
+        )
     }
     
     private func startScanAnimation() {
@@ -262,22 +276,19 @@ struct CameraView: View {
         cameraModel.stopSession()
         
         Task {
-            // Check if user has free uses or subscription
-            if !deviceManager.hasUnlimitedAccess && deviceManager.freeUsesRemaining <= 0 {
-                isProcessing = false
-                showingUpgrade = true
-                return
-            }
-            
-            // Consume a free use if not subscribed
-            if !deviceManager.hasUnlimitedAccess {
-                let success = await deviceManager.consumeFreeUse()
-                if !success {
+            // Check subscription status
+            if !subscriptionManager.isPremium {
+                let remainingRecipes = subscriptionManager.getRemainingDailyRecipes()
+                if remainingRecipes <= 0 {
                     isProcessing = false
-                    showingUpgrade = true
+                    premiumPromptReason = .dailyLimitReached
+                    showPremiumPrompt = true
+                    cameraModel.restartSession()
                     return
                 }
             }
+            
+            // No need to consume free uses - we track daily count in SubscriptionManager
             
             // Generate session ID
             let sessionId = UUID().uuidString
@@ -324,6 +335,11 @@ struct CameraView: View {
                         
                         // Increment snaps taken counter
                         self.appState.incrementSnapsTaken()
+                        
+                        // Increment daily recipe count if not premium
+                        if !self.subscriptionManager.isPremium {
+                            self.subscriptionManager.incrementDailyRecipeCount()
+                        }
                         
                         // Preload the data on a background queue
                         DispatchQueue.global(qos: .userInitiated).async {
