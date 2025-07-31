@@ -367,28 +367,23 @@ struct CameraView: View {
                             self.subscriptionManager.incrementDailyRecipeCount()
                         }
                         
-                        // Preload the data on a background queue
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            // Save recipes to app state with the captured photo
-                            for recipe in recipes {
-                                self.appState.addRecentRecipe(recipe)
-                                self.appState.saveRecipeWithPhotos(recipe, beforePhoto: image, afterPhoto: nil)
-                            }
-                            
-                            DispatchQueue.main.async {
-                                // Update UI on main thread
-                                self.generatedRecipes = recipes
-                                self.detectedIngredients = apiResponse.data.ingredients
-                                self.resultsPreloaded = true
-                                
-                                // Dismiss processing overlay first
-                                self.isProcessing = false
-                                
-                                // Small delay to ensure smooth transition
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                    self.showingResults = true
-                                }
-                            }
+                        // Save recipes to app state on main thread
+                        for recipe in recipes {
+                            self.appState.addRecentRecipe(recipe)
+                            self.appState.saveRecipeWithPhotos(recipe, beforePhoto: image, afterPhoto: nil)
+                        }
+                        
+                        // Update UI on main thread
+                        self.generatedRecipes = recipes
+                        self.detectedIngredients = apiResponse.data.ingredients
+                        self.resultsPreloaded = true
+                        
+                        // Dismiss processing overlay first
+                        self.isProcessing = false
+                        
+                        // Small delay to ensure smooth transition
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            self.showingResults = true
                         }
                         
                     case .failure(let error):
