@@ -11,15 +11,15 @@ struct FoodPreferencesView: View {
         ("Italian", "🍝"),
         ("Mexican", "🌮"),
         ("Chinese", "🥟"),
-        ("Japanese", "🍱"),
-        ("Thai", "🍜"),
-        ("Indian", "🍛"),
         ("American", "🍔"),
-        ("French", "🥐"),
-        ("Mediterranean", "🥙"),
-        ("Korean", "🍖"),
         ("Healthy", "🥗"),
-        ("Comfort Food", "🍗")
+        ("Vegetarian", "🥬"),
+        ("Keto", "🥑"),
+        ("Carnivore", "🥩"),
+        ("Low Carb", "🥚"),
+        ("Paleo", "🦴"),
+        ("Gluten Free", "🌾"),
+        ("Vegan", "🌱")
     ]
     
     var body: some View {

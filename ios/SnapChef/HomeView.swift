@@ -98,7 +98,7 @@ struct HomeView: View {
                             .buttonStyle(PlainButtonStyle())
                             .padding(.horizontal, 30)
                             .padding(.top, 30)
-                            .padding(.bottom, 20)
+                            .padding(.bottom, 40)
                         }
                     }
                     .padding(.bottom, 100)
@@ -406,7 +406,7 @@ struct ViralChallengeSection: View {
                         }
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                    .frame(height: 520)
+                    .frame(height: 540)
                     
                     // Page indicators
                     HStack(spacing: 6) {
@@ -420,7 +420,7 @@ struct ViralChallengeSection: View {
                     .padding(.bottom, 20)
                 }
             }
-            .frame(height: 520)
+            .frame(height: 540)
         }
         .onAppear {
             sparkleAnimation = true
@@ -626,7 +626,7 @@ struct EnhancedChallengeCard: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .padding(.vertical, 20)
         .shadow(color: Color.black.opacity(0.3), radius: 20, y: 10)
         .onAppear {
             particleAnimation = true
@@ -712,6 +712,7 @@ struct EnhancedRecipeCard: View {
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                     .lineLimit(2)
+                    .frame(height: 48, alignment: .topLeading)
                 
                 HStack {
                     Label("\(recipe.cookTime)m", systemImage: "clock")
@@ -726,7 +727,7 @@ struct EnhancedRecipeCard: View {
                 }
             }
             .padding(16)
-            .frame(width: 220)
+            .frame(width: 220, height: 220)
         })
         .scaleEffect(isPressed ? 0.95 : 1)
         .onTapGesture {

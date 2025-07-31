@@ -1272,7 +1272,7 @@ struct FoodPreferencesCard: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Your Food Types")
+                    Text("Your Food Type Choices")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
