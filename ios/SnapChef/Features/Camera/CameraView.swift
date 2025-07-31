@@ -572,6 +572,19 @@ struct CameraControlsEnhanced: View {
     let isProcessing: Bool
     @Binding var captureAnimation: Bool
     
+    var flashIcon: String {
+        switch cameraModel.flashMode {
+        case .off:
+            return "bolt.slash.fill"
+        case .on:
+            return "bolt.fill"
+        case .auto:
+            return "bolt.badge.automatic.fill"
+        @unknown default:
+            return "bolt.slash.fill"
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 30) {
             // Instructions

@@ -633,6 +633,7 @@
 				A6B7C8D9E0F1234567890123 /* InfluencerShowcaseCard.swift in Sources */,
 				A7B8C9D0E1F2345678901234 /* InfluencerCarousel.swift in Sources */,
 				A8B9C0D1E2F3456789012345 /* InfluencerDetailView.swift in Sources */,
+				0C1EC8259C114306AB8DE1D5 /* AIProcessingView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

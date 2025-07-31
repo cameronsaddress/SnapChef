@@ -58,16 +58,6 @@ struct HomeView: View {
                             // Equal spacing below button
                             Spacer()
                                 .frame(height: 50)
-                            
-                            if !deviceManager.hasUnlimitedAccess {
-                                Button(action: { showingUpgrade = true }) {
-                                    FreeUsesIndicatorEnhanced(remaining: deviceManager.freeUsesRemaining)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .padding(.horizontal, 30)
-                                .padding(.top, 20)  // Add more space above
-                                .padding(.bottom, 15)
-                            }
                         }
                         
                         // Celebrity Kitchens Carousel
@@ -92,14 +82,26 @@ struct HomeView: View {
                         
                         // Viral Section
                         ViralChallengeSection()
-                            .padding(.vertical, 20)
+                            .padding(.top, 20)
+                            .padding(.bottom, 40)
                         
                         // Recent Recipes
                         if !appState.recentRecipes.isEmpty {
                             EnhancedRecipesSection(recipes: appState.recentRecipes)
                         }
+                        
+                        // Free uses indicator at bottom
+                        if !deviceManager.hasUnlimitedAccess {
+                            Button(action: { showingUpgrade = true }) {
+                                FreeUsesIndicatorEnhanced(remaining: deviceManager.freeUsesRemaining)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .padding(.horizontal, 30)
+                            .padding(.top, 30)
+                            .padding(.bottom, 20)
+                        }
                     }
-                    .padding(.bottom, 120)
+                    .padding(.bottom, 100)
                 }
                 .scrollContentBackground(.hidden)
                 
@@ -404,7 +406,7 @@ struct ViralChallengeSection: View {
                         }
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                    .frame(height: 500)
+                    .frame(height: 520)
                     
                     // Page indicators
                     HStack(spacing: 6) {
@@ -418,7 +420,7 @@ struct ViralChallengeSection: View {
                     .padding(.bottom, 20)
                 }
             }
-            .frame(height: 500)
+            .frame(height: 520)
         }
         .onAppear {
             sparkleAnimation = true
@@ -624,6 +626,7 @@ struct EnhancedChallengeCard: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .padding(.horizontal, 20)
+        .padding(.vertical, 10)
         .shadow(color: Color.black.opacity(0.3), radius: 20, y: 10)
         .onAppear {
             particleAnimation = true
