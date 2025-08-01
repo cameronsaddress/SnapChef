@@ -175,6 +175,16 @@ struct RecipeResultsView: View {
         appState.saveRecipeWithPhotos(recipe, beforePhoto: capturedImage, afterPhoto: nil)
         savedRecipeIds.insert(recipe.id)
         
+        // Track streak activities
+        Task {
+            await StreakManager.shared.recordActivity(for: .recipeCreation)
+            
+            // Check if recipe is healthy (under 500 calories)
+            if recipe.nutrition.calories < 500 {
+                await StreakManager.shared.recordActivity(for: .healthyEating)
+            }
+        }
+        
         // Haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)

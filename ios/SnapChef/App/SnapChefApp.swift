@@ -8,6 +8,7 @@ struct SnapChefApp: App {
     @StateObject private var gamificationManager = GamificationManager()
     @StateObject private var socialShareManager = SocialShareManager.shared
     @StateObject private var cloudKitSync = CloudKitSyncService.shared
+    @StateObject private var cloudKitDataManager = CloudKitDataManager.shared
     
     var body: some Scene {
         WindowGroup {
@@ -17,6 +18,7 @@ struct SnapChefApp: App {
                 .environmentObject(deviceManager)
                 .environmentObject(gamificationManager)
                 .environmentObject(socialShareManager)
+                .environmentObject(cloudKitDataManager)
                 .preferredColorScheme(.dark) // Force dark mode
                 .onAppear {
                     setupApp()
@@ -28,6 +30,18 @@ struct SnapChefApp: App {
                     DeepLinkRecipeView()
                         .environmentObject(socialShareManager)
                         .environmentObject(cloudKitSync)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+                    // App is going to background
+                    Task {
+                        await cloudKitDataManager.endAppSession()
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
+                    // App is terminating
+                    Task {
+                        await cloudKitDataManager.endAppSession()
+                    }
                 }
         }
     }
@@ -50,6 +64,22 @@ struct SnapChefApp: App {
         // Setup notifications for challenges
         Task {
             _ = await ChallengeNotificationManager.shared.requestNotificationPermission()
+        }
+        
+        // Initialize CloudKit data synchronization
+        Task {
+            // Start app session tracking
+            let sessionID = await cloudKitDataManager.startAppSession()
+            appState.currentSessionID = sessionID
+            
+            // Register device for multi-device sync
+            try? await cloudKitDataManager.registerDevice()
+            
+            // Perform initial sync
+            await cloudKitDataManager.performFullSync()
+            
+            // Track app launch
+            await cloudKitDataManager.trackScreenView("AppLaunch")
         }
     }
     

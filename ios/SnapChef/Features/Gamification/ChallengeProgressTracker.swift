@@ -418,6 +418,11 @@ class ChallengeProgressTracker: ObservableObject {
         // Complete the challenge
         gamificationManager.completeChallengeWithPersistence(challenge, score: score)
         
+        // Track challenge completion streak
+        Task {
+            await StreakManager.shared.recordActivity(for: .challengeCompletion)
+        }
+        
         // Stop tracking
         stopTracking(challengeId: challenge.id)
         

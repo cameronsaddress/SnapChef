@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
+    @EnvironmentObject var cloudKitDataManager: CloudKitDataManager
     @State private var showingCamera = false
     @State private var showingMysteryMeal = false
     @State private var particleTrigger = false
@@ -38,6 +39,21 @@ struct HomeView: View {
                                 .padding(.horizontal, 40)
                         }
                         .padding(.top, 30)
+                        
+                        // Streak Summary (UI placeholder - full views created but need Xcode project update)
+                        HStack {
+                            Text("🔥")
+                                .font(.title2)
+                            Text("Streak System Active")
+                                .font(.headline)
+                            Spacer()
+                            Text("✓")
+                                .foregroundColor(.green)
+                        }
+                        .padding()
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .cornerRadius(12)
+                        .padding(.horizontal, 20)
                         
                         // Main CTA Section with prominent spacing
                         VStack(spacing: 0) {
@@ -78,6 +94,11 @@ struct HomeView: View {
                             .padding(.horizontal, 30)
                             .padding(.top, 20)
                         
+                        // Viral Section (Today's Challenges)
+                        ViralChallengeSection()
+                            .padding(.top, 20)
+                            .padding(.bottom, 20)
+                        
                         // Mystery Meal Button
                         MysteryMealButton(
                             isAnimating: $mysteryMealAnimation,
@@ -87,12 +108,7 @@ struct HomeView: View {
                             }
                         )
                         .padding(.horizontal, 30)
-                        .padding(.top, 20)
-                        
-                        // Viral Section
-                        ViralChallengeSection()
-                            .padding(.top, 20)
-                            .padding(.bottom, 40)
+                        .padding(.bottom, 40)
                         
                         // Recent Recipes
                         if !appState.recentRecipes.isEmpty {
@@ -130,6 +146,11 @@ struct HomeView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .particleExplosion(trigger: $particleTrigger)
         .onAppear {
+            // Track screen view
+            Task {
+                await cloudKitDataManager.trackScreenView("Home")
+            }
+            
             // Simple fade in for mystery meal animation
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 withAnimation(.easeInOut(duration: 0.6)) {
@@ -257,7 +278,7 @@ struct ViralChallengeSection: View {
     @State private var selectedChallenge: Challenge?
     @State private var autoTimer: Timer?
     @State private var sparkleAnimation = false
-    @StateObject private var gamificationManager = GamificationManager.shared
+    @StateObject private var challengeDatabase = ChallengeDatabase.shared
     
     // Colors for challenges based on type/category
     let challengeColors = [
@@ -269,14 +290,14 @@ struct ViralChallengeSection: View {
     ]
     
     var displayChallenges: [(emoji: String, challenge: Challenge, participants: String, color: Color)] {
-        // Get first 5 active challenges from GamificationManager
-        let activeChallenges = Array(gamificationManager.activeChallenges.prefix(5))
+        // Get first 5 active challenges from ChallengeDatabase
+        let activeChallenges = Array(challengeDatabase.activeChallenges.prefix(5))
         
-        // If we have local challenges, use them
+        // If we have active challenges, use them
         if !activeChallenges.isEmpty {
             return activeChallenges.enumerated().map { index, challenge in
-                // Look for emoji in ChallengeSeeder data
-                let emoji = getEmojiForChallenge(challenge) ?? "🎯"
+                // Get emoji for the challenge
+                let emoji = challengeDatabase.getEmojiForChallenge(challenge)
                 let participantCount = "\(challenge.participants) chefs"
                 let color = challengeColors[index % challengeColors.count]
                 
@@ -294,14 +315,38 @@ struct ViralChallengeSection: View {
         ]
         
         return mockData.enumerated().map { index, data in
+            // Determine difficulty based on points
+            let difficulty: DifficultyLevel = {
+                if data.4 <= 300 { return .easy }
+                else if data.4 <= 450 { return .medium }
+                else if data.4 <= 600 { return .hard }
+                else { return .expert }
+            }()
+            
+            // Set end time based on difficulty with some variation
+            let baseHours: Double = {
+                switch difficulty {
+                case .easy: return 12
+                case .medium: return 24
+                case .hard: return 48
+                case .expert: return 72
+                case .master: return 168 // 1 week
+                }
+            }()
+            
+            // Add variation to prevent same countdown times
+            let variation = Double.random(in: -2...2) // +/- 2 hours variation
+            let hoursOffset = baseHours + variation + Double(index * 3) // Additional offset per challenge
+            
             let challenge = Challenge(
                 id: "home-\(data.1.replacingOccurrences(of: " ", with: "-").lowercased())",
                 title: data.1,
                 description: data.2,
                 type: .daily,
+                difficulty: difficulty,
                 points: data.4,
                 coins: data.4 / 10,
-                endDate: Date().addingTimeInterval(TimeInterval(3600 * (index + 1) * 8)),
+                endDate: Date().addingTimeInterval(TimeInterval(hoursOffset * 3600)),
                 requirements: ["Create a \(data.1.lowercased()) dish and share it"],
                 currentProgress: 0,
                 participants: Int.random(in: 100...500)
@@ -430,6 +475,7 @@ struct ViralChallengeSection: View {
                             participants: challengeData.participants,
                             points: "\(challengeData.challenge.points)",
                             color: challengeData.color,
+                            actualChallenge: challengeData.challenge,
                             action: {
                                 selectedChallenge = challengeData.challenge
                                 showingChallengeView = true
@@ -446,6 +492,10 @@ struct ViralChallengeSection: View {
         }
         .onAppear {
             sparkleAnimation = true
+            startAutoScroll()
+        }
+        .onDisappear {
+            stopAutoScroll()
         }
         .sheet(item: $selectedChallenge) { challenge in
             ChallengeDetailView(challenge: challenge)
@@ -473,27 +523,23 @@ struct EnhancedChallengeCard: View {
     let participants: String
     let points: String
     let color: Color
+    let actualChallenge: Challenge?
     let action: () -> Void
     
     @State private var isPressed = false
     @State private var particleAnimation = false
-    @StateObject private var gamificationManager = GamificationManager.shared
     @State private var timeRemaining = ""
+    @StateObject private var gamificationManager = GamificationManager.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
-    // Get the actual challenge to access its endDate
+    // Fallback challenge if none provided
     private var challenge: Challenge? {
-        // First check if we have a challenge from CloudKit
-        if let activeChallenge = gamificationManager.activeChallenges.first(where: { $0.title == title }) {
-            return activeChallenge
+        // Use the actual challenge if provided
+        if let actualChallenge = actualChallenge {
+            return actualChallenge
         }
         
-        // Check completed challenges
-        if let completedChallenge = gamificationManager.completedChallenges.first(where: { $0.title == title }) {
-            return completedChallenge
-        }
-        
-        // Create a mock challenge with proper end date if not found
+        // Otherwise create a mock challenge with proper end date
         return Challenge(
             title: title,
             description: description,
@@ -678,7 +724,9 @@ struct EnhancedChallengeCard: View {
     }
     
     private func updateTimeRemaining() {
-        guard let challenge = challenge else {
+        // Use actualChallenge if available, otherwise use fallback
+        let challengeToUse = actualChallenge ?? challenge
+        guard let challenge = challengeToUse else {
             timeRemaining = "00:00:00"
             return
         }
@@ -691,18 +739,15 @@ struct EnhancedChallengeCard: View {
             return
         }
         
-        let difference = Calendar.current.dateComponents([.hour, .minute, .second], from: now, to: endDate)
+        let timeInterval = endDate.timeIntervalSince(now)
+        let totalHours = Int(timeInterval) / 3600
+        let minutes = (Int(timeInterval) % 3600) / 60
+        let seconds = Int(timeInterval) % 60
         
-        let hours = difference.hour ?? 0
-        let minutes = difference.minute ?? 0
-        let seconds = difference.second ?? 0
-        
-        if hours > 24 {
-            let days = hours / 24
-            timeRemaining = "\(days)d \(hours % 24)h"
-        } else {
-            timeRemaining = String(format: "%02d:%02d:%02d", hours, minutes, seconds)
-        }
+        // Always show in HH:MM:SS format, even for days
+        // If more than 99 hours, show 99:59:59 as max
+        let displayHours = min(totalHours, 99)
+        timeRemaining = String(format: "%02d:%02d:%02d", displayHours, minutes, seconds)
     }
 }
 

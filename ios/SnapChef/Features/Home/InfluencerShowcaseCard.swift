@@ -4,6 +4,7 @@ import SwiftUI
 struct InfluencerHeaderView: View {
     let influencer: InfluencerRecipe
     @Binding var sparkleAnimation: Bool
+    @State private var showingUserProfile = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -24,15 +25,20 @@ struct InfluencerHeaderView: View {
                 )
             
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    Text(influencer.influencerName)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color(hex: "#4facfe"))
+                Button(action: {
+                    showingUserProfile = true
+                }) {
+                    HStack(spacing: 4) {
+                        Text(influencer.influencerName)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(hex: "#4facfe"))
+                    }
                 }
+                .buttonStyle(PlainButtonStyle())
                 
                 Text(influencer.followerCount + " followers")
                     .font(.system(size: 12, weight: .medium))
@@ -46,6 +52,12 @@ struct InfluencerHeaderView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
+        .sheet(isPresented: $showingUserProfile) {
+            UserProfileView(
+                userID: influencer.influencerHandle.replacingOccurrences(of: "@", with: ""),
+                userName: influencer.influencerName
+            )
+        }
     }
 }
 

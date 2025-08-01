@@ -474,7 +474,9 @@ struct RecipeGridCard: View {
     @State private var showShareGenerator = false
     @State private var showDeleteAlert = false
     @State private var deleteOffset: CGFloat = 0
+    @State private var showingUserProfile = false
     @EnvironmentObject var appState: AppState
+    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     
     var body: some View {
         GlassmorphicCard {
@@ -537,6 +539,24 @@ struct RecipeGridCard: View {
                             .foregroundColor(.white)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
+                        
+                        // Author row
+                        Button(action: {
+                            if let currentUser = cloudKitAuth.currentUser {
+                                showingUserProfile = true
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.white.opacity(0.6))
+                                Text(cloudKitAuth.currentUser?.displayName ?? "Me")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .underline()
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
                         
                         HStack {
                             Label("\(recipe.cookTime)m", systemImage: "clock")
@@ -645,6 +665,14 @@ struct RecipeGridCard: View {
             }
         } message: {
             Text("Are you sure you want to delete \"\(recipe.name)\"? This action cannot be undone.")
+        }
+        .sheet(isPresented: $showingUserProfile) {
+            if let currentUser = cloudKitAuth.currentUser {
+                UserProfileView(
+                    userID: currentUser.recordID ?? "current-user",
+                    userName: currentUser.displayName ?? "Me"
+                )
+            }
         }
     }
     

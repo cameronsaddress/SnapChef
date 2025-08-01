@@ -1,5 +1,8 @@
 DEFINE SCHEMA
 
+    -- Note: Photo storage is disabled pending appropriateness scanning implementation
+    -- Future: Profile photos and cooked meal photos will be stored after moderation
+    
     RECORD TYPE User (
         "___createTime" TIMESTAMP,
         "___createdBy"  REFERENCE,
@@ -210,20 +213,32 @@ DEFINE SCHEMA
         "___recordID"     REFERENCE QUERYABLE,
         id                STRING QUERYABLE,
         ownerID           STRING QUERYABLE,
+        ownerName         STRING SEARCHABLE,
+        ownerProfileImage STRING,
         title             STRING QUERYABLE SEARCHABLE,
         description       STRING SEARCHABLE,
         ingredients       STRING,
         instructions      STRING,
+        nutrition         STRING,
+        tags              LIST<STRING>,
         createdAt         TIMESTAMP SORTABLE,
         likeCount         INT64 SORTABLE,
-        commentCount      INT64,
-        viewCount         INT64,
-        shareCount        INT64,
+        commentCount      INT64 SORTABLE,
+        viewCount         INT64 SORTABLE,
+        shareCount        INT64 SORTABLE,
+        saveCount         INT64,
+        rating            DOUBLE,
+        ratingCount       INT64,
         isPublic          INT64 QUERYABLE,
+        isFeatured        INT64,
         cookingTime       INT64,
+        prepTime          INT64,
+        servings          INT64,
         difficulty        STRING QUERYABLE,
         cuisine           STRING QUERYABLE,
+        mealType          STRING QUERYABLE,
         imageAsset        ASSET,
+        -- Future: Multiple food photos after moderation
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"
     );
@@ -266,12 +281,20 @@ DEFINE SCHEMA
         "___recordID"      REFERENCE QUERYABLE,
         id                 STRING QUERYABLE,
         userID             STRING QUERYABLE,
+        userName           STRING,
+        userProfileImage   STRING,
+        userIsVerified     INT64,
         recipeID           STRING QUERYABLE,
+        recipeOwnerID      STRING,
         content            STRING,
         createdAt          TIMESTAMP SORTABLE,
+        updatedAt          TIMESTAMP,
         isDeleted          INT64,
+        isEdited           INT64,
         likeCount          INT64,
+        replyCount         INT64,
         parentCommentID    STRING QUERYABLE,
+        mentions           LIST<STRING>,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"
     );
@@ -297,4 +320,407 @@ DEFINE SCHEMA
         isRead             INT64 QUERYABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"
+    );
+
+    RECORD TYPE UserPreferences (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
+        userID             STRING QUERYABLE,
+        dietaryRestrictions LIST<STRING>,
+        cuisinePreferences LIST<STRING>,
+        difficultyPreference STRING,
+        cookingTimePreference STRING,
+        aiModelPreference  STRING,
+        notificationSettings STRING,
+        privacySettings    STRING,
+        themePreference    STRING,
+        lastUpdated        TIMESTAMP SORTABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE AnalyticsEvent (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        eventType          STRING QUERYABLE,
+        eventName          STRING QUERYABLE,
+        eventData          STRING,
+        screenName         STRING QUERYABLE,
+        timestamp          TIMESTAMP SORTABLE,
+        sessionID          STRING QUERYABLE,
+        platform           STRING,
+        appVersion         STRING,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE RecipeRating (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
+        userID             STRING QUERYABLE,
+        recipeID           STRING QUERYABLE,
+        rating             INT64,
+        feedback           STRING,
+        ratedAt            TIMESTAMP SORTABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE SocialShare (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        recipeID           STRING,
+        challengeID        STRING,
+        platform           STRING QUERYABLE,
+        shareURL           STRING,
+        sharedAt           TIMESTAMP SORTABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE CameraSession (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        sessionID          STRING QUERYABLE,
+        captureType        STRING,
+        flashEnabled       INT64,
+        ingredientsDetected LIST<STRING>,
+        recipesGenerated   INT64,
+        aiModel            STRING,
+        processingTime     DOUBLE,
+        timestamp          TIMESTAMP SORTABLE,
+        -- photoData field reserved for future use after moderation
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE RecipeGeneration (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        sessionID          STRING QUERYABLE,
+        recipeData         STRING,
+        ingredients        LIST<STRING>,
+        preferences        STRING,
+        generationTime     DOUBLE,
+        quality            STRING,
+        timestamp          TIMESTAMP SORTABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE AppSession (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        sessionID          STRING QUERYABLE,
+        startTime          TIMESTAMP SORTABLE,
+        endTime            TIMESTAMP,
+        duration           DOUBLE,
+        screensViewed      LIST<STRING>,
+        featuresUsed       LIST<STRING>,
+        recipesCreated     INT64,
+        challengesJoined   INT64,
+        deviceInfo         STRING,
+        appVersion         STRING,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE FeatureUsage (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        feature            STRING QUERYABLE,
+        usageCount         INT64,
+        lastUsed           TIMESTAMP SORTABLE,
+        totalDuration      DOUBLE,
+        successRate        DOUBLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE ErrorLog (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        errorType          STRING QUERYABLE,
+        errorMessage       STRING,
+        stackTrace         STRING,
+        context            STRING,
+        severity           STRING QUERYABLE,
+        timestamp          TIMESTAMP SORTABLE,
+        resolved           INT64,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE FoodPreference (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
+        userID             STRING QUERYABLE,
+        dietaryRestrictions LIST<STRING>,
+        allergies          LIST<STRING>,
+        favoriteCuisines   LIST<STRING>,
+        dislikedIngredients LIST<STRING>,
+        cookingSkillLevel  STRING,
+        preferredCookTime  INT64,
+        kitchenTools       LIST<STRING>,
+        mealPlanningGoals  STRING,
+        lastUpdated        TIMESTAMP SORTABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE SearchHistory (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        searchQuery        STRING QUERYABLE,
+        searchType         STRING,
+        resultsCount       INT64,
+        clickedResults     LIST<STRING>,
+        timestamp          TIMESTAMP SORTABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE NotificationPreference (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
+        userID             STRING QUERYABLE,
+        challengeReminders INT64,
+        socialUpdates      INT64,
+        recipeRecommendations INT64,
+        achievementAlerts  INT64,
+        teamNotifications  INT64,
+        marketingMessages  INT64,
+        quietHoursStart    STRING,
+        quietHoursEnd      STRING,
+        preferredTime      STRING,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE DeviceSync (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        deviceID           STRING QUERYABLE,
+        deviceName         STRING,
+        deviceType         STRING,
+        osVersion          STRING,
+        appVersion         STRING,
+        lastSync           TIMESTAMP SORTABLE,
+        syncData           STRING,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    -- Streak System Records
+    RECORD TYPE UserStreak (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        streakType         STRING QUERYABLE,
+        currentStreak      INT64 SORTABLE,
+        longestStreak      INT64 SORTABLE,
+        lastActivityDate   TIMESTAMP SORTABLE,
+        streakStartDate    TIMESTAMP,
+        totalDaysActive    INT64,
+        frozenUntil        TIMESTAMP,
+        insuranceActive    INT64,
+        multiplier         DOUBLE,
+        freezesRemaining   INT64,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE StreakHistory (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        streakType         STRING QUERYABLE,
+        streakLength       INT64 SORTABLE,
+        startDate          TIMESTAMP,
+        endDate            TIMESTAMP SORTABLE,
+        breakReason        STRING,
+        restored           INT64,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE StreakAchievement (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        achievementType    STRING QUERYABLE,
+        unlockedAt         TIMESTAMP SORTABLE,
+        streakLength       INT64,
+        rewardsClaimed     INT64,
+        badgeIcon          STRING,
+        milestoneTitle     STRING,
+        coinsEarned        INT64,
+        xpEarned           INT64,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE StreakFreeze (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        freezeDate         TIMESTAMP SORTABLE,
+        freezeType         STRING,
+        streakType         STRING,
+        remainingFreezes   INT64,
+        expiresAt          TIMESTAMP,
+        source             STRING,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE TeamStreak (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        teamID             STRING QUERYABLE,
+        streakType         STRING QUERYABLE,
+        currentStreak      INT64 SORTABLE,
+        memberContributions STRING,
+        lastActivityDate   TIMESTAMP,
+        gracePeriodUntil   TIMESTAMP,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE StreakPowerUp (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        powerUpType        STRING QUERYABLE,
+        streakType         STRING,
+        activatedAt        TIMESTAMP,
+        expiresAt          TIMESTAMP,
+        costInCoins        INT64,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE StreakLeaderboard (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        userName           STRING,
+        streakType         STRING QUERYABLE,
+        currentStreak      INT64 SORTABLE,
+        longestStreak      INT64,
+        totalStreakDays    INT64,
+        globalRank         INT64,
+        regionalRank       INT64,
+        lastUpdated        TIMESTAMP SORTABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    -- Future Photo Storage (after moderation implementation)
+    RECORD TYPE PhotoModeration (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        userID             STRING QUERYABLE,
+        photoType          STRING QUERYABLE,
+        moderationStatus   STRING QUERYABLE,
+        moderationScore    DOUBLE,
+        approvedAt         TIMESTAMP,
+        rejectionReason    STRING,
+        photoAsset         ASSET,
+        thumbnail          ASSET,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
     );

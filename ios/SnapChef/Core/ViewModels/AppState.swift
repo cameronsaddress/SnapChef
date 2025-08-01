@@ -29,6 +29,9 @@ class AppState: ObservableObject {
     @Published var showChallengeCompletion: Bool = false
     @Published var pendingChallengeRewards: [ChallengeReward] = []
     
+    // CloudKit Session Tracking
+    @Published var currentSessionID: String = ""
+    
     private let userDefaults = UserDefaults.standard
     private let firstLaunchKey = "hasLaunchedBefore"
     private let userJoinDateKey = "userJoinDate"

@@ -10,6 +10,7 @@ struct InfluencerDetailView: View {
     @State private var contentVisible = false
     @State private var showShareSheet = false
     @State private var showingSavedAlert = false
+    @State private var showingUserProfile = false
     
     // MARK: - Computed Properties
     private var profileSection: some View {
@@ -32,15 +33,20 @@ struct InfluencerDetailView: View {
                 .shadow(color: Color(hex: "#667eea").opacity(0.5), radius: 20)
             
             VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Text(influencer.influencerName)
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(Color(hex: "#4facfe"))
+                Button(action: {
+                    showingUserProfile = true
+                }) {
+                    HStack(spacing: 8) {
+                        Text(influencer.influencerName)
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(Color(hex: "#4facfe"))
+                    }
                 }
+                .buttonStyle(PlainButtonStyle())
                 
                 Text(influencer.influencerHandle + " • " + influencer.followerCount + " followers")
                     .font(.system(size: 16, weight: .medium))
@@ -229,6 +235,12 @@ struct InfluencerDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("This recipe has been added to your collection with '\(influencer.influencerName)' in the title.")
+        }
+        .sheet(isPresented: $showingUserProfile) {
+            UserProfileView(
+                userID: influencer.influencerHandle.replacingOccurrences(of: "@", with: ""),
+                userName: influencer.influencerName
+            )
         }
     }
     

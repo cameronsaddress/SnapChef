@@ -208,13 +208,27 @@ class GamificationManager: ObservableObject {
     @Published var pendingRewards: [ChallengeReward] = []
     @Published var hasCheckedInToday: Bool = false
     
+    private let challengeDatabase = ChallengeDatabase.shared
+    
     init() {
         loadMockData()
         checkDailyCheckInStatus()
-        loadLocalChallenges()
+        loadChallengesFromDatabase()
+        
+        // Subscribe to database updates
+        challengeDatabase.$activeChallenges
+            .assign(to: &$activeChallenges)
     }
     
-    // MARK: - Local Challenge Loading
+    // MARK: - Challenge Database Loading
+    
+    private func loadChallengesFromDatabase() {
+        // The database automatically updates its active challenges
+        // We just need to trigger an initial update
+        challengeDatabase.updateActiveChallenges()
+    }
+    
+    // MARK: - Local Challenge Loading (Legacy - kept for reference)
     
     private func loadLocalChallenges() {
         // Generate all challenges locally

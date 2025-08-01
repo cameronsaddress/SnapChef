@@ -1,5 +1,6 @@
 import SwiftUI
 import CloudKit
+import UIKit
 
 struct RecipeDetailView: View {
     let recipe: Recipe
@@ -46,7 +47,7 @@ struct RecipeDetailView: View {
                     
                     // Recipe Info
                     VStack(alignment: .leading, spacing: 16) {
-                        // Recipe title with like button
+                        // Recipe title with like and share buttons
                         HStack(alignment: .top, spacing: 12) {
                             Text(recipe.name)
                                 .font(.system(size: 32, weight: .bold, design: .rounded))
@@ -54,19 +55,55 @@ struct RecipeDetailView: View {
                             
                             Spacer()
                             
+                            // Share button
+                            Menu {
+                                Button(action: { shareVia("instagram") }) {
+                                    Label("Instagram", systemImage: "camera")
+                                }
+                                Button(action: { shareVia("tiktok") }) {
+                                    Label("TikTok", systemImage: "music.note")
+                                }
+                                Button(action: { shareVia("twitter") }) {
+                                    Label("X (Twitter)", systemImage: "bubble.left")
+                                }
+                                Button(action: { shareVia("whatsapp") }) {
+                                    Label("WhatsApp", systemImage: "message")
+                                }
+                                Divider()
+                                Button(action: { shareRecipe() }) {
+                                    Label("More Options", systemImage: "ellipsis")
+                                }
+                            } label: {
+                                VStack(spacing: 4) {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.system(size: 24, weight: .medium))
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            
                             // Like button
                             Button(action: toggleLike) {
                                 VStack(spacing: 4) {
-                                    Image(systemName: isLiked ? "heart.fill" : "heart")
-                                        .font(.system(size: 24, weight: .medium))
-                                        .foregroundColor(isLiked ? .pink : .gray)
-                                        .scaleEffect(isLiked ? 1.1 : 1.0)
-                                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isLiked)
+                                    ZStack {
+                                        Image(systemName: "heart.fill")
+                                            .font(.system(size: 24, weight: .medium))
+                                            .foregroundColor(.pink)
+                                            .scaleEffect(isLiked ? 1.1 : 0)
+                                            .opacity(isLiked ? 1 : 0)
+                                        
+                                        Image(systemName: "heart")
+                                            .font(.system(size: 24, weight: .medium))
+                                            .foregroundColor(.gray)
+                                            .scaleEffect(isLiked ? 0 : 1.0)
+                                            .opacity(isLiked ? 0 : 1)
+                                    }
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.6, blendDuration: 0), value: isLiked)
                                     
                                     if likeCount > 0 {
                                         Text("\(likeCount)")
                                             .font(.system(size: 14, weight: .bold))
-                                            .foregroundColor(.gray)
+                                            .foregroundColor(isLiked ? .pink : .gray)
+                                            .animation(.easeInOut(duration: 0.2), value: isLiked)
                                     }
                                 }
                             }
@@ -256,6 +293,10 @@ struct RecipeDetailView: View {
     private func toggleLike() {
         guard !isLoadingLike else { return }
         
+        // Haptic feedback
+        let impactGenerator = UIImpactFeedbackGenerator(style: .medium)
+        impactGenerator.impactOccurred()
+        
         Task {
             isLoadingLike = true
             defer { isLoadingLike = false }
@@ -275,9 +316,16 @@ struct RecipeDetailView: View {
                         isLiked = true
                         likeCount += 1
                     }
+                    
+                    // Success haptic for like
+                    let successGenerator = UINotificationFeedbackGenerator()
+                    successGenerator.notificationOccurred(.success)
                 }
             } catch {
                 print("Failed to toggle like: \(error)")
+                // Error haptic
+                let errorGenerator = UINotificationFeedbackGenerator()
+                errorGenerator.notificationOccurred(.error)
             }
         }
     }
@@ -321,6 +369,50 @@ struct RecipeDetailView: View {
             await MainActor.run {
                 newCommentText = ""
             }
+        }
+    }
+    
+    // MARK: - Share Functions
+    
+    private func shareVia(_ platform: String) {
+        let recipeText = """
+        Check out this amazing \(recipe.name) recipe I found on SnapChef! 
+        
+        ⏱ \(recipe.prepTime + recipe.cookTime) minutes
+        🍽 \(recipe.servings) servings
+        \(recipe.difficulty.emoji) \(recipe.difficulty.rawValue) difficulty
+        
+        #SnapChef #HomeCooking #FoodLove
+        """
+        
+        // For now, just use the system share sheet
+        shareRecipe()
+    }
+    
+    private func shareRecipe() {
+        let recipeText = """
+        \(recipe.name)
+        
+        \(recipe.description)
+        
+        ⏱ Cooking time: \(recipe.prepTime + recipe.cookTime) minutes
+        🍽 Servings: \(recipe.servings)
+        📊 Difficulty: \(recipe.difficulty.rawValue)
+        
+        Created with SnapChef - Turn your fridge into amazing recipes!
+        """
+        
+        let activityVC = UIActivityViewController(activityItems: [recipeText], applicationActivities: nil)
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootVC = window.rootViewController {
+            // For iPad
+            if let popover = activityVC.popoverPresentationController {
+                popover.sourceView = rootVC.view
+                popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+            }
+            rootVC.present(activityVC, animated: true)
         }
     }
 }

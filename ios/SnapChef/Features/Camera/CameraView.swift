@@ -6,6 +6,8 @@ struct CameraView: View {
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
+    @EnvironmentObject var cloudKitDataManager: CloudKitDataManager
+    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @Environment(\.dismiss) var dismiss
     @Binding var selectedTab: Int
     
@@ -182,6 +184,11 @@ struct CameraView: View {
         .onAppear {
             startScanAnimation()
             
+            // Track screen view
+            Task {
+                await cloudKitDataManager.trackScreenView("Camera")
+            }
+            
             // Check if this is the first time
             let hasSeenCamera = UserDefaults.standard.bool(forKey: "hasSeenCameraView")
             if !hasSeenCamera {
@@ -287,6 +294,11 @@ struct CameraView: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 showingPreview = true
             }
+            
+            // Track daily snap streak
+            Task {
+                await StreakManager.shared.recordActivity(for: .dailySnap)
+            }
         }
     }
     
@@ -314,6 +326,18 @@ struct CameraView: View {
             
             // Generate session ID
             let sessionId = UUID().uuidString
+            
+            // Track camera session start
+            let sessionData = CameraSessionData(
+                sessionID: sessionId,
+                captureType: "fridge_snap",
+                flashEnabled: cameraModel.flashMode == .on,
+                ingredientsDetected: [],
+                recipesGenerated: 0,
+                aiModel: UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "grok",
+                processingTime: 0
+            )
+            let startTime = Date()
             
             // Get existing recipe names to avoid duplicates
             let existingRecipeNames = appState.allRecipes.map { $0.name }
@@ -358,6 +382,52 @@ struct CameraView: View {
                         // Update state
                         self.generatedRecipes = recipes
                         self.detectedIngredients = apiResponse.data.ingredients
+                        
+                        // Track camera session completion
+                        let processingTime = Date().timeIntervalSince(startTime)
+                        let completedSession = CameraSessionData(
+                            sessionID: sessionId,
+                            captureType: "fridge_snap",
+                            flashEnabled: cameraModel.flashMode == .on,
+                            ingredientsDetected: apiResponse.data.ingredients.map { $0.name },
+                            recipesGenerated: recipes.count,
+                            aiModel: llmProvider,
+                            processingTime: processingTime
+                        )
+                        await cloudKitDataManager.trackCameraSession(completedSession)
+                        
+                        // Track recipe generation
+                        for recipe in recipes {
+                            let generationData = RecipeGenerationData(
+                                sessionID: sessionId,
+                                recipe: recipe,
+                                ingredients: apiResponse.data.ingredients.map { $0.name },
+                                preferencesJSON: String(describing: [
+                                    "dietary": currentDietaryRestrictions,
+                                    "foodType": effectiveFoodType ?? "",
+                                    "difficulty": selectedDifficulty ?? "",
+                                    "health": selectedHealthPreference ?? "",
+                                    "mealType": selectedMealType ?? "",
+                                    "cookingTime": selectedCookingTime ?? ""
+                                ]),
+                                generationTime: processingTime / Double(recipes.count),
+                                quality: "high"
+                            )
+                            await cloudKitDataManager.trackRecipeGeneration(generationData)
+                        }
+                        
+                        // Track feature usage
+                        await cloudKitDataManager.trackFeatureUse("recipe_generation")
+                        
+                        // Save recipes to CloudKit
+                        for recipe in recipes {
+                            do {
+                                let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true)
+                                print("✅ Recipe saved to CloudKit with ID: \(recipeID)")
+                            } catch {
+                                print("❌ Failed to save recipe to CloudKit: \(error)")
+                            }
+                        }
                         
                         // Increment snaps taken counter
                         self.appState.incrementSnapsTaken()

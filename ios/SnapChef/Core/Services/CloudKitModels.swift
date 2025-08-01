@@ -251,7 +251,7 @@ struct CloudKitLeaderboardEntry {
 }
 
 // MARK: - Team CloudKit Extension
-struct CloudKitTeam {
+struct CloudKitTeamWrapper {
     let team: Team
     var recordID: CKRecord.ID?
     

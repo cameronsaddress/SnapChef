@@ -162,6 +162,11 @@ struct ShareGeneratorView: View {
                             // Award coins for sharing
                             ChefCoinsManager.shared.awardSocialCoins(action: .share)
                             
+                            // Track social share streak
+                            Task {
+                                await StreakManager.shared.recordActivity(for: .socialShare)
+                            }
+                            
                             // Post notification for recipe sharing
                             NotificationCenter.default.post(
                                 name: Notification.Name("RecipeShared"),

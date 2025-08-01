@@ -191,10 +191,25 @@ class ChallengeGenerator {
         let userLevel = gamificationManager.userStats.level
         let difficultyMultiplier = 1.0 + (Double(userLevel) * 0.1)
         
+        // Determine base duration based on difficulty
+        let baseDuration: TimeInterval = {
+            if template.basePoints <= 100 { return 12 * 3600 } // Easy: 12 hours
+            else if template.basePoints <= 200 { return 24 * 3600 } // Medium: 24 hours
+            else if template.basePoints <= 500 { return 48 * 3600 } // Hard: 48 hours
+            else { return 72 * 3600 } // Expert: 72 hours
+        }()
+        
+        // Add variation to prevent identical countdowns
+        let hourVariation = Double.random(in: -2...2) * 3600
+        let minuteVariation = Double.random(in: 0...59) * 60
+        let secondVariation = Double.random(in: 0...59)
+        
+        let endDate = date.addingTimeInterval(baseDuration + hourVariation + minuteVariation + secondVariation)
+        
         return createChallenge(
             from: template,
             type: .daily,
-            endDate: endOfDay(for: date),
+            endDate: endDate,
             difficultyMultiplier: difficultyMultiplier
         )
     }
@@ -205,7 +220,13 @@ class ChallengeGenerator {
         let templateIndex = weekOfYear % weeklyChallengeTemplates.count
         let template = weeklyChallengeTemplates[templateIndex]
         
-        let endDate = calendar.date(byAdding: .day, value: 7, to: date) ?? date
+        // Base end date is 7 days from now
+        let baseEndDate = calendar.date(byAdding: .day, value: 7, to: date) ?? date
+        
+        // Add variation to prevent identical countdowns
+        let hourVariation = Double.random(in: -4...4) * 3600 // +/- 4 hours
+        let minuteVariation = Double.random(in: 0...59) * 60
+        let endDate = baseEndDate.addingTimeInterval(hourVariation + minuteVariation)
         
         return createChallenge(
             from: template,

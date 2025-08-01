@@ -52,17 +52,62 @@ struct ProfileView: View {
                     GamificationStatsView()
                         .staggeredFade(index: 0, isShowing: contentVisible)
                     
+                    // Streak Summary (UI placeholder - full views created but need Xcode project update)
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("🔥 Streaks")
+                                .font(.headline)
+                            Spacer()
+                            Text("Active")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
+                        
+                        HStack(spacing: 20) {
+                            VStack {
+                                Text("5")
+                                    .font(.title2.bold())
+                                Text("Active")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            
+                            VStack {
+                                Text("47")
+                                    .font(.title2.bold())
+                                Text("Total Days")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            
+                            VStack {
+                                Text("1.5x")
+                                    .font(.title2.bold())
+                                Text("Multiplier")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .padding()
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(16)
+                    .staggeredFade(index: 1, isShowing: contentVisible)
+                    
                     // Collection Progress
                     CollectionProgressView()
-                        .staggeredFade(index: 1, isShowing: contentVisible)
+                        .staggeredFade(index: 2, isShowing: contentVisible)
                     
                     // Active Challenges
                     ActiveChallengesSection()
-                        .staggeredFade(index: 2, isShowing: contentVisible)
+                        .staggeredFade(index: 3, isShowing: contentVisible)
                     
                     // Achievement Gallery
                     ProfileAchievementGalleryView()
-                        .staggeredFade(index: 3, isShowing: contentVisible)
+                        .staggeredFade(index: 4, isShowing: contentVisible)
                     
                     // Subscription Status Enhanced
                     EnhancedSubscriptionCard(
@@ -71,18 +116,18 @@ struct ProfileView: View {
                             showingSubscriptionView = true
                         }
                     )
-                    .staggeredFade(index: 4, isShowing: contentVisible)
+                    .staggeredFade(index: 5, isShowing: contentVisible)
                     
                     // Settings Section Enhanced
                     EnhancedSettingsSection()
-                        .staggeredFade(index: 5, isShowing: contentVisible)
+                        .staggeredFade(index: 6, isShowing: contentVisible)
                     
                     // Sign Out Button (only if authenticated)
                     if cloudKitAuthManager.isAuthenticated {
                         EnhancedSignOutButton(action: {
                             cloudKitAuthManager.signOut()
                         })
-                        .staggeredFade(index: 6, isShowing: contentVisible)
+                        .staggeredFade(index: 7, isShowing: contentVisible)
                         .padding(.top, 20)
                     }
                 }
