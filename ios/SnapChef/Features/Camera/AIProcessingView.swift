@@ -11,11 +11,10 @@ struct AIProcessingView: View {
             Color.black.opacity(0.85)
                 .ignoresSafeArea()
             
-            VStack(spacing: 50) {
+            VStack(spacing: 40) {
                 Spacer()
-                    .frame(height: 60)
                 
-                // Animated AI Icon at top
+                // Animated AI Icon
                 ZStack {
                     // Glow effect
                     Circle()
@@ -73,18 +72,20 @@ struct AIProcessingView: View {
                 }
                 
                 // Text content with professional animation
-                VStack(spacing: 24) {
-                    VStack(spacing: 12) {
+                VStack(spacing: 20) {
+                    VStack(spacing: 8) {
                         Text("Our AI is scanning")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .opacity(textOpacity)
                             .scaleEffect(textOpacity)
                             .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.2), value: textOpacity)
                         
-                        Text("Detecting food items, quantity & freshness")
-                            .font(.system(size: 18, weight: .medium, design: .rounded))
+                        Text("Detecting food items,\nquantity & freshness")
+                            .font(.system(size: 17, weight: .medium, design: .rounded))
                             .foregroundColor(.white.opacity(0.9))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
                             .opacity(textOpacity)
                             .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.4), value: textOpacity)
                     }
@@ -104,30 +105,53 @@ struct AIProcessingView: View {
                                 )
                         }
                     }
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 4)
                     
-                    Text("While our chef prepares your recipes...")
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    Text("While our chef prepares\nyour recipes...")
+                        .font(.system(size: 19, weight: .semibold, design: .rounded))
                         .foregroundColor(Color(hex: "#f093fb"))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
                         .opacity(textOpacity)
                         .animation(.easeInOut(duration: 0.5).delay(0.8), value: textOpacity)
                     
-                    Text("Enjoy a quick game!")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(hex: "#f093fb"), Color(hex: "#f5576c")],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                    // Prominent game button
+                    VStack(spacing: 8) {
+                        ZStack {
+                            // Pulsing background
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#f093fb"), Color(hex: "#f5576c")],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: 260, height: 56)
+                                .scaleEffect(isAnimating ? 1.05 : 1.0)
+                                .opacity(isAnimating ? 0.9 : 1.0)
+                                .animation(
+                                    Animation.easeInOut(duration: 1.5)
+                                        .repeatForever(autoreverses: true),
+                                    value: isAnimating
+                                )
+                            
+                            HStack(spacing: 8) {
+                                Image(systemName: "gamecontroller.fill")
+                                    .font(.system(size: 22))
+                                Text("Play a quick game on us!")
+                                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                            }
+                            .foregroundColor(.white)
+                        }
                         .opacity(textOpacity)
                         .scaleEffect(textOpacity)
                         .animation(.spring(response: 0.8, dampingFraction: 0.6).delay(1.0), value: textOpacity)
+                    }
+                    .padding(.top, 8)
                 }
-                .multilineTextAlignment(.center)
                 .padding(.horizontal, 30)
-                .frame(maxWidth: 500) // Limit width for readability
+                .frame(maxWidth: 400) // Limit width for readability
                 
                 Spacer()
             }

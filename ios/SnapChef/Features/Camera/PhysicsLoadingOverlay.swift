@@ -218,8 +218,8 @@ struct MagicalProcessingOverlay: View {
             if showAIProcessingView {
                 AIProcessingView()
                     .onAppear {
-                        // Hide AI processing view after 4 seconds
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                        // Hide AI processing view after 6 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
                             withAnimation(.easeOut(duration: 0.5)) {
                                 showAIProcessingView = false
                             }
