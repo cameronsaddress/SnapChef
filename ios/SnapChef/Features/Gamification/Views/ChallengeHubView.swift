@@ -6,6 +6,7 @@ struct ChallengeHubView: View {
     @State private var showingDailyCheckIn = false
     @State private var selectedChallenge: Challenge?
     @State private var refreshID = UUID()
+    @State private var hasPromptedForNotifications = false
     
     private enum ChallengeFilter: String, CaseIterable {
         case all = "All"
@@ -85,6 +86,14 @@ struct ChallengeHubView: View {
             if gamificationManager.activeChallenges.isEmpty {
                 Task {
                     await ChallengeService.shared.createMockChallenges()
+                }
+            }
+            
+            // Prompt for notifications if not already enabled
+            if !hasPromptedForNotifications && !ChallengeNotificationManager.shared.notificationsEnabled {
+                hasPromptedForNotifications = true
+                Task {
+                    await ChallengeNotificationManager.shared.requestNotificationPermission()
                 }
             }
         }

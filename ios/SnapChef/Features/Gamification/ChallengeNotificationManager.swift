@@ -1,10 +1,8 @@
 import Foundation
 import SwiftUI
+import UserNotifications
 
 // MARK: - Challenge Notification Manager
-// TODO: Enable when UserNotifications framework is properly linked
-/*
-import UserNotifications
 
 @MainActor
 class ChallengeNotificationManager: ObservableObject {
@@ -13,7 +11,7 @@ class ChallengeNotificationManager: ObservableObject {
     @Published var notificationsEnabled = false
     @Published var pendingNotifications: [UNNotificationRequest] = []
     
-    private let notificationCenter = UNNotificationCenter.current()
+    private let notificationCenter = UNUserNotificationCenter.current()
     private let gamificationManager = GamificationManager.shared
     
     // Notification Categories
@@ -374,47 +372,6 @@ class ChallengeNotificationManager: ObservableObject {
             cancelNotification(identifier: NotificationIdentifier.weeklyLeaderboard)
         }
     }
-}
-*/
-
-// Temporary stub implementation
-@MainActor
-class ChallengeNotificationManager: ObservableObject {
-    static let shared = ChallengeNotificationManager()
-    
-    @Published var notificationsEnabled = false
-    @Published var pendingNotifications: [Any] = []
-    
-    private init() {}
-    
-    func requestNotificationPermission() async -> Bool {
-        return false
-    }
-    
-    func scheduleChallengeReminder(for challenge: Challenge, reminderTime: Date) {}
-    
-    func notifyChallengeComplete(_ challenge: Challenge, reward: ChallengeReward) {}
-    
-    func scheduleDailyStreakReminder(at time: DateComponents) {}
-    
-    func scheduleWeeklyLeaderboardUpdate() {}
-    
-    func notifyTeamChallengeInvite(from userName: String, teamName: String, challengeName: String) {}
-    
-    func notifyNewChallengeAvailable(_ challenge: Challenge) {}
-    
-    func cancelNotification(identifier: String) {}
-    
-    func cancelAllChallengeNotifications() {}
-    
-    func updatePendingNotifications() {}
-    
-    func updateNotificationSettings(
-        challengeReminders: Bool,
-        streakReminders: Bool,
-        leaderboardUpdates: Bool,
-        teamInvites: Bool
-    ) {}
 }
 
 // MARK: - Notification Settings View

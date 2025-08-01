@@ -436,7 +436,7 @@ struct CameraView: View {
                         // Convert API errors to user-friendly errors
                         if case APIError.authenticationError = error {
                             self.currentError = .authenticationError("Authentication failed")
-                        } else if case APIError.serverError(let statusCode, let message) = error {
+                        } else if case APIError.serverError(_, let message) = error {
                             self.currentError = .apiError("Server error: \(message)")
                         } else {
                             self.currentError = .unknown(error.localizedDescription)

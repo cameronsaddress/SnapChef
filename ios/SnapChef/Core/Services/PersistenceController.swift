@@ -1,4 +1,5 @@
 import CoreData
+import CloudKit
 
 struct PersistenceController {
     static let shared = PersistenceController()
@@ -17,12 +18,20 @@ struct PersistenceController {
         return result
     }()
 
-    let container: NSPersistentContainer
+    let container: NSPersistentCloudKitContainer
 
     init(inMemory: Bool = false) {
-        container = NSPersistentContainer(name: "ChallengeModels")
+        container = NSPersistentCloudKitContainer(name: "ChallengeModels")
+        
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
+        } else {
+            // Configure for CloudKit
+            container.persistentStoreDescriptions.forEach { storeDescription in
+                storeDescription.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+                storeDescription.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+                storeDescription.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: "iCloud.com.snapchefapp.app")
+            }
         }
         
         container.loadPersistentStores { (storeDescription, error) in

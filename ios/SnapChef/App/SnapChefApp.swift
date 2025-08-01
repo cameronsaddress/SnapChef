@@ -34,8 +34,10 @@ struct SnapChefApp: App {
         // Check device fingerprint
         deviceManager.checkDeviceStatus()
         
-        // Setup analytics
-        // AnalyticsManager.shared.initialize() // TODO: Add AnalyticsManager.swift to Xcode project
+        // Setup notifications for challenges
+        Task {
+            await ChallengeNotificationManager.shared.requestNotificationPermission()
+        }
     }
     
     private func configureNavigationBar() {
