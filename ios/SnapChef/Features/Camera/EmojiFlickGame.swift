@@ -52,7 +52,7 @@ struct EmojiFlickGame: View {
                         .aspectRatio(contentMode: .fill)
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .opacity(0.375) // 25% less transparent (was 0.3, now 0.375)
-                        .blur(radius: 5)
+                        .blur(radius: 2.5) // Reduced blur for clearer background (was 5)
                         .clipped()
                         .ignoresSafeArea()
                 }
