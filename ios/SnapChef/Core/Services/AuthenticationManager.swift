@@ -1,6 +1,8 @@
 import SwiftUI
 import AuthenticationServices
 // import GoogleSignIn  // TODO: Add GoogleSignIn package dependency
+// import FBSDKCoreKit  // TODO: Add Facebook SDK package dependency
+// import FBSDKLoginKit
 
 @MainActor
 class AuthenticationManager: ObservableObject {
@@ -78,6 +80,37 @@ class AuthenticationManager: ObservableObject {
         */
     }
     
+    func signInWithFacebook(presentingViewController: UIViewController) async throws {
+        // TODO: Implement when Facebook SDK is added
+        throw AuthError.missingConfiguration
+        /*
+        let loginManager = LoginManager()
+        
+        do {
+            let result = try await loginManager.logIn(permissions: ["public_profile", "email"], from: presentingViewController)
+            
+            guard let token = result?.token else {
+                throw AuthError.invalidCredential
+            }
+            
+            // Get user info
+            let request = GraphRequest(graphPath: "me", parameters: ["fields": "id, name, email"])
+            let graphResult = try await request.start()
+            
+            let authData = FacebookAuthData(
+                userId: graphResult.userId ?? "",
+                email: graphResult.email,
+                name: graphResult.name,
+                accessToken: token.tokenString
+            )
+            
+            try await authenticateWithBackend(provider: .facebook, authData: authData)
+        } catch {
+            throw AuthError.unknown
+        }
+        */
+    }
+    
     private func authenticateWithBackend<T: Encodable>(provider: AuthProvider, authData: T) async throws {
         let response = try await NetworkManager.shared.authenticate(
             provider: provider,
@@ -104,11 +137,59 @@ class AuthenticationManager: ObservableObject {
             showAuthSheet = true
         }
     }
+    
+    // Check if authentication is required for specific features
+    func isAuthRequiredFor(feature: AuthRequiredFeature) -> Bool {
+        switch feature {
+        case .challenges, .leaderboard, .socialSharing, .teams, .streaks, .premiumFeatures:
+            return !isAuthenticated
+        case .basicRecipes:
+            return false // Basic recipe generation doesn't require auth
+        }
+    }
+    
+    func promptAuthForFeature(_ feature: AuthRequiredFeature) {
+        if isAuthRequiredFor(feature: feature) {
+            showAuthSheet = true
+        }
+    }
 }
 
 enum AuthProvider: String {
     case apple = "apple"
     case google = "google"
+    case facebook = "facebook"
+}
+
+enum AuthRequiredFeature {
+    case basicRecipes
+    case challenges
+    case leaderboard
+    case socialSharing
+    case teams
+    case streaks
+    case premiumFeatures
+    
+    var title: String {
+        switch self {
+        case .basicRecipes: return "Basic Recipes"
+        case .challenges: return "Challenges"
+        case .leaderboard: return "Leaderboard"
+        case .socialSharing: return "Social Sharing"
+        case .teams: return "Teams"
+        case .streaks: return "Streaks"
+        case .premiumFeatures: return "Premium Features"
+        }
+    }
+    
+    var requiresAuth: Bool {
+        switch self {
+        case .basicRecipes:
+            return false
+        case .challenges, .leaderboard, .socialSharing, .teams, .streaks, .premiumFeatures:
+            return true
+        }
+    }
 }
 
 enum AuthError: LocalizedError {
@@ -144,6 +225,13 @@ struct GoogleAuthData: Encodable {
     let email: String?
     let name: String?
     let idToken: String?
+}
+
+struct FacebookAuthData: Encodable {
+    let userId: String
+    let email: String?
+    let name: String?
+    let accessToken: String
 }
 
 struct AuthResponse: Decodable {

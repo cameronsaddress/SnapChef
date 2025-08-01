@@ -4,12 +4,24 @@ struct User: Codable {
     let id: String
     let email: String?
     let name: String?
+    let username: String  // Unique username for social features
     let profileImageURL: String?
     let subscription: Subscription
     let credits: Int
     let deviceId: String
     let createdAt: Date
     let lastLoginAt: Date
+    
+    // Social features
+    let totalPoints: Int
+    let currentStreak: Int
+    let longestStreak: Int
+    let challengesCompleted: Int
+    let recipesShared: Int
+    
+    // Privacy settings
+    let isProfilePublic: Bool
+    let showOnLeaderboard: Bool
 }
 
 struct Subscription: Codable {
