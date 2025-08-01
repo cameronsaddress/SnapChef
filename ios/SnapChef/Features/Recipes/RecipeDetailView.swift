@@ -314,21 +314,5 @@ struct RecipePrintView: View {
 }
 
 #Preview {
-    RecipeDetailView(recipe: MockDataProvider.shared.mockRecipeResponse().recipes?.first ?? Recipe(
-        id: UUID(),
-        name: "Sample Recipe",
-        description: "A delicious sample recipe",
-        ingredients: [
-            Ingredient(id: UUID(), name: "Flour", quantity: "2", unit: "cups", isAvailable: true),
-            Ingredient(id: UUID(), name: "Sugar", quantity: "1", unit: "cup", isAvailable: true)
-        ],
-        instructions: ["Step 1", "Step 2"],
-        cookTime: 30,
-        prepTime: 15,
-        servings: 4,
-        difficulty: .easy,
-        nutrition: Nutrition(calories: 300, protein: 20, carbs: 40, fat: 10, fiber: 5, sugar: 5, sodium: 500),
-        imageURL: nil,
-        createdAt: Date()
-    ))
+    RecipeDetailView(recipe: MockDataProvider.shared.mockRecipe())
 }

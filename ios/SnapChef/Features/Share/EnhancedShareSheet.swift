@@ -473,18 +473,5 @@ struct ConfettiParticle: View {
 }
 
 #Preview {
-    EnhancedShareSheet(recipe: MockDataProvider.shared.mockRecipeResponse().recipes?.first ?? Recipe(
-        id: UUID(),
-        name: "Sample Recipe",
-        description: "A delicious sample recipe",
-        ingredients: [],
-        instructions: [],
-        cookTime: 30,
-        prepTime: 15,
-        servings: 4,
-        difficulty: .easy,
-        nutrition: Nutrition(calories: 300, protein: 20, carbs: 40, fat: 10, fiber: 5, sugar: 5, sodium: 500),
-        imageURL: nil,
-        createdAt: Date()
-    ))
+    EnhancedShareSheet(recipe: MockDataProvider.shared.mockRecipe())
 }

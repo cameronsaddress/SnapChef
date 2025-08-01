@@ -332,18 +332,5 @@ struct ShareTextFieldStyle: TextFieldStyle {
 }
 
 #Preview {
-    SimpleShareSheet(recipe: Recipe(
-        id: UUID(),
-        name: "Chicken Stir Fry",
-        description: "A quick and healthy dish",
-        ingredients: [],
-        instructions: [],
-        cookTime: 15,
-        prepTime: 10,
-        servings: 4,
-        difficulty: .medium,
-        nutrition: Nutrition(calories: 320, protein: 28, carbs: 15, fat: 12, fiber: nil, sugar: nil, sodium: nil),
-        imageURL: nil,
-        createdAt: Date()
-    ))
+    SimpleShareSheet(recipe: MockDataProvider.shared.mockRecipe())
 }

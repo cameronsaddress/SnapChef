@@ -138,6 +138,23 @@ struct ShareGeneratorView: View {
                 // Auto-navigate to share sheet after generation
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     shareSheet = true
+                    
+                    // Award coins for sharing
+                    ChefCoinsManager.shared.awardSocialCoins(action: .share)
+                    
+                    // Post notification for recipe sharing
+                    NotificationCenter.default.post(
+                        name: Notification.Name("RecipeShared"),
+                        object: nil,
+                        userInfo: ["recipeId": recipe.id]
+                    )
+                    
+                    // Track social challenge progress
+                    ChallengeProgressTracker.shared.trackAction(.recipeShared, metadata: [
+                        "recipeId": recipe.id,
+                        "recipeName": recipe.name,
+                        "style": selectedStyle.rawValue
+                    ])
                 }
             }
         }

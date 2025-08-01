@@ -367,6 +367,52 @@ struct CameraView: View {
                             self.subscriptionManager.incrementDailyRecipeCount()
                         }
                         
+                        // Track challenge progress for recipe creation
+                        for recipe in recipes {
+                            // Post notification for recipe creation
+                            NotificationCenter.default.post(
+                                name: Notification.Name("RecipeCreated"),
+                                object: recipe
+                            )
+                            
+                            // Award coins based on recipe quality
+                            let quality = self.determineRecipeQuality(recipe)
+                            ChefCoinsManager.shared.awardRecipeCreationCoins(recipeQuality: quality)
+                            
+                            // Track specific challenge actions
+                            if recipe.nutrition.calories < 500 {
+                                ChallengeProgressTracker.shared.trackAction(.calorieTarget, metadata: [
+                                    "calories": recipe.nutrition.calories,
+                                    "recipeId": recipe.id
+                                ])
+                            }
+                            
+                            if recipe.nutrition.protein >= 20 {
+                                ChallengeProgressTracker.shared.trackAction(.proteinTarget, metadata: [
+                                    "protein": recipe.nutrition.protein,
+                                    "recipeId": recipe.id
+                                ])
+                            }
+                            
+                            // Track cuisine if available in tags
+                            if let cuisineTag = recipe.tags.first(where: { tag in
+                                ["italian", "mexican", "chinese", "japanese", "thai", "indian", "french", "american"].contains(tag.lowercased())
+                            }) {
+                                ChallengeProgressTracker.shared.trackAction(.cuisineExplored, metadata: [
+                                    "cuisine": cuisineTag,
+                                    "recipeId": recipe.id
+                                ])
+                            }
+                            
+                            // Check for speed challenges
+                            if recipe.prepTime + recipe.cookTime <= 30 {
+                                ChallengeProgressTracker.shared.trackAction(.timeCompleted, metadata: [
+                                    "totalTime": recipe.prepTime + recipe.cookTime,
+                                    "recipeId": recipe.id
+                                ])
+                            }
+                        }
+                        
                         // Don't auto-save recipes - user will choose which ones to save
                         // Store the captured image for later use
                         self.capturedImage = image
@@ -416,6 +462,47 @@ struct CameraView: View {
         
         // Process it the same way as a captured photo
         processImage(testImage)
+    }
+    
+    private func determineRecipeQuality(_ recipe: Recipe) -> RecipeQuality {
+        var score = 0
+        
+        // Check nutrition balance
+        let nutrition = recipe.nutrition
+        if nutrition.calories > 0 && nutrition.calories < 800 {
+            score += 1
+        }
+        if nutrition.protein >= 15 {
+            score += 1
+        }
+        if nutrition.carbs > 0 && nutrition.carbs < 60 {
+            score += 1
+        }
+        
+        // Check recipe completeness
+        if recipe.ingredients.count >= 5 {
+            score += 1
+        }
+        if recipe.instructions.count >= 3 {
+            score += 1
+        }
+        if !recipe.tags.isEmpty {
+            score += 1
+        }
+        
+        // Determine quality based on score
+        switch score {
+        case 0...2:
+            return .basic
+        case 3...4:
+            return .good
+        case 5:
+            return .excellent
+        case 6...:
+            return .perfect
+        default:
+            return .basic
+        }
     }
 }
 

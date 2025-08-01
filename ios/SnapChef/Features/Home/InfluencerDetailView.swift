@@ -247,7 +247,9 @@ struct InfluencerDetailView: View {
             difficulty: originalRecipe.difficulty,
             nutrition: originalRecipe.nutrition,
             imageURL: originalRecipe.imageURL,
-            createdAt: Date() // Current date for when it's saved
+            createdAt: Date(), // Current date for when it's saved
+            tags: originalRecipe.tags,
+            dietaryInfo: originalRecipe.dietaryInfo
         )
         
         // Save the recipe

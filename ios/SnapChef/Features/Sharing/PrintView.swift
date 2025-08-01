@@ -249,28 +249,5 @@ struct NutritionRow: View {
 }
 
 #Preview {
-    PrintView(recipe: Recipe(
-        id: UUID(),
-        name: "Chicken Stir Fry",
-        description: "A quick and healthy Asian-inspired dish",
-        ingredients: [
-            Ingredient(id: UUID(), name: "Chicken breast", quantity: "500", unit: "g", isAvailable: true),
-            Ingredient(id: UUID(), name: "Bell peppers", quantity: "2", unit: nil, isAvailable: true),
-            Ingredient(id: UUID(), name: "Soy sauce", quantity: "3", unit: "tbsp", isAvailable: false)
-        ],
-        instructions: [
-            "Cut chicken into bite-sized pieces",
-            "Heat oil in a wok over high heat",
-            "Stir fry chicken until golden",
-            "Add vegetables and cook for 3-4 minutes",
-            "Add sauce and toss everything together"
-        ],
-        cookTime: 15,
-        prepTime: 10,
-        servings: 4,
-        difficulty: .medium,
-        nutrition: Nutrition(calories: 320, protein: 28, carbs: 15, fat: 12, fiber: 3, sugar: 5, sodium: 580),
-        imageURL: nil,
-        createdAt: Date()
-    ))
+    PrintView(recipe: MockDataProvider.shared.mockRecipe())
 }

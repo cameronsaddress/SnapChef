@@ -439,98 +439,6 @@ struct AnimatedStatCard: View {
     }
 }
 
-// MARK: - Achievement Gallery
-struct AchievementGalleryView: View {
-    let achievements = [
-        ("🎯", "First Recipe", true),
-        ("🔥", "Week Streak", true),
-        ("🌟", "Viral Chef", false),
-        ("👨‍🍳", "Master Chef", false),
-        ("🚀", "Speed Demon", true),
-        ("💎", "Premium Member", false)
-    ]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Achievements")
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-            
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
-                ForEach(0..<achievements.count, id: \.self) { index in
-                    AchievementBadge(
-                        emoji: achievements[index].0,
-                        title: achievements[index].1,
-                        unlocked: achievements[index].2
-                    )
-                }
-            }
-        }
-    }
-}
-
-struct AchievementBadge: View {
-    let emoji: String
-    let title: String
-    let unlocked: Bool
-    
-    @State private var isAnimating = false
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(
-                        unlocked
-                            ? LinearGradient(
-                                colors: [
-                                    Color(hex: "#667eea").opacity(0.3),
-                                    Color(hex: "#764ba2").opacity(0.3)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            : LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.1),
-                                    Color.white.opacity(0.05)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                    )
-                    .frame(width: 60, height: 60)
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                unlocked
-                                    ? Color(hex: "#667eea").opacity(0.5)
-                                    : Color.white.opacity(0.2),
-                                lineWidth: 2
-                            )
-                    )
-                
-                Text(unlocked ? emoji : "🔒")
-                    .font(.system(size: 30))
-                    .scaleEffect(isAnimating && unlocked ? 1.2 : 1)
-                    .opacity(unlocked ? 1 : 0.5)
-            }
-            
-            Text(title)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.white.opacity(unlocked ? 0.9 : 0.5))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-        }
-        .onAppear {
-            if unlocked {
-                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                    isAnimating = true
-                }
-            }
-        }
-    }
-}
 
 // MARK: - Enhanced Subscription Card
 struct EnhancedSubscriptionCard: View {
@@ -1140,32 +1048,6 @@ struct ProfileOptionRow: View {
     }
 }
 
-// MARK: - Notification Settings View
-struct NotificationSettingsView: View {
-    @State private var dailyReminders = true
-    @State private var challengeAlerts = true
-    @State private var recipeRecommendations = false
-    @State private var socialUpdates = true
-    
-    var body: some View {
-        ZStack {
-            MagicalBackground()
-                .ignoresSafeArea()
-            
-            ScrollView {
-                VStack(spacing: 20) {
-                    NeumorphicToggle(isOn: $dailyReminders, label: "Daily Cooking Reminders")
-                    NeumorphicToggle(isOn: $challengeAlerts, label: "Challenge Notifications")
-                    NeumorphicToggle(isOn: $recipeRecommendations, label: "Recipe Recommendations")
-                    NeumorphicToggle(isOn: $socialUpdates, label: "Social Updates")
-                }
-                .padding(20)
-            }
-        }
-        .navigationTitle("Notifications")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
 
 // MARK: - Privacy Settings View
 struct PrivacySettingsView: View {

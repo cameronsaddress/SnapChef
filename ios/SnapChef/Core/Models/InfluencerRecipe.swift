@@ -76,7 +76,14 @@ extension InfluencerRecipe {
                         sodium: 420
                     ),
                     imageURL: nil,
-                    createdAt: Date()
+                    createdAt: Date(),
+                    tags: ["gluten-free", "vegetarian", "kid-friendly", "no-cook"],
+                    dietaryInfo: DietaryInfo(
+                        isVegetarian: true,
+                        isVegan: false,
+                        isGlutenFree: true,
+                        isDairyFree: false
+                    )
                 ),
                 cuisine: "Healthy",
                 tags: ["gluten-free", "vegetarian", "kid-friendly", "no-cook"],
@@ -146,7 +153,14 @@ extension InfluencerRecipe {
                         sodium: 680
                     ),
                     imageURL: nil,
-                    createdAt: Date()
+                    createdAt: Date(),
+                    tags: ["vegan", "high-protein", "easy", "quick"],
+                    dietaryInfo: DietaryInfo(
+                        isVegetarian: true,
+                        isVegan: true,
+                        isGlutenFree: false,
+                        isDairyFree: true
+                    )
                 ),
                 cuisine: "Thai",
                 tags: ["asian", "lettuce-wraps", "quick", "kid-friendly"],
@@ -215,7 +229,14 @@ extension InfluencerRecipe {
                         sodium: 320
                     ),
                     imageURL: nil,
-                    createdAt: Date()
+                    createdAt: Date(),
+                    tags: ["italian", "comfort-food", "quick", "easy"],
+                    dietaryInfo: DietaryInfo(
+                        isVegetarian: false,
+                        isVegan: false,
+                        isGlutenFree: false,
+                        isDairyFree: false
+                    )
                 ),
                 cuisine: "Healthy",
                 tags: ["gluten-free", "vegetarian", "bowls", "harvest"],
@@ -282,7 +303,14 @@ extension InfluencerRecipe {
                         sodium: 85
                     ),
                     imageURL: nil,
-                    createdAt: Date()
+                    createdAt: Date(),
+                    tags: ["paleo", "gluten-free", "grain-free", "healthy"],
+                    dietaryInfo: DietaryInfo(
+                        isVegetarian: false,
+                        isVegan: false,
+                        isGlutenFree: true,
+                        isDairyFree: true
+                    )
                 ),
                 cuisine: "Southern",
                 tags: ["breakfast", "smoothie-bowl", "peach", "healthy"],
@@ -351,7 +379,14 @@ extension InfluencerRecipe {
                         sodium: 15
                     ),
                     imageURL: nil,
-                    createdAt: Date()
+                    createdAt: Date(),
+                    tags: ["healthy", "mediterranean", "light", "fresh"],
+                    dietaryInfo: DietaryInfo(
+                        isVegetarian: true,
+                        isVegan: false,
+                        isGlutenFree: false,
+                        isDairyFree: false
+                    )
                 ),
                 cuisine: "Vegan",
                 tags: ["no-bake", "vegan", "energy-balls", "snack"],

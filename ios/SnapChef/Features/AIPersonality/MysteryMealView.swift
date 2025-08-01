@@ -248,7 +248,9 @@ struct MysteryMealView: View {
                     difficulty: recipe.difficulty,
                     nutrition: recipe.nutrition,
                     imageURL: recipe.imageURL,
-                    createdAt: recipe.createdAt
+                    createdAt: recipe.createdAt,
+                    tags: recipe.tags,
+                    dietaryInfo: recipe.dietaryInfo
                 )
             }
         case .medium:
@@ -266,7 +268,9 @@ struct MysteryMealView: View {
                     difficulty: recipe.difficulty,
                     nutrition: recipe.nutrition,
                     imageURL: recipe.imageURL,
-                    createdAt: recipe.createdAt
+                    createdAt: recipe.createdAt,
+                    tags: recipe.tags,
+                    dietaryInfo: recipe.dietaryInfo
                 )
             }
         case .wild:
@@ -284,7 +288,9 @@ struct MysteryMealView: View {
                     difficulty: recipe.difficulty,
                     nutrition: recipe.nutrition,
                     imageURL: recipe.imageURL,
-                    createdAt: recipe.createdAt
+                    createdAt: recipe.createdAt,
+                    tags: recipe.tags,
+                    dietaryInfo: recipe.dietaryInfo
                 )
             }
         case .insane:
@@ -302,7 +308,9 @@ struct MysteryMealView: View {
                     difficulty: recipe.difficulty,
                     nutrition: recipe.nutrition,
                     imageURL: recipe.imageURL,
-                    createdAt: recipe.createdAt
+                    createdAt: recipe.createdAt,
+                    tags: recipe.tags,
+                    dietaryInfo: recipe.dietaryInfo
                 )
             }
         }

@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 
+@MainActor
 class AppState: ObservableObject {
     @Published var isFirstLaunch: Bool
     @Published var currentUser: User?
@@ -18,6 +19,15 @@ class AppState: ObservableObject {
     @Published var totalShares: Int = 0
     @Published var totalSnapsTaken: Int = 0
     @Published var userJoinDate: Date = Date()
+    
+    // Challenge System State
+    @Published var gamificationManager = GamificationManager.shared
+    @Published var challengeGenerator = ChallengeGenerator()
+    @Published var challengeProgressTracker = ChallengeProgressTracker.shared
+    @Published var challengeService = ChallengeService.shared
+    @Published var activeChallenge: Challenge?
+    @Published var showChallengeCompletion: Bool = false
+    @Published var pendingChallengeRewards: [ChallengeReward] = []
     
     private let userDefaults = UserDefaults.standard
     private let firstLaunchKey = "hasLaunchedBefore"
@@ -47,6 +57,9 @@ class AppState: ObservableObject {
         
         // Load total snaps taken
         self.totalSnapsTaken = userDefaults.integer(forKey: totalSnapsTakenKey)
+        
+        // Initialize challenge system
+        initializeChallengeSystem()
         
         // DEBUG: Clear recipes for testing - remove this in production
         #if DEBUG
@@ -192,6 +205,92 @@ class AppState: ObservableObject {
             // Save just a flag in UserDefaults to indicate we have saved recipes
             userDefaults.set(true, forKey: "hasSavedRecipes")
         }
+    }
+    
+    // MARK: - Challenge System Methods
+    
+    @MainActor
+    private func initializeChallengeSystem() {
+        // Start challenge generation
+        challengeGenerator.scheduleAutomaticGeneration()
+        
+        // Start real-time sync
+        challengeService.startRealtimeSync()
+        
+        // Generate initial challenges if none exist
+        if gamificationManager.activeChallenges.isEmpty {
+            generateInitialChallenges()
+        }
+        
+        // Observe challenge completions
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleChallengeCompleted),
+            name: Notification.Name("ChallengeCompleted"),
+            object: nil
+        )
+    }
+    
+    @MainActor
+    private func generateInitialChallenges() {
+        // Generate daily challenge
+        let dailyChallenge = challengeGenerator.generateDailyChallenge()
+        gamificationManager.saveChallenge(dailyChallenge)
+        
+        // Generate weekly challenge
+        let weeklyChallenge = challengeGenerator.generateWeeklyChallenge()
+        gamificationManager.saveChallenge(weeklyChallenge)
+        
+        // Generate community challenge
+        let communityChallenge = challengeGenerator.generateCommunityChallenge()
+        gamificationManager.saveChallenge(communityChallenge)
+        
+        // Check for special events
+        if let specialChallenge = challengeGenerator.generateSpecialEventChallenge() {
+            gamificationManager.saveChallenge(specialChallenge)
+        }
+    }
+    
+    @objc private func handleChallengeCompleted(_ notification: Notification) {
+        if let userInfo = notification.userInfo,
+           let reward = userInfo["reward"] as? ChallengeReward {
+            pendingChallengeRewards.append(reward)
+            showChallengeCompletion = true
+        }
+    }
+    
+    func selectChallenge(_ challenge: Challenge) {
+        activeChallenge = challenge
+        challengeProgressTracker.startTracking(challenge: challenge)
+        gamificationManager.joinChallenge(challenge)
+    }
+    
+    func trackRecipeCreated(_ recipe: Recipe) {
+        // Increment recipe count
+        addRecentRecipe(recipe)
+        
+        // Track for challenges
+        challengeProgressTracker.handleRecipeCreated(recipe)
+        
+        // Track in gamification manager
+        gamificationManager.trackRecipeCreated(recipe)
+    }
+    
+    func claimPendingRewards() {
+        for reward in pendingChallengeRewards {
+            // Award points
+            if reward.points > 0 {
+                gamificationManager.awardPoints(reward.points, reason: "Challenge completion")
+            }
+            
+            // Award badge
+            if let badge = reward.badge {
+                gamificationManager.awardBadge(badge)
+            }
+        }
+        
+        pendingChallengeRewards.removeAll()
+        showChallengeCompletion = false
     }
 }
 

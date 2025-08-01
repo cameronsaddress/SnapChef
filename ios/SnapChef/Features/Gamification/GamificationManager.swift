@@ -34,7 +34,7 @@ struct Challenge: Identifiable {
     let title: String
     let description: String
     let requirement: String
-    let reward: ChallengeReward
+    var reward: ChallengeReward
     let endDate: Date
     let participants: Int
     var progress: Double = 0
@@ -54,10 +54,10 @@ struct Challenge: Identifiable {
 
 // MARK: - Challenge Reward
 struct ChallengeReward {
-    let points: Int
-    let badge: String?
-    let title: String?
-    let unlockable: String?
+    var points: Int
+    var badge: String?
+    var title: String?
+    var unlockable: String?
 }
 
 // MARK: - User Stats
@@ -133,12 +133,24 @@ class GamificationManager: ObservableObject {
     @Published var globalLeaderboard: [LeaderboardEntry] = []
     @Published var unlockedBadges: [GameBadge] = []
     @Published var pendingRewards: [ChallengeReward] = []
+    @Published var hasCheckedInToday: Bool = false
     
     private init() {
         loadMockData()
+        checkDailyCheckInStatus()
     }
     
     // MARK: - Challenge Management
+    
+    func saveChallenge(_ challenge: Challenge) {
+        // Add challenge to active challenges
+        activeChallenges.append(challenge)
+    }
+    
+    func saveChallengeProgress(challengeId: UUID, action: String, value: Double, metadata: [String: Any]? = nil) {
+        // Save challenge progress
+        print("Saving progress for challenge \(challengeId): \(action) = \(value)")
+    }
     
     func joinChallenge(_ challenge: Challenge) {
         // Join challenge logic
@@ -178,6 +190,32 @@ class GamificationManager: ObservableObject {
         
         // Update stats
         userStats.challengesCompleted += 1
+    }
+    
+    func completeChallengeWithPersistence(_ challenge: Challenge, score: Int) {
+        var completedChallenge = challenge
+        completedChallenge.isCompleted = true
+        completedChallenges.append(completedChallenge)
+        
+        // Award rewards with score
+        awardPoints(score)
+        if let badge = challenge.reward.badge {
+            awardBadge(badge)
+        }
+        
+        // Remove from active
+        activeChallenges.removeAll { $0.id == challenge.id }
+        
+        // Update stats
+        userStats.challengesCompleted += 1
+        
+        // Save to persistent storage (would be Core Data in real app)
+        saveChallengeProgress(
+            challengeId: challenge.id,
+            action: "completed",
+            value: 1.0,
+            metadata: ["score": score]
+        )
     }
     
     // MARK: - Points & Rewards
@@ -280,6 +318,32 @@ class GamificationManager: ObservableObject {
     func updateLeaderboards() async {
         // In real app, fetch from server
         // For now, using mock data
+    }
+    
+    // MARK: - Daily Check-In
+    
+    func performDailyCheckIn() {
+        hasCheckedInToday = true
+        updateStreak()
+        
+        // Save check-in date
+        UserDefaults.standard.set(Date(), forKey: "lastCheckInDate")
+        
+        // Award daily points
+        awardPoints(50, reason: "Daily check-in")
+    }
+    
+    private func checkDailyCheckInStatus() {
+        // Check if user has already checked in today
+        if let lastCheckIn = UserDefaults.standard.object(forKey: "lastCheckInDate") as? Date {
+            let calendar = Calendar.current
+            hasCheckedInToday = calendar.isDateInToday(lastCheckIn)
+            
+            // Check if streak should be broken
+            if !calendar.isDateInYesterday(lastCheckIn) && !calendar.isDateInToday(lastCheckIn) {
+                breakStreak()
+            }
+        }
     }
     
     // MARK: - Mock Data

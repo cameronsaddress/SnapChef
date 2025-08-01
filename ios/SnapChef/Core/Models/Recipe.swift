@@ -14,6 +14,8 @@ struct Recipe: Identifiable, Codable {
     let nutrition: Nutrition
     let imageURL: String?
     let createdAt: Date
+    let tags: [String]
+    let dietaryInfo: DietaryInfo
     
     enum Difficulty: String, Codable, CaseIterable {
         case easy = "Easy"
@@ -69,6 +71,13 @@ struct RecipeGenerationRequest: Codable {
     let dietaryPreferences: [String]
     let mealType: String?
     let servings: Int
+}
+
+struct DietaryInfo: Codable {
+    let isVegetarian: Bool
+    let isVegan: Bool
+    let isGlutenFree: Bool
+    let isDairyFree: Bool
 }
 
 struct RecipeGenerationResponse: Codable {

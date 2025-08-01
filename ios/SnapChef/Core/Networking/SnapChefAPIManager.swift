@@ -414,6 +414,15 @@ class SnapChefAPIManager {
             difficulty = .medium
         }
         
+        // Extract dietary info from tags
+        let tags = apiRecipe.tags ?? []
+        let dietaryInfo = DietaryInfo(
+            isVegetarian: tags.contains { $0.lowercased().contains("vegetarian") },
+            isVegan: tags.contains { $0.lowercased().contains("vegan") },
+            isGlutenFree: tags.contains { $0.lowercased().contains("gluten-free") || $0.lowercased().contains("gluten free") },
+            isDairyFree: tags.contains { $0.lowercased().contains("dairy-free") || $0.lowercased().contains("dairy free") }
+        )
+        
         return Recipe(
             id: UUID(uuidString: apiRecipe.id) ?? UUID(),
             name: apiRecipe.name,
@@ -426,7 +435,9 @@ class SnapChefAPIManager {
             difficulty: difficulty,
             nutrition: nutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: tags,
+            dietaryInfo: dietaryInfo
         )
     }
 }

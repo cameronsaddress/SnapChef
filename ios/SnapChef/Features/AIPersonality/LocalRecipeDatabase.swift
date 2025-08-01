@@ -12,8 +12,16 @@ struct LocalRecipeDatabase {
         }
     }
     
-    // Default nutrition for all recipes
-    private let defaultNutrition = Nutrition(calories: 450, protein: 25, carbs: 35, fat: 18, fiber: 5, sugar: 8, sodium: 600)
+    // Default nutrition values
+    private let defaultNutrition = Nutrition(
+        calories: 350,
+        protein: 15,
+        carbs: 45,
+        fat: 12,
+        fiber: 5,
+        sugar: 8,
+        sodium: 480
+    )
     
     // MARK: - Italian Recipes
     var italianRecipes: [Recipe] {
@@ -24,13 +32,15 @@ struct LocalRecipeDatabase {
             description: "Creamy pasta with crispy pancetta and parmesan",
             ingredients: createIngredients(from: ["400g spaghetti", "200g pancetta", "4 egg yolks", "100g Parmigiano Reggiano", "Black pepper", "Salt"]),
             instructions: ["Cook spaghetti until al dente", "Crisp pancetta in a pan", "Mix egg yolks with cheese", "Toss hot pasta with pancetta", "Remove from heat and add egg mixture", "Season with pepper"],
-            cookTime: 20,
+            cookTime: 15,
             prepTime: 10,
             servings: 4,
-            difficulty: .medium,
+            difficulty: .easy,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["italian", "pasta", "classic"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false)
         ),
         Recipe(
             id: UUID(),
@@ -44,7 +54,9 @@ struct LocalRecipeDatabase {
             difficulty: .easy,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["italian", "pizza", "vegetarian"],
+            dietaryInfo: DietaryInfo(isVegetarian: true, isVegan: false, isGlutenFree: false, isDairyFree: false)
         )
         ]
     }
@@ -59,12 +71,14 @@ struct LocalRecipeDatabase {
             ingredients: createIngredients(from: ["Chicken thighs", "Corn tortillas", "Pineapple", "Onion", "Cilantro", "Lime", "Chili powder"]),
             instructions: ["Marinate chicken in spices", "Grill with pineapple", "Warm tortillas", "Chop chicken", "Assemble tacos", "Top with onion and cilantro"],
             cookTime: 20,
-            prepTime: 2,
+            prepTime: 30,
             servings: 4,
             difficulty: .medium,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["mexican", "tacos", "spicy"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true)
         ),
         Recipe(
             id: UUID(),
@@ -75,10 +89,12 @@ struct LocalRecipeDatabase {
             cookTime: 25,
             prepTime: 20,
             servings: 6,
-            difficulty: .easy,
+            difficulty: .medium,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["mexican", "enchiladas", "spicy"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: false)
         )
         ]
     }
@@ -98,7 +114,9 @@ struct LocalRecipeDatabase {
             difficulty: .medium,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["chinese", "spicy", "nuts"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: true)
         ),
         Recipe(
             id: UUID(),
@@ -107,12 +125,14 @@ struct LocalRecipeDatabase {
             ingredients: createIngredients(from: ["Pork shoulder", "Pineapple", "Bell peppers", "Onion", "Vinegar", "Sugar", "Ketchup"]),
             instructions: ["Cut pork into chunks", "Batter and deep fry", "Make sweet sour sauce", "Stir-fry vegetables", "Combine everything", "Serve over rice"],
             cookTime: 25,
-            prepTime: 20,
+            prepTime: 30,
             servings: 4,
-            difficulty: .medium,
+            difficulty: .hard,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["chinese", "sweet", "pork"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: true)
         )
         ]
     }
@@ -132,7 +152,9 @@ struct LocalRecipeDatabase {
             difficulty: .easy,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["japanese", "teriyaki", "sweet"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: true)
         ),
         Recipe(
             id: UUID(),
@@ -142,11 +164,13 @@ struct LocalRecipeDatabase {
             instructions: ["Cook onions in dashi", "Add seasonings", "Add beef slices", "Simmer briefly", "Serve over rice", "Top with pickled ginger"],
             cookTime: 15,
             prepTime: 10,
-            servings: 4,
+            servings: 2,
             difficulty: .easy,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["japanese", "beef", "rice"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true)
         )
         ]
     }
@@ -162,11 +186,13 @@ struct LocalRecipeDatabase {
             instructions: ["Soak noodles", "Make pad thai sauce", "Stir-fry shrimp", "Add noodles and sauce", "Toss with vegetables", "Top with peanuts"],
             cookTime: 15,
             prepTime: 20,
-            servings: 4,
+            servings: 2,
             difficulty: .medium,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["thai", "noodles", "seafood"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true)
         ),
         Recipe(
             id: UUID(),
@@ -174,13 +200,15 @@ struct LocalRecipeDatabase {
             description: "Spicy coconut curry with vegetables",
             ingredients: createIngredients(from: ["Green curry paste", "Coconut milk", "Chicken", "Thai eggplant", "Basil", "Fish sauce"]),
             instructions: ["Fry curry paste", "Add coconut milk", "Simmer chicken", "Add vegetables", "Season to taste", "Garnish with basil"],
-            cookTime: 25,
+            cookTime: 20,
             prepTime: 15,
             servings: 4,
-            difficulty: .easy,
+            difficulty: .medium,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["thai", "curry", "spicy"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true)
         )
         ]
     }
@@ -195,12 +223,14 @@ struct LocalRecipeDatabase {
             ingredients: createIngredients(from: ["Chicken", "Yogurt", "Tomatoes", "Cream", "Garam masala", "Ginger", "Garlic"]),
             instructions: ["Marinate chicken", "Grill until charred", "Make curry sauce", "Simmer chicken in sauce", "Finish with cream", "Garnish with cilantro"],
             cookTime: 30,
-            prepTime: 2,
+            prepTime: 30,
             servings: 4,
             difficulty: .medium,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["indian", "curry", "creamy"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: false)
         ),
         Recipe(
             id: UUID(),
@@ -209,12 +239,14 @@ struct LocalRecipeDatabase {
             ingredients: createIngredients(from: ["Spinach", "Paneer", "Onions", "Tomatoes", "Cream", "Cumin", "Garlic"]),
             instructions: ["Blanch spinach", "Blend to puree", "Sauté aromatics", "Add spinach puree", "Fold in paneer", "Finish with cream"],
             cookTime: 25,
-            prepTime: 15,
+            prepTime: 20,
             servings: 4,
-            difficulty: .easy,
+            difficulty: .medium,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["indian", "vegetarian", "spinach"],
+            dietaryInfo: DietaryInfo(isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false)
         )
         ]
     }
@@ -234,7 +266,9 @@ struct LocalRecipeDatabase {
             difficulty: .hard,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["french", "braised", "wine"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true)
         ),
         Recipe(
             id: UUID(),
@@ -242,13 +276,15 @@ struct LocalRecipeDatabase {
             description: "Savory custard tart with bacon",
             ingredients: createIngredients(from: ["Pie crust", "Eggs", "Heavy cream", "Bacon", "Gruyere cheese", "Nutmeg"]),
             instructions: ["Blind bake crust", "Cook bacon", "Mix custard", "Add bacon and cheese", "Pour into crust", "Bake until set"],
-            cookTime: 40,
+            cookTime: 35,
             prepTime: 20,
             servings: 8,
             difficulty: .medium,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["french", "brunch", "eggs"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false)
         )
         ]
     }
@@ -268,7 +304,9 @@ struct LocalRecipeDatabase {
             difficulty: .easy,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["american", "burger", "comfort-food"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false)
         ),
         Recipe(
             id: UUID(),
@@ -276,13 +314,15 @@ struct LocalRecipeDatabase {
             description: "Creamy baked pasta with cheese",
             ingredients: createIngredients(from: ["Elbow macaroni", "Cheddar", "Butter", "Flour", "Milk", "Breadcrumbs"]),
             instructions: ["Cook pasta", "Make cheese sauce", "Combine pasta and sauce", "Top with breadcrumbs", "Bake until golden", "Let rest before serving"],
-            cookTime: 30,
+            cookTime: 25,
             prepTime: 15,
             servings: 6,
             difficulty: .easy,
             nutrition: defaultNutrition,
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["american", "pasta", "comfort-food"],
+            dietaryInfo: DietaryInfo(isVegetarian: true, isVegan: false, isGlutenFree: false, isDairyFree: false)
         )
         ]
     }
@@ -296,29 +336,35 @@ struct LocalRecipeDatabase {
             .replacingOccurrences(of: " 🍛", with: "")
             .replacingOccurrences(of: " 🥐", with: "")
             .replacingOccurrences(of: " 🍔", with: "")
+            .lowercased()
         
-        switch cleanCuisine.lowercased() {
+        let recipes: [Recipe]
+        
+        switch cleanCuisine {
         case "italian":
-            return italianRecipes.randomElement()
+            recipes = italianRecipes
         case "mexican":
-            return mexicanRecipes.randomElement()
+            recipes = mexicanRecipes
         case "chinese":
-            return chineseRecipes.randomElement()
+            recipes = chineseRecipes
         case "japanese":
-            return japaneseRecipes.randomElement()
+            recipes = japaneseRecipes
         case "thai":
-            return thaiRecipes.randomElement()
+            recipes = thaiRecipes
         case "indian":
-            return indianRecipes.randomElement()
+            recipes = indianRecipes
         case "french":
-            return frenchRecipes.randomElement()
+            recipes = frenchRecipes
         case "american":
-            return americanRecipes.randomElement()
+            recipes = americanRecipes
         default:
-            // Return a random recipe from any cuisine
-            let allRecipes = italianRecipes + mexicanRecipes + chineseRecipes + japaneseRecipes
-                + thaiRecipes + indianRecipes + frenchRecipes + americanRecipes
-            return allRecipes.randomElement()
+            // If cuisine not found, return a random recipe from all cuisines
+            let allRecipes = italianRecipes + mexicanRecipes + chineseRecipes + 
+                           japaneseRecipes + thaiRecipes + indianRecipes + 
+                           frenchRecipes + americanRecipes
+            recipes = allRecipes
         }
+        
+        return recipes.randomElement()
     }
 }

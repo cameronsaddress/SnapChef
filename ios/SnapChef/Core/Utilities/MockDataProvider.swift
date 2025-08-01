@@ -52,7 +52,14 @@ class MockDataProvider {
                     sodium: 320
                 ),
                 imageURL: nil,
-                createdAt: Date()
+                createdAt: Date(),
+                tags: ["healthy", "vegetarian", "quick", "salad"],
+                dietaryInfo: DietaryInfo(
+                    isVegetarian: true,
+                    isVegan: false,
+                    isGlutenFree: true,
+                    isDairyFree: false
+                )
             ),
             Recipe(
                 id: UUID(),
@@ -92,7 +99,14 @@ class MockDataProvider {
                     sodium: 580
                 ),
                 imageURL: nil,
-                createdAt: Date()
+                createdAt: Date(),
+                tags: ["asian", "chicken", "quick", "stir-fry"],
+                dietaryInfo: DietaryInfo(
+                    isVegetarian: false,
+                    isVegan: false,
+                    isGlutenFree: false,
+                    isDairyFree: true
+                )
             ),
             Recipe(
                 id: UUID(),
@@ -134,7 +148,14 @@ class MockDataProvider {
                     sodium: 420
                 ),
                 imageURL: nil,
-                createdAt: Date()
+                createdAt: Date(),
+                tags: ["soup", "vegetarian", "healthy", "comfort-food"],
+                dietaryInfo: DietaryInfo(
+                    isVegetarian: true,
+                    isVegan: true,
+                    isGlutenFree: false,
+                    isDairyFree: true
+                )
             )
         ]
         
@@ -207,7 +228,14 @@ class MockDataProvider {
                 sodium: 320
             ),
             imageURL: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            tags: ["healthy", "vegetarian", "quick", "salad"],
+            dietaryInfo: DietaryInfo(
+                isVegetarian: true,
+                isVegan: false,
+                isGlutenFree: true,
+                isDairyFree: false
+            )
         )
     }
 }

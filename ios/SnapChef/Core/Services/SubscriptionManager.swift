@@ -232,7 +232,40 @@ class SubscriptionManager: ObservableObject {
         case .saveRecipes:
             // Allow limited saves for free users
             return true
+        case .premiumChallenges:
+            return isPremium
+        case .doubleRewards:
+            return isPremium
+        case .exclusiveBadges:
+            return isPremium
         }
+    }
+    
+    // MARK: - Premium Challenge Management
+    
+    /// Get available premium challenges
+    func getPremiumChallenges() -> [String] {
+        guard isPremium else { return [] }
+        
+        return [
+            "Master Chef Marathon",
+            "Michelin Star Week",
+            "Global Cuisine Tour",
+            "Zero Waste Champion",
+            "Nutrition Perfectionist",
+            "Speed Demon Deluxe",
+            "Social Butterfly Supreme"
+        ]
+    }
+    
+    /// Check if a challenge is premium-only
+    func isPremiumChallenge(_ challengeTitle: String) -> Bool {
+        return getPremiumChallenges().contains(challengeTitle)
+    }
+    
+    /// Get reward multiplier for premium users
+    func getPremiumRewardMultiplier() -> Double {
+        return isPremium ? 2.0 : 1.0
     }
     
     // MARK: - Free Tier Limits
@@ -285,6 +318,9 @@ enum PremiumFeature {
     case nutritionTracking
     case prioritySupport
     case saveRecipes
+    case premiumChallenges
+    case doubleRewards
+    case exclusiveBadges
 }
 
 // MARK: - Subscription Period Extension
