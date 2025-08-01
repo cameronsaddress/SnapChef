@@ -161,44 +161,164 @@ ZStack {
 
 ## Gamification Components
 
-### EnhancedGamificationManager
-**Location**: `Features/Gamification/EnhancedGamificationManager.swift`
-**Purpose**: Central gamification logic
+### GamificationManager
+**Location**: `Features/Gamification/GamificationManager.swift`
+**Purpose**: Central gamification state management
 
-**Core Systems**:
-1. **Points**: Actions earn XP
-2. **Levels**: 50 levels with scaling XP
-3. **Badges**: 30+ achievements
-4. **Quests**: Daily/weekly challenges
-5. **Streaks**: Consecutive day bonuses
-
-**Point Values**:
+**Core Properties**:
 ```swift
-snapPhoto: 10
-completeRecipe: 50
-shareRecipe: 25
-dailyStreak: 20
-perfectWeek: 100
+@Published var userStats: UserGameStats
+@Published var activeChallenges: [Challenge]
+@Published var completedChallenges: [Challenge]
+@Published var weeklyLeaderboard: [LeaderboardEntry]
+@Published var globalLeaderboard: [LeaderboardEntry]
+@Published var unlockedBadges: [GameBadge]
+@Published var hasCheckedInToday: Bool
 ```
 
-### GamificationCenterView
-**Location**: `Features/Gamification/GamificationCenterView.swift`
-**Purpose**: Hub for all gamification features
+**Point System**:
+```swift
+recipeCreated: 10 + quality bonus
+challengeCompleted: 100-2000 (varies)
+dailyCheckIn: 50
+streakBonus: 50-500
+perfectRecipe: 50
+shareRecipe: 25
+```
+
+### Challenge System Components
+
+#### ChallengeHubView
+**Location**: `Features/Gamification/Views/ChallengeHubView.swift`
+**Purpose**: Main dashboard for all challenges
+
+**Sections**:
+1. **Featured Challenge**: Highlighted special event
+2. **Active Challenges**: Daily, weekly, community
+3. **Quick Stats**: Points, streak, rank
+4. **Navigation**: To leaderboard, achievements
+
+#### ChallengeCardView
+**Location**: `Features/Gamification/Views/ChallengeCardView.swift`
+**Purpose**: Individual challenge display
+
+**Features**:
+- Progress bar with animation
+- Time remaining countdown
+- Participant count
+- Reward preview
+- Join/Complete actions
+
+#### LeaderboardView
+**Location**: `Features/Gamification/Views/LeaderboardView.swift`
+**Purpose**: Global and regional rankings
 
 **Tabs**:
-1. **Overview**: Level, XP, stats
-2. **Badges**: Achievement gallery
-3. **Quests**: Active challenges
-4. **Leaderboard**: Global rankings
+- Weekly: Current week competition
+- All-Time: Global rankings
+- Friends: Social leaderboard (future)
 
-### BadgeCard
-**Location**: `Features/Gamification/Views/BadgeCard.swift`
-**Purpose**: Individual achievement display
+#### AchievementGalleryView
+**Location**: `Features/Gamification/Views/AchievementGalleryView.swift`
+**Purpose**: Badge collection display
 
-**States**:
-- Locked: Grayscale with lock icon
-- Unlocked: Full color with glow
-- Featured: 3D rotation animation
+**Features**:
+- Category filtering
+- Progress statistics
+- Badge detail view
+- Share achievements
+
+#### DailyCheckInView
+**Location**: `Features/Gamification/Views/DailyCheckInView.swift`
+**Purpose**: Maintain daily streaks
+
+**Components**:
+- Streak counter with flame animation
+- Weekly calendar view
+- Reward preview
+- Check-in button
+
+### Core Services
+
+#### ChallengeGenerator
+**Location**: `Features/Gamification/ChallengeGenerator.swift`
+**Purpose**: Creates dynamic challenges
+
+**Challenge Types**:
+- Recipe count challenges
+- Calorie target challenges
+- Time-based challenges
+- Cuisine exploration
+- Social sharing goals
+
+#### ChallengeProgressTracker
+**Location**: `Features/Gamification/ChallengeProgressTracker.swift`
+**Purpose**: Real-time progress monitoring
+
+**Tracked Actions**:
+```swift
+enum TrackedAction {
+    case recipeCreated
+    case calorieTarget
+    case timeCompleted
+    case cuisineExplored
+    case socialShare
+    case proteinTarget
+}
+```
+
+#### ChefCoinsManager
+**Location**: `Features/Gamification/ChefCoinsManager.swift`
+**Purpose**: Virtual currency system
+
+**Features**:
+- Earn coins from challenges
+- Spend on unlockables
+- Transaction history
+- Balance management
+
+### Data Models
+
+#### Challenge
+```swift
+struct Challenge {
+    let id: UUID
+    let type: ChallengeType
+    let title: String
+    let description: String
+    let requirement: String
+    var reward: ChallengeReward
+    let endDate: Date
+    let participants: Int
+    var progress: Double
+    var isCompleted: Bool
+}
+```
+
+#### GameBadge
+```swift
+struct GameBadge {
+    let id: UUID
+    let name: String
+    let icon: String
+    let description: String
+    let rarity: BadgeRarity
+    let unlockedDate: Date
+}
+```
+
+#### UserGameStats
+```swift
+struct UserGameStats {
+    var totalPoints: Int
+    var level: Int
+    var currentStreak: Int
+    var longestStreak: Int
+    var challengesCompleted: Int
+    var recipesCreated: Int
+    var badges: [GameBadge]
+}
+```
 
 ## Design System Components
 
@@ -340,7 +460,22 @@ GlassmorphicCard(
 3. Snapshot tests for UI
 4. Integration tests for flows
 
+## Recent Component Updates
+
+### Challenge System (January 2025)
+- Added complete challenge system with 20+ new components
+- Integrated gamification with recipe creation flow
+- Added Core Data persistence and CloudKit sync
+- Implemented real-time progress tracking
+- Created comprehensive UI for challenges and rewards
+
+### Fixed Issues
+- GlassmorphicCard parameter consistency
+- Recipe model updates (tags, dietaryInfo)
+- MainActor isolation for async operations
+- String indexing and regex patterns
+
 ---
 
 Last Updated: January 31, 2025
-Version: 1.0.0
+Version: 1.1.0

@@ -32,8 +32,19 @@ struct AchievementGalleryView: View {
     
     private var allPossibleBadges: [GameBadge] {
         // This would normally come from a data source
-        // For now, return an empty array or create mock badges
-        return []
+        // For now, return mock badges to show progress
+        return [
+            GameBadge(name: "First Recipe", icon: "star.fill", description: "Create your first recipe", rarity: .common, unlockedDate: Date()),
+            GameBadge(name: "Recipe Explorer", icon: "map.fill", description: "Create 10 recipes", rarity: .common, unlockedDate: Date()),
+            GameBadge(name: "Culinary Creator", icon: "sparkles", description: "Create 50 recipes", rarity: .rare, unlockedDate: Date()),
+            GameBadge(name: "Master Chef", icon: "crown.fill", description: "Create 100 recipes", rarity: .epic, unlockedDate: Date()),
+            GameBadge(name: "Week Warrior", icon: "flame.fill", description: "7-day streak", rarity: .rare, unlockedDate: Date()),
+            GameBadge(name: "Dedication Master", icon: "medal.fill", description: "30-day streak", rarity: .legendary, unlockedDate: Date()),
+            GameBadge(name: "Social Butterfly", icon: "person.3.fill", description: "Share 10 recipes", rarity: .rare, unlockedDate: Date()),
+            GameBadge(name: "Speed Demon", icon: "timer.fill", description: "Complete speed challenge", rarity: .common, unlockedDate: Date()),
+            GameBadge(name: "Health Guru", icon: "heart.fill", description: "Create 10 healthy recipes", rarity: .rare, unlockedDate: Date()),
+            GameBadge(name: "Perfectionist", icon: "checkmark.seal.fill", description: "5 perfect recipes", rarity: .epic, unlockedDate: Date())
+        ]
     }
     
     private var unlockedBadgeIds: Set<UUID> {
@@ -116,7 +127,8 @@ struct AchievementGalleryView: View {
                     }
                     
                     VStack(spacing: 8) {
-                        Text("\(Int(Double(gamificationManager.userStats.badges.count) / Double(allPossibleBadges.count) * 100))%")
+                        let percentage = allPossibleBadges.isEmpty ? 0 : Int(Double(gamificationManager.userStats.badges.count) / Double(allPossibleBadges.count) * 100)
+                        Text("\(percentage)%")
                             .font(.system(size: 36, weight: .bold, design: .rounded))
                             .foregroundColor(Color(hex: "#667eea"))
                         Text("Complete")
@@ -141,7 +153,7 @@ struct AchievementGalleryView: View {
                                 )
                             )
                             .frame(
-                                width: geometry.size.width * (Double(gamificationManager.userStats.badges.count) / Double(allPossibleBadges.count)),
+                                width: allPossibleBadges.isEmpty ? 0 : geometry.size.width * (Double(gamificationManager.userStats.badges.count) / Double(allPossibleBadges.count)),
                                 height: 12
                             )
                             .animation(.spring(), value: gamificationManager.userStats.badges.count)
@@ -180,13 +192,16 @@ struct AchievementGalleryView: View {
             GridItem(.flexible()),
             GridItem(.flexible())
         ], spacing: 16) {
-            // For now, just show the user's actual badges
-            ForEach(gamificationManager.userStats.badges) { badge in
+            // Show all possible badges with unlock status
+            ForEach(allPossibleBadges) { badge in
+                let isUnlocked = unlockedBadgeIds.contains(badge.id)
                 BadgeCell(
                     badge: badge,
-                    isUnlocked: true
+                    isUnlocked: isUnlocked
                 ) {
-                    selectedBadge = badge
+                    if isUnlocked {
+                        selectedBadge = badge
+                    }
                 }
             }
         }

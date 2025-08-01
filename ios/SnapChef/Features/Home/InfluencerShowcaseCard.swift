@@ -97,6 +97,11 @@ struct BeforeAfterSliderView: View {
                     .frame(width: geometry.size.width / 2, height: 200)
                     .clipped()
                     .overlay(
+                        // Dark filter overlay
+                        Rectangle()
+                            .fill(Color.black.opacity(0.35))
+                    )
+                    .overlay(
                         VStack {
                             Spacer()
                             Text("BEFORE")
@@ -125,6 +130,11 @@ struct BeforeAfterSliderView: View {
                     }
                     .frame(width: geometry.size.width / 2, height: 200)
                     .clipped()
+                    .overlay(
+                        // Dark filter overlay
+                        Rectangle()
+                            .fill(Color.black.opacity(0.35))
+                    )
                     .overlay(
                         VStack {
                             Spacer()
