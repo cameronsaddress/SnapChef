@@ -1,6 +1,7 @@
 import Foundation
 import CloudKit
 import AuthenticationServices
+import GoogleSignIn
 import SwiftUI
 
 @MainActor
@@ -104,27 +105,27 @@ class CloudKitAuthManager: ObservableObject {
         self.showAuthSheet = false
     }
     
-    func signInWithGoogle(idToken: String, userInfo: GoogleUserInfo) async throws {
-        // Similar to Apple, but use Google user ID
-        let userID = "google_\(userInfo.userID)"
+    func signInWithGoogle(user: GIDGoogleUser) async throws {
+        // Use Google user ID with prefix to ensure uniqueness
+        let userID = "google_\(user.userID ?? UUID().uuidString)"
         await signInWithProvider(
             userID: userID,
             provider: "google",
-            email: userInfo.email,
-            displayName: userInfo.name,
-            profileImageURL: userInfo.profileImageURL
+            email: user.profile?.email,
+            displayName: user.profile?.name,
+            profileImageURL: user.profile?.imageURL(withDimension: 200)?.absoluteString
         )
     }
     
-    func signInWithFacebook(accessToken: String, userInfo: FacebookUserInfo) async throws {
-        // Similar to Apple, but use Facebook user ID
-        let userID = "facebook_\(userInfo.userID)"
+    func signInWithFacebook(userID: String, email: String?, name: String?, profileImageURL: String?) async throws {
+        // Use Facebook user ID with prefix to ensure uniqueness
+        let cloudKitUserID = "facebook_\(userID)"
         await signInWithProvider(
-            userID: userID,
+            userID: cloudKitUserID,
             provider: "facebook",
-            email: userInfo.email,
-            displayName: userInfo.name,
-            profileImageURL: userInfo.profileImageURL
+            email: email,
+            displayName: name,
+            profileImageURL: profileImageURL
         )
     }
     
@@ -396,19 +397,9 @@ struct UserStatUpdates {
     var coinBalance: Int?
 }
 
-struct GoogleUserInfo {
-    let userID: String
-    let email: String?
-    let name: String?
-    let profileImageURL: String?
-}
-
-struct FacebookUserInfo {
-    let userID: String
-    let email: String?
-    let name: String?
-    let profileImageURL: String?
-}
+// Google and Facebook user info are handled by their respective SDKs
+// GoogleSignIn provides GIDGoogleUser
+// Facebook SDK provides similar user objects
 
 enum CloudKitAuthError: LocalizedError {
     case invalidCredential

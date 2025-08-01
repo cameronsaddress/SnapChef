@@ -1,5 +1,6 @@
 import SwiftUI
 import AuthenticationServices
+import GoogleSignIn
 
 struct CloudKitAuthView: View {
     @StateObject private var authManager = CloudKitAuthManager.shared
@@ -77,10 +78,35 @@ struct CloudKitAuthView: View {
                         .frame(height: 50)
                         .cornerRadius(25)
                         
-                        // Note about other providers
-                        Text("Google and Facebook sign-in coming soon")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
+                        // Google Sign-In
+                        Button(action: handleSignInWithGoogle) {
+                            HStack {
+                                Image(systemName: "globe")
+                                    .font(.system(size: 18))
+                                Text("Sign in with Google")
+                                    .fontWeight(.medium)
+                            }
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color.white)
+                            .cornerRadius(25)
+                        }
+                        
+                        // Facebook Sign-In (placeholder for now)
+                        Button(action: handleSignInWithFacebook) {
+                            HStack {
+                                Image(systemName: "person.2.fill")
+                                    .font(.system(size: 18))
+                                Text("Sign in with Facebook")
+                                    .fontWeight(.medium)
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color(hex: "#1877F2"))
+                            .cornerRadius(25)
+                        }
                     }
                     .padding(.horizontal, 24)
                     .disabled(isLoading)
@@ -133,6 +159,51 @@ struct CloudKitAuthView: View {
                 isLoading = false
             }
         }
+    }
+    
+    private func handleSignInWithGoogle() {
+        isLoading = true
+        
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            errorMessage = "Unable to get root view controller"
+            showError = true
+            isLoading = false
+            return
+        }
+        
+        GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController) { [weak authManager] result, error in
+            Task { @MainActor in
+                if let error = error {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                    isLoading = false
+                    return
+                }
+                
+                guard let result = result else {
+                    errorMessage = "No result from Google Sign-In"
+                    showError = true
+                    isLoading = false
+                    return
+                }
+                
+                do {
+                    try await authManager?.signInWithGoogle(user: result.user)
+                    dismiss()
+                } catch {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                    isLoading = false
+                }
+            }
+        }
+    }
+    
+    private func handleSignInWithFacebook() {
+        // Facebook sign-in not yet implemented
+        errorMessage = "Facebook sign-in coming soon"
+        showError = true
     }
 }
 

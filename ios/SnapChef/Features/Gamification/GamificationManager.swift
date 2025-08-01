@@ -307,6 +307,13 @@ class GamificationManager: ObservableObject {
     }
     
     func joinChallenge(_ challenge: Challenge) {
+        // Check if authentication is required
+        let authManager = CloudKitAuthManager.shared
+        if authManager.isAuthRequiredFor(feature: .challenges) {
+            authManager.promptAuthForFeature(.challenges)
+            return
+        }
+        
         // Join challenge logic
         print("Joined challenge: \(challenge.title)")
         
