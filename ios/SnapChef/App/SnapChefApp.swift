@@ -5,6 +5,7 @@ struct SnapChefApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var authManager = AuthenticationManager()
     @StateObject private var deviceManager = DeviceManager()
+    @StateObject private var gamificationManager = GamificationManager()
     
     var body: some Scene {
         WindowGroup {
@@ -12,6 +13,7 @@ struct SnapChefApp: App {
                 .environmentObject(appState)
                 .environmentObject(authManager)
                 .environmentObject(deviceManager)
+                .environmentObject(gamificationManager)
                 .preferredColorScheme(.dark) // Force dark mode
                 .onAppear {
                     setupApp()

@@ -30,6 +30,8 @@ struct ProfileView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var deviceManager: DeviceManager
+    @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
+    @EnvironmentObject var gamificationManager: GamificationManager
     @State private var showingSubscriptionView = false
     @State private var contentVisible = false
     @State private var profileImageScale: CGFloat = 0
@@ -45,15 +47,18 @@ struct ProfileView: View {
                     // Enhanced Profile Header
                     EnhancedProfileHeader(user: authManager.currentUser)
                         .scaleEffect(profileImageScale)
-                        .scaleEffect(profileImageScale)
                     
                     // Gamification Stats
                     GamificationStatsView()
                         .staggeredFade(index: 0, isShowing: contentVisible)
                     
-                    // Achievement Gallery
-                    AchievementGalleryView()
+                    // Collection Progress
+                    CollectionProgressView()
                         .staggeredFade(index: 1, isShowing: contentVisible)
+                    
+                    // Achievement Gallery
+                    ProfileAchievementGalleryView()
+                        .staggeredFade(index: 2, isShowing: contentVisible)
                     
                     // Subscription Status Enhanced
                     EnhancedSubscriptionCard(
@@ -62,15 +67,24 @@ struct ProfileView: View {
                             showingSubscriptionView = true
                         }
                     )
-                    .staggeredFade(index: 2, isShowing: contentVisible)
+                    .staggeredFade(index: 3, isShowing: contentVisible)
                     
                     // Social Stats
                     SocialStatsCard()
-                        .staggeredFade(index: 3, isShowing: contentVisible)
+                        .staggeredFade(index: 4, isShowing: contentVisible)
                     
                     // Settings Section Enhanced
                     EnhancedSettingsSection()
-                        .staggeredFade(index: 4, isShowing: contentVisible)
+                        .staggeredFade(index: 5, isShowing: contentVisible)
+                    
+                    // Sign Out Button (only if authenticated)
+                    if cloudKitAuthManager.isAuthenticated {
+                        EnhancedSignOutButton(action: {
+                            cloudKitAuthManager.signOut()
+                        })
+                        .staggeredFade(index: 6, isShowing: contentVisible)
+                        .padding(.top, 20)
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 100)
@@ -102,7 +116,58 @@ struct EnhancedProfileHeader: View {
     @State private var showingEditProfile = false
     @State private var customName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
     @State private var customPhotoData: Data? = UserDefaults.standard.data(forKey: "CustomChefPhoto")
+    @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var gamificationManager: GamificationManager
+    
+    // Computed properties for display
+    private var displayName: String {
+        // Priority: CloudKit username > CloudKit display name > Custom name > User name > Guest
+        if let cloudKitUser = cloudKitAuthManager.currentUser {
+            return cloudKitUser.username ?? cloudKitUser.displayName
+        } else if !customName.isEmpty {
+            return customName
+        } else if let userName = user?.name {
+            return userName
+        } else {
+            return "Guest Chef"
+        }
+    }
+    
+    private var profileInitial: String {
+        displayName.prefix(1).uppercased()
+    }
+    
+    private var emailDisplay: String {
+        if let cloudKitUser = cloudKitAuthManager.currentUser {
+            return cloudKitUser.email ?? "Start your culinary journey"
+        } else if let userEmail = user?.email {
+            return userEmail
+        } else {
+            return "Start your culinary journey"
+        }
+    }
+    
+    private var currentStreak: Int {
+        // Use CloudKit streak if available, otherwise calculate from local data
+        if let cloudKitUser = cloudKitAuthManager.currentUser {
+            return cloudKitUser.currentStreak
+        } else {
+            return calculateStreak()
+        }
+    }
+    
+    private func calculateLevel() -> Int {
+        // Calculate level from total points
+        if let cloudKitUser = cloudKitAuthManager.currentUser {
+            let points = cloudKitUser.totalPoints
+            return min(1 + (points / 1000), 99) // Level up every 1000 points, max level 99
+        } else {
+            // Fallback to recipe count based level
+            let recipeCount = appState.allRecipes.count
+            return min(1 + (recipeCount / 5), 20) // Level up every 5 recipes for non-authenticated users
+        }
+    }
     
     private func calculateStreak() -> Int {
         // Get all recipe creation dates
@@ -141,15 +206,18 @@ struct EnhancedProfileHeader: View {
     }
     
     private func calculateUserStatus() -> String {
-        let recipeCount = appState.allRecipes.count
+        // Use CloudKit data if available, otherwise local data
+        let recipeCount = cloudKitAuthManager.currentUser?.recipesCreated ?? appState.allRecipes.count
+        let level = calculateLevel()
         
-        if recipeCount >= 50 {
+        // Status based on level (which is based on points for authenticated users)
+        if level >= 50 {
             return "⚡ Master Chef"
-        } else if recipeCount >= 20 {
+        } else if level >= 20 {
             return "🌟 Pro Chef"
-        } else if recipeCount >= 10 {
+        } else if level >= 10 {
             return "💫 Rising Star"
-        } else if recipeCount >= 5 {
+        } else if level >= 5 {
             return "🔥 Home Cook"
         } else {
             return "🌱 Beginner"
@@ -395,37 +463,37 @@ struct AnimatedStatCard: View {
     var body: some View {
         Button(action: {}) {
             GlassmorphicCard(content: {
-                VStack(spacing: 12) {
-                    // Icon with glow
+                VStack(spacing: 8) {
+                    // Icon with glow - made smaller
                     ZStack {
                         Circle()
                             .fill(color.opacity(0.2))
-                            .frame(width: 50, height: 50)
-                            .blur(radius: 10)
+                            .frame(width: 36, height: 36)
+                            .blur(radius: 8)
                         
                         Image(systemName: icon)
-                            .font(.system(size: 24, weight: .semibold))
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(color)
                     }
                     
-                    // Animated counter
+                    // Animated counter - made smaller
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text("\(value)")
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .contentTransition(.numericText())
                         
                         Text(suffix)
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white.opacity(0.8))
                     }
                     
                     Text(title)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                         .multilineTextAlignment(.center)
                 }
-                .padding(.vertical, 20)
+                .padding(.vertical, 16)
                 .frame(maxWidth: .infinity)
             }, glowColor: color)
         }
@@ -1401,6 +1469,374 @@ struct ProviderOptionCard: View {
     }
 }
 
+// MARK: - Collection Progress View
+struct CollectionProgressView: View {
+    @EnvironmentObject var appState: AppState
+    @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
+    @State private var animateProgress = false
+    
+    var totalRecipes: Int {
+        if let cloudKitUser = cloudKitAuthManager.currentUser {
+            return cloudKitUser.recipesCreated
+        } else {
+            return appState.allRecipes.count
+        }
+    }
+    
+    var favoriteRecipes: Int {
+        appState.favoritedRecipeIds.count
+    }
+    
+    var sharedRecipes: Int {
+        if let cloudKitUser = cloudKitAuthManager.currentUser {
+            return cloudKitUser.recipesShared
+        } else {
+            return appState.totalShares
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            HStack {
+                Text("Collection Progress")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                Spacer()
+                Text("📚")
+                    .font(.system(size: 24))
+            }
+            
+            VStack(spacing: 16) {
+                CollectionProgressRow(
+                    icon: "fork.knife",
+                    title: "Recipes Created",
+                    value: totalRecipes,
+                    maxValue: 100,
+                    color: Color(hex: "#667eea"),
+                    animate: animateProgress
+                )
+                
+                CollectionProgressRow(
+                    icon: "heart.fill",
+                    title: "Favorites",
+                    value: favoriteRecipes,
+                    maxValue: 50,
+                    color: Color(hex: "#f093fb"),
+                    animate: animateProgress
+                )
+                
+                CollectionProgressRow(
+                    icon: "square.and.arrow.up",
+                    title: "Shared",
+                    value: sharedRecipes,
+                    maxValue: 25,
+                    color: Color(hex: "#43e97b"),
+                    animate: animateProgress
+                )
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+            )
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.5)) {
+                animateProgress = true
+            }
+        }
+    }
+}
+
+// MARK: - Collection Progress Row
+struct CollectionProgressRow: View {
+    let icon: String
+    let title: String
+    let value: Int
+    let maxValue: Int
+    let color: Color
+    let animate: Bool
+    
+    private var progress: Double {
+        min(Double(value) / Double(maxValue), 1.0)
+    }
+    
+    private var percentage: Int {
+        Int(progress * 100)
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(color)
+                
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.8))
+                
+                Spacer()
+                
+                Text("\(value)/\(maxValue)")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
+            
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.white.opacity(0.1))
+                        .frame(height: 8)
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: animate ? geometry.size.width * progress : 0, height: 8)
+                        .animation(.spring(response: 0.8, dampingFraction: 0.7), value: animate)
+                }
+            }
+            .frame(height: 8)
+        }
+    }
+}
+
+// MARK: - Achievement Gallery View
+struct ProfileAchievementGalleryView: View {
+    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var gamificationManager: GamificationManager
+    @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
+    @State private var selectedAchievement: ProfileAchievement?
+    
+    let achievements = [
+        ProfileAchievement(id: "first_recipe", title: "First Recipe", description: "Create your first recipe", icon: "🍳", isUnlocked: false, unlockedDate: nil),
+        ProfileAchievement(id: "recipe_explorer", title: "Recipe Explorer", description: "Create 10 recipes", icon: "🧭", isUnlocked: false, unlockedDate: nil),
+        ProfileAchievement(id: "master_chef", title: "Master Chef", description: "Create 50 recipes", icon: "👨‍🍳", isUnlocked: false, unlockedDate: nil),
+        ProfileAchievement(id: "week_streak", title: "Week Warrior", description: "7 day streak", icon: "🔥", isUnlocked: false, unlockedDate: nil),
+        ProfileAchievement(id: "month_streak", title: "Dedicated Chef", description: "30 day streak", icon: "💪", isUnlocked: false, unlockedDate: nil),
+        ProfileAchievement(id: "social_butterfly", title: "Social Butterfly", description: "Share 10 recipes", icon: "🦋", isUnlocked: false, unlockedDate: nil)
+    ]
+    
+    private func isAchievementUnlocked(_ achievement: ProfileAchievement) -> Bool {
+        let recipeCount = cloudKitAuthManager.currentUser?.recipesCreated ?? appState.allRecipes.count
+        let sharedCount = cloudKitAuthManager.currentUser?.recipesShared ?? appState.totalShares
+        let streak = cloudKitAuthManager.currentUser?.currentStreak ?? 0
+        
+        switch achievement.id {
+        case "first_recipe":
+            return recipeCount >= 1
+        case "recipe_explorer":
+            return recipeCount >= 10
+        case "master_chef":
+            return recipeCount >= 50
+        case "week_streak":
+            return streak >= 7
+        case "month_streak":
+            return streak >= 30
+        case "social_butterfly":
+            return sharedCount >= 10
+        default:
+            return false
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            HStack {
+                Text("Achievements")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                Spacer()
+                Text("🏆")
+                    .font(.system(size: 24))
+            }
+            
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                ForEach(achievements) { achievement in
+                    ProfileAchievementBadge(
+                        achievement: achievement,
+                        isUnlocked: isAchievementUnlocked(achievement)
+                    )
+                    .onTapGesture {
+                        selectedAchievement = achievement
+                    }
+                }
+            }
+        }
+        .sheet(item: $selectedAchievement) { achievement in
+            ProfileAchievementDetailView(
+                achievement: achievement,
+                isUnlocked: isAchievementUnlocked(achievement)
+            )
+        }
+    }
+}
+
+// MARK: - Achievement Model
+struct ProfileAchievement: Identifiable {
+    let id: String
+    let title: String
+    let description: String
+    let icon: String
+    let isUnlocked: Bool
+    let unlockedDate: Date?
+}
+
+// MARK: - Achievement Badge
+struct ProfileAchievementBadge: View {
+    let achievement: ProfileAchievement
+    let isUnlocked: Bool
+    @State private var isAnimating = false
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(
+                        isUnlocked
+                            ? LinearGradient(
+                                colors: [Color(hex: "#43e97b"), Color(hex: "#38f9d7")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [Color.white.opacity(0.1), Color.white.opacity(0.05)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                    )
+                    .frame(width: 60, height: 60)
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                isUnlocked ? Color(hex: "#43e97b") : Color.white.opacity(0.2),
+                                lineWidth: 2
+                            )
+                    )
+                    .scaleEffect(isAnimating && isUnlocked ? 1.1 : 1)
+                    .shadow(
+                        color: isUnlocked ? Color(hex: "#43e97b").opacity(0.5) : Color.clear,
+                        radius: isAnimating ? 15 : 5
+                    )
+                
+                Text(achievement.icon)
+                    .font(.system(size: 28))
+                    .scaleEffect(isUnlocked ? 1 : 0.8)
+                    .opacity(isUnlocked ? 1 : 0.5)
+            }
+            
+            Text(achievement.title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(isUnlocked ? .white : .white.opacity(0.5))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .onAppear {
+            if isUnlocked {
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    isAnimating = true
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Achievement Detail View
+struct ProfileAchievementDetailView: View {
+    let achievement: ProfileAchievement
+    let isUnlocked: Bool
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        ZStack {
+            MagicalBackground()
+                .ignoresSafeArea()
+            
+            VStack(spacing: 30) {
+                // Close button
+                HStack {
+                    Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+                .padding()
+                
+                Spacer()
+                
+                // Achievement icon
+                ZStack {
+                    Circle()
+                        .fill(
+                            isUnlocked
+                                ? LinearGradient(
+                                    colors: [Color(hex: "#43e97b"), Color(hex: "#38f9d7")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                : LinearGradient(
+                                    colors: [Color.white.opacity(0.1), Color.white.opacity(0.05)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                        )
+                        .frame(width: 120, height: 120)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    isUnlocked ? Color(hex: "#43e97b") : Color.white.opacity(0.2),
+                                    lineWidth: 3
+                                )
+                        )
+                    
+                    Text(achievement.icon)
+                        .font(.system(size: 60))
+                        .opacity(isUnlocked ? 1 : 0.5)
+                }
+                
+                // Achievement info
+                VStack(spacing: 12) {
+                    Text(achievement.title)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    Text(achievement.description)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                    
+                    if isUnlocked {
+                        Text("Unlocked! 🎉")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(Color(hex: "#43e97b"))
+                            .padding(.top, 10)
+                    } else {
+                        Text("Keep cooking to unlock!")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                            .padding(.top, 10)
+                    }
+                }
+                .padding(.horizontal, 40)
+                
+                Spacer()
+            }
+        }
+    }
+}
+
 #Preview {
     ZStack {
         MagicalBackground()
@@ -1410,5 +1846,6 @@ struct ProviderOptionCard: View {
             .environmentObject(AppState())
             .environmentObject(AuthenticationManager())
             .environmentObject(DeviceManager())
+            .environmentObject(GamificationManager())
     }
 }

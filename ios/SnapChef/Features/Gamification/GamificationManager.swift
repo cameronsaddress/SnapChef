@@ -208,7 +208,7 @@ class GamificationManager: ObservableObject {
     @Published var pendingRewards: [ChallengeReward] = []
     @Published var hasCheckedInToday: Bool = false
     
-    private init() {
+    init() {
         loadMockData()
         checkDailyCheckInStatus()
         loadLocalChallenges()
