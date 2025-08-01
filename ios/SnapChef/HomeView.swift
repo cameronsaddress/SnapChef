@@ -268,7 +268,7 @@ struct ViralChallengeSection: View {
     ]
     
     var challenges: [Challenge] {
-        challengeData.map { data in
+        challengeData.enumerated().map { index, data in
             Challenge(
                 id: "home-\(data.1.replacingOccurrences(of: " ", with: "-").lowercased())",
                 title: data.1,
@@ -276,7 +276,7 @@ struct ViralChallengeSection: View {
                 type: .daily,
                 points: Int(data.4) ?? 50,
                 coins: (Int(data.4) ?? 50) / 10,
-                endDate: Date().addingTimeInterval(86400), // 24 hours from now
+                endDate: Date().addingTimeInterval(TimeInterval(3600 * (index + 1) * 8)), // Staggered end times
                 requirements: ["Create a \(data.1.lowercased()) dish and share it"],
                 currentProgress: 0,
                 participants: Int.random(in: 100...500)
@@ -408,6 +408,14 @@ struct EnhancedChallengeCard: View {
     @State private var isPressed = false
     @State private var particleAnimation = false
     @StateObject private var gamificationManager = GamificationManager.shared
+    @State private var timeRemaining = ""
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
+    // Get the actual challenge to access its endDate
+    private var challenge: Challenge? {
+        gamificationManager.activeChallenges.first { $0.title == title } ??
+        gamificationManager.completedChallenges.first { $0.title == title }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -498,17 +506,9 @@ struct EnhancedChallengeCard: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                     
-                    HStack(spacing: 12) {
-                        TimeUnit(value: "18", unit: "HRS")
-                        Text(":")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white.opacity(0.5))
-                        TimeUnit(value: "42", unit: "MIN")
-                        Text(":")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white.opacity(0.5))
-                        TimeUnit(value: "37", unit: "SEC")
-                    }
+                    Text(timeRemaining)
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
                 }
                 .padding(.vertical, 16)
                 .padding(.horizontal, 24)
@@ -582,6 +582,38 @@ struct EnhancedChallengeCard: View {
         .shadow(color: Color.black.opacity(0.3), radius: 20, y: 10)
         .onAppear {
             particleAnimation = true
+            updateTimeRemaining()
+        }
+        .onReceive(timer) { _ in
+            updateTimeRemaining()
+        }
+    }
+    
+    private func updateTimeRemaining() {
+        guard let challenge = challenge else {
+            timeRemaining = "00:00:00"
+            return
+        }
+        
+        let now = Date()
+        let endDate = challenge.endDate
+        
+        if now >= endDate {
+            timeRemaining = "Ended"
+            return
+        }
+        
+        let difference = Calendar.current.dateComponents([.hour, .minute, .second], from: now, to: endDate)
+        
+        let hours = difference.hour ?? 0
+        let minutes = difference.minute ?? 0
+        let seconds = difference.second ?? 0
+        
+        if hours > 24 {
+            let days = hours / 24
+            timeRemaining = "\(days)d \(hours % 24)h"
+        } else {
+            timeRemaining = String(format: "%02d:%02d:%02d", hours, minutes, seconds)
         }
     }
 }
