@@ -86,8 +86,11 @@ class CloudKitAuthManager: ObservableObject {
             newRecord[CKField.User.recipesShared] = Int64(0)
             newRecord[CKField.User.recipesCreated] = Int64(0)
             newRecord[CKField.User.coinBalance] = Int64(100) // Starting bonus
+            newRecord[CKField.User.followerCount] = Int64(0)
+            newRecord[CKField.User.followingCount] = Int64(0)
             newRecord[CKField.User.isProfilePublic] = Int64(1)
             newRecord[CKField.User.showOnLeaderboard] = Int64(1)
+            newRecord[CKField.User.isVerified] = Int64(0)
             newRecord[CKField.User.subscriptionTier] = "free"
             
             // Save new user
@@ -180,8 +183,11 @@ class CloudKitAuthManager: ObservableObject {
             newRecord[CKField.User.recipesShared] = Int64(0)
             newRecord[CKField.User.recipesCreated] = Int64(0)
             newRecord[CKField.User.coinBalance] = Int64(100) // Starting bonus
+            newRecord[CKField.User.followerCount] = Int64(0)
+            newRecord[CKField.User.followingCount] = Int64(0)
             newRecord[CKField.User.isProfilePublic] = Int64(1)
             newRecord[CKField.User.showOnLeaderboard] = Int64(1)
+            newRecord[CKField.User.isVerified] = Int64(0)
             newRecord[CKField.User.subscriptionTier] = "free"
             
             // Save new user
@@ -293,6 +299,12 @@ class CloudKitAuthManager: ObservableObject {
         if let coinBalance = updates.coinBalance {
             record[CKField.User.coinBalance] = Int64(coinBalance)
         }
+        if let followerCount = updates.followerCount {
+            record[CKField.User.followerCount] = Int64(followerCount)
+        }
+        if let followingCount = updates.followingCount {
+            record[CKField.User.followingCount] = Int64(followingCount)
+        }
         
         record[CKField.User.lastActiveAt] = Date()
         
@@ -314,6 +326,12 @@ class CloudKitAuthManager: ObservableObject {
         }
         if let coinBalance = updates.coinBalance {
             self.currentUser?.coinBalance = coinBalance
+        }
+        if let followerCount = updates.followerCount {
+            self.currentUser?.followerCount = followerCount
+        }
+        if let followingCount = updates.followingCount {
+            self.currentUser?.followingCount = followingCount
         }
     }
     
@@ -342,6 +360,131 @@ class CloudKitAuthManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "currentUserRecordID")
     }
     
+    // MARK: - Social Methods
+    
+    func followUser(_ userID: String) async throws {
+        guard let currentUserID = currentUser?.recordID,
+              let currentUserName = currentUser?.displayName else {
+            throw CloudKitAuthError.notAuthenticated
+        }
+        
+        // Check if already following
+        let isFollowing = try await isFollowing(userID)
+        if isFollowing {
+            return // Already following
+        }
+        
+        // Create follow record
+        let follow = CKRecord(recordType: CloudKitConfig.followRecordType)
+        follow[CKField.Follow.followerID] = currentUserID
+        follow[CKField.Follow.followingID] = userID
+        follow[CKField.Follow.followedAt] = Date()
+        follow[CKField.Follow.isActive] = Int64(1)
+        
+        try await database.save(follow)
+        
+        // Update counts
+        await updateSocialCounts()
+        
+        // Update followed user's follower count
+        await updateUserFollowerCount(userID, increment: true)
+        
+        // Create activity for the followed user
+        try await CloudKitSyncService.shared.createActivity(
+            type: "follow",
+            actorID: currentUserID,
+            actorName: currentUserName,
+            targetUserID: userID
+        )
+    }
+    
+    func unfollowUser(_ userID: String) async throws {
+        guard let currentUserID = currentUser?.recordID else {
+            throw CloudKitAuthError.notAuthenticated
+        }
+        
+        // Find the follow record
+        let predicate = NSPredicate(format: "%K == %@ AND %K == %@ AND %K == %d",
+                                  CKField.Follow.followerID, currentUserID,
+                                  CKField.Follow.followingID, userID,
+                                  CKField.Follow.isActive, 1)
+        let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
+        
+        let results = try await database.records(matching: query)
+        
+        // Soft delete the follow record
+        for (_, result) in results.matchResults {
+            if case .success(let record) = result {
+                record[CKField.Follow.isActive] = Int64(0)
+                try await database.save(record)
+            }
+        }
+        
+        // Update counts
+        await updateSocialCounts()
+        
+        // Update unfollowed user's follower count
+        await updateUserFollowerCount(userID, increment: false)
+    }
+    
+    func isFollowing(_ userID: String) async throws -> Bool {
+        guard let currentUserID = currentUser?.recordID else {
+            throw CloudKitAuthError.notAuthenticated
+        }
+        
+        let predicate = NSPredicate(format: "%K == %@ AND %K == %@ AND %K == %d",
+                                  CKField.Follow.followerID, currentUserID,
+                                  CKField.Follow.followingID, userID,
+                                  CKField.Follow.isActive, 1)
+        let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
+        
+        let results = try await database.records(matching: query)
+        return !results.matchResults.isEmpty
+    }
+    
+    func updateSocialCounts() async {
+        guard let currentUserID = currentUser?.recordID else { return }
+        
+        do {
+            // Count followers
+            let followersPredicate = NSPredicate(format: "%K == %@ AND %K == %d",
+                                               CKField.Follow.followingID, currentUserID,
+                                               CKField.Follow.isActive, 1)
+            let followersQuery = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: followersPredicate)
+            let followerResults = try await database.records(matching: followersQuery)
+            let followerCount = followerResults.matchResults.count
+            
+            // Count following
+            let followingPredicate = NSPredicate(format: "%K == %@ AND %K == %d",
+                                               CKField.Follow.followerID, currentUserID,
+                                               CKField.Follow.isActive, 1)
+            let followingQuery = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: followingPredicate)
+            let followingResults = try await database.records(matching: followingQuery)
+            let followingCount = followingResults.matchResults.count
+            
+            // Update user record
+            let updates = UserStatUpdates(
+                followerCount: followerCount,
+                followingCount: followingCount
+            )
+            try await updateUserStats(updates)
+        } catch {
+            print("Failed to update social counts: \(error)")
+        }
+    }
+    
+    private func updateUserFollowerCount(_ userID: String, increment: Bool) async {
+        do {
+            let record = try await database.record(for: CKRecord.ID(recordName: userID))
+            let currentCount = record[CKField.User.followerCount] as? Int64 ?? 0
+            let newCount = increment ? currentCount + 1 : max(0, currentCount - 1)
+            record[CKField.User.followerCount] = newCount
+            try await database.save(record)
+        } catch {
+            print("Failed to update follower count for user \(userID): \(error)")
+        }
+    }
+    
     // MARK: - Private Helpers
     
     private func loadUser(recordID: String) async {
@@ -358,6 +501,138 @@ class CloudKitAuthManager: ObservableObject {
             UserDefaults.standard.removeObject(forKey: "currentUserRecordID")
             self.isAuthenticated = false
         }
+    }
+    
+    // MARK: - User Discovery Methods
+    
+    func searchUsers(query: String) async throws -> [CloudKitUser] {
+        let predicate = NSPredicate(format: "%K BEGINSWITH %@ OR %K CONTAINS %@",
+                                  CKField.User.username, query.lowercased(),
+                                  CKField.User.displayName, query)
+        let ckQuery = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        ckQuery.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+        
+        let results = try await database.records(matching: ckQuery)
+        var users: [CloudKitUser] = []
+        
+        for (_, result) in results.matchResults {
+            if case .success(let record) = result {
+                if let user = parseUserRecord(record) {
+                    users.append(user)
+                }
+            }
+        }
+        
+        return users
+    }
+    
+    func getSuggestedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        // Get users with high follower count that current user isn't following
+        let predicate = NSPredicate(format: "%K > %d", CKField.User.followerCount, 100)
+        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+        
+        let operation = CKQueryOperation(query: query)
+        operation.resultsLimit = limit
+        
+        var users: [CloudKitUser] = []
+        
+        operation.recordMatchedBlock = { _, result in
+            if case .success(let record) = result {
+                if let user = self.parseUserRecord(record) {
+                    users.append(user)
+                }
+            }
+        }
+        
+        database.add(operation)
+        
+        // Filter out users already being followed
+        if let currentUserID = currentUser?.recordID {
+            let followedUsers = await getFollowingIDs(currentUserID)
+            return users.filter { user in
+                if let userID = user.recordID {
+                    return !followedUsers.contains(userID) && userID != currentUserID
+                }
+                return true
+            }
+        }
+        
+        return users
+    }
+    
+    func getTrendingUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        // Get users who have been active recently
+        let oneWeekAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+        let predicate = NSPredicate(format: "%K > %@", CKField.User.lastActiveAt, oneWeekAgo as NSDate)
+        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.recipesShared, ascending: false)]
+        
+        let operation = CKQueryOperation(query: query)
+        operation.resultsLimit = limit
+        
+        var users: [CloudKitUser] = []
+        
+        operation.recordMatchedBlock = { _, result in
+            if case .success(let record) = result {
+                if let user = self.parseUserRecord(record) {
+                    users.append(user)
+                }
+            }
+        }
+        
+        database.add(operation)
+        return users
+    }
+    
+    func getVerifiedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        let predicate = NSPredicate(format: "%K == %d", CKField.User.isVerified, 1)
+        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+        
+        let operation = CKQueryOperation(query: query)
+        operation.resultsLimit = limit
+        
+        var users: [CloudKitUser] = []
+        
+        operation.recordMatchedBlock = { _, result in
+            if case .success(let record) = result {
+                if let user = self.parseUserRecord(record) {
+                    users.append(user)
+                }
+            }
+        }
+        
+        database.add(operation)
+        return users
+    }
+    
+    private func getFollowingIDs(_ userID: String) async -> Set<String> {
+        let predicate = NSPredicate(format: "%K == %@ AND %K == %d",
+                                  CKField.Follow.followerID, userID,
+                                  CKField.Follow.isActive, 1)
+        let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
+        
+        do {
+            let results = try await database.records(matching: query)
+            var followingIDs = Set<String>()
+            
+            for (_, result) in results.matchResults {
+                if case .success(let record) = result,
+                   let followingID = record[CKField.Follow.followingID] as? String {
+                    followingIDs.insert(followingID)
+                }
+            }
+            
+            return followingIDs
+        } catch {
+            print("Failed to get following IDs: \(error)")
+            return []
+        }
+    }
+    
+    private func parseUserRecord(_ record: CKRecord) -> CloudKitUser? {
+        return CloudKitUser(from: record)
     }
 }
 
@@ -378,8 +653,11 @@ struct CloudKitUser: Identifiable {
     var recipesShared: Int
     let recipesCreated: Int
     var coinBalance: Int
+    var followerCount: Int
+    var followingCount: Int
     let isProfilePublic: Bool
     let showOnLeaderboard: Bool
+    let isVerified: Bool
     let subscriptionTier: String
     let createdAt: Date
     let lastLoginAt: Date
@@ -398,8 +676,11 @@ struct CloudKitUser: Identifiable {
         self.recipesShared = Int(record[CKField.User.recipesShared] as? Int64 ?? 0)
         self.recipesCreated = Int(record[CKField.User.recipesCreated] as? Int64 ?? 0)
         self.coinBalance = Int(record[CKField.User.coinBalance] as? Int64 ?? 0)
+        self.followerCount = Int(record[CKField.User.followerCount] as? Int64 ?? 0)
+        self.followingCount = Int(record[CKField.User.followingCount] as? Int64 ?? 0)
         self.isProfilePublic = (record[CKField.User.isProfilePublic] as? Int64 ?? 1) == 1
         self.showOnLeaderboard = (record[CKField.User.showOnLeaderboard] as? Int64 ?? 1) == 1
+        self.isVerified = (record[CKField.User.isVerified] as? Int64 ?? 0) == 1
         self.subscriptionTier = record[CKField.User.subscriptionTier] as? String ?? "free"
         self.createdAt = record[CKField.User.createdAt] as? Date ?? Date()
         self.lastLoginAt = record[CKField.User.lastLoginAt] as? Date ?? Date()
@@ -415,6 +696,8 @@ struct UserStatUpdates {
     var recipesShared: Int?
     var recipesCreated: Int?
     var coinBalance: Int?
+    var followerCount: Int?
+    var followingCount: Int?
 }
 
 // Google and Facebook user info are handled by their respective SDKs

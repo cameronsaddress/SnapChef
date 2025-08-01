@@ -48,6 +48,11 @@ class SocialShareManager: ObservableObject {
     
     @Published var isSharing = false
     @Published var shareProgress: Double = 0
+    @Published var pendingDeepLink: DeepLink?
+    @Published var showRecipeFromDeepLink = false
+    
+    private let baseURL = "https://snapchef.app"
+    private let appStoreURL = "https://apps.apple.com/app/snapchef/id1234567890" // TODO: Update with real App Store ID
     @Published var lastSharePlatform: SocialPlatform?
     @Published var shareCount = 0
     
@@ -339,6 +344,117 @@ class SocialShareManager: ObservableObject {
         case 100: return "Legendary Sharer 🏆"
         default: return nil
         }
+    }
+    
+    // MARK: - Deep Link Types
+    enum DeepLink {
+        case recipe(String)
+        case profile(String)
+        case challenge(String)
+        
+        var path: String {
+            switch self {
+            case .recipe(let id):
+                return "recipe/\(id)"
+            case .profile(let id):
+                return "profile/\(id)"
+            case .challenge(let id):
+                return "challenge/\(id)"
+            }
+        }
+    }
+    
+    // MARK: - URL Generation
+    
+    func generateRecipeShareURL(recipeID: String) -> URL {
+        let deepLinkPath = DeepLink.recipe(recipeID).path
+        let urlString = "\(baseURL)/\(deepLinkPath)"
+        return URL(string: urlString)!
+    }
+    
+    func generateUniversalLink(for recipe: Recipe, cloudKitRecordID: String) -> URL {
+        let urlString = "\(baseURL)/recipe/\(cloudKitRecordID)"
+        return URL(string: urlString)!
+    }
+    
+    // MARK: - URL Handling
+    
+    func handleIncomingURL(_ url: URL) -> Bool {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: true) else {
+            return false
+        }
+        
+        // Handle different URL schemes
+        if url.scheme == "snapchef" {
+            return handleCustomSchemeURL(components)
+        } else if url.host == "snapchef.app" {
+            return handleUniversalLink(components)
+        }
+        
+        return false
+    }
+    
+    private func handleCustomSchemeURL(_ components: URLComponents) -> Bool {
+        guard let host = components.host else { return false }
+        
+        switch host {
+        case "recipe":
+            if let recipeID = components.path.split(separator: "/").last {
+                pendingDeepLink = .recipe(String(recipeID))
+                showRecipeFromDeepLink = true
+                return true
+            }
+        case "profile":
+            if let userID = components.path.split(separator: "/").last {
+                pendingDeepLink = .profile(String(userID))
+                return true
+            }
+        case "challenge":
+            if let challengeID = components.path.split(separator: "/").last {
+                pendingDeepLink = .challenge(String(challengeID))
+                return true
+            }
+        default:
+            break
+        }
+        
+        return false
+    }
+    
+    private func handleUniversalLink(_ components: URLComponents) -> Bool {
+        let pathComponents = components.path.split(separator: "/").map(String.init)
+        
+        guard pathComponents.count >= 2 else { return false }
+        
+        switch pathComponents[0] {
+        case "recipe":
+            pendingDeepLink = .recipe(pathComponents[1])
+            showRecipeFromDeepLink = true
+            return true
+        case "profile":
+            pendingDeepLink = .profile(pathComponents[1])
+            return true
+        case "challenge":
+            pendingDeepLink = .challenge(pathComponents[1])
+            return true
+        default:
+            return false
+        }
+    }
+    
+    func resolvePendingDeepLink() {
+        guard let deepLink = pendingDeepLink else { return }
+        
+        switch deepLink {
+        case .recipe(let recipeID):
+            print("Opening recipe: \(recipeID)")
+        case .profile(let userID):
+            print("Opening profile: \(userID)")
+        case .challenge(let challengeID):
+            print("Opening challenge: \(challengeID)")
+        }
+        
+        pendingDeepLink = nil
     }
 }
 

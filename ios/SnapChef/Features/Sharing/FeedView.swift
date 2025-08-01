@@ -1,116 +1,24 @@
 import SwiftUI
 
-struct ContentView: View {
-    @EnvironmentObject var appState: AppState
-    @EnvironmentObject var authManager: AuthenticationManager
-    @EnvironmentObject var deviceManager: DeviceManager
-    @State private var showingLaunchAnimation = true
-    
-    var body: some View {
-        ZStack {
-            if showingLaunchAnimation {
-                LaunchAnimationView {
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        showingLaunchAnimation = false
-                    }
-                }
-                .zIndex(3)
-            } else {
-                // Magical animated background
-                MagicalBackground()
-                    .ignoresSafeArea()
-                    .zIndex(0)
-                
-                // Main navigation on top
-                Group {
-                    if appState.isFirstLaunch {
-                        OnboardingView()
-                    } else {
-                        MainTabView()
-                    }
-                }
-                .zIndex(2)
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
-            }
-        }
-        .animation(.easeInOut(duration: 0.5), value: showingLaunchAnimation)
-    }
-}
-
-struct MainTabView: View {
-    @State private var selectedTab = 0
-    
-    var body: some View {
-        // Single NavigationStack at the root level
-        NavigationStack {
-            ZStack {
-                // Content based on selected tab
-                Group {
-                    switch selectedTab {
-                    case 0:
-                        HomeView()
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                removal: .opacity.combined(with: .scale(scale: 1.02))
-                            ))
-                    case 1:
-                        CameraView(selectedTab: $selectedTab)
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                removal: .opacity.combined(with: .scale(scale: 1.02))
-                            ))
-                    case 2:
-                        RecipesView()
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                removal: .opacity.combined(with: .scale(scale: 1.02))
-                            ))
-                    case 3:
-                        SocialFeedView()
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                removal: .opacity.combined(with: .scale(scale: 1.02))
-                            ))
-                    case 4:
-                        ProfileView()
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                removal: .opacity.combined(with: .scale(scale: 1.02))
-                            ))
-                    default:
-                        HomeView()
-                    }
-                }
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
-                
-                // Custom morphing tab bar (hide when camera is selected)
-                if selectedTab != 1 {
-                    VStack {
-                        Spacer()
-                        
-                        MorphingTabBar(selectedTab: $selectedTab)
-                            .padding(.horizontal, 30)
-                            .padding(.bottom, 30)
-                            .shadow(
-                                color: Color.black.opacity(0.2),
-                                radius: 20,
-                                y: 10
-                            )
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-            .navigationBarHidden(true) // Hide the default navigation bar
-        }
-    }
-}
-
-// MARK: - Social Feed View
-struct SocialFeedView: View {
+struct FeedView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @State private var showingDiscoverUsers = false
-    @State private var isRefreshing = false
+    @State private var selectedFilter: ActivityFilter = .all
+    
+    enum ActivityFilter: String, CaseIterable {
+        case all = "All"
+        case following = "Following"
+        case mentions = "Mentions"
+        
+        var icon: String {
+            switch self {
+            case .all: return "square.grid.2x2"
+            case .following: return "person.2"
+            case .mentions: return "at"
+            }
+        }
+    }
     
     var body: some View {
         NavigationStack {
@@ -123,6 +31,11 @@ struct SocialFeedView: View {
                     socialStatsHeader
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
+                        .padding(.bottom, 16)
+                    
+                    // Filter Pills
+                    filterPills
+                        .padding(.horizontal, 20)
                         .padding(.bottom, 16)
                     
                     // Activity Feed Content
@@ -143,24 +56,11 @@ struct SocialFeedView: View {
                     }
                 }
             }
-            .refreshable {
-                await refreshSocialData()
-            }
         }
         .sheet(isPresented: $showingDiscoverUsers) {
             DiscoverUsersView()
                 .environmentObject(appState)
         }
-        .task {
-            // Update social counts when view appears
-            await cloudKitAuth.updateSocialCounts()
-        }
-    }
-    
-    private func refreshSocialData() async {
-        isRefreshing = true
-        await cloudKitAuth.updateSocialCounts()
-        isRefreshing = false
     }
     
     private var socialStatsHeader: some View {
@@ -261,11 +161,41 @@ struct SocialFeedView: View {
                 .foregroundColor(.white.opacity(0.7))
         }
     }
+    
+    private var filterPills: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(ActivityFilter.allCases, id: \.self) { filter in
+                    filterPill(filter)
+                }
+            }
+        }
+    }
+    
+    private func filterPill(_ filter: ActivityFilter) -> some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.3)) {
+                selectedFilter = filter
+            }
+        }) {
+            HStack(spacing: 6) {
+                Image(systemName: filter.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(filter.rawValue)
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundColor(selectedFilter == filter ? .white : .white.opacity(0.7))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(selectedFilter == filter ? Color(hex: "#667eea") : Color.white.opacity(0.1))
+            )
+        }
+    }
 }
 
 #Preview {
-    ContentView()
+    FeedView()
         .environmentObject(AppState())
-        .environmentObject(AuthenticationManager())
-        .environmentObject(DeviceManager())
 }

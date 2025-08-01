@@ -56,9 +56,13 @@ struct ProfileView: View {
                     CollectionProgressView()
                         .staggeredFade(index: 1, isShowing: contentVisible)
                     
+                    // Active Challenges
+                    ActiveChallengesSection()
+                        .staggeredFade(index: 2, isShowing: contentVisible)
+                    
                     // Achievement Gallery
                     ProfileAchievementGalleryView()
-                        .staggeredFade(index: 2, isShowing: contentVisible)
+                        .staggeredFade(index: 3, isShowing: contentVisible)
                     
                     // Subscription Status Enhanced
                     EnhancedSubscriptionCard(
@@ -67,11 +71,7 @@ struct ProfileView: View {
                             showingSubscriptionView = true
                         }
                     )
-                    .staggeredFade(index: 3, isShowing: contentVisible)
-                    
-                    // Social Stats
-                    SocialStatsCard()
-                        .staggeredFade(index: 4, isShowing: contentVisible)
+                    .staggeredFade(index: 4, isShowing: contentVisible)
                     
                     // Settings Section Enhanced
                     EnhancedSettingsSection()
@@ -211,11 +211,9 @@ struct EnhancedProfileHeader: View {
     }
     
     private func calculateUserStatus() -> String {
-        // Use CloudKit data if available, otherwise local data
-        let recipeCount = cloudKitAuthManager.currentUser?.recipesCreated ?? appState.allRecipes.count
+        // Status based on level (which is based on points for authenticated users)
         let level = calculateLevel()
         
-        // Status based on level (which is based on points for authenticated users)
         if level >= 50 {
             return "⚡ Master Chef"
         } else if level >= 20 {
@@ -708,80 +706,6 @@ struct UpgradePrompt: View {
     }
 }
 
-// MARK: - Social Stats Card
-struct SocialStatsCard: View {
-    @EnvironmentObject var appState: AppState
-    @State private var isExpanded = true
-    
-    var body: some View {
-        GlassmorphicCard(content: {
-            VStack(spacing: 20) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Social")
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                        
-                        Text("You're inspiring thousands!")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.6))
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                }
-                
-                if isExpanded {
-                    VStack(spacing: 16) {
-                        SocialStatRow(icon: "person.2.fill", label: "Followers", value: "0")
-                        SocialStatRow(icon: "heart.fill", label: "Likes received", value: "\(appState.totalLikes)")
-                        SocialStatRow(icon: "bubble.left.fill", label: "Comments", value: "0")
-                        SocialStatRow(icon: "link", label: "Recipe shares", value: "\(appState.totalShares)")
-                    }
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .top)),
-                        removal: .opacity.combined(with: .move(edge: .top))
-                    ))
-                }
-            }
-            .padding(24)
-        }, glowColor: Color(hex: "#4facfe"))
-        .onTapGesture {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                isExpanded.toggle()
-            }
-        }
-    }
-}
-
-struct SocialStatRow: View {
-    let icon: String
-    let label: String
-    let value: String
-    
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(Color(hex: "#4facfe"))
-                .frame(width: 24)
-            
-            Text(label)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.8))
-            
-            Spacer()
-            
-            Text(value)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-        }
-    }
-}
 
 // MARK: - Enhanced Settings Section
 struct EnhancedSettingsSection: View {
@@ -1843,6 +1767,198 @@ struct ProfileAchievementDetailView: View {
                 Spacer()
             }
         }
+    }
+}
+
+// MARK: - Active Challenges Section
+struct ActiveChallengesSection: View {
+    @StateObject private var gamificationManager = GamificationManager.shared
+    @State private var showingChallengeHub = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Active Challenges")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    Text("\(gamificationManager.activeChallenges.count) challenges active")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                
+                Spacer()
+                
+                Button(action: { showingChallengeHub = true }) {
+                    Text("View All")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color(hex: "#667eea"))
+                }
+            }
+            
+            // Active Challenges List
+            if gamificationManager.activeChallenges.isEmpty {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "trophy.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.white.opacity(0.3))
+                        Text("No active challenges")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .padding(.vertical, 30)
+                    Spacer()
+                }
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(Array(gamificationManager.activeChallenges.prefix(3))) { challenge in
+                            CompactChallengeCard(challenge: challenge) {
+                                showingChallengeHub = true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.3),
+                                    Color.white.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .sheet(isPresented: $showingChallengeHub) {
+            ChallengeHubView()
+        }
+    }
+}
+
+// MARK: - Compact Challenge Card
+struct CompactChallengeCard: View {
+    let challenge: Challenge
+    let action: () -> Void
+    @StateObject private var progressTracker = ChallengeProgressTracker.shared
+    
+    private var progress: Double {
+        challenge.currentProgress
+    }
+    
+    private var timeRemaining: String {
+        let remaining = challenge.endDate.timeIntervalSinceNow
+        if remaining <= 0 { return "Ended" }
+        
+        let hours = Int(remaining) / 3600
+        let minutes = Int(remaining) % 3600 / 60
+        
+        if hours > 24 {
+            return "\(hours / 24)d left"
+        } else if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Challenge Type Badge
+                HStack {
+                    Text(challenge.type.rawValue)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(challenge.type.color.opacity(0.3))
+                        )
+                    
+                    Spacer()
+                    
+                    Text(timeRemaining)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                
+                // Challenge Title
+                Text(challenge.title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                // Points & Progress
+                HStack {
+                    Label("\(challenge.points) pts", systemImage: "star.fill")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color(hex: "#ffd93d"))
+                    
+                    Spacer()
+                    
+                    // Progress Circle
+                    ZStack {
+                        Circle()
+                            .stroke(Color.white.opacity(0.2), lineWidth: 3)
+                            .frame(width: 30, height: 30)
+                        
+                        Circle()
+                            .trim(from: 0, to: progress)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color(hex: "#43e97b"), Color(hex: "#38f9d7")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                            )
+                            .frame(width: 30, height: 30)
+                            .rotationEffect(.degrees(-90))
+                        
+                        Text("\(Int(progress * 100))%")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                }
+            }
+            .padding(16)
+            .frame(width: 200)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                challenge.type.color.opacity(0.3),
+                                challenge.type.color.opacity(0.1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(challenge.type.color.opacity(0.5), lineWidth: 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

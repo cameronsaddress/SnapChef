@@ -1,0 +1,142 @@
+#!/bin/bash
+
+# add-to-xcode
+# Wrapper script for add_files_to_xcode.rb
+# Makes it easier to add files to the SnapChef Xcode project
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+RUBY_SCRIPT="$SCRIPT_DIR/add_files_to_xcode.rb"
+
+# Default values
+PROJECT_PATH="$PROJECT_DIR/SnapChef.xcodeproj"
+TARGET_NAME="SnapChef"
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to print usage
+usage() {
+    echo "Usage: add-to-xcode [options] <group_path> <files...>"
+    echo ""
+    echo "Add files to the SnapChef Xcode project"
+    echo ""
+    echo "Options:"
+    echo "  -t, --target NAME     Target name (default: SnapChef)"
+    echo "  -p, --project PATH    Project path (default: ./SnapChef.xcodeproj)"
+    echo "  -l, --list-targets    List available targets"
+    echo "  -g, --list-groups     List all groups in project"
+    echo "  -c, --create          Create files if they don't exist"
+    echo "  -h, --help            Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  add-to-xcode SnapChef/Features/Social ActivityFeedView.swift"
+    echo "  add-to-xcode -c SnapChef/Features/Auth LoginView.swift SignupView.swift"
+    echo "  add-to-xcode -l"
+    echo "  add-to-xcode -g SnapChef/Features"
+}
+
+# Parse command line arguments
+RUBY_ARGS=()
+GROUP_PATH=""
+FILES=()
+PARSING_FILES=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -t|--target)
+            TARGET_NAME="$2"
+            shift 2
+            ;;
+        -p|--project)
+            PROJECT_PATH="$2"
+            shift 2
+            ;;
+        -l|--list-targets)
+            ruby "$RUBY_SCRIPT" -l "$PROJECT_PATH"
+            exit $?
+            ;;
+        -g|--list-groups)
+            if [[ -n "$2" && ! "$2" =~ ^- ]]; then
+                ruby "$RUBY_SCRIPT" -g "$2" "$PROJECT_PATH"
+                shift 2
+            else
+                ruby "$RUBY_SCRIPT" -g "$PROJECT_PATH"
+                shift
+            fi
+            exit $?
+            ;;
+        -c|--create)
+            RUBY_ARGS+=("-c")
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            if [[ ! $PARSING_FILES ]]; then
+                GROUP_PATH="$1"
+                PARSING_FILES=true
+            else
+                FILES+=("$1")
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Validate inputs
+if [[ -z "$GROUP_PATH" ]]; then
+    echo -e "${RED}Error: Group path is required${NC}"
+    echo ""
+    usage
+    exit 1
+fi
+
+if [[ ${#FILES[@]} -eq 0 ]]; then
+    echo -e "${RED}Error: At least one file must be specified${NC}"
+    echo ""
+    usage
+    exit 1
+fi
+
+# Check if xcodeproj gem is installed
+if ! gem list xcodeproj -i >/dev/null 2>&1; then
+    echo -e "${YELLOW}xcodeproj gem not found. Installing...${NC}"
+    gem install xcodeproj
+    if [[ $? -ne 0 ]]; then
+        echo -e "${RED}Failed to install xcodeproj gem${NC}"
+        echo "Try running: sudo gem install xcodeproj"
+        exit 1
+    fi
+fi
+
+# Check if project exists
+if [[ ! -d "$PROJECT_PATH" ]]; then
+    echo -e "${RED}Error: Project not found at $PROJECT_PATH${NC}"
+    exit 1
+fi
+
+# Display what we're about to do
+echo -e "${BLUE}Adding files to Xcode project:${NC}"
+echo "  Project: $PROJECT_PATH"
+echo "  Target: $TARGET_NAME"
+echo "  Group: $GROUP_PATH"
+echo "  Files: ${FILES[*]}"
+echo ""
+
+# Run the Ruby script
+ruby "$RUBY_SCRIPT" "${RUBY_ARGS[@]}" "$PROJECT_PATH" "$TARGET_NAME" "$GROUP_PATH" "${FILES[@]}"
+
+# Check the exit status
+if [[ $? -eq 0 ]]; then
+    echo -e "${GREEN}✅ Operation completed successfully${NC}"
+else
+    echo -e "${RED}❌ Operation failed${NC}"
+    exit 1
+fi

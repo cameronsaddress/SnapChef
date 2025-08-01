@@ -28,6 +28,9 @@ import CloudKit
  - recipesShared: Int64
  - recipesCreated: Int64
  - coinBalance: Int64
+ - followerCount: Int64 (Indexed, Sortable)
+ - followingCount: Int64 (Indexed, Sortable)
+ - isVerified: Int64 // 0 or 1
  - isProfilePublic: Int64 // 0 or 1
  - showOnLeaderboard: Int64 // 0 or 1
  - subscriptionTier: String // "free", "basic", "premium"
@@ -132,6 +135,61 @@ import CloudKit
  - challengeID: String
  - itemPurchased: String
  
+ === RECORD TYPE: Follow ===
+ Fields:
+ - followerID: String (Indexed, Queryable)
+ - followingID: String (Indexed, Queryable)
+ - followedAt: Date/Time (Indexed, Sortable)
+ - isActive: Int64 // 0 or 1 (for soft delete)
+ 
+ === RECORD TYPE: RecipeLike ===
+ Fields:
+ - userID: String (Indexed, Queryable)
+ - recipeID: String (Indexed, Queryable)
+ - likedAt: Date/Time (Indexed, Sortable)
+ - recipeOwnerID: String (Indexed, Queryable)
+ 
+ === RECORD TYPE: RecipeView ===
+ Fields:
+ - userID: String (Indexed, Queryable) // Can be null for anonymous views
+ - recipeID: String (Indexed, Queryable)
+ - viewedAt: Date/Time (Indexed, Sortable)
+ - viewDuration: Int64 // in seconds
+ - recipeOwnerID: String (Indexed, Queryable)
+ - source: String // "feed", "search", "profile", "challenge", "deeplink"
+ 
+ === RECORD TYPE: RecipeComment ===
+ Fields:
+ - id: String (Indexed, Queryable)
+ - userID: String (Indexed, Queryable)
+ - recipeID: String (Indexed, Queryable)
+ - content: String
+ - createdAt: Date/Time (Indexed, Sortable)
+ - editedAt: Date/Time
+ - isDeleted: Int64 // 0 or 1 (soft delete)
+ - parentCommentID: String // for threaded comments
+ - likeCount: Int64 (Sortable)
+ 
+ === RECORD TYPE: Recipe ===
+ Fields:
+ - id: String (Indexed, Queryable)
+ - ownerID: String (Indexed, Queryable)
+ - title: String (Queryable)
+ - description: String
+ - imageURL: String
+ - createdAt: Date/Time (Indexed, Sortable)
+ - likeCount: Int64 (Indexed, Sortable)
+ - commentCount: Int64 (Indexed, Sortable)
+ - viewCount: Int64 (Indexed, Sortable)
+ - shareCount: Int64 (Indexed, Sortable)
+ - challengeID: String (Indexed, Queryable) // if created for a challenge
+ - isPublic: Int64 // 0 or 1
+ - ingredients: String (JSON array)
+ - instructions: String (JSON array)
+ - cookingTime: Int64 // in minutes
+ - difficulty: String // "easy", "medium", "hard"
+ - cuisine: String (Indexed, Queryable)
+ 
  === SUBSCRIPTIONS TO CREATE ===
  1. Challenge Updates - Subscribe to Challenge record changes
  2. Team Messages - Subscribe to TeamMessage for user's teams
@@ -160,6 +218,14 @@ struct CloudKitConfig {
     static let achievementRecordType = "Achievement"
     static let coinTransactionRecordType = "CoinTransaction"
     
+    // Social Record Types
+    static let followRecordType = "Follow"
+    static let recipeLikeRecordType = "RecipeLike"
+    static let recipeViewRecordType = "RecipeView"
+    static let recipeCommentRecordType = "RecipeComment"
+    static let recipeRecordType = "Recipe"
+    static let activityRecordType = "Activity"
+    
     // Zone Names
     static let challengesZone = "ChallengesZone"
     static let userDataZone = "UserDataZone"
@@ -187,6 +253,9 @@ struct CKField {
         static let recipesShared = "recipesShared"
         static let recipesCreated = "recipesCreated"
         static let coinBalance = "coinBalance"
+        static let followerCount = "followerCount"
+        static let followingCount = "followingCount"
+        static let isVerified = "isVerified"
         static let isProfilePublic = "isProfilePublic"
         static let showOnLeaderboard = "showOnLeaderboard"
         static let subscriptionTier = "subscriptionTier"
@@ -297,6 +366,86 @@ struct CKField {
         static let balance = "balance"
         static let challengeID = "challengeID"
         static let itemPurchased = "itemPurchased"
+    }
+    
+    // Follow Fields
+    struct Follow {
+        static let followerID = "followerID"
+        static let followingID = "followingID"
+        static let followedAt = "followedAt"
+        static let isActive = "isActive"
+    }
+    
+    // RecipeLike Fields
+    struct RecipeLike {
+        static let userID = "userID"
+        static let recipeID = "recipeID"
+        static let likedAt = "likedAt"
+        static let recipeOwnerID = "recipeOwnerID"
+    }
+    
+    // RecipeView Fields
+    struct RecipeView {
+        static let userID = "userID"
+        static let recipeID = "recipeID"
+        static let viewedAt = "viewedAt"
+        static let viewDuration = "viewDuration"
+        static let recipeOwnerID = "recipeOwnerID"
+        static let source = "source"
+    }
+    
+    // RecipeComment Fields
+    struct RecipeComment {
+        static let id = "id"
+        static let userID = "userID"
+        static let recipeID = "recipeID"
+        static let content = "content"
+        static let createdAt = "createdAt"
+        static let editedAt = "editedAt"
+        static let isDeleted = "isDeleted"
+        static let parentCommentID = "parentCommentID"
+        static let likeCount = "likeCount"
+    }
+    
+    // Recipe Fields
+    struct Recipe {
+        static let id = "id"
+        static let ownerID = "ownerID"
+        static let title = "title"
+        static let description = "description"
+        static let imageURL = "imageURL"
+        static let createdAt = "createdAt"
+        static let likeCount = "likeCount"
+        static let commentCount = "commentCount"
+        static let viewCount = "viewCount"
+        static let shareCount = "shareCount"
+        static let challengeID = "challengeID"
+        static let isPublic = "isPublic"
+        static let ingredients = "ingredients"
+        static let instructions = "instructions"
+        static let cookingTime = "cookingTime"
+        static let difficulty = "difficulty"
+        static let cuisine = "cuisine"
+    }
+    
+    // Activity Fields
+    struct Activity {
+        static let id = "id"
+        static let type = "type" // follow, recipeShared, recipeLiked, recipeComment, challengeCompleted, badgeEarned
+        static let actorID = "actorID" // User who performed the action
+        static let actorName = "actorName"
+        static let targetUserID = "targetUserID" // User affected by the action (if applicable)
+        static let targetUserName = "targetUserName"
+        static let recipeID = "recipeID" // Recipe involved (if applicable)
+        static let recipeName = "recipeName"
+        static let recipeImageURL = "recipeImageURL"
+        static let challengeID = "challengeID" // Challenge involved (if applicable)
+        static let challengeName = "challengeName"
+        static let badgeID = "badgeID" // Badge earned (if applicable)
+        static let badgeName = "badgeName"
+        static let timestamp = "timestamp"
+        static let isRead = "isRead" // For the target user
+        static let metadata = "metadata" // JSON for additional data
     }
 }
 

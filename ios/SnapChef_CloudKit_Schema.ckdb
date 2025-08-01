@@ -1,5 +1,39 @@
 DEFINE SCHEMA
 
+    RECORD TYPE User (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
+        username        STRING QUERYABLE SORTABLE,
+        displayName     STRING QUERYABLE SEARCHABLE,
+        email           STRING,
+        profileImageURL STRING,
+        authProvider    STRING QUERYABLE,
+        totalPoints     INT64 QUERYABLE SORTABLE,
+        currentStreak   INT64,
+        longestStreak   INT64,
+        challengesCompleted INT64,
+        recipesShared   INT64,
+        recipesCreated  INT64,
+        coinBalance     INT64,
+        isProfilePublic INT64,
+        showOnLeaderboard INT64,
+        subscriptionTier STRING,
+        createdAt       TIMESTAMP SORTABLE,
+        lastLoginAt     TIMESTAMP SORTABLE,
+        lastActiveAt    TIMESTAMP SORTABLE,
+        followerCount   INT64,
+        followingCount  INT64,
+        isVerified      INT64,
+        bio             STRING,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
     RECORD TYPE Challenge (
         "___createTime" TIMESTAMP,
         "___createdBy"  REFERENCE,
@@ -153,32 +187,114 @@ DEFINE SCHEMA
         GRANT READ TO "_creator"
     );
 
-    RECORD TYPE User (
-        "___createTime" TIMESTAMP,
-        "___createdBy"  REFERENCE,
-        "___etag"       STRING,
-        "___modTime"    TIMESTAMP,
-        "___modifiedBy" REFERENCE,
-        "___recordID"   REFERENCE QUERYABLE,
-        username        STRING QUERYABLE SORTABLE,
-        displayName     STRING,
-        email           STRING,
-        profileImageURL STRING,
-        authProvider    STRING QUERYABLE,
-        totalPoints     INT64 QUERYABLE SORTABLE,
-        currentStreak   INT64,
-        longestStreak   INT64,
-        challengesCompleted INT64,
-        recipesShared   INT64,
-        recipesCreated  INT64,
-        coinBalance     INT64,
-        isProfilePublic INT64,
-        showOnLeaderboard INT64,
-        subscriptionTier STRING,
-        createdAt       TIMESTAMP SORTABLE,
-        lastLoginAt     TIMESTAMP SORTABLE,
-        lastActiveAt    TIMESTAMP SORTABLE,
+    RECORD TYPE Follow (
+        "___createTime"   TIMESTAMP,
+        "___createdBy"    REFERENCE,
+        "___etag"         STRING,
+        "___modTime"      TIMESTAMP,
+        "___modifiedBy"   REFERENCE,
+        "___recordID"     REFERENCE QUERYABLE,
+        followerID        STRING QUERYABLE,
+        followingID       STRING QUERYABLE,
+        followedAt        TIMESTAMP SORTABLE,
         GRANT WRITE TO "_creator",
-        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE Recipe (
+        "___createTime"   TIMESTAMP,
+        "___createdBy"    REFERENCE,
+        "___etag"         STRING,
+        "___modTime"      TIMESTAMP,
+        "___modifiedBy"   REFERENCE,
+        "___recordID"     REFERENCE QUERYABLE,
+        id                STRING QUERYABLE,
+        ownerID           STRING QUERYABLE,
+        title             STRING QUERYABLE SEARCHABLE,
+        description       STRING SEARCHABLE,
+        ingredients       STRING,
+        instructions      STRING,
+        createdAt         TIMESTAMP SORTABLE,
+        likeCount         INT64 SORTABLE,
+        commentCount      INT64,
+        viewCount         INT64,
+        shareCount        INT64,
+        isPublic          INT64 QUERYABLE,
+        cookingTime       INT64,
+        difficulty        STRING QUERYABLE,
+        cuisine           STRING QUERYABLE,
+        imageAsset        ASSET,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE RecipeLike (
+        "___createTime"   TIMESTAMP,
+        "___createdBy"    REFERENCE,
+        "___etag"         STRING,
+        "___modTime"      TIMESTAMP,
+        "___modifiedBy"   REFERENCE,
+        "___recordID"     REFERENCE QUERYABLE,
+        userID            STRING QUERYABLE,
+        recipeID          STRING QUERYABLE,
+        recipeOwnerID     STRING,
+        likedAt           TIMESTAMP SORTABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE RecipeView (
+        "___createTime"   TIMESTAMP,
+        "___createdBy"    REFERENCE,
+        "___etag"         STRING,
+        "___modTime"      TIMESTAMP,
+        "___modifiedBy"   REFERENCE,
+        "___recordID"     REFERENCE QUERYABLE,
+        userID            STRING QUERYABLE,
+        recipeID          STRING QUERYABLE,
+        viewedAt          TIMESTAMP SORTABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE RecipeComment (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
+        id                 STRING QUERYABLE,
+        userID             STRING QUERYABLE,
+        recipeID           STRING QUERYABLE,
+        content            STRING,
+        createdAt          TIMESTAMP SORTABLE,
+        isDeleted          INT64,
+        likeCount          INT64,
+        parentCommentID    STRING QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE Activity (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
+        id                 STRING QUERYABLE,
+        type               STRING QUERYABLE,
+        actorID            STRING QUERYABLE,
+        actorName          STRING,
+        targetUserID       STRING QUERYABLE,
+        targetUserName     STRING,
+        recipeID           STRING,
+        recipeName         STRING,
+        challengeID        STRING,
+        challengeName      STRING,
+        timestamp          TIMESTAMP SORTABLE,
+        isRead             INT64 QUERYABLE,
+        GRANT WRITE TO "_creator",
         GRANT READ TO "_world"
     );

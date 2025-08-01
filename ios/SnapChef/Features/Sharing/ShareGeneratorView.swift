@@ -11,6 +11,11 @@ struct ShareGeneratorView: View {
     @State private var showingCamera = false
     @State private var selectedStyle: ShareStyle = ShareStyle.allCases.randomElement() ?? .homeCook
     @State private var animationPhase = 0.0
+    @State private var cloudKitRecordID: String?
+    @State private var shareURL: URL?
+    @State private var isUploadingToCloudKit = false
+    @StateObject private var cloudKitSync = CloudKitSyncService.shared
+    @StateObject private var socialShareManager = SocialShareManager.shared
     
     enum ShareStyle: String, CaseIterable {
         case homeCook = "Home Cook"
@@ -89,7 +94,7 @@ struct ShareGeneratorView: View {
         }
         .sheet(isPresented: $shareSheet) {
             if let image = generatedImage {
-                ShareSheet(items: [image, generateShareText()])
+                ShareSheet(items: buildShareItems(image: image))
             }
         }
         // TODO: SimplePhotoCaptureView was moved to archive
@@ -111,69 +116,142 @@ struct ShareGeneratorView: View {
     
     private func generateShareImage() {
         isGenerating = true
+        isUploadingToCloudKit = true
         
         // Haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
         
-        // Delay to ensure view is properly laid out
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            // Create the share image
-            let shareContent = ShareImageContent(
-                recipe: recipe,
-                ingredientsPhoto: ingredientsPhoto,
-                afterPhoto: afterPhoto,
-                style: selectedStyle
-            )
-            
-            let renderer = ImageRenderer(content: shareContent)
-            renderer.scale = 3.0 // High quality
-            
-            if let uiImage = renderer.uiImage {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    generatedImage = uiImage
-                    isGenerating = false
-                }
+        // First upload recipe to CloudKit
+        Task {
+            do {
+                // Create image data from the after photo if available
+                let imageData = afterPhoto?.jpegData(compressionQuality: 0.8)
                 
-                // Auto-navigate to share sheet after generation
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    shareSheet = true
+                // Upload recipe to CloudKit
+                let recordID = try await cloudKitSync.uploadRecipe(recipe, imageData: imageData)
+                cloudKitRecordID = recordID
+                
+                // Generate shareable URL
+                shareURL = socialShareManager.generateUniversalLink(for: recipe, cloudKitRecordID: recordID)
+                
+                await MainActor.run {
+                    isUploadingToCloudKit = false
                     
-                    // Award coins for sharing
-                    ChefCoinsManager.shared.awardSocialCoins(action: .share)
-                    
-                    // Post notification for recipe sharing
-                    NotificationCenter.default.post(
-                        name: Notification.Name("RecipeShared"),
-                        object: nil,
-                        userInfo: ["recipeId": recipe.id]
+                    // Create the share image
+                    let shareContent = ShareImageContent(
+                        recipe: recipe,
+                        ingredientsPhoto: ingredientsPhoto,
+                        afterPhoto: afterPhoto,
+                        style: selectedStyle
                     )
                     
-                    // Track social challenge progress
-                    ChallengeProgressTracker.shared.trackAction(.recipeShared, metadata: [
-                        "recipeId": recipe.id,
-                        "recipeName": recipe.name,
-                        "style": selectedStyle.rawValue
-                    ])
+                    let renderer = ImageRenderer(content: shareContent)
+                    renderer.scale = 3.0 // High quality
+                    
+                    if let uiImage = renderer.uiImage {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                            generatedImage = uiImage
+                            isGenerating = false
+                        }
+                        
+                        // Auto-navigate to share sheet after generation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            shareSheet = true
+                            
+                            // Award coins for sharing
+                            ChefCoinsManager.shared.awardSocialCoins(action: .share)
+                            
+                            // Post notification for recipe sharing
+                            NotificationCenter.default.post(
+                                name: Notification.Name("RecipeShared"),
+                                object: nil,
+                                userInfo: ["recipeId": recipe.id]
+                            )
+                            
+                            // Track social challenge progress
+                            ChallengeProgressTracker.shared.trackAction(.recipeShared, metadata: [
+                                "recipeId": recipe.id,
+                                "recipeName": recipe.name,
+                                "style": selectedStyle.rawValue,
+                                "cloudKitRecordID": recordID
+                            ])
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isGenerating = false
+                    isUploadingToCloudKit = false
+                    print("Failed to upload recipe to CloudKit: \(error)")
+                    // Still generate the share image even if CloudKit upload fails
+                    generateLocalShareImage()
                 }
             }
         }
     }
     
+    private func generateLocalShareImage() {
+        // Fallback for when CloudKit upload fails
+        let shareContent = ShareImageContent(
+            recipe: recipe,
+            ingredientsPhoto: ingredientsPhoto,
+            afterPhoto: afterPhoto,
+            style: selectedStyle
+        )
+        
+        let renderer = ImageRenderer(content: shareContent)
+        renderer.scale = 3.0
+        
+        if let uiImage = renderer.uiImage {
+            generatedImage = uiImage
+            shareSheet = true
+        }
+    }
+    
     private func generateShareText() -> String {
-        return """
+        var text = """
         🔥 MY FRIDGE CHALLENGE 🔥
         
         I just turned these random ingredients into \(recipe.name)! 
         
         ⏱ Ready in just \(recipe.prepTime + recipe.cookTime) minutes
         🎯 Difficulty: \(recipe.difficulty.emoji) \(recipe.difficulty.rawValue.capitalized)
+        """
+        
+        if let shareURL = shareURL {
+            text += """
+            
+            
+            👨‍🍳 Get the full recipe here:
+            \(shareURL.absoluteString)
+            """
+        }
+        
+        text += """
+        
         
         Think you can beat my fridge game? 
-        Download SnapChef and show me what you got! 👨‍🍳
+        Download SnapChef and show me what you got!
         
         #FridgeChallenge #SnapChef #CookingMagic
         """
+        
+        return text
+    }
+    
+    private func buildShareItems(image: UIImage) -> [Any] {
+        var items: [Any] = [image]
+        
+        // Add the share URL if available
+        if let shareURL = shareURL {
+            items.append(shareURL)
+        }
+        
+        // Add the share text
+        items.append(generateShareText())
+        
+        return items
     }
 }
 

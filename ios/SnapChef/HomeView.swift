@@ -420,48 +420,32 @@ struct ViralChallengeSection: View {
             .padding(.bottom, 20)
             
             // Carousel
-            GeometryReader { geometry in
-                ZStack(alignment: .bottom) {
-                    TabView(selection: $currentChallenge) {
-                        ForEach(Array(displayChallenges.enumerated()), id: \.offset) { index, challengeData in
-                            EnhancedChallengeCard(
-                                emoji: challengeData.emoji,
-                                title: challengeData.challenge.title,
-                                description: challengeData.challenge.description,
-                                participants: challengeData.participants,
-                                points: "\(challengeData.challenge.points)",
-                                color: challengeData.color,
-                                action: {
-                                    selectedChallenge = challengeData.challenge
-                                    showingChallengeView = true
-                                }
-                            )
-                            .tag(index)
-                        }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 20) {
+                    ForEach(Array(displayChallenges.enumerated()), id: \.offset) { index, challengeData in
+                        EnhancedChallengeCard(
+                            emoji: challengeData.emoji,
+                            title: challengeData.challenge.title,
+                            description: challengeData.challenge.description,
+                            participants: challengeData.participants,
+                            points: "\(challengeData.challenge.points)",
+                            color: challengeData.color,
+                            action: {
+                                selectedChallenge = challengeData.challenge
+                                showingChallengeView = true
+                            }
+                        )
+                        .frame(width: UIScreen.main.bounds.width - 60)
+                        .scaleEffect(currentChallenge == index ? 1 : 0.9)
+                        .animation(.spring(response: 0.3), value: currentChallenge)
                     }
-                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                    .frame(height: 540)
-                    
-                    // Page indicators
-                    HStack(spacing: 6) {
-                        ForEach(0..<displayChallenges.count, id: \.self) { index in
-                            Capsule()
-                                .fill(currentChallenge == index ? Color.white : Color.white.opacity(0.3))
-                                .frame(width: currentChallenge == index ? 24 : 8, height: 8)
-                                .animation(.spring(response: 0.3), value: currentChallenge)
-                        }
-                    }
-                    .padding(.bottom, 20)
                 }
+                .padding(.horizontal, 30)
             }
             .frame(height: 540)
         }
         .onAppear {
             sparkleAnimation = true
-            startAutoScroll()
-        }
-        .onDisappear {
-            stopAutoScroll()
         }
         .sheet(item: $selectedChallenge) { challenge in
             ChallengeDetailView(challenge: challenge)

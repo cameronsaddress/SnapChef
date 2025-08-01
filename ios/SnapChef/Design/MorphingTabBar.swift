@@ -8,7 +8,7 @@ struct MorphingTabBar: View {
         ("house.fill", "Home", Color(hex: "#667eea")),
         ("camera.fill", "Snap", Color(hex: "#f093fb")),
         ("book.fill", "Recipes", Color(hex: "#4facfe")),
-        ("trophy.fill", "Challenges", Color(hex: "#fa709a")),
+        ("heart.text.square.fill", "Feed", Color(hex: "#f77062")),
         ("person.fill", "Profile", Color(hex: "#43e97b"))
     ]
     

@@ -213,6 +213,10 @@ struct MagicalRecipeCard: View {
     
     @State private var isHovered = false
     @State private var shimmerPhase: CGFloat = -1
+    @State private var isLiked = false
+    @State private var likeCount = 0
+    @State private var isLoadingLike = false
+    @StateObject private var cloudKitSync = CloudKitSyncService.shared
     
     var body: some View {
         GlassmorphicCard(content: {
@@ -275,6 +279,14 @@ struct MagicalRecipeCard: View {
                 
                 // Action buttons
                 HStack(spacing: 12) {
+                    // Like button with count
+                    LikeButton(
+                        isLiked: isLiked,
+                        likeCount: likeCount,
+                        isLoading: isLoadingLike,
+                        action: toggleLike
+                    )
+                    
                     ActionButton(
                         title: isSaved ? "Saved" : "Save",
                         icon: isSaved ? "checkmark.circle.fill" : "bookmark.fill",
@@ -304,6 +316,48 @@ struct MagicalRecipeCard: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
         .onHover { hovering in
             isHovered = hovering
+        }
+        .task {
+            // Load like status when view appears
+            await loadLikeStatus()
+        }
+    }
+    
+    private func toggleLike() {
+        guard !isLoadingLike else { return }
+        
+        Task {
+            isLoadingLike = true
+            defer { isLoadingLike = false }
+            
+            do {
+                if isLiked {
+                    try await cloudKitSync.unlikeRecipe(recipe.id.uuidString)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        isLiked = false
+                        likeCount = max(0, likeCount - 1)
+                    }
+                } else {
+                    // For demo purposes, use current user ID as owner ID
+                    let ownerID = CloudKitAuthManager.shared.currentUser?.recordID ?? "anonymous"
+                    try await cloudKitSync.likeRecipe(recipe.id.uuidString, recipeOwnerID: ownerID)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        isLiked = true
+                        likeCount += 1
+                    }
+                }
+            } catch {
+                print("Failed to toggle like: \(error)")
+            }
+        }
+    }
+    
+    private func loadLikeStatus() async {
+        do {
+            isLiked = try await cloudKitSync.isRecipeLiked(recipe.id.uuidString)
+            likeCount = try await cloudKitSync.getRecipeLikeCount(recipe.id.uuidString)
+        } catch {
+            print("Failed to load like status: \(error)")
         }
     }
 }
@@ -374,6 +428,45 @@ struct DifficultyBadge: View {
                 Capsule()
                     .fill(difficultyColor)
             )
+    }
+}
+
+// MARK: - Like Button
+struct LikeButton: View {
+    let isLiked: Bool
+    let likeCount: Int
+    let isLoading: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: isLiked ? "heart.fill" : "heart")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(isLiked ? Color(hex: "#ff6b6b") : .white)
+                    .scaleEffect(isLiked ? 1.1 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isLiked)
+                
+                if likeCount > 0 {
+                    Text("\(likeCount)")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .contentTransition(.numericText())
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isLiked ? Color(hex: "#ff6b6b").opacity(0.2) : Color.white.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isLiked ? Color(hex: "#ff6b6b") : Color.white.opacity(0.3), lineWidth: 1.5)
+                    )
+            )
+        }
+        .disabled(isLoading)
+        .opacity(isLoading ? 0.6 : 1.0)
     }
 }
 

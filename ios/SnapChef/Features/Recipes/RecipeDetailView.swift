@@ -1,9 +1,25 @@
 import SwiftUI
+import CloudKit
 
 struct RecipeDetailView: View {
     let recipe: Recipe
+    var cloudKitRecipe: CloudKitRecipe?
     @Environment(\.dismiss) var dismiss
     @State private var showingPrintView = false
+    @State private var showingComments = false
+    @State private var isLiked = false
+    @State private var likeCount = 0
+    @State private var isLoadingLike = false
+    @State private var showingUserProfile = false
+    @State private var authorName = ""
+    @State private var newCommentText = ""
+    @State private var isSubmittingComment = false
+    @State private var showingAllComments = false
+    @State private var selectedUserID = ""
+    @State private var selectedUserName = ""
+    @StateObject private var cloudKitSync = CloudKitSyncService.shared
+    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var commentsViewModel = RecipeCommentsViewModel()
     
     var body: some View {
         NavigationStack {
@@ -30,8 +46,48 @@ struct RecipeDetailView: View {
                     
                     // Recipe Info
                     VStack(alignment: .leading, spacing: 16) {
-                        Text(recipe.name)
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                        // Recipe title with like button
+                        HStack(alignment: .top, spacing: 12) {
+                            Text(recipe.name)
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .fixedSize(horizontal: false, vertical: true)
+                            
+                            Spacer()
+                            
+                            // Like button
+                            Button(action: toggleLike) {
+                                VStack(spacing: 4) {
+                                    Image(systemName: isLiked ? "heart.fill" : "heart")
+                                        .font(.system(size: 24, weight: .medium))
+                                        .foregroundColor(isLiked ? .pink : .gray)
+                                        .scaleEffect(isLiked ? 1.1 : 1.0)
+                                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isLiked)
+                                    
+                                    if likeCount > 0 {
+                                        Text("\(likeCount)")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(.gray)
+                                    }
+                                }
+                            }
+                            .disabled(isLoadingLike)
+                            .opacity(isLoadingLike ? 0.6 : 1.0)
+                        }
+                        
+                        // Author info (if available)
+                        if let cloudKitRecipe = cloudKitRecipe, !cloudKitRecipe.ownerID.isEmpty {
+                            Button(action: { showingUserProfile = true }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.blue)
+                                    Text("by \(authorName.isEmpty ? "Chef" : authorName)")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
                         
                         Text(recipe.description)
                             .font(.system(size: 18))
@@ -92,6 +148,66 @@ struct RecipeDetailView: View {
                             RecipeDetailNutritionItem(label: "Fat", value: "\(recipe.nutrition.fat)g")
                         }
                     }
+                    
+                    // Comments Section
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Text("Comments")
+                                .font(.system(size: 24, weight: .bold))
+                            Spacer()
+                            if commentsViewModel.comments.count > 0 {
+                                Text("\(commentsViewModel.comments.count)")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        // Comment Input
+                        HStack(spacing: 12) {
+                            TextField("Add a comment...", text: $newCommentText)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                            
+                            Button(action: submitComment) {
+                                Image(systemName: "paperplane.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(newCommentText.isEmpty ? .gray : .blue)
+                            }
+                            .disabled(newCommentText.isEmpty || isSubmittingComment)
+                        }
+                        
+                        // Comments List
+                        if commentsViewModel.isLoading && commentsViewModel.comments.isEmpty {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .tint(.gray)
+                                Spacer()
+                            }
+                            .padding(.vertical, 20)
+                        } else if commentsViewModel.comments.isEmpty {
+                            Text("Be the first to comment!")
+                                .font(.system(size: 16))
+                                .foregroundColor(.secondary)
+                                .padding(.vertical, 20)
+                        } else {
+                            ForEach(commentsViewModel.comments.prefix(5)) { comment in
+                                RecipeCommentRow(comment: comment, onUserTap: {
+                                    selectedUserID = comment.userID
+                                    selectedUserName = comment.userName
+                                    showingUserProfile = true
+                                })
+                                .padding(.vertical, 8)
+                            }
+                            
+                            if commentsViewModel.comments.count > 5 {
+                                Button(action: { showingAllComments = true }) {
+                                    Text("View all \(commentsViewModel.comments.count) comments")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                        }
+                    }
                 }
                 .padding()
             }
@@ -105,6 +221,7 @@ struct RecipeDetailView: View {
                     }
                 }
                 
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
@@ -113,6 +230,96 @@ struct RecipeDetailView: View {
             }
             .sheet(isPresented: $showingPrintView) {
                 RecipePrintView(recipe: recipe)
+            }
+            .sheet(isPresented: $showingUserProfile) {
+                if !selectedUserID.isEmpty {
+                    UserProfileView(userID: selectedUserID, userName: selectedUserName)
+                        .onDisappear {
+                            selectedUserID = ""
+                            selectedUserName = ""
+                        }
+                } else if let cloudKitRecipe = cloudKitRecipe {
+                    UserProfileView(userID: cloudKitRecipe.ownerID, userName: authorName)
+                }
+            }
+            .sheet(isPresented: $showingAllComments) {
+                RecipeCommentsView(recipe: recipe)
+            }
+            .task {
+                await loadLikeStatus()
+                await loadAuthorInfo()
+                await commentsViewModel.loadComments(for: recipe.id.uuidString)
+            }
+        }
+    }
+    
+    private func toggleLike() {
+        guard !isLoadingLike else { return }
+        
+        Task {
+            isLoadingLike = true
+            defer { isLoadingLike = false }
+            
+            do {
+                if isLiked {
+                    try await cloudKitSync.unlikeRecipe(recipe.id.uuidString)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        isLiked = false
+                        likeCount = max(0, likeCount - 1)
+                    }
+                } else {
+                    // For demo purposes, use current user ID as owner ID
+                    let ownerID = CloudKitAuthManager.shared.currentUser?.recordID ?? "anonymous"
+                    try await cloudKitSync.likeRecipe(recipe.id.uuidString, recipeOwnerID: ownerID)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        isLiked = true
+                        likeCount += 1
+                    }
+                }
+            } catch {
+                print("Failed to toggle like: \(error)")
+            }
+        }
+    }
+    
+    private func loadLikeStatus() async {
+        do {
+            isLiked = try await cloudKitSync.isRecipeLiked(recipe.id.uuidString)
+            likeCount = try await cloudKitSync.getRecipeLikeCount(recipe.id.uuidString)
+        } catch {
+            print("Failed to load like status: \(error)")
+        }
+    }
+    
+    private func loadAuthorInfo() async {
+        guard let cloudKitRecipe = cloudKitRecipe, !cloudKitRecipe.ownerID.isEmpty else { return }
+        
+        do {
+            let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+            let record = try await database.record(for: CKRecord.ID(recordName: cloudKitRecipe.ownerID))
+            let user = CloudKitUser(from: record)
+            await MainActor.run {
+                authorName = user.displayName
+            }
+        } catch {
+            print("Failed to load author info: \(error)")
+        }
+    }
+    
+    private func submitComment() {
+        guard !newCommentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        
+        Task {
+            isSubmittingComment = true
+            defer { isSubmittingComment = false }
+            
+            await commentsViewModel.addComment(
+                to: recipe.id.uuidString,
+                content: newCommentText
+            )
+            
+            await MainActor.run {
+                newCommentText = ""
             }
         }
     }
@@ -134,6 +341,60 @@ struct RecipeDetailNutritionItem: View {
         .padding()
         .background(Color.gray.opacity(0.1))
         .cornerRadius(10)
+    }
+}
+
+// MARK: - Recipe Comment Row
+struct RecipeCommentRow: View {
+    let comment: CommentItem
+    let onUserTap: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                // User Avatar
+                Button(action: onUserTap) {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+                        .overlay(
+                            Text(comment.userName.prefix(1).uppercased())
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Button(action: onUserTap) {
+                            Text(comment.userName)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.primary)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        Text("• \(comment.timeAgoText)")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                    }
+                    
+                    Text(comment.content)
+                        .font(.system(size: 15))
+                        .foregroundColor(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.horizontal, 4)
     }
 }
 
