@@ -40,10 +40,6 @@ struct HomeView: View {
                         }
                         .padding(.top, 30)
                         
-                        // Streak Summary
-                        StreakSummaryCard()
-                            .padding(.horizontal, 20)
-                        
                         // Main CTA Section with prominent spacing
                         VStack(spacing: 0) {
                             // Equal spacing above button
@@ -77,6 +73,11 @@ struct HomeView: View {
                         // Celebrity Kitchens Carousel
                         InfluencerCarousel()
                             .padding(.top, 10)
+                        
+                        // Streak Summary
+                        StreakSummaryCard()
+                            .padding(.horizontal, 20)
+                            .padding(.top, 20)
                         
                         // Food Preferences Card
                         FoodPreferencesCard()

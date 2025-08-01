@@ -72,23 +72,62 @@ struct AIProcessingView: View {
                         .scaleEffect(sparkleScale)
                 }
                 
-                // Text content with doubled size
-                VStack(spacing: 30) {
-                    Text("Our awesome AI is now scanning for all food items, quantity, and freshness.")
-                        .font(.system(size: 44, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white)
-                        .opacity(textOpacity)
-                        .lineSpacing(8)
+                // Text content with professional animation
+                VStack(spacing: 24) {
+                    VStack(spacing: 12) {
+                        Text("Our AI is scanning")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .opacity(textOpacity)
+                            .scaleEffect(textOpacity)
+                            .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.2), value: textOpacity)
+                        
+                        Text("Detecting food items, quantity & freshness")
+                            .font(.system(size: 18, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.9))
+                            .opacity(textOpacity)
+                            .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.4), value: textOpacity)
+                    }
                     
-                    Text("While he cooks, here's a fun game on us!")
-                        .font(.system(size: 44, weight: .semibold, design: .rounded))
+                    // Loading dots animation
+                    HStack(spacing: 8) {
+                        ForEach(0..<3) { index in
+                            Circle()
+                                .fill(Color.white.opacity(0.8))
+                                .frame(width: 10, height: 10)
+                                .scaleEffect(isAnimating ? 1.0 : 0.5)
+                                .animation(
+                                    Animation.easeInOut(duration: 0.6)
+                                        .repeatForever()
+                                        .delay(Double(index) * 0.2),
+                                    value: isAnimating
+                                )
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    
+                    Text("While our chef prepares your recipes...")
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
                         .foregroundColor(Color(hex: "#f093fb"))
-                        .padding(.top, 20)
                         .opacity(textOpacity)
-                        .animation(.easeInOut(duration: 0.5).delay(0.6), value: textOpacity)
+                        .animation(.easeInOut(duration: 0.5).delay(0.8), value: textOpacity)
+                    
+                    Text("Enjoy a quick game!")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color(hex: "#f093fb"), Color(hex: "#f5576c")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .opacity(textOpacity)
+                        .scaleEffect(textOpacity)
+                        .animation(.spring(response: 0.8, dampingFraction: 0.6).delay(1.0), value: textOpacity)
                 }
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+                .padding(.horizontal, 30)
+                .frame(maxWidth: 500) // Limit width for readability
                 
                 Spacer()
             }
