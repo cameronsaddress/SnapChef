@@ -368,11 +368,11 @@ class ChefCoinsManager: ObservableObject {
 
 // MARK: - Supporting Types
 
-enum RecipeQuality {
-    case basic
-    case good
-    case excellent
-    case perfect
+enum RecipeQuality: String {
+    case basic = "basic"
+    case good = "good"
+    case excellent = "excellent"
+    case perfect = "perfect"
 }
 
 enum SocialAction {

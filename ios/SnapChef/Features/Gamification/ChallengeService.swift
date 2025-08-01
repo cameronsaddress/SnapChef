@@ -197,7 +197,7 @@ class ChallengeService {
             let gamificationManager = GamificationManager.shared
             for userChallenge in userChallenges {
                 gamificationManager.updateChallengeProgress(
-                    UUID(uuidString: userChallenge.challengeId) ?? UUID(),
+                    userChallenge.challengeId,
                     progress: userChallenge.progress
                 )
             }
@@ -252,20 +252,16 @@ struct ChallengeDTO: Codable {
     
     func toChallenge() -> Challenge {
         Challenge(
-            type: ChallengeType(rawValue: type) ?? .daily,
+            id: id,
             title: title,
             description: description,
-            requirement: requirement,
-            reward: ChallengeReward(
-                points: rewardPoints,
-                badge: rewardBadge,
-                title: rewardTitle,
-                unlockable: rewardUnlockable
-            ),
+            type: ChallengeType(rawValue: type) ?? .daily,
+            points: rewardPoints,
+            coins: rewardPoints / 10,
             endDate: endDate,
-            participants: participantCount,
-            progress: 0,
-            isCompleted: false
+            requirements: [requirement],
+            currentProgress: 0,
+            participants: participantCount
         )
     }
 }

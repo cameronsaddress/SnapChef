@@ -269,20 +269,15 @@ struct ViralChallengeSection: View {
     var challenges: [Challenge] {
         challengeData.map { data in
             Challenge(
-                type: .daily,
                 title: data.1,
                 description: data.2,
-                requirement: "Create a \(data.1.lowercased()) dish and share it",
-                reward: ChallengeReward(
-                    points: Int(data.4) ?? 50,
-                    badge: nil,
-                    title: nil,
-                    unlockable: nil
-                ),
+                type: .daily,
+                points: Int(data.4) ?? 50,
+                coins: (Int(data.4) ?? 50) / 10,
                 endDate: Date().addingTimeInterval(86400), // 24 hours from now
-                participants: Int.random(in: 100...500),
-                progress: 0,
-                isCompleted: false
+                requirements: ["Create a \(data.1.lowercased()) dish and share it"],
+                currentProgress: 0,
+                participants: Int.random(in: 100...500)
             )
         }
     }

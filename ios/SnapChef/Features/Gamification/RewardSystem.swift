@@ -115,7 +115,7 @@ class RewardSystem: ObservableObject {
         let tier = determineTier(for: completionScore)
         
         // Base coins reward
-        let baseCoins = challenge.reward.points
+        let baseCoins = challenge.points
         let tierMultiplier = tier.multiplier
         let totalCoins = Int(Double(baseCoins) * tierMultiplier)
         
@@ -146,23 +146,24 @@ class RewardSystem: ObservableObject {
         // Special rewards based on tier
         if tier == .gold {
             // Gold tier gets special rewards
-            if let badgeName = challenge.reward.badge {
-                rewards.append(Reward(
-                    type: .badge,
-                    tier: .gold,
-                    value: 1,
-                    name: badgeName,
-                    description: "Exclusive gold tier badge",
-                    iconName: "shield.fill",
-                    unlockableId: "badge_\(badgeName.lowercased().replacingOccurrences(of: " ", with: "_"))",
-                    timestamp: Date()
-                ))
-            }
+            // Badge reward based on challenge type
+            let badgeName = "\(challenge.type.rawValue) Champion"
+            rewards.append(Reward(
+                type: .badge,
+                tier: .gold,
+                value: 1,
+                name: badgeName,
+                description: "Exclusive gold tier badge",
+                iconName: "shield.fill",
+                unlockableId: "badge_\(badgeName.lowercased().replacingOccurrences(of: " ", with: "_"))",
+                timestamp: Date()
+            ))
             
-            if let title = challenge.reward.title {
-                rewards.append(Reward(
-                    type: .title,
-                    tier: .gold,
+            // Title reward
+            let title = "Gold \(challenge.type.rawValue) Master"
+            rewards.append(Reward(
+                type: .title,
+                tier: .gold,
                     value: 1,
                     name: title,
                     description: "Prestigious title for perfect completion",
@@ -171,10 +172,11 @@ class RewardSystem: ObservableObject {
                     timestamp: Date()
                 ))
             }
-        }
         
         // Challenge-specific unlockables
-        if let unlockable = challenge.reward.unlockable {
+        // Create unlockable based on challenge difficulty
+        if challenge.difficulty.rawValue >= 3 { // Hard or above
+            let unlockable = "Premium \(challenge.type.rawValue) Pack"
             let unlockableTier = tier == .bronze ? .silver : tier // Bronze gets silver tier unlockable
             rewards.append(createUnlockableReward(for: unlockable, tier: unlockableTier))
         }
@@ -294,6 +296,10 @@ class RewardSystem: ObservableObject {
     /// Apply a reward to the user's account
     private func applyReward(_ reward: Reward) {
         switch reward.type {
+        case .chefCoins:
+            chefCoinsManager.earnCoins(reward.value, reason: reward.name)
+        case .experiencePoints:
+            gamificationManager.awardPoints(reward.value, reason: reward.name)
         case .badge:
             gamificationManager.awardBadge(reward.name)
         case .title:
@@ -308,8 +314,6 @@ class RewardSystem: ObservableObject {
                 unlockedItems.append(unlockableId)
                 UserDefaults.standard.set(unlockedItems, forKey: "unlockedItems")
             }
-        default:
-            break
         }
     }
     
@@ -425,7 +429,7 @@ extension Reward {
                 return unlockedItems.contains(unlockableId)
             }
             return false
-        default:
+        case .chefCoins, .experiencePoints:
             return true
         }
     }

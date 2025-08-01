@@ -36,7 +36,7 @@ struct ChallengeDetailView: View {
                             .padding(.horizontal, 20)
                         
                         // Rewards
-                        RewardsCard(reward: challenge.reward)
+                        RewardsCard(challenge: challenge)
                             .padding(.horizontal, 20)
                         
                         // Leaderboard preview
@@ -145,7 +145,7 @@ struct RequirementsCard: View {
                     HStack(spacing: 12) {
                         Image(systemName: "checkmark.circle")
                             .foregroundColor(Color(hex: "#43e97b"))
-                        Text(challenge.requirement)
+                        Text(challenge.requirements.first ?? "Complete the challenge")
                             .font(.system(size: 16))
                             .foregroundColor(.white.opacity(0.8))
                     }
@@ -168,7 +168,7 @@ struct RequirementsCard: View {
 
 // MARK: - Rewards Card
 struct RewardsCard: View {
-    let reward: ChallengeReward
+    let challenge: Challenge
     
     var body: some View {
         GlassmorphicCard {
@@ -180,7 +180,7 @@ struct RewardsCard: View {
                 HStack(spacing: 40) {
                     // Points
                     VStack(spacing: 8) {
-                        Text("\(reward.points)")
+                        Text("\(challenge.points)")
                             .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundColor(Color(hex: "#f093fb"))
                         Text("Points")
@@ -188,15 +188,19 @@ struct RewardsCard: View {
                             .foregroundColor(.white.opacity(0.6))
                     }
                     
-                    // Badge
-                    if let badge = reward.badge, !badge.isEmpty {
-                        VStack(spacing: 8) {
-                            Text(badge)
-                                .font(.system(size: 40))
-                            Text("Badge")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
+                    // Coins
+                    VStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bitcoinsign.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundColor(.yellow)
+                            Text("\(challenge.coins)")
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .foregroundColor(.yellow)
                         }
+                        Text("Coins")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
                     }
                 }
             }
@@ -268,14 +272,12 @@ struct MiniLeaderboardCard: View {
 
 #Preview {
     ChallengeDetailView(challenge: Challenge(
-        type: .weekly,
         title: "Pasta Master",
         description: "Create 5 different pasta dishes this week",
-        requirement: "Cook 5 pasta recipes",
-        reward: ChallengeReward(points: 500, badge: "🍝", title: nil, unlockable: nil),
+        type: .weekly,
         endDate: Date().addingTimeInterval(5 * 24 * 60 * 60),
-        participants: 234,
-        progress: 0.4,
-        isCompleted: false
+        requirements: ["Cook 5 pasta recipes"],
+        currentProgress: 0.4,
+        participants: 234
     ))
 }

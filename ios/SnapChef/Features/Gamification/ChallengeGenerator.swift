@@ -248,19 +248,15 @@ class ChallengeGenerator {
         let currentRecipes = Int.random(in: 700_000...900_000)
         
         return Challenge(
-            type: .community,
             title: theme,
             description: "Community goal: \(targetRecipes/1000)K recipes this month",
-            requirement: "\(currentRecipes.formatted())/\(targetRecipes.formatted())",
-            reward: ChallengeReward(
-                points: 2000,
-                badge: "Community Hero",
-                title: "Global Champion",
-                unlockable: "Exclusive recipe pack"
-            ),
+            type: .community,
+            points: 2000,
+            coins: 200,
             endDate: endOfMonth,
-            participants: Int.random(in: 30_000...60_000),
-            progress: Double(currentRecipes) / Double(targetRecipes)
+            requirements: ["\(currentRecipes.formatted())/\(targetRecipes.formatted())"],
+            currentProgress: Double(currentRecipes) / Double(targetRecipes),
+            participants: Int.random(in: 30_000...60_000)
         )
     }
     
@@ -296,26 +292,31 @@ class ChallengeGenerator {
             difficultyMultiplier: 1.0
         )
         
-        // Apply premium reward multiplier and badge
+        // Apply premium reward multiplier
         let multiplier = subscriptionManager.getPremiumRewardMultiplier()
-        let premiumPoints = Int(Double(challenge.reward.points) * multiplier)
-        let premiumBadge = "⭐ \(challenge.reward.badge ?? "Premium Champion")"
+        let premiumPoints = Int(Double(challenge.points) * multiplier)
+        let premiumCoins = Int(Double(challenge.coins) * multiplier)
         
-        // Create new challenge with updated reward
+        // Create new challenge with updated rewards
         return Challenge(
-            type: challenge.type,
-            title: challenge.title,
+            id: challenge.id,
+            title: "⭐ \(challenge.title)",
             description: challenge.description,
-            requirement: challenge.requirement,
-            reward: ChallengeReward(
-                points: premiumPoints,
-                badge: premiumBadge,
-                title: challenge.reward.title,
-                unlockable: challenge.reward.unlockable
-            ),
+            type: challenge.type,
+            category: challenge.category,
+            difficulty: challenge.difficulty,
+            points: premiumPoints,
+            coins: premiumCoins,
+            startDate: challenge.startDate,
             endDate: challenge.endDate,
+            requirements: challenge.requirements,
+            currentProgress: challenge.currentProgress,
+            isCompleted: challenge.isCompleted,
+            isActive: challenge.isActive,
             participants: challenge.participants,
-            progress: challenge.progress
+            completions: challenge.completions,
+            imageURL: challenge.imageURL,
+            isPremium: true
         )
     }
     
@@ -338,19 +339,15 @@ class ChallengeGenerator {
         let unlockable = generateUnlockable(for: type, points: adjustedPoints)
         
         return Challenge(
-            type: type,
             title: title,
             description: description,
-            requirement: requirement,
-            reward: ChallengeReward(
-                points: adjustedPoints,
-                badge: badge,
-                title: generateTitle(for: adjustedPoints),
-                unlockable: unlockable
-            ),
+            type: type,
+            points: adjustedPoints,
+            coins: adjustedPoints / 10,
             endDate: endDate,
-            participants: generateParticipantCount(for: type),
-            progress: 0
+            requirements: [requirement],
+            currentProgress: 0,
+            participants: generateParticipantCount(for: type)
         )
     }
     
@@ -359,55 +356,43 @@ class ChallengeGenerator {
         let nextMilestone = ((streak / 7) + 1) * 7
         
         return Challenge(
-            type: .daily,
             title: "Streak Master",
             description: "Maintain your \(nextMilestone)-day streak",
-            requirement: "\(streak)/\(nextMilestone) days",
-            reward: ChallengeReward(
-                points: nextMilestone * 20,
-                badge: "\(nextMilestone)-Day Streak",
-                title: "Dedication Expert",
-                unlockable: nil
-            ),
+            type: .daily,
+            points: nextMilestone * 20,
+            coins: nextMilestone * 2,
             endDate: Date().addingTimeInterval(86400),
-            participants: Int.random(in: 500...1500),
-            progress: Double(streak) / Double(nextMilestone)
+            requirements: ["\(streak)/\(nextMilestone) days"],
+            currentProgress: Double(streak) / Double(nextMilestone),
+            participants: Int.random(in: 500...1500)
         )
     }
     
     private func generateBeginnerChallenge() -> Challenge {
         return Challenge(
-            type: .daily,
             title: "First Steps",
             description: "Create your first 5 recipes",
-            requirement: "\(gamificationManager.userStats.recipesCreated)/5 recipes",
-            reward: ChallengeReward(
-                points: 200,
-                badge: "Rising Star",
-                title: "Beginner Chef",
-                unlockable: "Starter recipe pack"
-            ),
+            type: .daily,
+            points: 200,
+            coins: 20,
             endDate: Date().addingTimeInterval(259200), // 3 days
-            participants: Int.random(in: 2000...5000),
-            progress: Double(gamificationManager.userStats.recipesCreated) / 5.0
+            requirements: ["\(gamificationManager.userStats.recipesCreated)/5 recipes"],
+            currentProgress: Double(gamificationManager.userStats.recipesCreated) / 5.0,
+            participants: Int.random(in: 2000...5000)
         )
     }
     
     private func generatePerfectionistChallenge() -> Challenge {
         return Challenge(
-            type: .weekly,
             title: "Perfection Week",
             description: "Create 5 perfect recipes (5-star rating)",
-            requirement: "0/5 perfect recipes",
-            reward: ChallengeReward(
-                points: 1000,
-                badge: "Perfectionist Pro",
-                title: "Master of Excellence",
-                unlockable: "Gold chef hat"
-            ),
+            type: .weekly,
+            points: 1000,
+            coins: 100,
             endDate: Date().addingTimeInterval(604800), // 7 days
-            participants: Int.random(in: 1000...3000),
-            progress: 0
+            requirements: ["0/5 perfect recipes"],
+            currentProgress: 0,
+            participants: Int.random(in: 1000...3000)
         )
     }
     

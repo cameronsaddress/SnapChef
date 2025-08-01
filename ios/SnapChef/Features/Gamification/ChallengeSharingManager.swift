@@ -173,7 +173,7 @@ class ChallengeSharingManager: ObservableObject {
         // Generate type-specific text
         switch type {
         case .challengeComplete(let challenge):
-            text += "🎉 Challenge Complete! I just finished \"\(challenge.title)\" and earned \(challenge.reward.points) points! 🔥\n\n"
+            text += "🎉 Challenge Complete! I just finished \"\(challenge.title)\" and earned \(challenge.points) points! 🔥\n\n"
             
         case .levelUp(let level):
             text += "🆙 LEVEL UP! Just reached Level \(level) on SnapChef! 🎊\n\n"
@@ -360,20 +360,15 @@ class ChallengeSharingManager: ObservableObject {
     ) async throws {
         // Create a custom challenge for friends
         let challenge = Challenge(
-            type: .special,
             title: "Friend Challenge: \(challengeType)",
             description: "Challenge between you and \(friendUsername)",
-            requirement: "Complete within time limit",
-            reward: ChallengeReward(
-                points: stakes,
-                badge: nil,
-                title: "Friend Champion",
-                unlockable: nil
-            ),
+            type: .special,
+            points: stakes,
+            coins: stakes / 10,
             endDate: Date().addingTimeInterval(duration),
-            participants: 2,
-            progress: 0,
-            isCompleted: false
+            requirements: ["Complete within time limit"],
+            currentProgress: 0,
+            participants: 2
         )
         
         // Save to CloudKit and notify friend
@@ -514,7 +509,7 @@ struct ChallengeCompleteShareView: View {
                     .font(.system(size: 24, weight: .medium))
                     .foregroundColor(.white.opacity(0.8))
                 
-                Text("\(challenge.reward.points) Points")
+                Text("\(challenge.points) Points")
                     .font(.system(size: 56, weight: .black, design: .rounded))
                     .foregroundColor(.yellow)
             }

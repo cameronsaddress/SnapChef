@@ -9,13 +9,13 @@ class ChallengeProgressTracker: ObservableObject {
     // MARK: - Properties
     static let shared = ChallengeProgressTracker()
     
-    @Published var activeTracking: [UUID: TrackingSession] = [:]
+    @Published var activeTracking: [String: TrackingSession] = [:]
     @Published var recentActions: [ChallengeAction] = []
     @Published var milestoneReached: MilestoneNotification?
     
     private let gamificationManager = GamificationManager.shared
     private var cancellables = Set<AnyCancellable>()
-    private var trackingTimers: [UUID: Timer] = [:]
+    private var trackingTimers: [String: Timer] = [:]
     
     // Action types that can trigger progress
     enum ActionType: String {
@@ -86,7 +86,7 @@ class ChallengeProgressTracker: ObservableObject {
     }
     
     /// Stop tracking a specific challenge
-    func stopTracking(challengeId: UUID) {
+    func stopTracking(challengeId: String) {
         activeTracking.removeValue(forKey: challengeId)
         
         // Stop timer if exists
@@ -168,7 +168,7 @@ class ChallengeProgressTracker: ObservableObject {
             
             switch action {
             case .recipeCreated:
-                if challenge.requirement.contains("recipe") {
+                if challenge.requirements.first?.contains("recipe") ?? false {
                     shouldUpdate = true
                     progressIncrement = 1.0 / Double(extractTargetValue(from: challenge))
                 }
@@ -208,7 +208,7 @@ class ChallengeProgressTracker: ObservableObject {
             }
             
             if shouldUpdate {
-                let newProgress = min(challenge.progress + progressIncrement, 1.0)
+                let newProgress = min(challenge.currentProgress + progressIncrement, 1.0)
                 updateProgress(for: challenge, to: newProgress)
                 
                 // Save progress to Core Data
@@ -231,13 +231,13 @@ class ChallengeProgressTracker: ObservableObject {
             // Calculate increment based on requirement
             let target = extractTargetValue(from: challenge)
             let increment = 1.0 / Double(target)
-            let newProgress = min(challenge.progress + increment, 1.0)
+            let newProgress = min(challenge.currentProgress + increment, 1.0)
             updateProgress(for: challenge, to: newProgress)
         }
     }
     
     private func updateProgress(for challenge: Challenge, to newProgress: Double) {
-        let oldProgress = challenge.progress
+        let oldProgress = challenge.currentProgress
         gamificationManager.updateChallengeProgress(challenge.id, progress: newProgress)
         
         // Check for milestones
@@ -253,7 +253,9 @@ class ChallengeProgressTracker: ObservableObject {
     
     private func startTimerTracking(for challenge: Challenge) {
         let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateTimerProgress(for: challenge)
+            Task { @MainActor in
+                self?.updateTimerProgress(for: challenge)
+            }
         }
         
         trackingTimers[challenge.id] = timer
@@ -321,7 +323,8 @@ class ChallengeProgressTracker: ObservableObject {
     
     private func extractTargetValue(from challenge: Challenge) -> Int {
         // Extract number from requirement string (e.g., "0/10 recipes" -> 10)
-        let components = challenge.requirement.split(separator: "/")
+        let requirementText = challenge.requirements.first ?? ""
+        let components = requirementText.split(separator: "/")
         if components.count >= 2 {
             let targetString = components[1].split(separator: " ")[0]
             return Int(targetString) ?? 1
@@ -381,7 +384,7 @@ class ChallengeProgressTracker: ObservableObject {
                     challengeId: challenge.id,
                     challengeTitle: challenge.title,
                     milestone: milestone,
-                    reward: milestone == 1.0 ? challenge.reward.points : Int(Double(challenge.reward.points) * milestone * 0.2)
+                    reward: milestone == 1.0 ? challenge.points : Int(Double(challenge.points) * milestone * 0.2)
                 )
                 
                 milestoneReached = notification
@@ -400,7 +403,7 @@ class ChallengeProgressTracker: ObservableObject {
     
     private func completeChallenge(_ challenge: Challenge) {
         // Calculate final score based on completion time and other factors
-        var score = challenge.reward.points
+        var score = challenge.points
         
         if let session = activeTracking[challenge.id] {
             let completionTime = Date().timeIntervalSince(session.startTime)
@@ -431,7 +434,7 @@ class ChallengeProgressTracker: ObservableObject {
                 "challengeId": challenge.id,
                 "title": challenge.title,
                 "score": score,
-                "reward": challenge.reward
+                "reward": challenge
             ]
         )
     }
@@ -440,7 +443,7 @@ class ChallengeProgressTracker: ObservableObject {
 // MARK: - Supporting Types
 
 struct TrackingSession {
-    let challengeId: UUID
+    let challengeId: String
     let startTime: Date
     let targetValue: Int
     var currentValue: Int
@@ -455,7 +458,7 @@ struct ChallengeAction {
 
 struct MilestoneNotification: Identifiable {
     let id = UUID()
-    let challengeId: UUID
+    let challengeId: String
     let challengeTitle: String
     let milestone: Double
     let reward: Int
@@ -470,7 +473,7 @@ struct MilestoneNotification: Identifiable {
 extension ChallengeProgressTracker {
     
     /// Get progress analytics for a specific challenge
-    func getAnalytics(for challengeId: UUID) -> ChallengeAnalytics? {
+    func getAnalytics(for challengeId: String) -> ChallengeAnalytics? {
         guard let session = activeTracking[challengeId] else { return nil }
         
         let elapsedTime = Date().timeIntervalSince(session.startTime)
@@ -485,7 +488,7 @@ extension ChallengeProgressTracker {
             progressRate: progressRate,
             estimatedCompletion: estimatedCompletion,
             actionsPerformed: recentActions.filter { action in
-                if let actionChallengeId = action.metadata["challengeId"] as? UUID {
+                if let actionChallengeId = action.metadata["challengeId"] as? String {
                     return actionChallengeId == challengeId
                 }
                 return false
@@ -495,7 +498,7 @@ extension ChallengeProgressTracker {
 }
 
 struct ChallengeAnalytics {
-    let challengeId: UUID
+    let challengeId: String
     let startTime: Date
     let elapsedTime: TimeInterval
     let progressRate: Double

@@ -63,14 +63,22 @@ struct ChallengeHubView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        withAnimation {
-                            refreshChallenges()
+                    HStack(spacing: 16) {
+                        NavigationLink(destination: AnalyticsView()) {
+                            Image(systemName: "chart.xyaxis.line")
+                                .font(.body)
+                                .foregroundColor(.primary)
                         }
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.body)
-                            .foregroundColor(.primary)
+                        
+                        Button(action: {
+                            withAnimation {
+                                refreshChallenges()
+                            }
+                        }) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                        }
                     }
                 }
             }
@@ -359,6 +367,164 @@ private struct FilterTab: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Analytics View
+struct AnalyticsView: View {
+    @StateObject private var analytics = ChallengeAnalyticsService.shared
+    
+    var body: some View {
+        ZStack {
+            MagicalBackground()
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header Stats
+                    HStack(spacing: 16) {
+                        AnalyticsStatCard(
+                            title: "Challenges",
+                            value: "\(analytics.userEngagement.totalChallengesStarted)",
+                            icon: "target",
+                            color: Color(hex: "#667eea")
+                        )
+                        
+                        AnalyticsStatCard(
+                            title: "Completion",
+                            value: String(format: "%.0f%%", analytics.userEngagement.completionRate * 100),
+                            icon: "checkmark.circle.fill",
+                            color: .green
+                        )
+                    }
+                    
+                    HStack(spacing: 16) {
+                        AnalyticsStatCard(
+                            title: "Coins Earned",
+                            value: "\(analytics.userEngagement.totalCoinsEarned)",
+                            icon: "bitcoinsign.circle.fill",
+                            color: .yellow
+                        )
+                        
+                        AnalyticsStatCard(
+                            title: "Daily Avg",
+                            value: "\(Int(analytics.userEngagement.averageDailyTime / 60))m",
+                            icon: "clock.fill",
+                            color: .orange
+                        )
+                    }
+                    
+                    // Daily Metrics
+                    GlassmorphicCard(content: {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Today's Activity")
+                                .font(.headline)
+                            
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text("Started")
+                                    Text("\(analytics.dailyMetrics.challengesStarted)")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                }
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .leading) {
+                                    Text("Completed")
+                                    Text("\(analytics.dailyMetrics.challengesCompleted)")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.green)
+                                }
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .leading) {
+                                    Text("Coins")
+                                    Text("\(analytics.dailyMetrics.coinsEarned)")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.yellow)
+                                }
+                            }
+                        }
+                        .padding()
+                    }, glowColor: Color(hex: "#667eea"))
+                    
+                    // Performance Insights
+                    if !analytics.performanceInsights.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Insights")
+                                .font(.headline)
+                                .padding(.horizontal)
+                            
+                            ForEach(analytics.performanceInsights.prefix(3)) { insight in
+                                HStack(spacing: 12) {
+                                    Image(systemName: insight.icon)
+                                        .font(.title3)
+                                        .foregroundColor(insight.type.color)
+                                        .frame(width: 40, height: 40)
+                                        .background(
+                                            Circle()
+                                                .fill(insight.type.color.opacity(0.2))
+                                        )
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(insight.title)
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                        
+                                        Text(insight.message)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                }
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.gray.opacity(0.1))
+                                )
+                            }
+                        }
+                    }
+                }
+                .padding()
+            }
+        }
+        .navigationTitle("Analytics")
+        .navigationBarTitleDisplayMode(.large)
+    }
+}
+
+private struct AnalyticsStatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        GlassmorphicCard(content: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .foregroundColor(color)
+                    Spacer()
+                }
+                
+                Text(value)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+        }, glowColor: color.opacity(0.3))
     }
 }
 

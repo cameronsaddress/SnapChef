@@ -411,6 +411,17 @@ struct CameraView: View {
                                     "recipeId": recipe.id
                                 ])
                             }
+                            
+                            // Track analytics for recipe creation
+                            ChallengeAnalyticsService.shared.trackEvent(.milestoneReached, parameters: [
+                                "milestone": "recipe_created",
+                                "quality": quality.rawValue,
+                                "calories": recipe.nutrition.calories,
+                                "protein": recipe.nutrition.protein,
+                                "totalTime": recipe.prepTime + recipe.cookTime,
+                                "difficulty": recipe.difficulty,
+                                "recipeId": recipe.id.uuidString
+                            ])
                         }
                         
                         // Don't auto-save recipes - user will choose which ones to save

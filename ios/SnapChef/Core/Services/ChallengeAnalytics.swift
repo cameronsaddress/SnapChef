@@ -1,10 +1,10 @@
 import Foundation
 import SwiftUI
 
-/// ChallengeAnalytics tracks and analyzes challenge engagement and performance
+/// ChallengeAnalyticsService tracks and analyzes challenge engagement and performance
 @MainActor
-class ChallengeAnalytics: ObservableObject {
-    static let shared = ChallengeAnalytics()
+class ChallengeAnalyticsService: ObservableObject {
+    static let shared = ChallengeAnalyticsService()
     
     // MARK: - Analytics Data
     @Published var dailyMetrics: DailyChallengeMetrics
@@ -61,12 +61,21 @@ class ChallengeAnalytics: ObservableObject {
     }
     
     /// Track challenge interaction
-    func trackChallengeInteraction(challengeId: UUID, action: String, metadata: [String: Any] = [:]) {
+    func trackChallengeInteraction(challengeId: String, action: String, metadata: [String: Any] = [:]) {
         var parameters = metadata
-        parameters["challengeId"] = challengeId.uuidString
+        parameters["challengeId"] = challengeId
         parameters["action"] = action
         
-        trackEvent(.challengeStarted, parameters: parameters)
+        let event: AnalyticsEvent = {
+            switch action {
+            case "started": return .challengeStarted
+            case "completed": return .challengeCompleted
+            case "abandoned": return .challengeAbandoned
+            default: return .challengeStarted
+            }
+        }()
+        
+        trackEvent(event, parameters: parameters)
     }
     
     /// Track reward interaction
@@ -217,7 +226,7 @@ class ChallengeAnalytics: ObservableObject {
             totalCoinsSpent: userEngagement.totalCoinsSpent,
             currentBalance: ChefCoinsManager.shared.currentBalance,
             mostValuableReward: determineMostValuableReward(),
-            totalBadgesEarned: GamificationManager.shared.userStats.totalBadges,
+            totalBadgesEarned: GamificationManager.shared.unlockedBadges.count,
             averageCoinsPerChallenge: calculateAverageCoinsPerChallenge()
         )
     }
@@ -362,7 +371,7 @@ class ChallengeAnalytics: ObservableObject {
 // MARK: - Supporting Types
 
 struct AnalyticsEventData {
-    let event: ChallengeAnalytics.AnalyticsEvent
+    let event: ChallengeAnalyticsService.AnalyticsEvent
     let timestamp: Date
     let parameters: [String: Any]
 }
@@ -410,6 +419,7 @@ struct UserEngagementMetrics: Codable {
     var lastActiveDate: Date = Date()
     var firstActiveDate: Date = Date()
     var daysActive: Int = 1
+    var averageDailyTime: TimeInterval = 0 // In seconds
 }
 
 struct PerformanceInsight: Identifiable {
@@ -460,7 +470,7 @@ struct StoredAnalyticsData: Codable {
 
 // MARK: - Analytics Export
 
-extension ChallengeAnalytics {
+extension ChallengeAnalyticsService {
     
     /// Export analytics data for external analysis
     func exportAnalyticsData() -> Data? {
@@ -492,3 +502,17 @@ struct AnalyticsExportData: Codable {
 extension ChallengeStatistics: Codable {}
 extension RewardStatistics: Codable {}
 extension EngagementTrends: Codable {}
+
+// Extension for InsightType color
+extension PerformanceInsight.InsightType {
+    var color: Color {
+        switch self {
+        case .achievement:
+            return Color(hex: "#667eea")
+        case .improvement:
+            return .orange
+        case .suggestion:
+            return .blue
+        }
+    }
+}

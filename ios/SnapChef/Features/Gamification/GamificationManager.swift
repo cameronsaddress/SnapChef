@@ -27,22 +27,92 @@ enum ChallengeType: String, CaseIterable {
     }
 }
 
+// MARK: - Difficulty Level
+enum DifficultyLevel: Int, CaseIterable {
+    case easy = 1
+    case medium = 2
+    case hard = 3
+    case expert = 4
+    case master = 5
+    
+    var label: String {
+        switch self {
+        case .easy: return "Easy"
+        case .medium: return "Medium"
+        case .hard: return "Hard"
+        case .expert: return "Expert"
+        case .master: return "Master"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .easy: return .green
+        case .medium: return .yellow
+        case .hard: return .orange
+        case .expert: return .red
+        case .master: return .purple
+        }
+    }
+}
+
 // MARK: - Challenge Model
 struct Challenge: Identifiable {
-    let id = UUID()
+    let id: String
     let type: ChallengeType
     let title: String
     let description: String
-    let requirement: String
-    var reward: ChallengeReward
+    let category: String
+    let difficulty: DifficultyLevel
+    let points: Int
+    let coins: Int
+    let startDate: Date
     let endDate: Date
+    let requirements: [String]
+    var currentProgress: Double
+    var isCompleted: Bool
+    var isActive: Bool
     let participants: Int
-    var progress: Double = 0
-    var isCompleted: Bool = false
-    var rank: Int?
+    let completions: Int
+    let imageURL: String?
+    let isPremium: Bool
     
-    var isActive: Bool {
-        Date() < endDate
+    init(id: String = UUID().uuidString,
+         title: String,
+         description: String,
+         type: ChallengeType,
+         category: String = "cooking",
+         difficulty: DifficultyLevel = .medium,
+         points: Int = 100,
+         coins: Int = 10,
+         startDate: Date = Date(),
+         endDate: Date,
+         requirements: [String] = [],
+         currentProgress: Double = 0,
+         isCompleted: Bool = false,
+         isActive: Bool = true,
+         participants: Int = 0,
+         completions: Int = 0,
+         imageURL: String? = nil,
+         isPremium: Bool = false) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.type = type
+        self.category = category
+        self.difficulty = difficulty
+        self.points = points
+        self.coins = coins
+        self.startDate = startDate
+        self.endDate = endDate
+        self.requirements = requirements
+        self.currentProgress = currentProgress
+        self.isCompleted = isCompleted
+        self.isActive = isActive && Date() < endDate
+        self.participants = participants
+        self.completions = completions
+        self.imageURL = imageURL
+        self.isPremium = isPremium
     }
     
     var timeRemaining: String {
@@ -138,6 +208,75 @@ class GamificationManager: ObservableObject {
     private init() {
         loadMockData()
         checkDailyCheckInStatus()
+        setupCloudKitSync()
+    }
+    
+    // MARK: - CloudKit Integration
+    
+    private func setupCloudKitSync() {
+        // Start syncing with CloudKit
+        Task {
+            await CloudKitSyncService.shared.syncChallenges()
+            await CloudKitSyncService.shared.syncUserProgress()
+        }
+    }
+    
+    func updateChallenges(_ challenges: [Challenge]) {
+        // Merge CloudKit challenges with local ones
+        for challenge in challenges {
+            if let index = activeChallenges.firstIndex(where: { $0.id == challenge.id }) {
+                // Update existing challenge
+                activeChallenges[index] = challenge
+            } else if !completedChallenges.contains(where: { $0.id == challenge.id }) {
+                // Add new challenge
+                activeChallenges.append(challenge)
+            }
+        }
+        
+        // Sort by end date
+        activeChallenges.sort { $0.endDate < $1.endDate }
+    }
+    
+    func syncUserChallenges(_ userChallenges: [UserChallenge]) {
+        // Update local challenge progress from CloudKit
+        for userChallenge in userChallenges {
+            if let index = activeChallenges.firstIndex(where: { $0.id == userChallenge.challengeID }) {
+                activeChallenges[index].currentProgress = userChallenge.progress
+                activeChallenges[index].isCompleted = userChallenge.status == "completed"
+                
+                if userChallenge.status == "completed" {
+                    // Move to completed
+                    let challenge = activeChallenges.remove(at: index)
+                    completedChallenges.append(challenge)
+                    
+                    // Update stats
+                    userStats.totalPoints += userChallenge.earnedPoints
+                    userStats.challengesCompleted += 1
+                }
+            }
+        }
+    }
+    
+    func syncChallengeProgress(for challengeID: String, progress: Double) async {
+        guard let userID = AuthenticationManager().currentUser?.id else { return }
+        
+        let userChallenge = UserChallenge(
+            userID: userID,
+            challengeID: challengeID,
+            status: progress >= 1.0 ? "completed" : "active",
+            progress: progress,
+            startedAt: Date(),
+            completedAt: progress >= 1.0 ? Date() : nil,
+            earnedPoints: progress >= 1.0 ? (activeChallenges.first { $0.id == challengeID }?.points ?? 0) : 0,
+            earnedCoins: progress >= 1.0 ? (activeChallenges.first { $0.id == challengeID }?.coins ?? 0) : 0,
+            teamID: nil
+        )
+        
+        do {
+            try await CloudKitSyncService.shared.saveUserChallenge(userChallenge)
+        } catch {
+            print("Failed to sync challenge progress: \(error)")
+        }
     }
     
     // MARK: - Challenge Management
@@ -147,22 +286,58 @@ class GamificationManager: ObservableObject {
         activeChallenges.append(challenge)
     }
     
-    func saveChallengeProgress(challengeId: UUID, action: String, value: Double, metadata: [String: Any]? = nil) {
+    func saveChallengeProgress(challengeId: String, action: String, value: Double, metadata: [String: Any]? = nil) {
         // Save challenge progress
         print("Saving progress for challenge \(challengeId): \(action) = \(value)")
+        
+        // Update local progress
+        if let index = activeChallenges.firstIndex(where: { $0.id == challengeId }) {
+            activeChallenges[index].currentProgress = min(value, 1.0)
+            
+            // Sync with CloudKit
+            Task {
+                await syncChallengeProgress(for: challengeId, progress: value)
+            }
+        }
     }
     
     func joinChallenge(_ challenge: Challenge) {
         // Join challenge logic
         print("Joined challenge: \(challenge.title)")
+        
+        // Track participation
+        if !activeChallenges.contains(where: { $0.id == challenge.id }) {
+            activeChallenges.append(challenge)
+            
+            // Track analytics
+            ChallengeAnalyticsService.shared.trackChallengeInteraction(
+                challengeId: challenge.id,
+                action: "started",
+                metadata: [
+                    "challengeType": challenge.type.rawValue,
+                    "difficulty": challenge.difficulty.rawValue,
+                    "category": challenge.category
+                ]
+            )
+            
+            // Sync with CloudKit
+            Task {
+                await syncChallengeProgress(for: challenge.id, progress: 0)
+            }
+        }
     }
     
-    func updateChallengeProgress(_ challengeId: UUID, progress: Double) {
+    func updateChallengeProgress(_ challengeId: String, progress: Double) {
         if let index = activeChallenges.firstIndex(where: { $0.id == challengeId }) {
-            activeChallenges[index].progress = progress
+            activeChallenges[index].currentProgress = progress
             
             if progress >= 1.0 {
                 completeChallenge(activeChallenges[index])
+            }
+            
+            // Sync with CloudKit
+            Task {
+                await syncChallengeProgress(for: challengeId, progress: progress)
             }
         }
     }
@@ -180,16 +355,46 @@ class GamificationManager: ObservableObject {
         completedChallenges.append(completedChallenge)
         
         // Award rewards
-        awardPoints(challenge.reward.points)
-        if let badge = challenge.reward.badge {
-            awardBadge(badge)
-        }
+        awardPoints(challenge.points)
         
         // Remove from active
         activeChallenges.removeAll { $0.id == challenge.id }
         
         // Update stats
         userStats.challengesCompleted += 1
+        
+        // Track analytics
+        ChallengeAnalyticsService.shared.trackChallengeInteraction(
+            challengeId: challenge.id,
+            action: "completed",
+            metadata: [
+                "challengeType": challenge.type.rawValue,
+                "difficulty": challenge.difficulty.rawValue,
+                "category": challenge.category,
+                "pointsEarned": challenge.points,
+                "coinsEarned": challenge.coins
+            ]
+        )
+        
+        // Track coin earning
+        ChallengeAnalyticsService.shared.trackRewardInteraction(
+            rewardType: "coins",
+            amount: challenge.coins,
+            source: "challenge_completion"
+        )
+        
+        // Update CloudKit leaderboard
+        Task {
+            do {
+                try await CloudKitSyncService.shared.updateLeaderboardEntry(
+                    for: AuthenticationManager().currentUser?.id ?? "",
+                    points: challenge.points,
+                    challengesCompleted: userStats.challengesCompleted
+                )
+            } catch {
+                print("Failed to update leaderboard: \(error)")
+            }
+        }
     }
     
     func completeChallengeWithPersistence(_ challenge: Challenge, score: Int) {
@@ -199,9 +404,6 @@ class GamificationManager: ObservableObject {
         
         // Award rewards with score
         awardPoints(score)
-        if let badge = challenge.reward.badge {
-            awardBadge(badge)
-        }
         
         // Remove from active
         activeChallenges.removeAll { $0.id == challenge.id }
@@ -209,13 +411,32 @@ class GamificationManager: ObservableObject {
         // Update stats
         userStats.challengesCompleted += 1
         
-        // Save to persistent storage (would be Core Data in real app)
+        // Save to persistent storage
         saveChallengeProgress(
             challengeId: challenge.id,
             action: "completed",
             value: 1.0,
             metadata: ["score": score]
         )
+        
+        // Track analytics
+        ChallengeAnalyticsService.shared.trackChallengeInteraction(
+            challengeId: challenge.id,
+            action: "completed",
+            metadata: [
+                "challengeType": challenge.type.rawValue,
+                "difficulty": challenge.difficulty.rawValue,
+                "category": challenge.category,
+                "score": score,
+                "pointsEarned": score,
+                "coinsEarned": challenge.coins
+            ]
+        )
+        
+        // Update CloudKit
+        Task {
+            await syncChallengeProgress(for: challenge.id, progress: 1.0)
+        }
     }
     
     // MARK: - Points & Rewards
@@ -299,7 +520,7 @@ class GamificationManager: ObservableObject {
         // Update challenge progress
         for challenge in activeChallenges {
             if challenge.title.contains("recipe") || challenge.title.contains("cook") {
-                updateChallengeProgress(challenge.id, progress: min(challenge.progress + 0.1, 1.0))
+                updateChallengeProgress(challenge.id, progress: min(challenge.currentProgress + 0.1, 1.0))
             }
         }
     }
@@ -331,6 +552,20 @@ class GamificationManager: ObservableObject {
         
         // Award daily points
         awardPoints(50, reason: "Daily check-in")
+        
+        // Track analytics
+        ChallengeAnalyticsService.shared.trackEvent(.milestoneReached, parameters: [
+            "milestone": "daily_checkin",
+            "streak": userStats.currentStreak,
+            "pointsEarned": 50
+        ])
+        
+        // Track coin earning from daily check-in
+        ChallengeAnalyticsService.shared.trackRewardInteraction(
+            rewardType: "points",
+            amount: 50,
+            source: "daily_checkin"
+        )
     }
     
     private func checkDailyCheckInStatus() {
@@ -366,64 +601,61 @@ class GamificationManager: ObservableObject {
         // Active challenges
         activeChallenges = [
             Challenge(
-                type: .daily,
                 title: "Speed Chef",
                 description: "Create 3 recipes in under 30 minutes total",
-                requirement: "0/3 recipes",
-                reward: ChallengeReward(
-                    points: 100,
-                    badge: "Speedy",
-                    title: "Speed Demon",
-                    unlockable: nil
-                ),
+                type: .daily,
+                category: "cooking",
+                difficulty: .medium,
+                points: 100,
+                coins: 10,
                 endDate: Date().addingTimeInterval(86400), // 24 hours
+                requirements: ["Create 3 recipes", "Each under 30 minutes"],
+                currentProgress: 0.33,
                 participants: 1284,
-                progress: 0.33
+                completions: 428
             ),
             Challenge(
-                type: .weekly,
                 title: "Healthy Week",
                 description: "Create 10 recipes under 500 calories",
-                requirement: "4/10 recipes",
-                reward: ChallengeReward(
-                    points: 500,
-                    badge: "Health Guru",
-                    title: "Nutrition Master",
-                    unlockable: "Green theme"
-                ),
+                type: .weekly,
+                category: "healthy",
+                difficulty: .hard,
+                points: 500,
+                coins: 50,
                 endDate: Date().addingTimeInterval(604800), // 7 days
+                requirements: ["Create 10 recipes", "Each under 500 calories"],
+                currentProgress: 0.4,
                 participants: 5672,
-                progress: 0.4
+                completions: 1890
             ),
             Challenge(
-                type: .special,
                 title: "Halloween Special 🎃",
                 description: "Create spooky-themed recipes",
-                requirement: "2/5 recipes",
-                reward: ChallengeReward(
-                    points: 1000,
-                    badge: "Spooky Chef",
-                    title: "Halloween Master",
-                    unlockable: "Halloween stickers"
-                ),
+                type: .special,
+                category: "creative",
+                difficulty: .medium,
+                points: 1000,
+                coins: 100,
                 endDate: Date().addingTimeInterval(259200), // 3 days
+                requirements: ["Create 5 spooky recipes", "Use Halloween ingredients"],
+                currentProgress: 0.4,
                 participants: 12847,
-                progress: 0.4
+                completions: 4282,
+                isPremium: true
             ),
             Challenge(
-                type: .community,
                 title: "Global Cook-Off",
                 description: "Community goal: 1M recipes this month",
-                requirement: "847,293/1,000,000",
-                reward: ChallengeReward(
-                    points: 2000,
-                    badge: "Community Hero",
-                    title: "Global Champion",
-                    unlockable: "Exclusive recipe pack"
-                ),
+                type: .community,
+                category: "social",
+                difficulty: .expert,
+                points: 2000,
+                coins: 200,
                 endDate: Date().addingTimeInterval(1296000), // 15 days
+                requirements: ["Contribute to 1M recipe goal", "Share with community"],
+                currentProgress: 0.847,
                 participants: 45892,
-                progress: 0.847
+                completions: 38907
             )
         ]
         
@@ -486,19 +718,13 @@ class GamificationManager: ObservableObject {
 extension Challenge {
     static var mockDailyChallenge: Challenge {
         Challenge(
-            type: .daily,
             title: "Quick Chef",
             description: "Create a recipe in under 5 minutes",
-            requirement: "Time limit challenge",
-            reward: ChallengeReward(
-                points: 100,
-                badge: nil,
-                title: "Speedy",
-                unlockable: nil
-            ),
+            type: .daily,
             endDate: Date().addingTimeInterval(86400),
-            participants: 523,
-            progress: 0
+            requirements: ["Time limit challenge"],
+            currentProgress: 0,
+            participants: 523
         )
     }
 }

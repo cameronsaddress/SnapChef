@@ -8,7 +8,7 @@ struct ChallengeCardView: View {
     @State private var particleOffset: CGFloat = 0
     
     private var progressPercentage: Double {
-        min(challenge.progress, 1.0)
+        min(challenge.currentProgress, 1.0)
     }
     
     private var progressColor: Color {
@@ -79,12 +79,12 @@ struct ChallengeCardView: View {
                         Spacer()
                         
                         // Reward preview
-                        if challenge.reward.points > 0 {
+                        if challenge.points > 0 {
                             HStack(spacing: 4) {
                                 Image(systemName: "star.circle.fill")
                                     .font(.title3)
                                     .foregroundColor(.yellow)
-                                Text("\(challenge.reward.points)")
+                                Text("\(challenge.points)")
                                     .font(.caption)
                                     .fontWeight(.semibold)
                             }
@@ -149,7 +149,7 @@ struct ChallengeCardView: View {
                         
                         // Progress text
                         HStack {
-                            Text(challenge.requirement)
+                            Text(challenge.requirements.first ?? "")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
@@ -178,13 +178,14 @@ struct ChallengeCardView: View {
                             )
                         }
                         
-                        if let rank = challenge.rank {
-                            StatusBadge(
-                                text: "#\(rank)",
-                                icon: "trophy.fill",
-                                color: .orange
-                            )
-                        }
+                        // TODO: Add rank from leaderboard data
+                        // if let rank = leaderboardRank {
+                        //     StatusBadge(
+                        //         text: "#\(rank)",
+                        //         icon: "trophy.fill",
+                        //         color: .orange
+                        //     )
+                        // }
                         
                         Spacer()
                     }
@@ -231,42 +232,35 @@ struct ChallengeCardView_Previews: PreviewProvider {
         VStack(spacing: 16) {
             ChallengeCardView(
                 challenge: Challenge(
-                    type: .daily,
                     title: "Quick Breakfast",
                     description: "Create 3 breakfast recipes today",
-                    requirement: "2/3 recipes",
-                    reward: ChallengeReward(
-                        points: 100,
-                        badge: nil,
-                        title: "Morning Chef",
-                        unlockable: nil
-                    ),
+                    type: .daily,
+                    points: 100,
+                    coins: 10,
                     endDate: Date().addingTimeInterval(86400),
-                    participants: 567,
-                    progress: 0.67,
-                    isCompleted: false
+                    requirements: ["2/3 recipes"],
+                    currentProgress: 0.67,
+                    participants: 567
                 ),
                 onTap: {}
             )
             
             ChallengeCardView(
-                challenge: Challenge(
-                    type: .weekly,
-                    title: "Protein Week",
-                    description: "Create 10 high-protein recipes",
-                    requirement: "10/10 recipes",
-                    reward: ChallengeReward(
+                challenge: {
+                    var challenge = Challenge(
+                        title: "Protein Week",
+                        description: "Create 10 high-protein recipes",
+                        type: .weekly,
                         points: 500,
-                        badge: "Protein Master",
-                        title: "Fitness Chef",
-                        unlockable: "Protein recipe pack"
-                    ),
-                    endDate: Date().addingTimeInterval(604800),
-                    participants: 2345,
-                    progress: 1.0,
-                    isCompleted: true,
-                    rank: 3
-                ),
+                        coins: 50,
+                        endDate: Date().addingTimeInterval(604800),
+                        requirements: ["10/10 recipes"],
+                        currentProgress: 1.0,
+                        participants: 2345
+                    )
+                    challenge.isCompleted = true
+                    return challenge
+                }(),
                 onTap: {}
             )
         }

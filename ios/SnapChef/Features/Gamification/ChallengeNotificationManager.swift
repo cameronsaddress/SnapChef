@@ -26,12 +26,12 @@ class ChallengeNotificationManager: ObservableObject {
     
     // Notification Identifiers
     struct NotificationIdentifier {
-        static func challengeReminder(_ challengeId: UUID) -> String {
-            "challenge_reminder_\(challengeId.uuidString)"
+        static func challengeReminder(_ challengeId: String) -> String {
+            "challenge_reminder_\(challengeId)"
         }
         
-        static func challengeComplete(_ challengeId: UUID) -> String {
-            "challenge_complete_\(challengeId.uuidString)"
+        static func challengeComplete(_ challengeId: String) -> String {
+            "challenge_complete_\(challengeId)"
         }
         
         static let dailyStreak = "daily_streak_reminder"
@@ -140,11 +140,11 @@ class ChallengeNotificationManager: ObservableObject {
         
         let content = UNMutableNotificationContent()
         content.title = "Challenge Ending Soon! ⏰"
-        content.body = "\"\(challenge.title)\" ends in \(challenge.timeRemaining). Complete it now to earn \(challenge.reward.points) points!"
+        content.body = "\"\(challenge.title)\" ends in \(challenge.timeRemaining). Complete it now to earn \(challenge.points) points!"
         content.sound = .default
         content.categoryIdentifier = NotificationCategory.challengeReminder.rawValue
         content.userInfo = [
-            "challengeId": challenge.id.uuidString,
+            "challengeId": challenge.id,
             "challengeType": challenge.type.rawValue
         ]
         
@@ -283,12 +283,12 @@ class ChallengeNotificationManager: ObservableObject {
         let content = UNMutableNotificationContent()
         content.title = "New \(challenge.type.rawValue) Available! ✨"
         content.body = "\"\(challenge.title)\" - \(challenge.description)"
-        content.subtitle = "Reward: \(challenge.reward.points) points"
+        content.subtitle = "Reward: \(challenge.points) points"
         content.sound = .default
         content.categoryIdentifier = NotificationCategory.newChallenge.rawValue
         
         let request = UNNotificationRequest(
-            identifier: "new_challenge_\(challenge.id.uuidString)",
+            identifier: "new_challenge_\(challenge.id)",
             content: content,
             trigger: nil
         )
