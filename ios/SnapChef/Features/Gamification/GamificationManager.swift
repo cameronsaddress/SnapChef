@@ -72,6 +72,7 @@ struct Challenge: Identifiable {
     var currentProgress: Double
     var isCompleted: Bool
     var isActive: Bool
+    var isJoined: Bool
     let participants: Int
     let completions: Int
     let imageURL: String?
@@ -91,6 +92,7 @@ struct Challenge: Identifiable {
          currentProgress: Double = 0,
          isCompleted: Bool = false,
          isActive: Bool = true,
+         isJoined: Bool = false,
          participants: Int = 0,
          completions: Int = 0,
          imageURL: String? = nil,
@@ -109,6 +111,7 @@ struct Challenge: Identifiable {
         self.currentProgress = currentProgress
         self.isCompleted = isCompleted
         self.isActive = isActive && Date() < endDate
+        self.isJoined = isJoined
         self.participants = participants
         self.completions = completions
         self.imageURL = imageURL
@@ -307,7 +310,10 @@ class GamificationManager: ObservableObject {
         
         // Track participation
         if !activeChallenges.contains(where: { $0.id == challenge.id }) {
-            activeChallenges.append(challenge)
+            var joinedChallenge = challenge
+            joinedChallenge.isJoined = true
+            joinedChallenge.currentProgress = 0
+            activeChallenges.append(joinedChallenge)
             
             // Track analytics
             ChallengeAnalyticsService.shared.trackChallengeInteraction(
@@ -325,6 +331,16 @@ class GamificationManager: ObservableObject {
                 await syncChallengeProgress(for: challenge.id, progress: 0)
             }
         }
+    }
+    
+    func isChallengeJoined(_ challengeId: String) -> Bool {
+        return activeChallenges.contains(where: { $0.id == challengeId }) ||
+               completedChallenges.contains(where: { $0.id == challengeId })
+    }
+    
+    func isChallengeJoinedByTitle(_ title: String) -> Bool {
+        return activeChallenges.contains(where: { $0.title == title }) ||
+               completedChallenges.contains(where: { $0.title == title })
     }
     
     func updateChallengeProgress(_ challengeId: String, progress: Double) {
@@ -611,6 +627,7 @@ class GamificationManager: ObservableObject {
                 endDate: Date().addingTimeInterval(86400), // 24 hours
                 requirements: ["Create 3 recipes", "Each under 30 minutes"],
                 currentProgress: 0.33,
+                isJoined: true,
                 participants: 1284,
                 completions: 428
             ),
@@ -625,6 +642,7 @@ class GamificationManager: ObservableObject {
                 endDate: Date().addingTimeInterval(604800), // 7 days
                 requirements: ["Create 10 recipes", "Each under 500 calories"],
                 currentProgress: 0.4,
+                isJoined: true,
                 participants: 5672,
                 completions: 1890
             ),
@@ -639,6 +657,7 @@ class GamificationManager: ObservableObject {
                 endDate: Date().addingTimeInterval(259200), // 3 days
                 requirements: ["Create 5 spooky recipes", "Use Halloween ingredients"],
                 currentProgress: 0.4,
+                isJoined: true,
                 participants: 12847,
                 completions: 4282,
                 isPremium: true
@@ -654,6 +673,7 @@ class GamificationManager: ObservableObject {
                 endDate: Date().addingTimeInterval(1296000), // 15 days
                 requirements: ["Contribute to 1M recipe goal", "Share with community"],
                 currentProgress: 0.847,
+                isJoined: true,
                 participants: 45892,
                 completions: 38907
             )

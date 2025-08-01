@@ -8,6 +8,7 @@ struct ChallengeDetailView: View {
     @Environment(\.dismiss) var dismiss
     @State private var isJoining = false
     @State private var joinSuccess = false
+    @StateObject private var gamificationManager = GamificationManager.shared
     
     var body: some View {
         NavigationStack {
@@ -45,13 +46,14 @@ struct ChallengeDetailView: View {
                         
                         // Join button
                         if !challenge.isCompleted {
+                            let isAlreadyJoined = gamificationManager.isChallengeJoined(challenge.id)
                             MagneticButton(
-                                title: joinSuccess ? "Joined!" : "Join Challenge",
-                                icon: joinSuccess ? "checkmark.circle.fill" : "plus.circle.fill",
-                                action: joinChallenge
+                                title: isAlreadyJoined || joinSuccess ? "Joined!" : "Join Challenge",
+                                icon: isAlreadyJoined || joinSuccess ? "checkmark.circle.fill" : "plus.circle.fill",
+                                action: isAlreadyJoined ? {} : joinChallenge
                             )
                             .padding(.horizontal, 20)
-                            .disabled(isJoining || joinSuccess)
+                            .disabled(isJoining || joinSuccess || isAlreadyJoined)
                         }
                     }
                     .padding(.vertical, 40)

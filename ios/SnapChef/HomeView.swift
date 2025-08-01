@@ -399,6 +399,7 @@ struct EnhancedChallengeCard: View {
     
     @State private var isPressed = false
     @State private var particleAnimation = false
+    @StateObject private var gamificationManager = GamificationManager.shared
     
     var body: some View {
         VStack(spacing: 0) {
@@ -511,9 +512,9 @@ struct EnhancedChallengeCard: View {
                 // CTA Button
                 Button(action: action) {
                     HStack {
-                        Text("Join Challenge")
+                        Text(gamificationManager.isChallengeJoinedByTitle(title) ? "View Progress" : "Join Challenge")
                             .font(.system(size: 18, weight: .semibold))
-                        Image(systemName: "arrow.right.circle.fill")
+                        Image(systemName: gamificationManager.isChallengeJoinedByTitle(title) ? "checkmark.circle.fill" : "arrow.right.circle.fill")
                             .font(.system(size: 18))
                     }
                     .foregroundColor(.white)
@@ -523,13 +524,16 @@ struct EnhancedChallengeCard: View {
                         RoundedRectangle(cornerRadius: 16)
                             .fill(
                                 LinearGradient(
-                                    colors: [color, color.opacity(0.8)],
+                                    colors: gamificationManager.isChallengeJoinedByTitle(title) ? 
+                                           [Color.green, Color.green.opacity(0.8)] : 
+                                           [color, color.opacity(0.8)],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
                             )
                     )
-                    .shadow(color: color.opacity(0.5), radius: 15, y: 5)
+                    .shadow(color: gamificationManager.isChallengeJoinedByTitle(title) ? 
+                            Color.green.opacity(0.5) : color.opacity(0.5), radius: 15, y: 5)
                 }
                 .scaleEffect(isPressed ? 0.95 : 1)
                 .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in

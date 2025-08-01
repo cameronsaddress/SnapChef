@@ -176,6 +176,12 @@ struct ChallengeCardView: View {
                                 icon: "xmark.circle.fill",
                                 color: .red
                             )
+                        } else if challenge.isJoined {
+                            StatusBadge(
+                                text: "Joined",
+                                icon: "person.crop.circle.badge.checkmark",
+                                color: .blue
+                            )
                         }
                         
                         // TODO: Add rank from leaderboard data
