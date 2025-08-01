@@ -12,6 +12,8 @@ class CloudKitAuthManager: ObservableObject {
     @Published var isLoading = false
     @Published var showAuthSheet = false
     @Published var showUsernameSelection = false
+    @Published var showError = false
+    @Published var errorMessage = ""
     
     private let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
     private let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
@@ -35,7 +37,7 @@ class CloudKitAuthManager: ObservableObject {
     
     func signInWithApple(authorization: ASAuthorization) async throws {
         guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
-            throw AuthError.invalidCredential
+            throw CloudKitAuthError.invalidCredential
         }
         
         isLoading = true
@@ -179,14 +181,20 @@ class CloudKitAuthManager: ObservableObject {
             newRecord[CKField.User.subscriptionTier] = "free"
             
             // Save new user
-            try await database.save(newRecord)
-            
-            // Convert to user object
-            self.currentUser = CloudKitUser(from: newRecord)
-            self.isAuthenticated = true
-            
-            // Store user ID
-            UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
+            do {
+                try await database.save(newRecord)
+                
+                // Convert to user object
+                self.currentUser = CloudKitUser(from: newRecord)
+                self.isAuthenticated = true
+                
+                // Store user ID
+                UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
+            } catch {
+                print("Failed to create new user: \(error.localizedDescription)")
+                self.errorMessage = error.localizedDescription
+                self.showError = true
+            }
             
             // Show username selection for new users
             self.showUsernameSelection = true
@@ -206,20 +214,20 @@ class CloudKitAuthManager: ObservableObject {
             let results = try await database.records(matching: query)
             return results.matchResults.isEmpty
         } catch {
-            throw AuthError.networkError
+            throw CloudKitAuthError.networkError
         }
     }
     
     func setUsername(_ username: String) async throws {
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID else {
-            throw AuthError.notAuthenticated
+            throw CloudKitAuthError.notAuthenticated
         }
         
         // Check availability first
         let isAvailable = try await checkUsernameAvailability(username)
         guard isAvailable else {
-            throw AuthError.usernameUnavailable
+            throw CloudKitAuthError.usernameUnavailable
         }
         
         // Fetch current record
@@ -243,7 +251,7 @@ class CloudKitAuthManager: ObservableObject {
     func updateUserStats(_ updates: UserStatUpdates) async throws {
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID else {
-            throw AuthError.notAuthenticated
+            throw CloudKitAuthError.notAuthenticated
         }
         
         let record = try await database.record(for: CKRecord.ID(recordName: recordID))
@@ -402,7 +410,7 @@ struct FacebookUserInfo {
     let profileImageURL: String?
 }
 
-enum AuthError: LocalizedError {
+enum CloudKitAuthError: LocalizedError {
     case invalidCredential
     case networkError
     case notAuthenticated

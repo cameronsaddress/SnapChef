@@ -181,6 +181,7 @@ class MockDataProvider {
             id: "mock-user-id",
             email: "test@snapchef.app",
             name: "Test User",
+            username: "testuser",
             profileImageURL: nil,
             subscription: Subscription(
                 tier: .free,
@@ -191,7 +192,14 @@ class MockDataProvider {
             credits: 10,
             deviceId: "mock-device-id",
             createdAt: Date(),
-            lastLoginAt: Date()
+            lastLoginAt: Date(),
+            totalPoints: 1250,
+            currentStreak: 7,
+            longestStreak: 14,
+            challengesCompleted: 5,
+            recipesShared: 12,
+            isProfilePublic: true,
+            showOnLeaderboard: true
         )
     }
     

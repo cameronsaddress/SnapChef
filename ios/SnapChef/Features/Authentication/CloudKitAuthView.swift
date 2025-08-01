@@ -52,10 +52,10 @@ struct CloudKitAuthView: View {
                     
                     // Benefits
                     VStack(alignment: .leading, spacing: 16) {
-                        BenefitRow(icon: "trophy.fill", title: "Join Challenges", subtitle: "Compete with other chefs")
-                        BenefitRow(icon: "flame.fill", title: "Track Streaks", subtitle: "Build your cooking habits")
-                        BenefitRow(icon: "person.3.fill", title: "Create Teams", subtitle: "Cook together with friends")
-                        BenefitRow(icon: "square.and.arrow.up", title: "Share Recipes", subtitle: "Show off your creations")
+                        CloudKitBenefitRow(icon: "trophy.fill", title: "Join Challenges", subtitle: "Compete with other chefs")
+                        CloudKitBenefitRow(icon: "flame.fill", title: "Track Streaks", subtitle: "Build your cooking habits")
+                        CloudKitBenefitRow(icon: "person.3.fill", title: "Create Teams", subtitle: "Cook together with friends")
+                        CloudKitBenefitRow(icon: "square.and.arrow.up", title: "Share Recipes", subtitle: "Show off your creations")
                     }
                     .padding(.horizontal, 32)
                     
@@ -108,7 +108,7 @@ struct CloudKitAuthView: View {
             Text(errorMessage)
         }
         .overlay(
-            isLoading ? LoadingOverlay() : nil
+            isLoading ? LoadingOverlay(message: "Signing in...") : nil
         )
         .sheet(isPresented: $authManager.showUsernameSelection) {
             CloudKitUsernameView()
@@ -136,7 +136,7 @@ struct CloudKitAuthView: View {
     }
 }
 
-struct BenefitRow: View {
+struct CloudKitBenefitRow: View {
     let icon: String
     let title: String
     let subtitle: String
@@ -164,3 +164,4 @@ struct BenefitRow: View {
 
 #Preview {
     CloudKitAuthView(requiredFor: .challenges)
+}

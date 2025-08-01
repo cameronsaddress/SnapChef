@@ -113,6 +113,9 @@
 		FED3E5EB696AF8E7C4375464 /* PersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AC9B83A23805AF72F7FA1CC /* PersistenceController.swift */; };
 		FFAF7C1CEA1855B0235BE6EC /* SnapchefLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 392BD76253A7DA8F69705F62 /* SnapchefLogo.swift */; };
 		FFCAA2B0DE7B5BAD2D349B8F /* fridge1.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 6DE095E53679E0668984799F /* fridge1.jpg */; };
+		20C81F1B946D411A830B4FCA /* CloudKitAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E456AED84984638A80E167B /* CloudKitAuthManager.swift */; };
+		8B7E8A3AFC2C41A88807A95E /* CloudKitAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE10EDDC2438467DBDDE607B /* CloudKitAuthView.swift */; };
+		A75B45E64F7A4EFF9A2B74C7 /* CloudKitUsernameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DABDD7D58B482E9F2F9D14 /* CloudKitUsernameView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -228,6 +231,9 @@
 		F56F890A2E3C509A00AF95B7 /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/UserNotifications.framework; sourceTree = DEVELOPER_DIR; };
 		F704D9176B948F55CD9DC566 /* ShareSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShareSheet.swift; path = SnapChef/Features/Sharing/ShareSheet.swift; sourceTree = "<group>"; };
 		F927FA724DAF0F3B30276BA3 /* CameraView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CameraView.swift; path = SnapChef/Features/Camera/CameraView.swift; sourceTree = "<group>"; };
+		3E456AED84984638A80E167B /* CloudKitAuthManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitAuthManager.swift; path = SnapChef/Core/Services/CloudKitAuthManager.swift; sourceTree = "<group>"; };
+		FE10EDDC2438467DBDDE607B /* CloudKitAuthView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitAuthView.swift; path = SnapChef/Features/Authentication/CloudKitAuthView.swift; sourceTree = "<group>"; };
+		E1DABDD7D58B482E9F2F9D14 /* CloudKitUsernameView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitUsernameView.swift; path = SnapChef/Features/Authentication/CloudKitUsernameView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -816,6 +822,9 @@
 				34E4DBC84C42786C925ECF2C /* ChefCoinsManager.swift in Sources */,
 				E75664E828329347C1E85661 /* ChallengeRewardAnimator.swift in Sources */,
 				A6524486AAEAA145396FE2BF /* UnlockablesStore.swift in Sources */,
+				20C81F1B946D411A830B4FCA /* CloudKitAuthManager.swift in Sources */,
+				8B7E8A3AFC2C41A88807A95E /* CloudKitAuthView.swift in Sources */,
+				A75B45E64F7A4EFF9A2B74C7 /* CloudKitUsernameView.swift in Sources */,
 				D0850CE26A36945F05E68AD7 /* ChallengeNotificationManager.swift in Sources */,
 				F8862A6FC8D7F8BDCA6DE35F /* TeamChallengeManager.swift in Sources */,
 				E43B2102D29EDE28D2BB58A9 /* ChallengeSharingManager.swift in Sources */,
