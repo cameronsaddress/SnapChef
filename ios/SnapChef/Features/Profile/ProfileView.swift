@@ -124,7 +124,12 @@ struct EnhancedProfileHeader: View {
     private var displayName: String {
         // Priority: CloudKit username > CloudKit display name > Custom name > User name > Guest
         if let cloudKitUser = cloudKitAuthManager.currentUser {
-            return cloudKitUser.username ?? cloudKitUser.displayName
+            // Prefer username if set, otherwise use display name
+            if let username = cloudKitUser.username, !username.isEmpty {
+                return username
+            } else {
+                return cloudKitUser.displayName
+            }
         } else if !customName.isEmpty {
             return customName
         } else if let userName = user?.name {
@@ -524,22 +529,16 @@ struct EnhancedSubscriptionCard: View {
             }
         }) {
             GlassmorphicCard(content: {
-                VStack(spacing: 20) {
-                    // Header with animated badge
-                    HStack {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 8) {
-                                Text("Your Plan")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.7))
-                                
-                                if tier == .premium {
-                                    PremiumBadge()
-                                }
-                            }
-                            
+                HStack(spacing: 16) {
+                    // Compact left side
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Your Plan")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                        
+                        HStack(spacing: 6) {
                             Text(tier.displayName)
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .font(.system(size: 20, weight: .bold, design: .rounded))
                                 .foregroundStyle(
                                     tier == .premium
                                         ? LinearGradient(
@@ -556,41 +555,51 @@ struct EnhancedSubscriptionCard: View {
                                             endPoint: .trailing
                                         )
                                 )
-                        }
-                        
-                        Spacer()
-                        
-                        // Animated icon
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    RadialGradient(
-                                        colors: [
-                                            tier == .premium ? Color(hex: "#43e97b").opacity(0.3) : Color(hex: "#f093fb").opacity(0.3),
-                                            Color.clear
-                                        ],
-                                        center: .center,
-                                        startRadius: 0,
-                                        endRadius: 40
-                                    )
-                                )
-                                .frame(width: 80, height: 80)
                             
-                            Image(systemName: tier == .premium ? "crown.fill" : "sparkles")
-                                .font(.system(size: 36, weight: .medium))
-                                .foregroundColor(tier == .premium ? Color(hex: "#43e97b") : Color(hex: "#f093fb"))
-                                .rotationEffect(.degrees(tier == .premium ? 0 : 15))
+                            if tier == .premium {
+                                PremiumBadge()
+                            }
                         }
                     }
                     
-                    // Benefits or upgrade prompt
+                    Spacer()
+                    
+                    // Compact upgrade prompt or benefits
                     if tier == .premium {
-                        UnlimitedBenefits()
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color(hex: "#43e97b"))
+                            Text("Unlimited access")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.9))
+                        }
                     } else {
-                        UpgradePrompt()
+                        HStack(spacing: 6) {
+                            Text("Unlock magic")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.9))
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(Color(hex: "#f093fb"))
+                        }
+                    }
+                    
+                    // Smaller icon
+                    ZStack {
+                        Circle()
+                            .fill(
+                                tier == .premium ? Color(hex: "#43e97b").opacity(0.2) : Color(hex: "#f093fb").opacity(0.2)
+                            )
+                            .frame(width: 40, height: 40)
+                        
+                        Image(systemName: tier == .premium ? "crown.fill" : "sparkles")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(tier == .premium ? Color(hex: "#43e97b") : Color(hex: "#f093fb"))
                     }
                 }
-                .padding(24)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
                 .overlay(
                     tier != .premium ? 
                     LinearGradient(
