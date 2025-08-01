@@ -10,7 +10,15 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
-### Latest Updates (Jan 31, 2025)
+### Latest Updates (Feb 1, 2025)
+- **NEW: Local Challenge System with 365 Days of Content**
+  - Embedded full year of challenges directly in app (no CloudKit needed)
+  - Automatic daily/weekly challenge rotation
+  - Seasonal challenges (Winter, Spring, Summer, Fall)
+  - Viral TikTok-style challenges
+  - Weekend special challenges
+  - Dynamic scheduling based on current date
+  - Hourly refresh to update active challenges
 - Enhanced emoji flick game with improved UI
 - Updated recipe results view with better text layout
 - Improved share generator with simplified workflow
@@ -18,7 +26,7 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 - Separated server code into dedicated repository
 - Removed server-main.py and server-prompt.py from iOS repo
 - **COMPLETED: Full Challenge System Implementation (Phase 1-3)**
-  - Database foundation with Core Data and CloudKit sync
+  - Database foundation with Core Data
   - Complete UI with Challenge Hub, cards, and leaderboards
   - Reward system with Chef Coins and unlockables
   - Social features including teams and sharing

@@ -36,7 +36,7 @@ struct SnapChefApp: App {
         
         // Setup notifications for challenges
         Task {
-            await ChallengeNotificationManager.shared.requestNotificationPermission()
+            _ = await ChallengeNotificationManager.shared.requestNotificationPermission()
         }
     }
     

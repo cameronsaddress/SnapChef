@@ -211,7 +211,179 @@ class GamificationManager: ObservableObject {
     private init() {
         loadMockData()
         checkDailyCheckInStatus()
-        setupCloudKitSync()
+        loadLocalChallenges()
+    }
+    
+    // MARK: - Local Challenge Loading
+    
+    private func loadLocalChallenges() {
+        // Generate all challenges locally
+        let allChallenges = generateYearOfChallenges()
+        
+        // Create challenges with proper scheduling
+        let calendar = Calendar.current
+        let now = Date()
+        var currentDate = calendar.startOfDay(for: now)
+        
+        // Go back 7 days to show some past challenges
+        currentDate = calendar.date(byAdding: .day, value: -7, to: currentDate) ?? currentDate
+        
+        var scheduledChallenges: [Challenge] = []
+        
+        for (index, template) in allChallenges.enumerated() {
+            let challenge = Challenge(
+                id: "local_\(index)_\(template.title.lowercased().replacingOccurrences(of: " ", with: "_"))",
+                title: template.title,
+                description: template.description,
+                type: template.durationDays <= 2 ? .daily : .weekly,
+                category: template.category,
+                difficulty: template.difficulty,
+                points: template.points,
+                coins: template.coins,
+                startDate: currentDate,
+                endDate: currentDate.addingTimeInterval(TimeInterval(template.durationDays * 24 * 60 * 60)),
+                requirements: template.requirements,
+                currentProgress: 0,
+                isCompleted: false,
+                isActive: true,
+                isJoined: false,
+                participants: Int.random(in: 100...2000),
+                completions: Int.random(in: 50...500),
+                imageURL: nil,
+                isPremium: template.isPremium
+            )
+            
+            scheduledChallenges.append(challenge)
+            
+            // Move to next date for scheduling
+            currentDate = currentDate.addingTimeInterval(TimeInterval(template.durationDays * 24 * 60 * 60))
+        }
+        
+        // Filter to show only current and upcoming challenges
+        let activeWindow = Date().addingTimeInterval(14 * 24 * 60 * 60) // Show next 2 weeks
+        activeChallenges = scheduledChallenges.filter { challenge in
+            return challenge.startDate <= Date() && challenge.endDate >= Date()
+        }
+        
+        // Sort by end date (soonest first)
+        activeChallenges.sort { $0.endDate < $1.endDate }
+        
+        print("📱 Loaded \(activeChallenges.count) active challenges from local data")
+        
+        // Schedule daily refresh
+        Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in
+            Task { @MainActor in
+                self.refreshActiveChallenges()
+            }
+        }
+    }
+    
+    private func refreshActiveChallenges() {
+        // Reload challenges to update active status
+        loadLocalChallenges()
+    }
+    
+    // MARK: - Challenge Data
+    
+    private struct ChallengeTemplate {
+        let emoji: String
+        let title: String
+        let description: String
+        let category: String
+        let difficulty: DifficultyLevel
+        let points: Int
+        let coins: Int
+        let durationDays: Int
+        let requirements: [String]
+        let tags: [String]
+        let isPremium: Bool
+    }
+    
+    private func generateYearOfChallenges() -> [ChallengeTemplate] {
+        var challenges: [ChallengeTemplate] = []
+        
+        // Winter Challenges
+        challenges.append(contentsOf: [
+            ChallengeTemplate(emoji: "🎄", title: "Holiday Cookie Decorating", description: "Create festive cookies that'll make Santa jealous!", category: "dessert", difficulty: .easy, points: 100, coins: 10, durationDays: 2, requirements: ["Decorate at least 6 cookies", "Use 3+ colors", "Share your creation"], tags: ["holiday", "baking", "family"], isPremium: false),
+            ChallengeTemplate(emoji: "☕️", title: "Cozy Hot Chocolate Bar", description: "Build the ultimate hot chocolate station with toppings galore", category: "drinks", difficulty: .easy, points: 150, coins: 15, durationDays: 3, requirements: ["Create 3+ topping options", "Make it Instagram-worthy", "Try a unique flavor"], tags: ["winter", "cozy", "drinks"], isPremium: false),
+            ChallengeTemplate(emoji: "🍲", title: "Soup Season Champion", description: "Master a hearty soup that warms the soul", category: "comfort", difficulty: .medium, points: 200, coins: 20, durationDays: 3, requirements: ["Make from scratch", "Include 5+ vegetables", "Perfect for freezing"], tags: ["winter", "healthy", "mealprep"], isPremium: false),
+            ChallengeTemplate(emoji: "🥧", title: "New Year's Lucky Dish", description: "Cook a traditional good luck meal from any culture", category: "cultural", difficulty: .medium, points: 250, coins: 25, durationDays: 4, requirements: ["Research the tradition", "Use authentic ingredients", "Share the story"], tags: ["newyear", "cultural", "tradition"], isPremium: false),
+            ChallengeTemplate(emoji: "🥗", title: "New Year New Salad", description: "Create a salad so good, you'll actually crave it", category: "healthy", difficulty: .easy, points: 150, coins: 15, durationDays: 2, requirements: ["Use 5+ ingredients", "Make homemade dressing", "Add protein"], tags: ["healthy", "newyear", "fresh"], isPremium: false),
+            ChallengeTemplate(emoji: "🍜", title: "Ramen Glow-Up", description: "Transform instant ramen into restaurant-quality bowls", category: "asian", difficulty: .easy, points: 100, coins: 10, durationDays: 1, requirements: ["Start with instant ramen", "Add 5+ toppings", "Make it beautiful"], tags: ["budget", "quick", "asian"], isPremium: false),
+            ChallengeTemplate(emoji: "🧃", title: "Smoothie Bowl Art", description: "Design a smoothie bowl that's almost too pretty to eat", category: "breakfast", difficulty: .easy, points: 150, coins: 15, durationDays: 2, requirements: ["Create a pattern/design", "Use 3+ toppings", "Natural colors only"], tags: ["healthy", "breakfast", "art"], isPremium: false),
+            ChallengeTemplate(emoji: "❤️", title: "Valentine's Treats", description: "Spread love with homemade Valentine's goodies", category: "dessert", difficulty: .medium, points: 200, coins: 20, durationDays: 3, requirements: ["Make it heart-shaped", "Use pink/red colors", "Package beautifully"], tags: ["valentine", "love", "gift"], isPremium: false),
+            ChallengeTemplate(emoji: "🫔", title: "Comfort Food Remix", description: "Give your favorite comfort food a healthy makeover", category: "comfort", difficulty: .medium, points: 250, coins: 25, durationDays: 3, requirements: ["Cut calories by 30%", "Keep it delicious", "Share the swap tips"], tags: ["healthy", "comfort", "remix"], isPremium: false),
+            ChallengeTemplate(emoji: "🥞", title: "Pancake Art Master", description: "Create edible art with colorful pancake designs", category: "breakfast", difficulty: .hard, points: 300, coins: 30, durationDays: 2, requirements: ["Create a character/design", "Use natural food coloring", "Make it flip-able"], tags: ["breakfast", "art", "viral"], isPremium: true)
+        ])
+        
+        // Spring Challenges
+        challenges.append(contentsOf: [
+            ChallengeTemplate(emoji: "🌈", title: "Rainbow Veggie Challenge", description: "Eat the rainbow with colorful veggie creations", category: "healthy", difficulty: .easy, points: 150, coins: 15, durationDays: 3, requirements: ["Use 5+ colors", "All natural ingredients", "Make it appealing to kids"], tags: ["spring", "healthy", "colorful"], isPremium: false),
+            ChallengeTemplate(emoji: "☘️", title: "Lucky Green Foods", description: "Go green for St. Patrick's Day with natural green dishes", category: "holiday", difficulty: .medium, points: 200, coins: 20, durationDays: 2, requirements: ["Everything green", "No artificial coloring", "Include a green drink"], tags: ["stpatricks", "green", "holiday"], isPremium: false),
+            ChallengeTemplate(emoji: "🥚", title: "Egg-cellent Creations", description: "Master eggs in ways you never imagined", category: "breakfast", difficulty: .medium, points: 200, coins: 20, durationDays: 3, requirements: ["Try 3 cooking methods", "Make it Instagram-worthy", "Perfect the timing"], tags: ["easter", "breakfast", "protein"], isPremium: false),
+            ChallengeTemplate(emoji: "🌷", title: "Edible Flowers", description: "Incorporate edible flowers into gorgeous dishes", category: "gourmet", difficulty: .hard, points: 350, coins: 35, durationDays: 4, requirements: ["Use real edible flowers", "Create 2+ dishes", "Focus on presentation"], tags: ["spring", "fancy", "flowers"], isPremium: true),
+            ChallengeTemplate(emoji: "🧺", title: "Perfect Picnic Spread", description: "Create portable foods perfect for spring picnics", category: "outdoor", difficulty: .medium, points: 250, coins: 25, durationDays: 3, requirements: ["Make 3+ items", "Everything travel-friendly", "No heating required"], tags: ["spring", "outdoor", "portable"], isPremium: false),
+            ChallengeTemplate(emoji: "🌮", title: "Taco Tuesday Takeover", description: "Reinvent Taco Tuesday with creative fillings", category: "mexican", difficulty: .easy, points: 150, coins: 15, durationDays: 1, requirements: ["Make 3+ taco varieties", "One must be vegetarian", "Make fresh salsa"], tags: ["mexican", "tuesday", "party"], isPremium: false),
+            ChallengeTemplate(emoji: "🍓", title: "Berry Delicious", description: "Celebrate berry season with fresh berry creations", category: "dessert", difficulty: .easy, points: 150, coins: 15, durationDays: 2, requirements: ["Use 3+ berry types", "Make something unexpected", "No added sugar option"], tags: ["spring", "fruit", "fresh"], isPremium: false)
+        ])
+        
+        // Summer Challenges
+        challenges.append(contentsOf: [
+            ChallengeTemplate(emoji: "🍔", title: "Better Burger Battle", description: "Create a gourmet burger that beats any restaurant", category: "grilling", difficulty: .medium, points: 250, coins: 25, durationDays: 3, requirements: ["Make the bun from scratch", "Create a signature sauce", "Stack it high"], tags: ["summer", "grilling", "american"], isPremium: false),
+            ChallengeTemplate(emoji: "🍦", title: "No-Churn Ice Cream", description: "Make creamy ice cream without a machine", category: "dessert", difficulty: .medium, points: 200, coins: 20, durationDays: 2, requirements: ["Create 2+ flavors", "Add mix-ins", "Achieve creamy texture"], tags: ["summer", "frozen", "dessert"], isPremium: false),
+            ChallengeTemplate(emoji: "🎆", title: "Red, White & Blue", description: "Create patriotic treats for Independence Day", category: "holiday", difficulty: .easy, points: 150, coins: 15, durationDays: 2, requirements: ["Use all 3 colors", "Make it festive", "Kid-friendly"], tags: ["july4th", "patriotic", "holiday"], isPremium: false),
+            ChallengeTemplate(emoji: "🌽", title: "Corn on the Cob Remix", description: "Elevate corn with international flavors", category: "sides", difficulty: .easy, points: 100, coins: 10, durationDays: 1, requirements: ["Try 3+ flavor profiles", "Include a spicy version", "Make it messy-good"], tags: ["summer", "bbq", "vegetables"], isPremium: false),
+            ChallengeTemplate(emoji: "🍉", title: "Watermelon Wow", description: "Transform watermelon into unexpected dishes", category: "fruit", difficulty: .medium, points: 200, coins: 20, durationDays: 2, requirements: ["Make a savory dish", "Try grilling/cooking", "Zero waste challenge"], tags: ["summer", "fruit", "creative"], isPremium: false),
+            ChallengeTemplate(emoji: "🥤", title: "Mocktail Mixologist", description: "Create Instagram-worthy alcohol-free cocktails", category: "drinks", difficulty: .medium, points: 200, coins: 20, durationDays: 3, requirements: ["Design 3+ mocktails", "Make fancy ice cubes", "Garnish game strong"], tags: ["summer", "drinks", "party"], isPremium: false),
+            ChallengeTemplate(emoji: "🏖️", title: "Beach Snack Pack", description: "Create portable snacks perfect for beach days", category: "snacks", difficulty: .easy, points: 150, coins: 15, durationDays: 2, requirements: ["No refrigeration needed", "Sand-proof packaging", "Healthy options"], tags: ["summer", "beach", "portable"], isPremium: false)
+        ])
+        
+        // Fall Challenges
+        challenges.append(contentsOf: [
+            ChallengeTemplate(emoji: "🍎", title: "Apple Everything", description: "Celebrate apple season with sweet and savory dishes", category: "seasonal", difficulty: .medium, points: 200, coins: 20, durationDays: 3, requirements: ["Make 1 sweet + 1 savory", "Use 3+ apple varieties", "Include apple chips"], tags: ["fall", "apples", "harvest"], isPremium: false),
+            ChallengeTemplate(emoji: "📚", title: "Back to School Lunch", description: "Create exciting lunches kids will actually eat", category: "lunch", difficulty: .medium, points: 250, coins: 25, durationDays: 5, requirements: ["Make 5 different lunches", "No repeats", "Include fun notes"], tags: ["school", "kids", "lunch"], isPremium: false),
+            ChallengeTemplate(emoji: "🎃", title: "Pumpkin Spice Everything", description: "Go beyond the latte with creative pumpkin dishes", category: "seasonal", difficulty: .medium, points: 250, coins: 25, durationDays: 4, requirements: ["Make 3+ items", "One must be savory", "From-scratch pumpkin puree"], tags: ["fall", "pumpkin", "trending"], isPremium: false),
+            ChallengeTemplate(emoji: "👻", title: "Spooky Food Art", description: "Create Halloween treats that are scary good", category: "holiday", difficulty: .hard, points: 300, coins: 30, durationDays: 3, requirements: ["Make it creepy-cute", "Use natural ingredients", "Kid-approved"], tags: ["halloween", "spooky", "fun"], isPremium: true),
+            ChallengeTemplate(emoji: "🍄", title: "Mushroom Magic", description: "Explore the world of mushrooms in creative dishes", category: "vegetarian", difficulty: .medium, points: 200, coins: 20, durationDays: 3, requirements: ["Use 3+ mushroom types", "Make mushroom 'meat'", "Try a new technique"], tags: ["fall", "vegetarian", "umami"], isPremium: false),
+            ChallengeTemplate(emoji: "🦃", title: "Thanksgiving Sides Star", description: "Create a side dish that steals the show", category: "holiday", difficulty: .hard, points: 350, coins: 35, durationDays: 5, requirements: ["Elevate a classic", "Make it ahead-friendly", "Wow factor required"], tags: ["thanksgiving", "sides", "holiday"], isPremium: true),
+            ChallengeTemplate(emoji: "🥧", title: "Pie Perfection", description: "Master the art of pie making from crust to filling", category: "dessert", difficulty: .hard, points: 400, coins: 40, durationDays: 4, requirements: ["Make crust from scratch", "Try a lattice top", "Perfect the edges"], tags: ["thanksgiving", "baking", "dessert"], isPremium: true),
+            ChallengeTemplate(emoji: "🍂", title: "Leftover Makeover", description: "Transform Thanksgiving leftovers into new meals", category: "creative", difficulty: .medium, points: 200, coins: 20, durationDays: 2, requirements: ["Create 3+ new dishes", "No simple reheating", "Make it crave-worthy"], tags: ["thanksgiving", "leftovers", "creative"], isPremium: false)
+        ])
+        
+        // Viral Challenges
+        challenges.append(contentsOf: [
+            ChallengeTemplate(emoji: "🧈", title: "Butter Board Bonanza", description: "Create a trendy butter board that goes viral", category: "trending", difficulty: .easy, points: 200, coins: 20, durationDays: 2, requirements: ["Use compound butters", "Make it artistic", "Include 5+ toppings"], tags: ["viral", "trending", "party"], isPremium: false),
+            ChallengeTemplate(emoji: "🍳", title: "Tiny Kitchen Challenge", description: "Cook a full meal using only miniature tools", category: "challenge", difficulty: .hard, points: 500, coins: 50, durationDays: 3, requirements: ["Use toy cookware", "Make 3 courses", "Everything must work"], tags: ["viral", "challenge", "fun"], isPremium: true),
+            ChallengeTemplate(emoji: "🧀", title: "Cheese Pull Champion", description: "Create the most epic cheese pull video", category: "viral", difficulty: .medium, points: 250, coins: 25, durationDays: 2, requirements: ["Get the perfect stretch", "Try 3+ dishes", "Slow-mo required"], tags: ["viral", "cheese", "video"], isPremium: false),
+            ChallengeTemplate(emoji: "🌯", title: "Wrap Hack Magic", description: "Master the viral tortilla wrap hack with creative fillings", category: "trending", difficulty: .easy, points: 150, coins: 15, durationDays: 1, requirements: ["Try 3+ combinations", "One breakfast version", "Perfect the fold"], tags: ["viral", "hack", "quick"], isPremium: false),
+            ChallengeTemplate(emoji: "🥞", title: "Pancake Cereal", description: "Join the mini pancake cereal trend", category: "trending", difficulty: .medium, points: 200, coins: 20, durationDays: 1, requirements: ["Make them tiny", "Try 2+ flavors", "Serve in a bowl"], tags: ["viral", "breakfast", "mini"], isPremium: false),
+            ChallengeTemplate(emoji: "☁️", title: "Cloud Bread Dreams", description: "Make the fluffiest cloud bread in pastel colors", category: "trending", difficulty: .medium, points: 250, coins: 25, durationDays: 2, requirements: ["Achieve cloud texture", "Natural colors only", "Make it jiggle"], tags: ["viral", "baking", "aesthetic"], isPremium: false),
+            ChallengeTemplate(emoji: "🍝", title: "One-Pot Pasta Magic", description: "Create a one-pot pasta that looks like wizardry", category: "easy", difficulty: .easy, points: 150, coins: 15, durationDays: 1, requirements: ["Everything in one pot", "15 minutes max", "Restaurant quality"], tags: ["viral", "easy", "pasta"], isPremium: false),
+            ChallengeTemplate(emoji: "🎂", title: "Mug Cake Master", description: "Perfect the 2-minute mug cake", category: "dessert", difficulty: .easy, points: 100, coins: 10, durationDays: 1, requirements: ["Under 2 minutes", "Try 3 flavors", "No overflow allowed"], tags: ["viral", "quick", "dessert"], isPremium: false),
+            ChallengeTemplate(emoji: "🥑", title: "Avocado Rose Art", description: "Master the art of avocado roses", category: "skills", difficulty: .medium, points: 200, coins: 20, durationDays: 2, requirements: ["Create perfect roses", "3+ presentation styles", "Tutorial video"], tags: ["viral", "skills", "art"], isPremium: false),
+            ChallengeTemplate(emoji: "🌊", title: "Ocean Water Cake", description: "Create a mesmerizing ocean-effect gelatin cake", category: "dessert", difficulty: .hard, points: 400, coins: 40, durationDays: 3, requirements: ["Create wave effect", "Multiple blue shades", "Add 'sea creatures'"], tags: ["viral", "artistic", "challenge"], isPremium: true)
+        ])
+        
+        // Weekend Challenges
+        challenges.append(contentsOf: [
+            ChallengeTemplate(emoji: "🥓", title: "Breakfast for Dinner", description: "Flip the script with epic breakfast at dinnertime", category: "weekend", difficulty: .easy, points: 150, coins: 15, durationDays: 2, requirements: ["Make it fancy", "Include a cocktail/mocktail", "Candlelit breakfast"], tags: ["weekend", "breakfast", "fun"], isPremium: false),
+            ChallengeTemplate(emoji: "🍕", title: "Pizza Night Reinvented", description: "Take pizza night to the next level", category: "weekend", difficulty: .medium, points: 250, coins: 25, durationDays: 3, requirements: ["Make dough from scratch", "Try 3+ topping combos", "One dessert pizza"], tags: ["weekend", "pizza", "family"], isPremium: false),
+            ChallengeTemplate(emoji: "🍿", title: "Movie Night Snacks", description: "Create cinema-worthy snacks at home", category: "weekend", difficulty: .easy, points: 150, coins: 15, durationDays: 2, requirements: ["Make 3+ snacks", "Gourmet popcorn required", "Create snack boxes"], tags: ["weekend", "snacks", "movie"], isPremium: false),
+            ChallengeTemplate(emoji: "🧺", title: "Farmers Market Haul", description: "Create a meal using only farmers market finds", category: "weekend", difficulty: .medium, points: 300, coins: 30, durationDays: 3, requirements: ["Visit local market", "Use 5+ vendors", "Share vendor stories"], tags: ["weekend", "local", "fresh"], isPremium: false),
+            ChallengeTemplate(emoji: "🎮", title: "Game Day Spread", description: "Create the ultimate spread for game day", category: "weekend", difficulty: .medium, points: 250, coins: 25, durationDays: 3, requirements: ["Make 5+ items", "Include a showstopper", "Easy to eat while watching"], tags: ["weekend", "sports", "party"], isPremium: false),
+            ChallengeTemplate(emoji: "🌅", title: "Sunrise Breakfast", description: "Wake up early for a spectacular sunrise meal", category: "weekend", difficulty: .easy, points: 200, coins: 20, durationDays: 2, requirements: ["Cook outdoors", "Capture sunrise", "Make it memorable"], tags: ["weekend", "outdoor", "breakfast"], isPremium: false),
+            ChallengeTemplate(emoji: "🎨", title: "Edible Art Project", description: "Create food that belongs in a gallery", category: "weekend", difficulty: .hard, points: 400, coins: 40, durationDays: 3, requirements: ["Recreate famous art", "Use only food", "Frame-worthy presentation"], tags: ["weekend", "art", "creative"], isPremium: true),
+            ChallengeTemplate(emoji: "🏕️", title: "Indoor Camping Cuisine", description: "Bring camping food indoors with a twist", category: "weekend", difficulty: .medium, points: 200, coins: 20, durationDays: 2, requirements: ["Make s'mores 2.0", "Indoor 'campfire' cooking", "Tell ghost stories"], tags: ["weekend", "camping", "family"], isPremium: false),
+            ChallengeTemplate(emoji: "🎪", title: "Carnival at Home", description: "Recreate carnival favorites in your kitchen", category: "weekend", difficulty: .medium, points: 250, coins: 25, durationDays: 3, requirements: ["Make 3+ fair foods", "Include cotton candy", "Create the atmosphere"], tags: ["weekend", "carnival", "fun"], isPremium: false),
+            ChallengeTemplate(emoji: "🌍", title: "Around the World", description: "Cook a dish from 5 different countries in one weekend", category: "weekend", difficulty: .hard, points: 500, coins: 50, durationDays: 3, requirements: ["5 different cuisines", "Authentic recipes", "Create passports"], tags: ["weekend", "international", "adventure"], isPremium: true)
+        ])
+        
+        // Add duplicates to ensure we have 365 days worth
+        while challenges.count < 365 {
+            challenges.append(contentsOf: challenges.prefix(365 - challenges.count))
+        }
+        
+        return challenges
     }
     
     // MARK: - CloudKit Integration
@@ -225,19 +397,16 @@ class GamificationManager: ObservableObject {
     }
     
     func updateChallenges(_ challenges: [Challenge]) {
-        // Merge CloudKit challenges with local ones
-        for challenge in challenges {
-            if let index = activeChallenges.firstIndex(where: { $0.id == challenge.id }) {
-                // Update existing challenge
-                activeChallenges[index] = challenge
-            } else if !completedChallenges.contains(where: { $0.id == challenge.id }) {
-                // Add new challenge
-                activeChallenges.append(challenge)
-            }
+        // Clear old challenges and use CloudKit as source of truth
+        activeChallenges = challenges.filter { challenge in
+            let now = Date()
+            return challenge.startDate <= now && challenge.endDate >= now && !challenge.isCompleted
         }
         
-        // Sort by end date
+        // Sort by end date (soonest first)
         activeChallenges.sort { $0.endDate < $1.endDate }
+        
+        print("📱 Updated challenges from CloudKit: \(activeChallenges.count) active")
     }
     
     func syncUserChallenges(_ userChallenges: [UserChallenge]) {

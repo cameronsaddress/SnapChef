@@ -259,29 +259,121 @@ struct ViralChallengeSection: View {
     @State private var sparkleAnimation = false
     @StateObject private var gamificationManager = GamificationManager.shared
     
-    let challengeData = [
-        ("🌮", "Taco Tuesday", "Transform leftovers into tacos", "2.3K chefs", "500", Color(hex: "#f093fb")),
-        ("🍕", "Pizza Party", "Create pizza with pantry items", "1.8K chefs", "450", Color(hex: "#667eea")),
-        ("🥗", "Salad Spectacular", "Make amazing salads", "956 chefs", "300", Color(hex: "#43e97b")),
-        ("🍜", "Ramen Remix", "Upgrade instant ramen to gourmet", "3.1K chefs", "600", Color(hex: "#ffa726")),
-        ("🥘", "One-Pot Wonder", "Create magic in a single pot", "1.2K chefs", "400", Color(hex: "#f5576c"))
+    // Colors for challenges based on type/category
+    let challengeColors = [
+        Color(hex: "#f093fb"),
+        Color(hex: "#667eea"),
+        Color(hex: "#43e97b"),
+        Color(hex: "#ffa726"),
+        Color(hex: "#f5576c")
     ]
     
-    var challenges: [Challenge] {
-        challengeData.enumerated().map { index, data in
-            Challenge(
+    var displayChallenges: [(emoji: String, challenge: Challenge, participants: String, color: Color)] {
+        // Get first 5 active challenges from GamificationManager
+        let activeChallenges = Array(gamificationManager.activeChallenges.prefix(5))
+        
+        // If we have local challenges, use them
+        if !activeChallenges.isEmpty {
+            return activeChallenges.enumerated().map { index, challenge in
+                // Look for emoji in ChallengeSeeder data
+                let emoji = getEmojiForChallenge(challenge) ?? "🎯"
+                let participantCount = "\(challenge.participants) chefs"
+                let color = challengeColors[index % challengeColors.count]
+                
+                return (emoji, challenge, participantCount, color)
+            }
+        }
+        
+        // Fallback to mock data if no CloudKit challenges
+        let mockData = [
+            ("🌮", "Taco Tuesday", "Transform leftovers into tacos", "2.3K chefs", 500, Color(hex: "#f093fb")),
+            ("🍕", "Pizza Party", "Create pizza with pantry items", "1.8K chefs", 450, Color(hex: "#667eea")),
+            ("🥗", "Salad Spectacular", "Make amazing salads", "956 chefs", 300, Color(hex: "#43e97b")),
+            ("🍜", "Ramen Remix", "Upgrade instant ramen to gourmet", "3.1K chefs", 600, Color(hex: "#ffa726")),
+            ("🥘", "One-Pot Wonder", "Create magic in a single pot", "1.2K chefs", 400, Color(hex: "#f5576c"))
+        ]
+        
+        return mockData.enumerated().map { index, data in
+            let challenge = Challenge(
                 id: "home-\(data.1.replacingOccurrences(of: " ", with: "-").lowercased())",
                 title: data.1,
                 description: data.2,
                 type: .daily,
-                points: Int(data.4) ?? 50,
-                coins: (Int(data.4) ?? 50) / 10,
-                endDate: Date().addingTimeInterval(TimeInterval(3600 * (index + 1) * 8)), // Staggered end times
+                points: data.4,
+                coins: data.4 / 10,
+                endDate: Date().addingTimeInterval(TimeInterval(3600 * (index + 1) * 8)),
                 requirements: ["Create a \(data.1.lowercased()) dish and share it"],
                 currentProgress: 0,
                 participants: Int.random(in: 100...500)
             )
+            return (data.0, challenge, data.3, data.5)
         }
+    }
+    
+    private func getEmojiForChallenge(_ challenge: Challenge) -> String? {
+        // Map of challenge titles to emojis from ChallengeSeeder
+        let emojiMap: [String: String] = [
+            // Winter
+            "Holiday Cookie Decorating": "🎄",
+            "Cozy Hot Chocolate Bar": "☕️",
+            "Soup Season Champion": "🍲",
+            "New Year's Lucky Dish": "🥧",
+            "New Year New Salad": "🥗",
+            "Ramen Glow-Up": "🍜",
+            "Smoothie Bowl Art": "🧃",
+            "Valentine's Treats": "❤️",
+            "Comfort Food Remix": "🫔",
+            "Pancake Art Master": "🥞",
+            // Spring
+            "Rainbow Veggie Challenge": "🌈",
+            "Lucky Green Foods": "☘️",
+            "Egg-cellent Creations": "🥚",
+            "Edible Flowers": "🌷",
+            "Perfect Picnic Spread": "🧺",
+            "Taco Tuesday Takeover": "🌮",
+            "Berry Delicious": "🍓",
+            // Summer
+            "Better Burger Battle": "🍔",
+            "No-Churn Ice Cream": "🍦",
+            "Red, White & Blue": "🎆",
+            "Corn on the Cob Remix": "🌽",
+            "Watermelon Wow": "🍉",
+            "Mocktail Mixologist": "🥤",
+            "Beach Snack Pack": "🏖️",
+            // Fall
+            "Apple Everything": "🍎",
+            "Back to School Lunch": "📚",
+            "Pumpkin Spice Everything": "🎃",
+            "Spooky Food Art": "👻",
+            "Mushroom Magic": "🍄",
+            "Thanksgiving Sides Star": "🦃",
+            "Pie Perfection": "🥧",
+            "Leftover Makeover": "🍂",
+            // Viral
+            "Butter Board Bonanza": "🧈",
+            "Tiny Kitchen Challenge": "🍳",
+            "Cheese Pull Champion": "🧀",
+            "Wrap Hack Magic": "🌯",
+            "Pancake Cereal": "🥞",
+            "Cloud Bread Dreams": "☁️",
+            "One-Pot Pasta Magic": "🍝",
+            "Mug Cake Master": "🎂",
+            "Avocado Rose Art": "🥑",
+            "Ocean Water Cake": "🌊",
+            // Weekend
+            "Breakfast for Dinner": "🥓",
+            "Pizza Night Reinvented": "🍕",
+            "Movie Night Snacks": "🍿",
+            "Farmers Market Haul": "🧺",
+            "Game Day Spread": "🎮",
+            "Sunrise Breakfast": "🌅",
+            "Edible Art Project": "🎨",
+            "Indoor Camping Cuisine": "🏕️",
+            "Carnival at Home": "🎪",
+            "Around the World": "🌍"
+        ]
+        
+        return emojiMap[challenge.title]
     }
     
     var body: some View {
@@ -331,22 +423,16 @@ struct ViralChallengeSection: View {
             GeometryReader { geometry in
                 ZStack(alignment: .bottom) {
                     TabView(selection: $currentChallenge) {
-                        ForEach(0..<challengeData.count, id: \.self) { index in
+                        ForEach(Array(displayChallenges.enumerated()), id: \.offset) { index, challengeData in
                             EnhancedChallengeCard(
-                                emoji: challengeData[index].0,
-                                title: challengeData[index].1,
-                                description: challengeData[index].2,
-                                participants: challengeData[index].3,
-                                points: challengeData[index].4,
-                                color: challengeData[index].5,
+                                emoji: challengeData.emoji,
+                                title: challengeData.challenge.title,
+                                description: challengeData.challenge.description,
+                                participants: challengeData.participants,
+                                points: "\(challengeData.challenge.points)",
+                                color: challengeData.color,
                                 action: {
-                                    let challengeTitle = challengeData[index].1
-                                    // Check if already joined and get the joined challenge
-                                    if let joinedChallenge = gamificationManager.activeChallenges.first(where: { $0.title == challengeTitle }) {
-                                        selectedChallenge = joinedChallenge
-                                    } else {
-                                        selectedChallenge = challenges[index]
-                                    }
+                                    selectedChallenge = challengeData.challenge
                                     showingChallengeView = true
                                 }
                             )
@@ -358,7 +444,7 @@ struct ViralChallengeSection: View {
                     
                     // Page indicators
                     HStack(spacing: 6) {
-                        ForEach(0..<challengeData.count, id: \.self) { index in
+                        ForEach(0..<displayChallenges.count, id: \.self) { index in
                             Capsule()
                                 .fill(currentChallenge == index ? Color.white : Color.white.opacity(0.3))
                                 .frame(width: currentChallenge == index ? 24 : 8, height: 8)
@@ -385,7 +471,7 @@ struct ViralChallengeSection: View {
     private func startAutoScroll() {
         autoTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { _ in
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                currentChallenge = (currentChallenge + 1) % challengeData.count
+                currentChallenge = (currentChallenge + 1) % max(displayChallenges.count, 1)
             }
         }
     }
@@ -413,8 +499,26 @@ struct EnhancedChallengeCard: View {
     
     // Get the actual challenge to access its endDate
     private var challenge: Challenge? {
-        gamificationManager.activeChallenges.first { $0.title == title } ??
-        gamificationManager.completedChallenges.first { $0.title == title }
+        // First check if we have a challenge from CloudKit
+        if let activeChallenge = gamificationManager.activeChallenges.first(where: { $0.title == title }) {
+            return activeChallenge
+        }
+        
+        // Check completed challenges
+        if let completedChallenge = gamificationManager.completedChallenges.first(where: { $0.title == title }) {
+            return completedChallenge
+        }
+        
+        // Create a mock challenge with proper end date if not found
+        return Challenge(
+            title: title,
+            description: description,
+            type: .daily,
+            points: Int(points.replacingOccurrences(of: " pts", with: "")) ?? 100,
+            coins: (Int(points.replacingOccurrences(of: " pts", with: "")) ?? 100) / 10,
+            endDate: Date().addingTimeInterval(24 * 60 * 60), // 24 hours from now
+            requirements: ["Complete the challenge"]
+        )
     }
     
     var body: some View {

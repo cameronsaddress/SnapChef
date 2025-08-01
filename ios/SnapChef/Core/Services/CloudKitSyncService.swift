@@ -87,15 +87,32 @@ class CloudKitSyncService: ObservableObject {
         await MainActor.run { isSyncing = true }
         
         do {
-            // Query active challenges
-            let predicate = CloudKitConfig.activeChallengePredicate()
+            // Query challenges that should be active now
+            let now = Date()
+            let predicate = NSPredicate(format: "startDate <= %@ AND endDate >= %@", now as NSDate, now as NSDate)
             let query = CKQuery(recordType: CloudKitConfig.challengeRecordType, predicate: predicate)
-            query.sortDescriptors = [NSSortDescriptor(key: CKField.Challenge.startDate, ascending: false)]
+            query.sortDescriptors = [NSSortDescriptor(key: CKField.Challenge.startDate, ascending: true)]
             
             let results = try await publicDatabase.records(matching: query)
             
             var challenges: [Challenge] = []
             for (_, result) in results.matchResults {
+                if case .success(let record) = result {
+                    if let challenge = Challenge(from: record) {
+                        challenges.append(challenge)
+                    }
+                }
+            }
+            
+            // Also fetch upcoming challenges (next 7 days)
+            let nextWeek = now.addingTimeInterval(7 * 24 * 60 * 60)
+            let upcomingPredicate = NSPredicate(format: "startDate > %@ AND startDate <= %@", now as NSDate, nextWeek as NSDate)
+            let upcomingQuery = CKQuery(recordType: CloudKitConfig.challengeRecordType, predicate: upcomingPredicate)
+            upcomingQuery.sortDescriptors = [NSSortDescriptor(key: CKField.Challenge.startDate, ascending: true)]
+            
+            let upcomingResults = try await publicDatabase.records(matching: upcomingQuery)
+            
+            for (_, result) in upcomingResults.matchResults {
                 if case .success(let record) = result {
                     if let challenge = Challenge(from: record) {
                         challenges.append(challenge)
@@ -110,7 +127,7 @@ class CloudKitSyncService: ObservableObject {
                 isSyncing = false
             }
             
-            print("✅ Synced \(challenges.count) challenges")
+            print("✅ Synced \(challenges.count) challenges (active and upcoming)")
             
         } catch {
             await MainActor.run {
@@ -244,30 +261,44 @@ class CloudKitSyncService: ObservableObject {
 
 extension Challenge {
     init?(from record: CKRecord) {
-        guard let id = record["id"] as? String,
-              let title = record["title"] as? String,
-              let description = record["description"] as? String,
-              let typeRaw = record["type"] as? String,
-              let type = ChallengeType(rawValue: typeRaw),
-              let category = record["category"] as? String,
-              let difficultyInt = record["difficulty"] as? Int64,
+        guard let id = record[CKField.Challenge.id] as? String,
+              let title = record[CKField.Challenge.title] as? String,
+              let description = record[CKField.Challenge.description] as? String,
+              let typeRaw = record[CKField.Challenge.type] as? String,
+              let category = record[CKField.Challenge.category] as? String,
+              let difficultyInt = record[CKField.Challenge.difficulty] as? Int64,
               let difficulty = DifficultyLevel(rawValue: Int(difficultyInt)),
-              let points = record["points"] as? Int64,
-              let coins = record["coins"] as? Int64,
-              let startDate = record["startDate"] as? Date,
-              let endDate = record["endDate"] as? Date,
-              let isActiveInt = record["isActive"] as? Int64,
-              let isPremiumInt = record["isPremium"] as? Int64,
-              let participantCount = record["participantCount"] as? Int64,
-              let completionCount = record["completionCount"] as? Int64 else {
+              let points = record[CKField.Challenge.points] as? Int64,
+              let coins = record[CKField.Challenge.coins] as? Int64,
+              let startDate = record[CKField.Challenge.startDate] as? Date,
+              let endDate = record[CKField.Challenge.endDate] as? Date,
+              let isActiveInt = record[CKField.Challenge.isActive] as? Int64,
+              let isPremiumInt = record[CKField.Challenge.isPremium] as? Int64,
+              let participantCount = record[CKField.Challenge.participantCount] as? Int64,
+              let completionCount = record[CKField.Challenge.completionCount] as? Int64 else {
+            print("❌ Failed to parse challenge from CloudKit record")
             return nil
         }
         
+        // Parse type
+        let type: ChallengeType
+        switch typeRaw.lowercased() {
+        case "daily":
+            type = .daily
+        case "weekly":
+            type = .weekly
+        case "special":
+            type = .special
+        case "community":
+            type = .community
+        default:
+            type = .daily
+        }
+        
+        // Parse requirements from pipe-separated string
         var requirements: [String] = []
-        if let requirementsData = record["requirements"] as? String,
-           let data = Data(base64Encoded: requirementsData),
-           let decoded = try? JSONDecoder().decode([String].self, from: data) {
-            requirements = decoded
+        if let requirementsString = record[CKField.Challenge.requirements] as? String {
+            requirements = requirementsString.split(separator: "|").map { String($0) }
         }
         
         self.init(
@@ -288,7 +319,7 @@ extension Challenge {
             isJoined: false,
             participants: Int(participantCount),
             completions: Int(completionCount),
-            imageURL: record["imageURL"] as? String,
+            imageURL: record[CKField.Challenge.imageURL] as? String,
             isPremium: isPremiumInt == 1
         )
     }
