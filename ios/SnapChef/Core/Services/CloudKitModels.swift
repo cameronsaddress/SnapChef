@@ -86,8 +86,8 @@ struct CloudKitTeam {
         record[CKField.Team.id] = team.id.uuidString
         record[CKField.Team.name] = team.name
         record[CKField.Team.description] = team.description
-        record[CKField.Team.captainID] = team.captain.userId
-        record[CKField.Team.memberIDs] = team.members.map { $0.userId }
+        record[CKField.Team.captainID] = team.captain
+        record[CKField.Team.memberIDs] = team.members
         
         // Store active challenges
         if !team.activeChallenges.isEmpty {

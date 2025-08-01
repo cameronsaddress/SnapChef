@@ -344,6 +344,132 @@ class CloudKitManager: ObservableObject {
         try context.save()
     }
     */
+    
+    // MARK: - Team Methods
+    
+    func saveTeam(_ team: Team) async throws {
+        let record = CKRecord(recordType: "Team")
+        record["name"] = team.name
+        record["description"] = team.description
+        record["imageIcon"] = team.imageIcon
+        record["color"] = team.color
+        record["captain"] = team.captain
+        record["members"] = team.members
+        record["totalPoints"] = team.totalPoints
+        record["weeklyPoints"] = team.weeklyPoints
+        record["weeklyGoal"] = team.weeklyGoal
+        record["isPublic"] = team.isPublic
+        record["joinCode"] = team.joinCode
+        record["maxMembers"] = team.maxMembers
+        record["completedChallenges"] = team.completedChallenges
+        record["createdAt"] = team.createdAt
+        record["region"] = team.region
+        
+        _ = try await publicDatabase.save(record)
+    }
+    
+    func updateTeam(_ team: Team) async throws {
+        // Fetch existing record
+        let recordID = CKRecord.ID(recordName: team.id.uuidString)
+        let record = try await publicDatabase.record(for: recordID)
+        
+        // Update fields
+        record["name"] = team.name
+        record["description"] = team.description
+        record["members"] = team.members
+        record["totalPoints"] = team.totalPoints
+        record["weeklyPoints"] = team.weeklyPoints
+        record["captain"] = team.captain
+        
+        _ = try await publicDatabase.save(record)
+    }
+    
+    func fetchTeamByCode(_ code: String) async throws -> [Team] {
+        let predicate = NSPredicate(format: "joinCode == %@", code)
+        let query = CKQuery(recordType: "Team", predicate: predicate)
+        
+        let result = try await publicDatabase.records(matching: query)
+        let teams = result.matchResults.compactMap { _, result in
+            try? result.get()
+        }.compactMap { record in
+            teamFromRecord(record)
+        }
+        
+        return teams
+    }
+    
+    func searchTeams(query: String, region: String?) async throws -> [Team] {
+        var predicate: NSPredicate
+        
+        if !query.isEmpty {
+            predicate = NSPredicate(format: "name CONTAINS[cd] %@ AND isPublic == true", query)
+        } else {
+            predicate = NSPredicate(format: "isPublic == true")
+        }
+        
+        let ckQuery = CKQuery(recordType: "Team", predicate: predicate)
+        ckQuery.sortDescriptors = [NSSortDescriptor(key: "weeklyPoints", ascending: false)]
+        
+        let result = try await publicDatabase.records(matching: ckQuery)
+        let teams = result.matchResults.compactMap { _, result in
+            try? result.get()
+        }.compactMap { record in
+            teamFromRecord(record)
+        }
+        
+        return teams
+    }
+    
+    func sendTeamChatMessage(_ message: TeamChatMessage) async throws {
+        let record = CKRecord(recordType: "TeamChat")
+        record["teamId"] = message.teamId.uuidString
+        record["senderId"] = message.senderId
+        record["senderName"] = message.senderName
+        record["message"] = message.message
+        record["timestamp"] = message.timestamp
+        
+        _ = try await publicDatabase.save(record)
+    }
+    
+    private func teamFromRecord(_ record: CKRecord) -> Team? {
+        guard let name = record["name"] as? String,
+              let description = record["description"] as? String,
+              let imageIcon = record["imageIcon"] as? String,
+              let color = record["color"] as? String,
+              let captain = record["captain"] as? String,
+              let members = record["members"] as? [String],
+              let totalPoints = record["totalPoints"] as? Int,
+              let weeklyPoints = record["weeklyPoints"] as? Int,
+              let weeklyGoal = record["weeklyGoal"] as? Int,
+              let isPublic = record["isPublic"] as? Bool,
+              let joinCode = record["joinCode"] as? String,
+              let maxMembers = record["maxMembers"] as? Int,
+              let completedChallenges = record["completedChallenges"] as? Int,
+              let createdAt = record["createdAt"] as? Date else {
+            return nil
+        }
+        
+        return Team(
+            id: UUID(uuidString: record.recordID.recordName) ?? UUID(),
+            name: name,
+            description: description,
+            imageIcon: imageIcon,
+            color: color,
+            captain: captain,
+            members: members,
+            totalPoints: totalPoints,
+            weeklyPoints: weeklyPoints,
+            weeklyGoal: weeklyGoal,
+            activeChallenges: record["activeChallenges"] as? [String] ?? [],
+            achievements: [],
+            isPublic: isPublic,
+            joinCode: joinCode,
+            maxMembers: maxMembers,
+            completedChallenges: completedChallenges,
+            createdAt: createdAt,
+            region: record["region"] as? String
+        )
+    }
 }
 
 // MARK: - CloudKit Errors

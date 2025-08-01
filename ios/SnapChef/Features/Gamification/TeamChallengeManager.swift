@@ -2,6 +2,33 @@ import Foundation
 import SwiftUI
 import CloudKit
 
+// MARK: - Team Errors
+enum TeamError: LocalizedError {
+    case noTeam
+    case teamFull
+    case teamNotFound
+    case invalidJoinCode
+    case notCaptain
+    case alreadyInTeam
+    
+    var errorDescription: String? {
+        switch self {
+        case .noTeam:
+            return "You are not currently in a team"
+        case .teamFull:
+            return "This team is full"
+        case .teamNotFound:
+            return "Team not found"
+        case .invalidJoinCode:
+            return "Invalid team join code"
+        case .notCaptain:
+            return "Only the team captain can perform this action"
+        case .alreadyInTeam:
+            return "You are already in a team"
+        }
+    }
+}
+
 // MARK: - Team Model
 struct Team: Identifiable, Codable {
     let id: UUID
@@ -9,14 +36,17 @@ struct Team: Identifiable, Codable {
     var description: String
     var imageIcon: String
     var color: String
-    var captain: TeamMember
-    var members: [TeamMember]
+    var captain: String // User ID
+    var members: [String] // User IDs
     var totalPoints: Int
     var weeklyPoints: Int
+    var weeklyGoal: Int
     var activeChallenges: [String] // Challenge IDs
     var achievements: [TeamAchievement]
     var isPublic: Bool
+    var joinCode: String
     var maxMembers: Int
+    var completedChallenges: Int
     var createdAt: Date
     var region: String?
     
@@ -138,6 +168,9 @@ class TeamChallengeManager: ObservableObject {
     
     @Published var currentTeam: Team?
     @Published var availableTeams: [Team] = []
+    @Published var publicTeams: [Team] = []
+    @Published var topTeams: [Team] = []
+    @Published var activeTeamChallenges: [Challenge] = []
     @Published var teamChallenges: [TeamChallenge] = []
     @Published var pendingInvitations: [TeamInvitation] = []
     @Published var teamChat: [TeamChatMessage] = []
@@ -152,35 +185,26 @@ class TeamChallengeManager: ObservableObject {
     
     // MARK: - Team Management
     
-    func createTeam(name: String, description: String, icon: String, color: String, isPublic: Bool) async throws -> Team {
+    func createTeam(name: String, description: String, icon: String, color: Color, isPrivate: Bool, weeklyGoal: Int) async throws -> Team {
         let userId = UserDefaults.standard.string(forKey: "userId") ?? "default-user"
-        let username = UserDefaults.standard.string(forKey: "username") ?? "Player"
-        
-        let captain = TeamMember(
-            id: UUID(),
-            userId: userId,
-            username: username,
-            avatar: "person.circle.fill",
-            role: .captain,
-            points: 0,
-            joinedAt: Date(),
-            lastActive: Date()
-        )
         
         let team = Team(
             id: UUID(),
             name: name,
             description: description,
             imageIcon: icon,
-            color: color,
-            captain: captain,
-            members: [captain],
+            color: color.toHex() ?? "#667eea",
+            captain: userId,
+            members: [userId],
             totalPoints: 0,
             weeklyPoints: 0,
+            weeklyGoal: weeklyGoal,
             activeChallenges: [],
             achievements: [],
-            isPublic: isPublic,
+            isPublic: !isPrivate,
+            joinCode: generateJoinCode(),
             maxMembers: 20,
+            completedChallenges: 0,
             createdAt: Date(),
             region: Locale.current.region?.identifier
         )
@@ -195,27 +219,24 @@ class TeamChallengeManager: ObservableObject {
         return team
     }
     
-    func joinTeam(_ team: Team) async throws {
+    private func generateJoinCode() -> String {
+        let characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        return String((0..<6).map { _ in characters.randomElement()! })
+    }
+    
+    func joinTeam(_ teamId: UUID) async throws {
+        guard let team = publicTeams.first(where: { $0.id == teamId }) else {
+            throw TeamError.teamNotFound
+        }
+        
         guard !team.isFull else {
             throw TeamError.teamFull
         }
         
         let userId = UserDefaults.standard.string(forKey: "userId") ?? "default-user"
-        let username = UserDefaults.standard.string(forKey: "username") ?? "Player"
-        
-        let newMember = TeamMember(
-            id: UUID(),
-            userId: userId,
-            username: username,
-            avatar: "person.circle.fill",
-            role: .member,
-            points: 0,
-            joinedAt: Date(),
-            lastActive: Date()
-        )
         
         var updatedTeam = team
-        updatedTeam.members.append(newMember)
+        updatedTeam.members.append(userId)
         
         // Update in CloudKit
         try await cloudKitManager.updateTeam(updatedTeam)
@@ -224,22 +245,46 @@ class TeamChallengeManager: ObservableObject {
             self.currentTeam = updatedTeam
             
             // Remove from available teams
-            self.availableTeams.removeAll { $0.id == team.id }
+            self.publicTeams.removeAll { $0.id == team.id }
         }
     }
     
-    func leaveTeam() async throws {
+    func joinTeamWithCode(_ code: String) async throws {
+        // Find team with matching code
+        let teams = try await cloudKitManager.fetchTeamByCode(code.uppercased())
+        
+        guard let team = teams.first else {
+            throw TeamError.invalidJoinCode
+        }
+        
+        guard !team.isFull else {
+            throw TeamError.teamFull
+        }
+        
+        let userId = UserDefaults.standard.string(forKey: "userId") ?? "default-user"
+        
+        var updatedTeam = team
+        updatedTeam.members.append(userId)
+        
+        // Update in CloudKit
+        try await cloudKitManager.updateTeam(updatedTeam)
+        
+        await MainActor.run {
+            self.currentTeam = updatedTeam
+        }
+    }
+    
+    func leaveCurrentTeam() async throws {
         guard let team = currentTeam else { return }
         
         let userId = UserDefaults.standard.string(forKey: "userId") ?? "default-user"
         
         var updatedTeam = team
-        updatedTeam.members.removeAll { $0.userId == userId }
+        updatedTeam.members.removeAll { $0 == userId }
         
         // If user was captain, assign new captain
-        if team.captain.userId == userId && !updatedTeam.members.isEmpty {
+        if team.captain == userId && !updatedTeam.members.isEmpty {
             updatedTeam.captain = updatedTeam.members.first!
-            updatedTeam.members[0].role = .captain
         }
         
         // Update in CloudKit
@@ -360,7 +405,8 @@ class TeamChallengeManager: ObservableObject {
         )
         
         // Save invitation to CloudKit
-        try await cloudKitManager.sendTeamInvitation(invitation, toUsername: username)
+        // TODO: Implement team invitation in CloudKit
+        print("Sending team invitation to \(username)")
         
         // Send notification
         notificationManager.notifyTeamChallengeInvite(
@@ -372,10 +418,13 @@ class TeamChallengeManager: ObservableObject {
     
     func acceptInvitation(_ invitation: TeamInvitation) async throws {
         // Find team
-        let team = try await cloudKitManager.fetchTeam(id: invitation.teamId)
+        // TODO: Implement fetchTeam in CloudKit
+        guard let team = publicTeams.first(where: { $0.id == invitation.teamId }) else {
+            throw TeamError.teamNotFound
+        }
         
         // Join team
-        try await joinTeam(team)
+        try await joinTeam(invitation.teamId)
         
         // Remove invitation
         await MainActor.run {
@@ -483,30 +532,24 @@ class TeamChallengeManager: ObservableObject {
         ]
         
         // Mock available teams
-        availableTeams = [
+        publicTeams = [
             Team(
                 id: UUID(),
                 name: "Kitchen Ninjas",
                 description: "Fast cooking enthusiasts",
                 imageIcon: "🥷",
                 color: "#000000",
-                captain: TeamMember(
-                    id: UUID(),
-                    userId: "captain1",
-                    username: "NinjaMaster",
-                    avatar: "person.circle.fill",
-                    role: .captain,
-                    points: 15000,
-                    joinedAt: Date().addingTimeInterval(-2592000),
-                    lastActive: Date()
-                ),
-                members: generateMockMembers(count: 12),
+                captain: "captain1",
+                members: ["captain1", "member1", "member2", "member3", "member4"],
                 totalPoints: 125000,
                 weeklyPoints: 8500,
+                weeklyGoal: 10000,
                 activeChallenges: [],
                 achievements: [],
                 isPublic: true,
+                joinCode: "NINJA1",
                 maxMembers: 20,
+                completedChallenges: 45,
                 createdAt: Date().addingTimeInterval(-2592000),
                 region: "US"
             ),
@@ -516,27 +559,24 @@ class TeamChallengeManager: ObservableObject {
                 description: "Discovering new tastes together",
                 imageIcon: "🧭",
                 color: "#667eea",
-                captain: TeamMember(
-                    id: UUID(),
-                    userId: "captain2",
-                    username: "TasteExplorer",
-                    avatar: "person.circle.fill",
-                    role: .captain,
-                    points: 22000,
-                    joinedAt: Date().addingTimeInterval(-5184000),
-                    lastActive: Date()
-                ),
-                members: generateMockMembers(count: 8),
+                captain: "captain2",
+                members: ["captain2", "member5", "member6"],
                 totalPoints: 98000,
                 weeklyPoints: 6200,
+                weeklyGoal: 8000,
                 activeChallenges: [],
                 achievements: [],
                 isPublic: true,
+                joinCode: "EXPLOR",
                 maxMembers: 15,
+                completedChallenges: 32,
                 createdAt: Date().addingTimeInterval(-5184000),
                 region: "UK"
             )
         ]
+        
+        // Mock top teams for leaderboard
+        topTeams = publicTeams.sorted { $0.weeklyPoints > $1.weeklyPoints }
     }
     
     private func generateMockMembers(count: Int) -> [TeamMember] {
@@ -572,61 +612,6 @@ struct TeamChatMessage: Identifiable {
     let timestamp: Date
 }
 
-// MARK: - Team Errors
-enum TeamError: LocalizedError {
-    case noTeam
-    case teamFull
-    case unauthorized
-    case invalidTeam
-    
-    var errorDescription: String? {
-        switch self {
-        case .noTeam:
-            return "You must be part of a team to perform this action"
-        case .teamFull:
-            return "This team is full"
-        case .unauthorized:
-            return "You don't have permission to perform this action"
-        case .invalidTeam:
-            return "Invalid team"
-        }
-    }
-}
-
-// MARK: - CloudKit Manager Extension
-extension CloudKitManager {
-    func saveTeam(_ team: Team) async throws {
-        // Implementation would save to CloudKit
-        print("Saving team to CloudKit: \(team.name)")
-    }
-    
-    func updateTeam(_ team: Team) async throws {
-        // Implementation would update in CloudKit
-        print("Updating team in CloudKit: \(team.name)")
-    }
-    
-    func fetchTeam(id: UUID) async throws -> Team {
-        // Implementation would fetch from CloudKit
-        // For now, return a mock team
-        throw TeamError.invalidTeam
-    }
-    
-    func searchTeams(query: String, region: String?) async throws -> [Team] {
-        // Implementation would search CloudKit
-        // For now, return mock data
-        return []
-    }
-    
-    func sendTeamInvitation(_ invitation: TeamInvitation, toUsername: String) async throws {
-        // Implementation would save invitation to CloudKit
-        print("Sending team invitation to \(toUsername)")
-    }
-    
-    func sendTeamChatMessage(_ message: TeamChatMessage) async throws {
-        // Implementation would save message to CloudKit
-        print("Sending team chat message")
-    }
-}
 
 // MARK: - Notification Manager Extension
 extension ChallengeNotificationManager {
