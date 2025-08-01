@@ -88,3 +88,11 @@ fastlane/test_output
 # https://github.com/johnno1962/injectionforxcode
 
 iOSInjectionProject/
+
+# Swift Package Manager - local checkouts
+checkouts/
+repositories/
+workspace-state.json
+
+# Temporary scripts
+*.rb
