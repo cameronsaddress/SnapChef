@@ -4,11 +4,21 @@ SnapChef is a magical iOS app that transforms photos of your fridge and pantry i
 
 ## 📚 Documentation
 
+### Core Documentation
 - **[APP_ARCHITECTURE_DOCUMENTATION.md](APP_ARCHITECTURE_DOCUMENTATION.md)** - Complete system architecture and data flow
 - **[COMPONENT_REFERENCE.md](COMPONENT_REFERENCE.md)** - Detailed component documentation
-- **[DEVELOPER_QUICK_REFERENCE.md](DEVELOPER_QUICK_REFERENCE.md)** - Quick commands and tips
 - **[CLAUDE.md](CLAUDE.md)** - AI assistant guidance and recent updates
-- **[PROJECT_BRIEF.md](PROJECT_BRIEF.md)** - Original project specifications
+
+### Development Guides
+- **[AI_DEVELOPER_GUIDE.md](AI_DEVELOPER_GUIDE.md)** - Comprehensive guide for AI assistants
+- **[COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md)** - Full app flow analysis
+- **[FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md)** - Active/unused file audit
+- **[DEVELOPER_QUICK_REFERENCE.md](DEVELOPER_QUICK_REFERENCE.md)** - Quick commands and tips
+
+### Implementation Details
+- **[CHALLENGE_SYSTEM_ORCHESTRATION.md](CHALLENGE_SYSTEM_ORCHESTRATION.md)** - Challenge system design
+- **[CHALLENGE_SYSTEM_SUMMARY.md](CHALLENGE_SYSTEM_SUMMARY.md)** - Implementation summary
+- **[WORKSPACE_STRUCTURE.md](WORKSPACE_STRUCTURE.md)** - Multi-repository workflow
 
 ## 📱 App Overview
 
