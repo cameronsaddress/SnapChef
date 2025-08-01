@@ -10,6 +10,16 @@ struct ChallengeDetailView: View {
     @State private var joinSuccess = false
     @StateObject private var gamificationManager = GamificationManager.shared
     
+    // Get the actual challenge from GamificationManager if it exists
+    private var displayChallenge: Challenge {
+        if let activeChallenge = gamificationManager.activeChallenges.first(where: { 
+            $0.id == challenge.id || $0.title == challenge.title 
+        }) {
+            return activeChallenge
+        }
+        return challenge
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -20,12 +30,12 @@ struct ChallengeDetailView: View {
                     VStack(spacing: 30) {
                         // Title and description
                         VStack(spacing: 16) {
-                            Text(challenge.title)
+                            Text(displayChallenge.title)
                                 .font(.system(size: 32, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
                                 .multilineTextAlignment(.center)
                             
-                            Text(challenge.description)
+                            Text(displayChallenge.description)
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
                                 .multilineTextAlignment(.center)
@@ -33,27 +43,35 @@ struct ChallengeDetailView: View {
                         .padding(.horizontal, 20)
                         
                         // Requirements
-                        RequirementsCard(challenge: challenge)
+                        RequirementsCard(challenge: displayChallenge)
                             .padding(.horizontal, 20)
                         
                         // Rewards
-                        RewardsCard(challenge: challenge)
+                        RewardsCard(challenge: displayChallenge)
                             .padding(.horizontal, 20)
                         
                         // Leaderboard preview
-                        MiniLeaderboardCard(challenge: challenge)
+                        MiniLeaderboardCard(challenge: displayChallenge)
                             .padding(.horizontal, 20)
                         
-                        // Join button
-                        if !challenge.isCompleted {
-                            let isAlreadyJoined = gamificationManager.isChallengeJoined(challenge.id)
-                            MagneticButton(
-                                title: isAlreadyJoined || joinSuccess ? "Joined!" : "Join Challenge",
-                                icon: isAlreadyJoined || joinSuccess ? "checkmark.circle.fill" : "plus.circle.fill",
-                                action: isAlreadyJoined ? {} : joinChallenge
-                            )
-                            .padding(.horizontal, 20)
-                            .disabled(isJoining || joinSuccess || isAlreadyJoined)
+                        // Progress or Join button
+                        if !displayChallenge.isCompleted {
+                            let isAlreadyJoined = displayChallenge.isJoined || gamificationManager.isChallengeJoined(displayChallenge.id)
+                            
+                            if isAlreadyJoined {
+                                // Show progress card
+                                ProgressCard(challenge: displayChallenge)
+                                    .padding(.horizontal, 20)
+                            } else {
+                                // Show join button
+                                MagneticButton(
+                                    title: joinSuccess ? "Joined!" : "Join Challenge",
+                                    icon: joinSuccess ? "checkmark.circle.fill" : "plus.circle.fill",
+                                    action: joinChallenge
+                                )
+                                .padding(.horizontal, 20)
+                                .disabled(isJoining || joinSuccess)
+                            }
                         }
                     }
                     .padding(.vertical, 40)
@@ -268,6 +286,105 @@ struct MiniLeaderboardCard: View {
         case 2: return Color(hex: "#c0c0c0")
         case 3: return Color(hex: "#cd7f32")
         default: return .white
+        }
+    }
+}
+
+// MARK: - Progress Card
+struct ProgressCard: View {
+    let challenge: Challenge
+    
+    private var progressPercentage: Int {
+        Int(challenge.currentProgress * 100)
+    }
+    
+    var body: some View {
+        GlassmorphicCard {
+            VStack(spacing: 20) {
+                Label("Your Progress", systemImage: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                // Progress Circle
+                ZStack {
+                    // Background circle
+                    Circle()
+                        .stroke(Color.white.opacity(0.2), lineWidth: 12)
+                        .frame(width: 120, height: 120)
+                    
+                    // Progress circle
+                    Circle()
+                        .trim(from: 0, to: challenge.currentProgress)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#4facfe"),
+                                    Color(hex: "#00f2fe")
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                        )
+                        .frame(width: 120, height: 120)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: challenge.currentProgress)
+                    
+                    // Progress text
+                    VStack(spacing: 4) {
+                        Text("\(progressPercentage)%")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("Complete")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                }
+                
+                // Status
+                HStack(spacing: 16) {
+                    VStack(spacing: 4) {
+                        Text("Status")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                        Text("In Progress")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color(hex: "#4facfe"))
+                    }
+                    
+                    Divider()
+                        .frame(height: 30)
+                        .background(Color.white.opacity(0.2))
+                    
+                    VStack(spacing: 4) {
+                        Text("Time Left")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                        Text(challenge.timeRemaining)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                }
+                
+                // Requirements checklist
+                if !challenge.requirements.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(challenge.requirements, id: \.self) { requirement in
+                            HStack {
+                                Image(systemName: challenge.currentProgress >= 1.0 ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(challenge.currentProgress >= 1.0 ? Color(hex: "#43e97b") : Color.white.opacity(0.5))
+                                    .font(.system(size: 16))
+                                Text(requirement)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.8))
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+            }
+            .padding(20)
         }
     }
 }

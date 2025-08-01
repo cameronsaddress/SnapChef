@@ -308,8 +308,8 @@ class GamificationManager: ObservableObject {
         // Join challenge logic
         print("Joined challenge: \(challenge.title)")
         
-        // Track participation
-        if !activeChallenges.contains(where: { $0.id == challenge.id }) {
+        // Check if already joined by ID or title
+        if !activeChallenges.contains(where: { $0.id == challenge.id || $0.title == challenge.title }) {
             var joinedChallenge = challenge
             joinedChallenge.isJoined = true
             joinedChallenge.currentProgress = 0
@@ -614,70 +614,8 @@ class GamificationManager: ObservableObject {
             globalRank: 2847
         )
         
-        // Active challenges
-        activeChallenges = [
-            Challenge(
-                title: "Speed Chef",
-                description: "Create 3 recipes in under 30 minutes total",
-                type: .daily,
-                category: "cooking",
-                difficulty: .medium,
-                points: 100,
-                coins: 10,
-                endDate: Date().addingTimeInterval(86400), // 24 hours
-                requirements: ["Create 3 recipes", "Each under 30 minutes"],
-                currentProgress: 0.33,
-                isJoined: true,
-                participants: 1284,
-                completions: 428
-            ),
-            Challenge(
-                title: "Healthy Week",
-                description: "Create 10 recipes under 500 calories",
-                type: .weekly,
-                category: "healthy",
-                difficulty: .hard,
-                points: 500,
-                coins: 50,
-                endDate: Date().addingTimeInterval(604800), // 7 days
-                requirements: ["Create 10 recipes", "Each under 500 calories"],
-                currentProgress: 0.4,
-                isJoined: true,
-                participants: 5672,
-                completions: 1890
-            ),
-            Challenge(
-                title: "Halloween Special 🎃",
-                description: "Create spooky-themed recipes",
-                type: .special,
-                category: "creative",
-                difficulty: .medium,
-                points: 1000,
-                coins: 100,
-                endDate: Date().addingTimeInterval(259200), // 3 days
-                requirements: ["Create 5 spooky recipes", "Use Halloween ingredients"],
-                currentProgress: 0.4,
-                isJoined: true,
-                participants: 12847,
-                completions: 4282,
-                isPremium: true
-            ),
-            Challenge(
-                title: "Global Cook-Off",
-                description: "Community goal: 1M recipes this month",
-                type: .community,
-                category: "social",
-                difficulty: .expert,
-                points: 2000,
-                coins: 200,
-                endDate: Date().addingTimeInterval(1296000), // 15 days
-                requirements: ["Contribute to 1M recipe goal", "Share with community"],
-                currentProgress: 0.847,
-                isJoined: true,
-                participants: 45892,
-                completions: 38907
-            )
-        ]
+        // Active challenges - empty initially, will be populated when user joins from HomeView
+        activeChallenges = []
         
         // Leaderboard data
         weeklyLeaderboard = generateMockLeaderboard(count: 100, includeUser: true, userRank: 156)

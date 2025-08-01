@@ -257,6 +257,7 @@ struct ViralChallengeSection: View {
     @State private var selectedChallenge: Challenge?
     @State private var autoTimer: Timer?
     @State private var sparkleAnimation = false
+    @StateObject private var gamificationManager = GamificationManager.shared
     
     let challengeData = [
         ("🌮", "Taco Tuesday", "Transform leftovers into tacos", "2.3K chefs", "500", Color(hex: "#f093fb")),
@@ -269,6 +270,7 @@ struct ViralChallengeSection: View {
     var challenges: [Challenge] {
         challengeData.map { data in
             Challenge(
+                id: "home-\(data.1.replacingOccurrences(of: " ", with: "-").lowercased())",
                 title: data.1,
                 description: data.2,
                 type: .daily,
@@ -338,7 +340,13 @@ struct ViralChallengeSection: View {
                                 points: challengeData[index].4,
                                 color: challengeData[index].5,
                                 action: {
-                                    selectedChallenge = challenges[index]
+                                    let challengeTitle = challengeData[index].1
+                                    // Check if already joined and get the joined challenge
+                                    if let joinedChallenge = gamificationManager.activeChallenges.first(where: { $0.title == challengeTitle }) {
+                                        selectedChallenge = joinedChallenge
+                                    } else {
+                                        selectedChallenge = challenges[index]
+                                    }
                                     showingChallengeView = true
                                 }
                             )
