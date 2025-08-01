@@ -11,9 +11,11 @@ struct UserChallenge {
     var completedAt: Date?
     let earnedPoints: Int
     let earnedCoins: Int
+    var proofImageURL: String?
+    var notes: String?
     var teamID: String?
     
-    init(userID: String, challengeID: String, status: String, progress: Double, startedAt: Date, completedAt: Date? = nil, earnedPoints: Int, earnedCoins: Int, teamID: String? = nil) {
+    init(userID: String, challengeID: String, status: String, progress: Double, startedAt: Date, completedAt: Date? = nil, earnedPoints: Int, earnedCoins: Int, proofImageURL: String? = nil, notes: String? = nil, teamID: String? = nil) {
         self.userID = userID
         self.challengeID = challengeID
         self.status = status
@@ -22,6 +24,8 @@ struct UserChallenge {
         self.completedAt = completedAt
         self.earnedPoints = earnedPoints
         self.earnedCoins = earnedCoins
+        self.proofImageURL = proofImageURL
+        self.notes = notes
         self.teamID = teamID
     }
     
@@ -50,6 +54,29 @@ struct UserChallenge {
         record[CKField.UserChallenge.teamID] = teamID
         return record
     }
+}
+
+struct Achievement {
+    let id: String
+    let userID: String
+    let type: String
+    let name: String
+    let description: String
+    let iconName: String
+    let earnedAt: Date
+    let rarity: String
+    let associatedChallengeID: String?
+}
+
+struct CoinTransaction {
+    let userID: String
+    let amount: Int
+    let type: String
+    let reason: String
+    let timestamp: Date
+    let balance: Int
+    let challengeID: String?
+    let itemPurchased: String?
 }
 
 struct CloudKitLeaderboardEntry {
@@ -109,36 +136,6 @@ struct CloudKitTeam {
 
 // MARK: - Model Extensions for CloudKit
 extension Challenge {
-    init?(from record: CKRecord) {
-        guard let id = record[CKField.Challenge.id] as? String,
-              let title = record[CKField.Challenge.title] as? String,
-              let description = record[CKField.Challenge.description] as? String,
-              let type = record[CKField.Challenge.type] as? String,
-              let startDate = record[CKField.Challenge.startDate] as? Date,
-              let endDate = record[CKField.Challenge.endDate] as? Date else { return nil }
-        
-        self.init(
-            id: id,
-            title: title,
-            description: description,
-            type: ChallengeType(rawValue: type) ?? .daily,
-            category: record[CKField.Challenge.category] as? String ?? "cooking",
-            difficulty: DifficultyLevel(rawValue: record[CKField.Challenge.difficulty] as? Int ?? 1) ?? .easy,
-            points: record[CKField.Challenge.points] as? Int ?? 0,
-            coins: record[CKField.Challenge.coins] as? Int ?? 0,
-            startDate: startDate,
-            endDate: endDate,
-            requirements: [],
-            currentProgress: 0,
-            isCompleted: false,
-            isActive: (record[CKField.Challenge.isActive] as? Int ?? 0) == 1,
-            participants: record[CKField.Challenge.participantCount] as? Int ?? 0,
-            completions: record[CKField.Challenge.completionCount] as? Int ?? 0,
-            imageURL: record[CKField.Challenge.imageURL] as? String,
-            isPremium: (record[CKField.Challenge.isPremium] as? Int ?? 0) == 1
-        )
-    }
-    
     func toCKRecord() -> CKRecord {
         let record = CKRecord(recordType: CloudKitConfig.challengeRecordType)
         record[CKField.Challenge.id] = id

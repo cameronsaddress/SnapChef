@@ -64,6 +64,12 @@ struct ChallengeHubView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
+                        NavigationLink(destination: LeaderboardView()) {
+                            Image(systemName: "trophy.fill")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                        }
+                        
                         NavigationLink(destination: AnalyticsView()) {
                             Image(systemName: "chart.xyaxis.line")
                                 .font(.body)

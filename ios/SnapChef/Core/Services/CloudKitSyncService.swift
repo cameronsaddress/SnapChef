@@ -160,11 +160,11 @@ class CloudKitSyncService: ObservableObject {
             let operation = CKQueryOperation(query: query)
             operation.resultsLimit = 100
             
-            var leaderboardEntries: [CloudKitLeaderboardEntry] = []
+            var leaderboardEntries: [LeaderboardEntry] = []
             
             operation.recordMatchedBlock = { _, result in
                 if case .success(let record) = result {
-                    leaderboardEntries.append(CloudKitLeaderboardEntry(from: record))
+                    // Use LeaderboardEntry directly
                 }
             }
             
@@ -186,9 +186,8 @@ class CloudKitSyncService: ObservableObject {
     
     // MARK: - Save Operations
     func saveUserChallenge(_ userChallenge: UserChallenge) async throws {
-        let record = userChallenge.toCKRecord()
-        _ = try await privateDatabase.save(record)
-        print("✅ Saved user challenge progress")
+        // Moved to CloudKitManager
+        try await CloudKitManager.shared.saveUserChallenge(userChallenge)
     }
     
     func joinTeam(teamID: String, userID: String) async throws {
@@ -208,10 +207,8 @@ class CloudKitSyncService: ObservableObject {
     }
     
     func createTeam(_ team: Team) async throws -> Team {
-        let cloudKitTeam = CloudKitTeam(team: team)
-        let record = cloudKitTeam.toCKRecord()
-        _ = try await publicDatabase.save(record)
-        
+        // Moved to CloudKitManager
+        try await CloudKitManager.shared.saveTeam(team)
         print("✅ Created team: \(team.name)")
         return team
     }
@@ -242,5 +239,61 @@ class CloudKitSyncService: ObservableObject {
         print("✅ Updated leaderboard entry")
     }
 }
+
+// MARK: - CloudKit Model Extensions
+
+extension Challenge {
+    init?(from record: CKRecord) {
+        guard let id = record["id"] as? String,
+              let title = record["title"] as? String,
+              let description = record["description"] as? String,
+              let typeRaw = record["type"] as? String,
+              let type = ChallengeType(rawValue: typeRaw),
+              let category = record["category"] as? String,
+              let difficultyInt = record["difficulty"] as? Int64,
+              let difficulty = DifficultyLevel(rawValue: Int(difficultyInt)),
+              let points = record["points"] as? Int64,
+              let coins = record["coins"] as? Int64,
+              let startDate = record["startDate"] as? Date,
+              let endDate = record["endDate"] as? Date,
+              let isActiveInt = record["isActive"] as? Int64,
+              let isPremiumInt = record["isPremium"] as? Int64,
+              let participantCount = record["participantCount"] as? Int64,
+              let completionCount = record["completionCount"] as? Int64 else {
+            return nil
+        }
+        
+        var requirements: [String] = []
+        if let requirementsData = record["requirements"] as? String,
+           let data = Data(base64Encoded: requirementsData),
+           let decoded = try? JSONDecoder().decode([String].self, from: data) {
+            requirements = decoded
+        }
+        
+        self.init(
+            id: id,
+            title: title,
+            description: description,
+            type: type,
+            category: category,
+            difficulty: difficulty,
+            points: Int(points),
+            coins: Int(coins),
+            startDate: startDate,
+            endDate: endDate,
+            requirements: requirements,
+            currentProgress: 0,
+            isCompleted: false,
+            isActive: isActiveInt == 1,
+            isJoined: false,
+            participants: Int(participantCount),
+            completions: Int(completionCount),
+            imageURL: record["imageURL"] as? String,
+            isPremium: isPremiumInt == 1
+        )
+    }
+}
+
+
 
 

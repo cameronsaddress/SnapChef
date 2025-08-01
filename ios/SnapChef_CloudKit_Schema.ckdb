@@ -1,0 +1,166 @@
+DEFINE SCHEMA
+
+    RECORD TYPE Challenge (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
+        id              STRING QUERYABLE SORTABLE,
+        title           STRING QUERYABLE,
+        description     STRING,
+        type            STRING QUERYABLE,
+        category        STRING QUERYABLE,
+        difficulty      INT64 QUERYABLE,
+        points          INT64,
+        coins           INT64,
+        requirements    STRING,
+        startDate       TIMESTAMP QUERYABLE SORTABLE,
+        endDate         TIMESTAMP QUERYABLE SORTABLE,
+        isActive        INT64 QUERYABLE,
+        isPremium       INT64 QUERYABLE,
+        participantCount INT64,
+        completionCount INT64,
+        imageURL        STRING,
+        badgeID         STRING,
+        teamBased       INT64,
+        minTeamSize     INT64,
+        maxTeamSize     INT64,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE UserChallenge (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        userID          STRING QUERYABLE,
+        challengeID     REFERENCE QUERYABLE,
+        status          STRING QUERYABLE,
+        progress        DOUBLE,
+        startedAt       TIMESTAMP SORTABLE,
+        completedAt     TIMESTAMP SORTABLE,
+        earnedPoints    INT64,
+        earnedCoins     INT64,
+        proofImageURL   STRING,
+        notes           STRING,
+        teamID          STRING QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE Team (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
+        id              STRING QUERYABLE,
+        name            STRING QUERYABLE,
+        description     STRING,
+        captainID       STRING,
+        memberIDs       LIST<STRING>,
+        challengeID     REFERENCE QUERYABLE,
+        totalPoints     INT64 SORTABLE,
+        createdAt       TIMESTAMP SORTABLE,
+        inviteCode      STRING QUERYABLE,
+        isPublic        INT64,
+        maxMembers      INT64,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE TeamMessage (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        teamID          STRING QUERYABLE,
+        senderID        STRING,
+        senderName      STRING,
+        message         STRING,
+        timestamp       TIMESTAMP SORTABLE,
+        type            STRING,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE Leaderboard (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        userID          STRING QUERYABLE,
+        userName        STRING,
+        avatarURL       STRING,
+        totalPoints     INT64 SORTABLE,
+        weeklyPoints    INT64 SORTABLE,
+        monthlyPoints   INT64 SORTABLE,
+        challengesCompleted INT64,
+        currentStreak   INT64,
+        longestStreak   INT64,
+        lastUpdated     TIMESTAMP SORTABLE,
+        region          STRING QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE Achievement (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        id              STRING QUERYABLE,
+        userID          STRING QUERYABLE,
+        type            STRING QUERYABLE,
+        name            STRING,
+        description     STRING,
+        iconName        STRING,
+        earnedAt        TIMESTAMP SORTABLE,
+        rarity          STRING,
+        associatedChallengeID STRING,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE CoinTransaction (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        userID          STRING QUERYABLE,
+        amount          INT64,
+        type            STRING,
+        reason          STRING,
+        timestamp       TIMESTAMP SORTABLE,
+        balance         INT64,
+        challengeID     STRING,
+        itemPurchased   STRING,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE Users (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        roles           LIST<INT64>,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );

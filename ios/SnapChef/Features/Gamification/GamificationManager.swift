@@ -272,11 +272,13 @@ class GamificationManager: ObservableObject {
             completedAt: progress >= 1.0 ? Date() : nil,
             earnedPoints: progress >= 1.0 ? (activeChallenges.first { $0.id == challengeID }?.points ?? 0) : 0,
             earnedCoins: progress >= 1.0 ? (activeChallenges.first { $0.id == challengeID }?.coins ?? 0) : 0,
+            proofImageURL: nil,
+            notes: nil,
             teamID: nil
         )
         
         do {
-            try await CloudKitSyncService.shared.saveUserChallenge(userChallenge)
+            try await CloudKitManager.shared.saveUserChallenge(userChallenge)
         } catch {
             print("Failed to sync challenge progress: \(error)")
         }
@@ -402,7 +404,7 @@ class GamificationManager: ObservableObject {
         // Update CloudKit leaderboard
         Task {
             do {
-                try await CloudKitSyncService.shared.updateLeaderboardEntry(
+                try await CloudKitManager.shared.updateLeaderboardEntry(
                     for: AuthenticationManager().currentUser?.id ?? "",
                     points: challenge.points,
                     challengesCompleted: userStats.challengesCompleted
