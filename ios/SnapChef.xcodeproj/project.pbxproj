@@ -21,6 +21,7 @@
 		1DC73B59A4CEA9D2D154AF58 /* meal2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 4538A20809A0F4F689F7F5B1 /* meal2.jpg */; };
 		1F3CC9E8D39F4DC49EDA72C5 /* MagicalTransitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A8DCF3FDF7CB6D914529906 /* MagicalTransitions.swift */; };
 		1F6B34545970A0A31EF82B46 /* DailyCheckInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F7BA94EACC90AA7F225C1D5 /* DailyCheckInView.swift */; };
+		20C81F1B946D411A830B4FCA /* CloudKitAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E456AED84984638A80E167B /* CloudKitAuthManager.swift */; };
 		2422E5C1C7E414D8FF5A0B7C /* NetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FDC970FB5C6C618DA4E006 /* NetworkManager.swift */; };
 		334B8CC90B7AB6E39FFE0A5E /* LaunchAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E808FB0C31658D7A40220ACC /* LaunchAnimationView.swift */; };
 		34E4DBC84C42786C925ECF2C /* ChefCoinsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8BA7F4B7BCA4208C26D2EDB /* ChefCoinsManager.swift */; };
@@ -52,6 +53,7 @@
 		7833A31EF38C48FD90F49007 /* SocialShareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CCD6FA6649726CC20EA9DE2 /* SocialShareManager.swift */; };
 		7BBE4481D9C08B38B01C33E7 /* LeaderboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4976D3BAC7409CD3C09ED36E /* LeaderboardViewModel.swift */; };
 		7E8464B6ABF815644BDE5E62 /* fridge3.jpg in Resources */ = {isa = PBXBuildFile; fileRef = ADDE0057FDAB5264593D3360 /* fridge3.jpg */; };
+		8B7E8A3AFC2C41A88807A95E /* CloudKitAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE10EDDC2438467DBDDE607B /* CloudKitAuthView.swift */; };
 		90F4B326E442F3BEAA8FD619 /* MockDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56DF24D3280D9F5229B2C67C /* MockDataProvider.swift */; };
 		95D60A4B82A76A430DD9CDDC /* ChallengeModels.xcdatamodeld in Resources */ = {isa = PBXBuildFile; fileRef = 1CDBD7787F7A05B2501F144E /* ChallengeModels.xcdatamodeld */; };
 		9654016E762E43BDA1AF349A /* ChallengeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9654016E762E43BDA1AF349B /* ChallengeDetailView.swift */; };
@@ -69,6 +71,7 @@
 		A6B7C8D9E0F1234567890123 /* InfluencerShowcaseCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B7C8D9E0F1234567890124 /* InfluencerShowcaseCard.swift */; };
 		A6D50BE115944D3A16DE5E62 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F704D9176B948F55CD9DC566 /* ShareSheet.swift */; };
 		A6E6D591C4F0B345F912FC7E /* AnalyticsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D502E726703734D99E68D2E /* AnalyticsManager.swift */; };
+		A75B45E64F7A4EFF9A2B74C7 /* CloudKitUsernameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DABDD7D58B482E9F2F9D14 /* CloudKitUsernameView.swift */; };
 		A7B8C9D0E1F2345678901234 /* InfluencerCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B8C9D0E1F2345678901235 /* InfluencerCarousel.swift */; };
 		A8B9C0D1E2F3456789012345 /* InfluencerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8B9C0D1E2F3456789012346 /* InfluencerDetailView.swift */; };
 		AE5F6AEEE75CF80D8EEFA941 /* meal1.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 749D158D8EA5E056935EE338 /* meal1.jpg */; };
@@ -113,9 +116,6 @@
 		FED3E5EB696AF8E7C4375464 /* PersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AC9B83A23805AF72F7FA1CC /* PersistenceController.swift */; };
 		FFAF7C1CEA1855B0235BE6EC /* SnapchefLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 392BD76253A7DA8F69705F62 /* SnapchefLogo.swift */; };
 		FFCAA2B0DE7B5BAD2D349B8F /* fridge1.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 6DE095E53679E0668984799F /* fridge1.jpg */; };
-		20C81F1B946D411A830B4FCA /* CloudKitAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E456AED84984638A80E167B /* CloudKitAuthManager.swift */; };
-		8B7E8A3AFC2C41A88807A95E /* CloudKitAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE10EDDC2438467DBDDE607B /* CloudKitAuthView.swift */; };
-		A75B45E64F7A4EFF9A2B74C7 /* CloudKitUsernameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DABDD7D58B482E9F2F9D14 /* CloudKitUsernameView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -149,6 +149,7 @@
 		37C541E1BB83BA1EC25EFF3F /* RecipesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RecipesView.swift; path = SnapChef/Features/Recipes/RecipesView.swift; sourceTree = "<group>"; };
 		392BD76253A7DA8F69705F62 /* SnapchefLogo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SnapchefLogo.swift; path = SnapChef/Design/SnapchefLogo.swift; sourceTree = "<group>"; };
 		3D442A0968AD8CC730708E9A /* LeaderboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LeaderboardView.swift; path = SnapChef/Features/Gamification/LeaderboardView.swift; sourceTree = "<group>"; };
+		3E456AED84984638A80E167B /* CloudKitAuthManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitAuthManager.swift; path = SnapChef/Core/Services/CloudKitAuthManager.swift; sourceTree = "<group>"; };
 		3F2D011EC538362F2FA24496 /* PhysicsLoadingOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PhysicsLoadingOverlay.swift; path = SnapChef/Features/Camera/PhysicsLoadingOverlay.swift; sourceTree = "<group>"; };
 		402F2BF3556512A175C480AD /* CapturedImageView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CapturedImageView.swift; path = SnapChef/Features/Camera/CapturedImageView.swift; sourceTree = "<group>"; };
 		4538A20809A0F4F689F7F5B1 /* meal2.jpg */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.jpeg; name = meal2.jpg; path = SnapChef/Resources/meal2.jpg; sourceTree = "<group>"; };
@@ -220,6 +221,7 @@
 		D763DE380F1DB760696FA722 /* HomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HomeView.swift; path = SnapChef/HomeView.swift; sourceTree = "<group>"; };
 		D79D60B603855BD2E41D0CFA /* RewardSystem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RewardSystem.swift; path = SnapChef/Features/Gamification/RewardSystem.swift; sourceTree = "<group>"; };
 		DC3087E3BC28593B910150BF /* ChallengeService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeService.swift; path = SnapChef/Features/Gamification/ChallengeService.swift; sourceTree = "<group>"; };
+		E1DABDD7D58B482E9F2F9D14 /* CloudKitUsernameView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitUsernameView.swift; path = SnapChef/Features/Authentication/CloudKitUsernameView.swift; sourceTree = "<group>"; };
 		E39D96ACCF5D46EE6F4094CA /* MysteryMealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MysteryMealView.swift; path = SnapChef/Features/AIPersonality/MysteryMealView.swift; sourceTree = "<group>"; };
 		E4C4CDE71E399F7520469E0E /* User.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = User.swift; path = SnapChef/Core/Models/User.swift; sourceTree = "<group>"; };
 		E4F9C285D07CBD89E2776441 /* ChallengeAnalytics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeAnalytics.swift; path = SnapChef/Core/Services/ChallengeAnalytics.swift; sourceTree = "<group>"; };
@@ -231,9 +233,7 @@
 		F56F890A2E3C509A00AF95B7 /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/UserNotifications.framework; sourceTree = DEVELOPER_DIR; };
 		F704D9176B948F55CD9DC566 /* ShareSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShareSheet.swift; path = SnapChef/Features/Sharing/ShareSheet.swift; sourceTree = "<group>"; };
 		F927FA724DAF0F3B30276BA3 /* CameraView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CameraView.swift; path = SnapChef/Features/Camera/CameraView.swift; sourceTree = "<group>"; };
-		3E456AED84984638A80E167B /* CloudKitAuthManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitAuthManager.swift; path = SnapChef/Core/Services/CloudKitAuthManager.swift; sourceTree = "<group>"; };
 		FE10EDDC2438467DBDDE607B /* CloudKitAuthView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitAuthView.swift; path = SnapChef/Features/Authentication/CloudKitAuthView.swift; sourceTree = "<group>"; };
-		E1DABDD7D58B482E9F2F9D14 /* CloudKitUsernameView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitUsernameView.swift; path = SnapChef/Features/Authentication/CloudKitUsernameView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -281,6 +281,7 @@
 				C5652B40604108248A1E9076 /* Frameworks */,
 				F4737935B5BA6D0B9ABCEB27 /* SnapChef */,
 				FAE14391640BA3821562690E,
+				F56F891D2E3D282000AF95B7 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -669,6 +670,16 @@
 				1BDD38BBCC57D0F28B462A0D /* Info.plist */,
 			);
 			name = SnapChef;
+			sourceTree = "<group>";
+		};
+		F56F891D2E3D282000AF95B7 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				3E456AED84984638A80E167B /* CloudKitAuthManager.swift */,
+				FE10EDDC2438467DBDDE607B /* CloudKitAuthView.swift */,
+				E1DABDD7D58B482E9F2F9D14 /* CloudKitUsernameView.swift */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 		FAE14391640BA3821562690E = {

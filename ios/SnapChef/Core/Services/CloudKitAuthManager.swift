@@ -16,6 +16,9 @@ class CloudKitAuthManager: ObservableObject {
     @Published var showError = false
     @Published var errorMessage = ""
     
+    // Auth completion callback
+    var authCompletionHandler: (() -> Void)?
+    
     private let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
     private let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
     
@@ -196,13 +199,21 @@ class CloudKitAuthManager: ObservableObject {
                 self.errorMessage = error.localizedDescription
                 self.showError = true
             }
+        }
+        
+        // Only close auth sheet if we have a username
+        if let username = currentUser?.username, !username.isEmpty {
+            self.showAuthSheet = false
             
+            // Call completion handler if set (e.g., to join challenge after auth)
+            if let handler = authCompletionHandler {
+                handler()
+                authCompletionHandler = nil
+            }
+        } else {
             // Show username selection for new users
             self.showUsernameSelection = true
         }
-        
-        // Close auth sheet
-        self.showAuthSheet = false
     }
     
     // MARK: - Username Management
@@ -245,6 +256,15 @@ class CloudKitAuthManager: ObservableObject {
         
         // Close username selection
         self.showUsernameSelection = false
+        
+        // Now close the auth sheet since we have a username
+        self.showAuthSheet = false
+        
+        // Call completion handler if set (e.g., to join challenge after auth)
+        if let handler = authCompletionHandler {
+            handler()
+            authCompletionHandler = nil
+        }
     }
     
     // MARK: - User Stats Updates

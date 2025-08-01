@@ -310,6 +310,10 @@ class GamificationManager: ObservableObject {
         // Check if authentication is required
         let authManager = CloudKitAuthManager.shared
         if authManager.isAuthRequiredFor(feature: .challenges) {
+            // Set completion handler to join challenge after auth
+            authManager.authCompletionHandler = { [weak self] in
+                self?.joinChallenge(challenge)
+            }
             authManager.promptAuthForFeature(.challenges)
             return
         }

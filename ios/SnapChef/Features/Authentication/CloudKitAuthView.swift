@@ -138,6 +138,7 @@ struct CloudKitAuthView: View {
         )
         .sheet(isPresented: $authManager.showUsernameSelection) {
             CloudKitUsernameView()
+                .interactiveDismissDisabled()
         }
     }
     
