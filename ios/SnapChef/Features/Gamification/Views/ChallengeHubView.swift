@@ -2,22 +2,26 @@ import SwiftUI
 
 struct ChallengeHubView: View {
     @StateObject private var gamificationManager = GamificationManager.shared
+    @StateObject private var premiumManager = PremiumChallengeManager.shared
     @State private var selectedFilter: ChallengeFilter = .all
     @State private var showingDailyCheckIn = false
     @State private var selectedChallenge: Challenge?
     @State private var refreshID = UUID()
     @State private var hasPromptedForNotifications = false
+    @State private var showingPremiumView = false
     
     private enum ChallengeFilter: String, CaseIterable {
         case all = "All"
         case active = "Active"
         case completed = "Completed"
+        case premium = "Premium"
         
         var icon: String {
             switch self {
             case .all: return "square.grid.2x2"
             case .active: return "flame.fill"
             case .completed: return "checkmark.circle.fill"
+            case .premium: return "crown.fill"
             }
         }
     }
@@ -25,11 +29,14 @@ struct ChallengeHubView: View {
     private var filteredChallenges: [Challenge] {
         switch selectedFilter {
         case .all:
-            return gamificationManager.activeChallenges + gamificationManager.completedChallenges
+            let allChallenges = gamificationManager.activeChallenges + gamificationManager.completedChallenges
+            return premiumManager.isPremiumUser ? allChallenges + premiumManager.premiumChallenges : allChallenges
         case .active:
             return gamificationManager.activeChallenges
         case .completed:
             return gamificationManager.completedChallenges
+        case .premium:
+            return premiumManager.premiumChallenges
         }
     }
     
@@ -93,6 +100,9 @@ struct ChallengeHubView: View {
             }
             .sheet(item: $selectedChallenge) { challenge in
                 ChallengeDetailView(challenge: challenge)
+            }
+            .sheet(isPresented: $showingPremiumView) {
+                PremiumFeaturesView()
             }
         }
         .onAppear {
@@ -256,19 +266,85 @@ struct ChallengeHubView: View {
     // MARK: - Challenges List
     private var challengesList: some View {
         VStack(spacing: 16) {
+            // Premium banner for non-premium users
+            if !premiumManager.isPremiumUser && selectedFilter == .all {
+                premiumBanner
+            }
+            
             if filteredChallenges.isEmpty {
                 emptyStateView
             } else {
                 ForEach(filteredChallenges) { challenge in
-                    ChallengeCardView(challenge: challenge) {
-                        selectedChallenge = challenge
+                    if challenge.isPremium {
+                        PremiumChallengeCard(
+                            challenge: challenge,
+                            isLocked: !premiumManager.isPremiumUser
+                        ) {
+                            if premiumManager.isPremiumUser {
+                                selectedChallenge = challenge
+                            } else {
+                                showingPremiumView = true
+                            }
+                        }
+                        .transition(.asymmetric(
+                            insertion: .scale.combined(with: .opacity),
+                            removal: .scale.combined(with: .opacity)
+                        ))
+                    } else {
+                        ChallengeCardView(challenge: challenge) {
+                            selectedChallenge = challenge
+                        }
+                        .transition(.asymmetric(
+                            insertion: .scale.combined(with: .opacity),
+                            removal: .scale.combined(with: .opacity)
+                        ))
                     }
-                    .transition(.asymmetric(
-                        insertion: .scale.combined(with: .opacity),
-                        removal: .scale.combined(with: .opacity)
-                    ))
                 }
             }
+        }
+    }
+    
+    // MARK: - Premium Banner
+    private var premiumBanner: some View {
+        Button(action: { showingPremiumView = true }) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Image(systemName: "crown.fill")
+                            .foregroundColor(Color(hex: "#FFD700"))
+                        Text("Unlock Premium Challenges")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+                    
+                    Text("Get 2x rewards and exclusive challenges")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#FFD700").opacity(0.3),
+                                Color(hex: "#FFD700").opacity(0.1)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(hex: "#FFD700"), lineWidth: 1)
+                    )
+            )
         }
     }
     
@@ -300,6 +376,8 @@ struct ChallengeHubView: View {
             return gamificationManager.activeChallenges.count
         case .completed:
             return gamificationManager.completedChallenges.count
+        case .premium:
+            return premiumManager.premiumChallenges.count
         }
     }
     

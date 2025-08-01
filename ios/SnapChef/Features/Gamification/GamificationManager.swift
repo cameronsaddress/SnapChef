@@ -372,8 +372,15 @@ class GamificationManager: ObservableObject {
         completedChallenge.isCompleted = true
         completedChallenges.append(completedChallenge)
         
-        // Award rewards
-        awardPoints(challenge.points)
+        // Apply premium rewards if applicable
+        let premiumManager = PremiumChallengeManager.shared
+        let (finalPoints, finalCoins) = premiumManager.applyDoubleRewards(
+            basePoints: challenge.points,
+            baseCoins: challenge.coins
+        )
+        
+        // Award rewards (with premium multiplier)
+        awardPoints(finalPoints)
         
         // Remove from active
         activeChallenges.removeAll { $0.id == challenge.id }
@@ -420,8 +427,15 @@ class GamificationManager: ObservableObject {
         completedChallenge.isCompleted = true
         completedChallenges.append(completedChallenge)
         
-        // Award rewards with score
-        awardPoints(score)
+        // Apply premium rewards if applicable
+        let premiumManager = PremiumChallengeManager.shared
+        let (finalPoints, _) = premiumManager.applyDoubleRewards(
+            basePoints: score,
+            baseCoins: 0
+        )
+        
+        // Award rewards with score (with premium multiplier)
+        awardPoints(finalPoints)
         
         // Remove from active
         activeChallenges.removeAll { $0.id == challenge.id }
@@ -434,7 +448,7 @@ class GamificationManager: ObservableObject {
             challengeId: challenge.id,
             action: "completed",
             value: 1.0,
-            metadata: ["score": score]
+            metadata: ["score": finalPoints]
         )
         
         // Track analytics
