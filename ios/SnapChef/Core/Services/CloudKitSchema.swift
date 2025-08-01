@@ -13,6 +13,28 @@ import CloudKit
  2. Select the SnapChef container (iCloud.com.snapchefapp.app)
  3. Create the following Record Types with their fields:
  
+ === RECORD TYPE: User ===
+ Fields:
+ - recordName: String (use provider ID as unique identifier)
+ - username: String (Indexed, Queryable, Unique) // Lowercase, 3-20 chars
+ - displayName: String
+ - email: String
+ - profileImageURL: String
+ - authProvider: String (Indexed) // "apple", "google", "facebook"
+ - totalPoints: Int64 (Indexed, Sortable)
+ - currentStreak: Int64
+ - longestStreak: Int64
+ - challengesCompleted: Int64
+ - recipesShared: Int64
+ - recipesCreated: Int64
+ - coinBalance: Int64
+ - isProfilePublic: Int64 // 0 or 1
+ - showOnLeaderboard: Int64 // 0 or 1
+ - subscriptionTier: String // "free", "basic", "premium"
+ - createdAt: Date/Time (Indexed, Sortable)
+ - lastLoginAt: Date/Time (Indexed, Sortable)
+ - lastActiveAt: Date/Time (Indexed, Sortable)
+ 
  === RECORD TYPE: Challenge ===
  Fields:
  - id: String (Indexed, Queryable, Sortable)
@@ -129,6 +151,7 @@ struct CloudKitConfig {
     static let containerIdentifier = "iCloud.com.snapchefapp.app"
     
     // Record Types
+    static let userRecordType = "User"
     static let challengeRecordType = "Challenge"
     static let userChallengeRecordType = "UserChallenge"
     static let teamRecordType = "Team"
@@ -150,6 +173,28 @@ struct CloudKitConfig {
 
 // MARK: - CloudKit Field Names
 struct CKField {
+    // User Fields
+    struct User {
+        static let username = "username"
+        static let displayName = "displayName"
+        static let email = "email"
+        static let profileImageURL = "profileImageURL"
+        static let authProvider = "authProvider"
+        static let totalPoints = "totalPoints"
+        static let currentStreak = "currentStreak"
+        static let longestStreak = "longestStreak"
+        static let challengesCompleted = "challengesCompleted"
+        static let recipesShared = "recipesShared"
+        static let recipesCreated = "recipesCreated"
+        static let coinBalance = "coinBalance"
+        static let isProfilePublic = "isProfilePublic"
+        static let showOnLeaderboard = "showOnLeaderboard"
+        static let subscriptionTier = "subscriptionTier"
+        static let createdAt = "createdAt"
+        static let lastLoginAt = "lastLoginAt"
+        static let lastActiveAt = "lastActiveAt"
+    }
+    
     // Challenge Fields
     struct Challenge {
         static let id = "id"

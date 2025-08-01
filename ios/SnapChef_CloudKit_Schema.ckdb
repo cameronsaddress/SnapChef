@@ -153,14 +153,32 @@ DEFINE SCHEMA
         GRANT READ TO "_creator"
     );
 
-    RECORD TYPE Users (
+    RECORD TYPE User (
         "___createTime" TIMESTAMP,
         "___createdBy"  REFERENCE,
         "___etag"       STRING,
         "___modTime"    TIMESTAMP,
         "___modifiedBy" REFERENCE,
-        "___recordID"   REFERENCE,
-        roles           LIST<INT64>,
+        "___recordID"   REFERENCE QUERYABLE,
+        username        STRING QUERYABLE SORTABLE,
+        displayName     STRING,
+        email           STRING,
+        profileImageURL STRING,
+        authProvider    STRING QUERYABLE,
+        totalPoints     INT64 QUERYABLE SORTABLE,
+        currentStreak   INT64,
+        longestStreak   INT64,
+        challengesCompleted INT64,
+        recipesShared   INT64,
+        recipesCreated  INT64,
+        coinBalance     INT64,
+        isProfilePublic INT64,
+        showOnLeaderboard INT64,
+        subscriptionTier STRING,
+        createdAt       TIMESTAMP SORTABLE,
+        lastLoginAt     TIMESTAMP SORTABLE,
+        lastActiveAt    TIMESTAMP SORTABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );

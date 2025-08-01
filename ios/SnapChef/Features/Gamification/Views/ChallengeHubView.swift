@@ -3,14 +3,13 @@ import SwiftUI
 struct ChallengeHubView: View {
     @StateObject private var gamificationManager = GamificationManager.shared
     @StateObject private var premiumManager = PremiumChallengeManager.shared
-    @StateObject private var authManager = AuthenticationManager()
+    @StateObject private var authManager = CloudKitAuthManager.shared
     @State private var selectedFilter: ChallengeFilter = .all
     @State private var showingDailyCheckIn = false
     @State private var selectedChallenge: Challenge?
     @State private var refreshID = UUID()
     @State private var hasPromptedForNotifications = false
     @State private var showingPremiumView = false
-    @State private var showingAuthView = false
     
     private enum ChallengeFilter: String, CaseIterable {
         case all = "All"
@@ -106,14 +105,14 @@ struct ChallengeHubView: View {
             .sheet(isPresented: $showingPremiumView) {
                 PremiumFeaturesView()
             }
-            .sheet(isPresented: $showingAuthView) {
-                AuthenticationView(requiredFor: .challenges)
+            .sheet(isPresented: $authManager.showAuthSheet) {
+                CloudKitAuthView(requiredFor: .challenges)
             }
         }
         .onAppear {
             // Check if authentication is required
             if authManager.isAuthRequiredFor(feature: .challenges) {
-                showingAuthView = true
+                authManager.promptAuthForFeature(.challenges)
                 return
             }
             // Create mock challenges if needed
