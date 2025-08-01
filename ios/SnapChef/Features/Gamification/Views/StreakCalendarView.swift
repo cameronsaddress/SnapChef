@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Calendar view showing streak history
 struct StreakCalendarView: View {
@@ -294,7 +295,7 @@ struct StreakHistoryView: View {
     var body: some View {
         NavigationView {
             List {
-                ForEach(groupedHistory.keys.sorted(by: >), id: \.self) { type in
+                ForEach(Array(groupedHistory.keys), id: \.self) { type in
                     Section(header: Label(type.displayName, systemImage: "flame")) {
                         ForEach(groupedHistory[type] ?? []) { history in
                             StreakHistoryRow(history: history)
@@ -394,10 +395,10 @@ struct StreakInsuranceView: View {
                 
                 // Benefits
                 VStack(alignment: .leading, spacing: 12) {
-                    BenefitRow(icon: "checkmark.shield", text: "Auto-restore streak if broken")
-                    BenefitRow(icon: "calendar", text: "Valid for 7 days")
-                    BenefitRow(icon: "bolt.shield", text: "Instant activation")
-                    BenefitRow(icon: "arrow.clockwise", text: "One-time use per purchase")
+                    InsuranceBenefitRow(icon: "checkmark.shield", text: "Auto-restore streak if broken")
+                    InsuranceBenefitRow(icon: "calendar", text: "Valid for 7 days")
+                    InsuranceBenefitRow(icon: "bolt.shield", text: "Instant activation")
+                    InsuranceBenefitRow(icon: "arrow.clockwise", text: "One-time use per purchase")
                 }
                 .padding()
                 .background(Color(UIColor.secondarySystemBackground))
@@ -449,16 +450,18 @@ struct StreakInsuranceView: View {
         isPurchasing = true
         
         if streakManager.purchaseInsurance(for: streakType) {
-            HapticManager.shared.impact(style: .success)
+            let generator = UIImpactFeedbackGenerator(style: .heavy)
+            generator.impactOccurred()
             dismiss()
         } else {
-            HapticManager.shared.impact(style: .error)
+            let errorGenerator = UINotificationFeedbackGenerator()
+            errorGenerator.notificationOccurred(.error)
             isPurchasing = false
         }
     }
 }
 
-struct BenefitRow: View {
+struct InsuranceBenefitRow: View {
     let icon: String
     let text: String
     
@@ -564,10 +567,12 @@ struct PowerUpCard: View {
         isPurchasing = true
         
         if streakManager.activatePowerUp(powerUp, for: streakType) {
-            HapticManager.shared.impact(style: .success)
+            let generator = UIImpactFeedbackGenerator(style: .heavy)
+            generator.impactOccurred()
             isPurchasing = false
         } else {
-            HapticManager.shared.impact(style: .error)
+            let errorGenerator = UINotificationFeedbackGenerator()
+            errorGenerator.notificationOccurred(.error)
             isPurchasing = false
         }
     }

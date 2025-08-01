@@ -40,20 +40,9 @@ struct HomeView: View {
                         }
                         .padding(.top, 30)
                         
-                        // Streak Summary (UI placeholder - full views created but need Xcode project update)
-                        HStack {
-                            Text("🔥")
-                                .font(.title2)
-                            Text("Streak System Active")
-                                .font(.headline)
-                            Spacer()
-                            Text("✓")
-                                .foregroundColor(.green)
-                        }
-                        .padding()
-                        .background(Color(UIColor.secondarySystemBackground))
-                        .cornerRadius(12)
-                        .padding(.horizontal, 20)
+                        // Streak Summary
+                        StreakSummaryCard()
+                            .padding(.horizontal, 20)
                         
                         // Main CTA Section with prominent spacing
                         VStack(spacing: 0) {

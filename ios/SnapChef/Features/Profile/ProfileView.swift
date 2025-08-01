@@ -52,50 +52,9 @@ struct ProfileView: View {
                     GamificationStatsView()
                         .staggeredFade(index: 0, isShowing: contentVisible)
                     
-                    // Streak Summary (UI placeholder - full views created but need Xcode project update)
-                    VStack(spacing: 12) {
-                        HStack {
-                            Text("🔥 Streaks")
-                                .font(.headline)
-                            Spacer()
-                            Text("Active")
-                                .font(.caption)
-                                .foregroundColor(.green)
-                        }
-                        
-                        HStack(spacing: 20) {
-                            VStack {
-                                Text("5")
-                                    .font(.title2.bold())
-                                Text("Active")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            
-                            VStack {
-                                Text("47")
-                                    .font(.title2.bold())
-                                Text("Total Days")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            
-                            VStack {
-                                Text("1.5x")
-                                    .font(.title2.bold())
-                                Text("Multiplier")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .padding()
-                    .background(Color(UIColor.secondarySystemBackground))
-                    .cornerRadius(16)
-                    .staggeredFade(index: 1, isShowing: contentVisible)
+                    // Streak Summary
+                    StreakSummaryCard()
+                        .staggeredFade(index: 1, isShowing: contentVisible)
                     
                     // Collection Progress
                     CollectionProgressView()

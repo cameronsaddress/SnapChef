@@ -167,7 +167,7 @@ struct StreakDetailCard: View {
                     Text("Current Streak")
                         .font(.headline)
                     
-                    HStack(baseline: .bottom, spacing: 4) {
+                    HStack(spacing: 4) {
                         Text("\(streak.currentStreak)")
                             .font(.system(size: 36, weight: .bold, design: .rounded))
                         Text("days")
@@ -219,28 +219,28 @@ struct StreakDetailCard: View {
                 GridItem(.flexible()),
                 GridItem(.flexible())
             ], spacing: 16) {
-                StatCard(
+                StreakStatCard(
                     title: "Longest",
                     value: "\(streak.longestStreak)",
                     subtitle: "days",
                     color: .purple
                 )
                 
-                StatCard(
+                StreakStatCard(
                     title: "Total Active",
                     value: "\(streak.totalDaysActive)",
                     subtitle: "days",
                     color: .green
                 )
                 
-                StatCard(
+                StreakStatCard(
                     title: "Multiplier",
                     value: String(format: "%.2fx", streak.multiplier),
                     subtitle: "bonus",
                     color: .blue
                 )
                 
-                StatCard(
+                StreakStatCard(
                     title: "Freezes",
                     value: "\(streak.freezesRemaining)",
                     subtitle: "remaining",
@@ -277,7 +277,7 @@ struct StreakDetailCard: View {
     }
 }
 
-struct StatCard: View {
+struct StreakStatCard: View {
     let title: String
     let value: String
     let subtitle: String
@@ -289,7 +289,7 @@ struct StatCard: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             
-            HStack(baseline: .bottom, spacing: 2) {
+            HStack(spacing: 2) {
                 Text(value)
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(color)
@@ -376,7 +376,7 @@ struct QuickActionsSection: View {
                     // Freeze button
                     if let streak = streakManager.currentStreaks[streakType],
                        !streak.isFrozen && streak.freezesRemaining > 0 {
-                        ActionButton(
+                        StreakActionButton(
                             icon: "❄️",
                             title: "Freeze",
                             subtitle: "\(streak.freezesRemaining) left",
@@ -388,7 +388,7 @@ struct QuickActionsSection: View {
                     }
                     
                     // Insurance button
-                    ActionButton(
+                    StreakActionButton(
                         icon: "🛡",
                         title: "Insurance",
                         subtitle: "Protect streak",
@@ -397,7 +397,7 @@ struct QuickActionsSection: View {
                     )
                     
                     // Power-ups button
-                    ActionButton(
+                    StreakActionButton(
                         icon: "⚡",
                         title: "Power-Ups",
                         subtitle: "Boost streak",
@@ -411,7 +411,7 @@ struct QuickActionsSection: View {
     }
 }
 
-struct ActionButton: View {
+struct StreakActionButton: View {
     let icon: String
     let title: String
     let subtitle: String
