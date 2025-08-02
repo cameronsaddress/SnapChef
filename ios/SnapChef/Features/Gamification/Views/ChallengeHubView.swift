@@ -256,19 +256,22 @@ struct ChallengeHubView: View {
     
     // MARK: - Filter Tabs
     private var filterTabs: some View {
-        HStack(spacing: 12) {
-            ForEach(ChallengeFilter.allCases, id: \.self) { filter in
-                FilterTab(
-                    title: filter.rawValue,
-                    icon: filter.icon,
-                    isSelected: selectedFilter == filter,
-                    count: getCountForFilter(filter)
-                ) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        selectedFilter = filter
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(ChallengeFilter.allCases, id: \.self) { filter in
+                    FilterTab(
+                        title: filter.rawValue,
+                        icon: filter.icon,
+                        isSelected: selectedFilter == filter,
+                        count: getCountForFilter(filter)
+                    ) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            selectedFilter = filter
+                        }
                     }
                 }
             }
+            .padding(.horizontal, 4)
         }
     }
     
@@ -433,16 +436,18 @@ private struct FilterTab: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.caption)
+                    .font(.system(size: 14))
                 
                 Text(title)
-                    .font(.subheadline)
+                    .font(.system(size: 15))
                     .fontWeight(isSelected ? .semibold : .regular)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
                 
                 if count > 0 {
                     Text("\(count)")
-                        .font(.caption2)
-                        .fontWeight(.semibold)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(isSelected ? Color(hex: "#667eea") : .white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
@@ -451,12 +456,17 @@ private struct FilterTab: View {
                         )
                 }
             }
-            .foregroundColor(isSelected ? .white : .secondary)
+            .foregroundColor(isSelected ? .white : Color.primary.opacity(0.7))
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
+            .frame(minWidth: 80)
             .background(
-                Capsule()
-                    .fill(isSelected ? Color(hex: "#667eea") : Color.gray.opacity(0.2))
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(isSelected ? Color(hex: "#667eea") : Color.gray.opacity(0.15))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(isSelected ? Color.clear : Color.gray.opacity(0.2), lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
