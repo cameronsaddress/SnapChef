@@ -572,6 +572,12 @@ class CloudKitAuthManager: ObservableObject {
         }
     }
     
+    /// Public method to refresh the current user's data from CloudKit
+    func refreshCurrentUser() async {
+        guard let userID = currentUser?.recordID else { return }
+        await loadUser(recordID: userID)
+    }
+    
     // MARK: - User Discovery Methods
     
     func searchUsers(query: String) async throws -> [CloudKitUser] {
@@ -720,7 +726,7 @@ struct CloudKitUser: Identifiable {
     let longestStreak: Int
     var challengesCompleted: Int
     var recipesShared: Int
-    let recipesCreated: Int
+    var recipesCreated: Int
     var coinBalance: Int
     var followerCount: Int
     var followingCount: Int

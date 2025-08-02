@@ -619,7 +619,7 @@ class DiscoverUsersViewModel: ObservableObject {
                 }
                 
                 // Force reload the current user to update following count in FeedView
-                await cloudKitAuth.loadCurrentUser()
+                await cloudKitAuth.refreshCurrentUser()
             } catch {
                 print("Failed to toggle follow: \(error)")
             }

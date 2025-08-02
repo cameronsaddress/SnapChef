@@ -90,7 +90,7 @@ struct FeedView: View {
         // Update recipe counts
         await cloudKitAuth.updateRecipeCounts()
         // Reload user data
-        await cloudKitAuth.loadCurrentUser()
+        await cloudKitAuth.refreshCurrentUser()
         isRefreshing = false
     }
     
