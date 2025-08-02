@@ -73,7 +73,25 @@ class CloudKitRecipeManager: ObservableObject {
         
         // Save to CloudKit - use private database for user's own recipes
         // This avoids permission issues with public database
-        let savedRecord = try await privateDB.save(record)
+        do {
+            let savedRecord = try await privateDB.save(record)
+            print("✅ Recipe saved to CloudKit with ID: \(savedRecord.recordID.recordName)")
+        } catch let error as CKError {
+            // If record already exists, just update the reference
+            if error.code == .serverRecordChanged || error.code == .unknownItem {
+                print("⚠️ Recipe already exists in CloudKit: \(recipeID)")
+                // Try to fetch the existing record
+                do {
+                    _ = try await privateDB.record(for: record.recordID)
+                    print("✅ Using existing recipe: \(recipeID)")
+                } catch {
+                    // If we can't fetch it, throw the original error
+                    throw error
+                }
+            } else {
+                throw error
+            }
+        }
         
         // Cache locally
         cachedRecipes[recipeID] = recipe
@@ -83,8 +101,8 @@ class CloudKitRecipeManager: ObservableObject {
             try await addRecipeToUserProfile(recipeID, type: .created)
         }
         
-        print("✅ Recipe uploaded to CloudKit: \(recipeID)")
-        return savedRecord.recordID.recordName
+        print("✅ Recipe processed in CloudKit: \(recipeID)")
+        return recipeID
     }
     
     // MARK: - Recipe Fetching
@@ -261,7 +279,12 @@ class CloudKitRecipeManager: ObservableObject {
         // Ensure references are loaded first
         if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
             // Try to load references if they haven't been loaded yet
-            guard let userID = getCurrentUserID() else { return [] }
+            guard let userID = getCurrentUserID() else { 
+                print("⚠️ No user ID found for loading saved recipes")
+                return [] 
+            }
+            
+            print("📱 Loading recipe references for user: \(userID)")
             
             do {
                 let profileRecord = try await fetchOrCreateUserProfile(userID)
@@ -280,6 +303,8 @@ class CloudKitRecipeManager: ObservableObject {
             } catch {
                 print("❌ Failed to load recipe references: \(error)")
             }
+        } else {
+            print("📱 Using cached references: \(userSavedRecipeIDs.count) saved")
         }
         
         return try await fetchRecipes(by: Array(userSavedRecipeIDs))
@@ -290,7 +315,12 @@ class CloudKitRecipeManager: ObservableObject {
         // Ensure references are loaded first
         if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
             // Try to load references if they haven't been loaded yet
-            guard let userID = getCurrentUserID() else { return [] }
+            guard let userID = getCurrentUserID() else { 
+                print("⚠️ No user ID found for loading created recipes")
+                return [] 
+            }
+            
+            print("📱 Loading recipe references for user: \(userID)")
             
             do {
                 let profileRecord = try await fetchOrCreateUserProfile(userID)
@@ -309,6 +339,8 @@ class CloudKitRecipeManager: ObservableObject {
             } catch {
                 print("❌ Failed to load recipe references: \(error)")
             }
+        } else {
+            print("📱 Using cached references: \(userCreatedRecipeIDs.count) created")
         }
         
         return try await fetchRecipes(by: Array(userCreatedRecipeIDs))
@@ -393,7 +425,12 @@ class CloudKitRecipeManager: ObservableObject {
     // MARK: - Helper Methods
     
     private func getCurrentUserID() -> String? {
-        return UserDefaults.standard.string(forKey: "currentUserID")
+        // Try both keys for compatibility
+        if let userID = UserDefaults.standard.string(forKey: "currentUserID") {
+            return userID
+        }
+        // Also check the key used by CloudKitAuthManager
+        return UserDefaults.standard.string(forKey: "currentUserRecordID")
     }
     
     private func checkRecipeExists(_ name: String, _ description: String) async -> String? {

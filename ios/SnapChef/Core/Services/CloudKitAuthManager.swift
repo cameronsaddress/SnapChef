@@ -66,8 +66,9 @@ class CloudKitAuthManager: ObservableObject {
             self.currentUser = CloudKitUser(from: existingRecord)
             self.isAuthenticated = true
             
-            // Store user ID
+            // Store user ID (use both keys for compatibility)
             UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
+            UserDefaults.standard.set(userID, forKey: "currentUserID")
             
             // Check if user has a username set
             if self.currentUser?.username == nil || self.currentUser?.username?.isEmpty == true {
@@ -115,8 +116,9 @@ class CloudKitAuthManager: ObservableObject {
             self.currentUser = CloudKitUser(from: newRecord)
             self.isAuthenticated = true
             
-            // Store user ID
+            // Store user ID (use both keys for compatibility)
             UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
+            UserDefaults.standard.set(userID, forKey: "currentUserID")
             
             // Show username selection for new users
             self.showUsernameSelection = true
@@ -174,8 +176,9 @@ class CloudKitAuthManager: ObservableObject {
             self.currentUser = CloudKitUser(from: existingRecord)
             self.isAuthenticated = true
             
-            // Store user ID
+            // Store user ID (use both keys for compatibility)
             UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
+            UserDefaults.standard.set(userID, forKey: "currentUserID")
             
             // Check if user has a username set
             if self.currentUser?.username == nil || self.currentUser?.username?.isEmpty == true {
