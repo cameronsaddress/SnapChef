@@ -137,7 +137,7 @@ struct CloudKitAuthView: View {
             isLoading ? LoadingOverlay(message: "Signing in...") : nil
         )
         .sheet(isPresented: $authManager.showUsernameSelection) {
-            CloudKitUsernameView()
+            UsernameSetupView()
                 .interactiveDismissDisabled()
         }
     }

@@ -3,7 +3,7 @@ import PhotosUI
 import CloudKit
 
 struct UsernameSetupView: View {
-    @EnvironmentObject var authManager: AuthenticationManager
+    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @Environment(\.dismiss) var dismiss
     
     @State private var username = ""
@@ -305,7 +305,7 @@ struct UsernameSetupView: View {
         
         Task {
             do {
-                let isAvailable = try await CloudKitUserManager.shared.isUsernameAvailable(username)
+                let isAvailable = try await cloudKitAuth.checkUsernameAvailability(username)
                 
                 await MainActor.run {
                     isCheckingUsername = false
@@ -329,19 +329,16 @@ struct UsernameSetupView: View {
         
         Task {
             do {
-                // Save username and photo to CloudKit
-                try await CloudKitUserManager.shared.saveUserProfile(
-                    username: username,
-                    profileImage: selectedImage
-                )
+                // Save username using CloudKitAuthManager
+                try await cloudKitAuth.setUsername(username)
                 
-                // Update local user object
+                // Save profile image to CloudKit if provided
+                if let image = selectedImage {
+                    try await CloudKitUserManager.shared.updateProfileImage(image)
+                }
+                
                 await MainActor.run {
-                    authManager.updateUsername(username)
-                    if let image = selectedImage {
-                        authManager.updateProfileImage(image)
-                    }
-                    
+                    cloudKitAuth.showUsernameSelection = false
                     dismiss()
                 }
             } catch {
@@ -355,14 +352,26 @@ struct UsernameSetupView: View {
     }
     
     private func skipSetup() {
-        // Generate a temporary username
+        // Generate a temporary username and save it
         let tempUsername = "Chef\(Int.random(in: 10000...99999))"
-        authManager.updateUsername(tempUsername)
-        dismiss()
+        
+        Task {
+            do {
+                try await cloudKitAuth.setUsername(tempUsername)
+                await MainActor.run {
+                    cloudKitAuth.showUsernameSelection = false
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to set temporary username"
+                    showError = true
+                }
+            }
+        }
     }
 }
 
 #Preview {
     UsernameSetupView()
-        .environmentObject(AuthenticationManager())
 }
