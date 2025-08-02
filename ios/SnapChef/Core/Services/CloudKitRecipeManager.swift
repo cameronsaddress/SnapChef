@@ -172,10 +172,10 @@ class CloudKitRecipeManager: ObservableObject {
         // Fetch user profile or create new one
         let profileRecord = try await fetchOrCreateUserProfile(userID)
         
-        // Get current recipe IDs
-        var savedIDs = (profileRecord["savedRecipeIDs"] as? [String]) ?? []
-        var createdIDs = (profileRecord["createdRecipeIDs"] as? [String]) ?? []
-        var favoritedIDs = (profileRecord["favoritedRecipeIDs"] as? [String]) ?? []
+        // Get current recipe IDs (handle nil fields for new profiles and filter placeholders)
+        var savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+        var createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+        var favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
         
         // Add recipe ID to appropriate list
         switch type {
@@ -196,10 +196,11 @@ class CloudKitRecipeManager: ObservableObject {
             }
         }
         
-        // Update record
-        profileRecord["savedRecipeIDs"] = savedIDs
-        profileRecord["createdRecipeIDs"] = createdIDs
-        profileRecord["favoritedRecipeIDs"] = favoritedIDs
+        // Update record - CloudKit requires non-empty arrays for list fields
+        // Use a placeholder value if array is empty
+        profileRecord["savedRecipeIDs"] = savedIDs.isEmpty ? ["_placeholder_"] : savedIDs
+        profileRecord["createdRecipeIDs"] = createdIDs.isEmpty ? ["_placeholder_"] : createdIDs
+        profileRecord["favoritedRecipeIDs"] = favoritedIDs.isEmpty ? ["_placeholder_"] : favoritedIDs
         profileRecord["lastUpdated"] = Date()
         
         // Save to CloudKit
@@ -219,10 +220,10 @@ class CloudKitRecipeManager: ObservableObject {
         
         let profileRecord = try await fetchOrCreateUserProfile(userID)
         
-        // Get current recipe IDs
-        var savedIDs = (profileRecord["savedRecipeIDs"] as? [String]) ?? []
-        var createdIDs = (profileRecord["createdRecipeIDs"] as? [String]) ?? []
-        var favoritedIDs = (profileRecord["favoritedRecipeIDs"] as? [String]) ?? []
+        // Get current recipe IDs (handle nil fields for new profiles and filter placeholders)
+        var savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+        var createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+        var favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
         
         // Remove recipe ID from appropriate list
         switch type {
@@ -237,10 +238,11 @@ class CloudKitRecipeManager: ObservableObject {
             userFavoritedRecipeIDs.remove(recipeID)
         }
         
-        // Update record
-        profileRecord["savedRecipeIDs"] = savedIDs
-        profileRecord["createdRecipeIDs"] = createdIDs
-        profileRecord["favoritedRecipeIDs"] = favoritedIDs
+        // Update record - CloudKit requires non-empty arrays for list fields
+        // Use a placeholder value if array is empty
+        profileRecord["savedRecipeIDs"] = savedIDs.isEmpty ? ["_placeholder_"] : savedIDs
+        profileRecord["createdRecipeIDs"] = createdIDs.isEmpty ? ["_placeholder_"] : createdIDs
+        profileRecord["favoritedRecipeIDs"] = favoritedIDs.isEmpty ? ["_placeholder_"] : favoritedIDs
         profileRecord["lastUpdated"] = Date()
         
         // Save to CloudKit
@@ -257,9 +259,10 @@ class CloudKitRecipeManager: ObservableObject {
             do {
                 let profileRecord = try await fetchOrCreateUserProfile(userID)
                 
-                let savedIDs = (profileRecord["savedRecipeIDs"] as? [String]) ?? []
-                let createdIDs = (profileRecord["createdRecipeIDs"] as? [String]) ?? []
-                let favoritedIDs = (profileRecord["favoritedRecipeIDs"] as? [String]) ?? []
+                // Get IDs and filter out placeholder values
+                let savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+                let createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+                let favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
                 
                 await MainActor.run {
                     self.userSavedRecipeIDs = Set(savedIDs)
@@ -289,9 +292,10 @@ class CloudKitRecipeManager: ObservableObject {
             do {
                 let profileRecord = try await fetchOrCreateUserProfile(userID)
                 
-                let savedIDs = (profileRecord["savedRecipeIDs"] as? [String]) ?? []
-                let createdIDs = (profileRecord["createdRecipeIDs"] as? [String]) ?? []
-                let favoritedIDs = (profileRecord["favoritedRecipeIDs"] as? [String]) ?? []
+                // Get IDs and filter out placeholder values
+                let savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+                let createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+                let favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
                 
                 await MainActor.run {
                     self.userSavedRecipeIDs = Set(savedIDs)
@@ -325,9 +329,10 @@ class CloudKitRecipeManager: ObservableObject {
             do {
                 let profileRecord = try await fetchOrCreateUserProfile(userID)
                 
-                let savedIDs = (profileRecord["savedRecipeIDs"] as? [String]) ?? []
-                let createdIDs = (profileRecord["createdRecipeIDs"] as? [String]) ?? []
-                let favoritedIDs = (profileRecord["favoritedRecipeIDs"] as? [String]) ?? []
+                // Get IDs and filter out placeholder values
+                let savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+                let createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+                let favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
                 
                 await MainActor.run {
                     self.userSavedRecipeIDs = Set(savedIDs)
@@ -356,9 +361,10 @@ class CloudKitRecipeManager: ObservableObject {
             do {
                 let profileRecord = try await fetchOrCreateUserProfile(userID)
                 
-                let savedIDs = (profileRecord["savedRecipeIDs"] as? [String]) ?? []
-                let createdIDs = (profileRecord["createdRecipeIDs"] as? [String]) ?? []
-                let favoritedIDs = (profileRecord["favoritedRecipeIDs"] as? [String]) ?? []
+                // Get IDs and filter out placeholder values
+                let savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+                let createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
+                let favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
                 
                 await MainActor.run {
                     self.userSavedRecipeIDs = Set(savedIDs)
@@ -460,9 +466,8 @@ class CloudKitRecipeManager: ObservableObject {
             // Create new profile
             let record = CKRecord(recordType: "UserProfile", recordID: recordID)
             record["userID"] = userID
-            record["savedRecipeIDs"] = [String]()
-            record["createdRecipeIDs"] = [String]()
-            record["favoritedRecipeIDs"] = [String]()
+            // Don't set empty arrays - CloudKit doesn't like them
+            // These fields will be created when we first add a recipe
             record["createdAt"] = Date()
             record["lastUpdated"] = Date()
             
