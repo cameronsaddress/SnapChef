@@ -71,8 +71,9 @@ class CloudKitRecipeManager: ObservableObject {
         record["rating"] = 0.0
         record["ratingCount"] = Int64(0)
         
-        // Save to CloudKit
-        let savedRecord = try await publicDB.save(record)
+        // Save to CloudKit - use private database for user's own recipes
+        // This avoids permission issues with public database
+        let savedRecord = try await privateDB.save(record)
         
         // Cache locally
         cachedRecipes[recipeID] = recipe
@@ -96,21 +97,32 @@ class CloudKitRecipeManager: ObservableObject {
             return cached
         }
         
-        // Fetch from CloudKit
+        // Fetch from CloudKit - try private database first, then public
         let recordID = CKRecord.ID(recordName: recipeID)
-        let record = try await publicDB.record(for: recordID)
         
-        // Parse recipe
-        let recipe = try parseRecipeFromRecord(record)
-        
-        // Cache locally
-        cachedRecipes[recipeID] = recipe
-        
-        // Increment view count
-        await incrementViewCount(for: recipeID)
-        
-        print("☁️ Recipe fetched from CloudKit: \(recipeID)")
-        return recipe
+        do {
+            // Try private database first (user's own recipes)
+            let record = try await privateDB.record(for: recordID)
+            let recipe = try parseRecipeFromRecord(record)
+            cachedRecipes[recipeID] = recipe
+            print("☁️ Recipe fetched from private CloudKit: \(recipeID)")
+            return recipe
+        } catch {
+            // If not in private, try public database
+            let record = try await publicDB.record(for: recordID)
+            
+            // Parse recipe
+            let recipe = try parseRecipeFromRecord(record)
+            
+            // Cache locally
+            cachedRecipes[recipeID] = recipe
+            
+            // Increment view count
+            await incrementViewCount(for: recipeID)
+            
+            print("☁️ Recipe fetched from public CloudKit: \(recipeID)")
+            return recipe
+        }
     }
     
     /// Batch fetch recipes by IDs
@@ -246,16 +258,88 @@ class CloudKitRecipeManager: ObservableObject {
     
     /// Get user's saved recipes
     func getUserSavedRecipes() async throws -> [Recipe] {
+        // Ensure references are loaded first
+        if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
+            // Try to load references if they haven't been loaded yet
+            guard let userID = getCurrentUserID() else { return [] }
+            
+            do {
+                let profileRecord = try await fetchOrCreateUserProfile(userID)
+                
+                let savedIDs = (profileRecord["savedRecipeIDs"] as? [String]) ?? []
+                let createdIDs = (profileRecord["createdRecipeIDs"] as? [String]) ?? []
+                let favoritedIDs = (profileRecord["favoritedRecipeIDs"] as? [String]) ?? []
+                
+                await MainActor.run {
+                    self.userSavedRecipeIDs = Set(savedIDs)
+                    self.userCreatedRecipeIDs = Set(createdIDs)
+                    self.userFavoritedRecipeIDs = Set(favoritedIDs)
+                }
+                
+                print("✅ Loaded recipe references: \(savedIDs.count) saved, \(createdIDs.count) created, \(favoritedIDs.count) favorited")
+            } catch {
+                print("❌ Failed to load recipe references: \(error)")
+            }
+        }
+        
         return try await fetchRecipes(by: Array(userSavedRecipeIDs))
     }
     
     /// Get user's created recipes
     func getUserCreatedRecipes() async throws -> [Recipe] {
+        // Ensure references are loaded first
+        if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
+            // Try to load references if they haven't been loaded yet
+            guard let userID = getCurrentUserID() else { return [] }
+            
+            do {
+                let profileRecord = try await fetchOrCreateUserProfile(userID)
+                
+                let savedIDs = (profileRecord["savedRecipeIDs"] as? [String]) ?? []
+                let createdIDs = (profileRecord["createdRecipeIDs"] as? [String]) ?? []
+                let favoritedIDs = (profileRecord["favoritedRecipeIDs"] as? [String]) ?? []
+                
+                await MainActor.run {
+                    self.userSavedRecipeIDs = Set(savedIDs)
+                    self.userCreatedRecipeIDs = Set(createdIDs)
+                    self.userFavoritedRecipeIDs = Set(favoritedIDs)
+                }
+                
+                print("✅ Loaded recipe references: \(savedIDs.count) saved, \(createdIDs.count) created, \(favoritedIDs.count) favorited")
+            } catch {
+                print("❌ Failed to load recipe references: \(error)")
+            }
+        }
+        
         return try await fetchRecipes(by: Array(userCreatedRecipeIDs))
     }
     
     /// Get user's favorited recipes
     func getUserFavoritedRecipes() async throws -> [Recipe] {
+        // Ensure references are loaded first
+        if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
+            // Try to load references if they haven't been loaded yet
+            guard let userID = getCurrentUserID() else { return [] }
+            
+            do {
+                let profileRecord = try await fetchOrCreateUserProfile(userID)
+                
+                let savedIDs = (profileRecord["savedRecipeIDs"] as? [String]) ?? []
+                let createdIDs = (profileRecord["createdRecipeIDs"] as? [String]) ?? []
+                let favoritedIDs = (profileRecord["favoritedRecipeIDs"] as? [String]) ?? []
+                
+                await MainActor.run {
+                    self.userSavedRecipeIDs = Set(savedIDs)
+                    self.userCreatedRecipeIDs = Set(createdIDs)
+                    self.userFavoritedRecipeIDs = Set(favoritedIDs)
+                }
+                
+                print("✅ Loaded recipe references: \(savedIDs.count) saved, \(createdIDs.count) created, \(favoritedIDs.count) favorited")
+            } catch {
+                print("❌ Failed to load recipe references: \(error)")
+            }
+        }
+        
         return try await fetchRecipes(by: Array(userFavoritedRecipeIDs))
     }
     

@@ -329,7 +329,7 @@ struct ShareImageContent: View {
     let style: ShareGeneratorView.ShareStyle
     
     @State private var customChefName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
-    @State private var customPhotoData: Data? = UserDefaults.standard.data(forKey: "CustomChefPhoto")
+    @State private var customPhotoData: Data? = SharePhotoHelper.loadCustomPhotoFromFile()
     
     var backgroundGradient: LinearGradient {
         switch style {
@@ -688,6 +688,22 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - Photo Storage Helper
+struct SharePhotoHelper {
+    static func loadCustomPhotoFromFile() -> Data? {
+        // First, clean up UserDefaults if photo exists there
+        if UserDefaults.standard.data(forKey: "CustomChefPhoto") != nil {
+            UserDefaults.standard.removeObject(forKey: "CustomChefPhoto")
+        }
+        
+        // Load from file system
+        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
+        let filePath = documentsPath.appendingPathComponent("customChefPhoto.jpg")
+        
+        return try? Data(contentsOf: filePath)
+    }
 }
 
 #Preview {

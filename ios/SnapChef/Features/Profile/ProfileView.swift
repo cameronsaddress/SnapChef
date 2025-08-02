@@ -142,7 +142,7 @@ struct EnhancedProfileHeader: View {
     @State private var rotationAngle: Double = 0
     @State private var showingEditProfile = false
     @State private var customName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
-    @State private var customPhotoData: Data? = UserDefaults.standard.data(forKey: "CustomChefPhoto")
+    @State private var customPhotoData: Data? = ProfilePhotoHelper.loadCustomPhotoFromFile()
     @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var gamificationManager: GamificationManager
@@ -1050,7 +1050,8 @@ struct EditProfileView: View {
                         // Persist to UserDefaults
                         UserDefaults.standard.set(customName, forKey: "CustomChefName")
                         if let photoData = customPhotoData {
-                            UserDefaults.standard.set(photoData, forKey: "CustomChefPhoto")
+                            // Save photo to file system instead of UserDefaults
+                            saveCustomPhotoToFile(photoData)
                         }
                         
                         dismiss()
@@ -2181,6 +2182,36 @@ struct CompactChallengeCard: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Photo Storage Helpers
+private func saveCustomPhotoToFile(_ data: Data) {
+    guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+    let filePath = documentsPath.appendingPathComponent("customChefPhoto.jpg")
+    
+    do {
+        try data.write(to: filePath)
+        // Remove from UserDefaults if it exists
+        UserDefaults.standard.removeObject(forKey: "CustomChefPhoto")
+        print("✅ Custom photo saved to file system")
+    } catch {
+        print("❌ Failed to save custom photo: \(error)")
+    }
+}
+
+struct ProfilePhotoHelper {
+    static func loadCustomPhotoFromFile() -> Data? {
+        // First, clean up UserDefaults if photo exists there
+        if UserDefaults.standard.data(forKey: "CustomChefPhoto") != nil {
+            UserDefaults.standard.removeObject(forKey: "CustomChefPhoto")
+        }
+        
+        // Load from file system
+        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
+        let filePath = documentsPath.appendingPathComponent("customChefPhoto.jpg")
+        
+        return try? Data(contentsOf: filePath)
     }
 }
 

@@ -225,13 +225,19 @@ struct RecipesView: View {
         guard !isLoadingCloudKit else { return }
         isLoadingCloudKit = true
         
+        print("📱 Starting to load CloudKit recipes...")
+        
         Task {
             do {
                 // Load user's saved recipes from CloudKit
+                print("📱 Loading saved recipes...")
                 let savedRecipes = try await cloudKitRecipeManager.getUserSavedRecipes()
+                print("📱 Loaded \(savedRecipes.count) saved recipes")
                 
                 // Also load user's created recipes (recipes generated via LLM)
+                print("📱 Loading created recipes...")
                 let createdRecipes = try await cloudKitRecipeManager.getUserCreatedRecipes()
+                print("📱 Loaded \(createdRecipes.count) created recipes")
                 
                 // Combine and deduplicate
                 var uniqueRecipes: [Recipe] = []
@@ -243,6 +249,8 @@ struct RecipesView: View {
                         uniqueRecipes.append(recipe)
                     }
                 }
+                
+                print("📱 Total unique recipes after deduplication: \(uniqueRecipes.count)")
                 
                 await MainActor.run {
                     self.cloudKitRecipes = uniqueRecipes

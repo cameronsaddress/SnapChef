@@ -135,7 +135,7 @@ DEFINE SCHEMA
         "___etag"       STRING,
         "___modTime"    TIMESTAMP,
         "___modifiedBy" REFERENCE,
-        "___recordID"   REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
         userID          STRING QUERYABLE,
         userName        STRING,
         avatarURL       STRING,
@@ -166,6 +166,7 @@ DEFINE SCHEMA
         iconName        STRING,
         earnedAt        TIMESTAMP SORTABLE,
         rarity          STRING,
+        points          INT64,
         associatedChallengeID STRING,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
@@ -200,6 +201,7 @@ DEFINE SCHEMA
         followerID        STRING QUERYABLE,
         followingID       STRING QUERYABLE,
         followedAt        TIMESTAMP SORTABLE,
+        isActive          INT64 QUERYABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"
     );
