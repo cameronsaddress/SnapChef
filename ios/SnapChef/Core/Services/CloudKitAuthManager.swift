@@ -472,6 +472,39 @@ class CloudKitAuthManager: ObservableObject {
         return !results.matchResults.isEmpty
     }
     
+    func updateRecipeCounts() async {
+        guard let currentUserID = currentUser?.recordID else { return }
+        
+        do {
+            // Count user's created recipes
+            let createdPredicate = NSPredicate(format: "ownerID == %@", currentUserID)
+            let createdQuery = CKQuery(recordType: "Recipe", predicate: createdPredicate)
+            let createdResults = try await database.records(matching: createdQuery)
+            let recipesCreated = createdResults.matchResults.count
+            
+            // Count user's shared recipes (public recipes)
+            let sharedPredicate = NSPredicate(format: "ownerID == %@ AND isPublic == 1", currentUserID)
+            let sharedQuery = CKQuery(recordType: "Recipe", predicate: sharedPredicate)
+            let sharedResults = try await database.records(matching: sharedQuery)
+            let recipesShared = sharedResults.matchResults.count
+            
+            // Update user record in CloudKit
+            let updates = UserStatUpdates(
+                recipesShared: recipesShared,
+                recipesCreated: recipesCreated
+            )
+            try await updateUserStats(updates)
+            
+            // Update local currentUser object immediately for UI refresh
+            await MainActor.run {
+                self.currentUser?.recipesShared = recipesShared
+                self.currentUser?.recipesCreated = recipesCreated
+            }
+        } catch {
+            print("Failed to update recipe counts: \(error)")
+        }
+    }
+    
     func updateSocialCounts() async {
         guard let currentUserID = currentUser?.recordID else { return }
         
@@ -492,12 +525,18 @@ class CloudKitAuthManager: ObservableObject {
             let followingResults = try await database.records(matching: followingQuery)
             let followingCount = followingResults.matchResults.count
             
-            // Update user record
+            // Update user record in CloudKit
             let updates = UserStatUpdates(
                 followerCount: followerCount,
                 followingCount: followingCount
             )
             try await updateUserStats(updates)
+            
+            // Update local currentUser object immediately for UI refresh
+            await MainActor.run {
+                self.currentUser?.followerCount = followerCount
+                self.currentUser?.followingCount = followingCount
+            }
         } catch {
             print("Failed to update social counts: \(error)")
         }

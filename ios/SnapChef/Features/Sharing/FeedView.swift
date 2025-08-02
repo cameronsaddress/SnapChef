@@ -5,6 +5,7 @@ struct FeedView: View {
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @State private var showingDiscoverUsers = false
     @State private var selectedFilter: ActivityFilter = .all
+    @State private var isRefreshing = false
     
     enum ActivityFilter: String, CaseIterable {
         case all = "All"
@@ -58,9 +59,39 @@ struct FeedView: View {
             }
         }
         .sheet(isPresented: $showingDiscoverUsers) {
+            // Refresh counts when sheet is dismissed
+            Task {
+                await refreshUserStats()
+            }
+        } content: {
             DiscoverUsersView()
                 .environmentObject(appState)
         }
+        .task {
+            // Load initial data
+            await refreshUserStats()
+        }
+        .refreshable {
+            // Pull to refresh
+            await refreshUserStats()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // Refresh when app becomes active
+            Task {
+                await refreshUserStats()
+            }
+        }
+    }
+    
+    private func refreshUserStats() async {
+        isRefreshing = true
+        // Update social counts (followers/following)
+        await cloudKitAuth.updateSocialCounts()
+        // Update recipe counts
+        await cloudKitAuth.updateRecipeCounts()
+        // Reload user data
+        await cloudKitAuth.loadCurrentUser()
+        isRefreshing = false
     }
     
     private var socialStatsHeader: some View {

@@ -617,6 +617,9 @@ class DiscoverUsersViewModel: ObservableObject {
                     searchResults[index].isFollowing.toggle()
                     searchResults[index].followerCount += searchResults[index].isFollowing ? 1 : -1
                 }
+                
+                // Force reload the current user to update following count in FeedView
+                await cloudKitAuth.loadCurrentUser()
             } catch {
                 print("Failed to toggle follow: \(error)")
             }
