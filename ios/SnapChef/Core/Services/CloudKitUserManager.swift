@@ -48,7 +48,7 @@ class CloudKitUserManager: ObservableObject {
     
     func saveUserProfile(username: String, profileImage: UIImage?) async throws {
         guard let userID = try await getCurrentUserID() else {
-            throw CloudKitError.notAuthenticated
+            throw CloudKitUserError.notAuthenticated
         }
         
         // Check if profile already exists
@@ -96,7 +96,15 @@ class CloudKitUserManager: ObservableObject {
         
         do {
             let results = try await database.records(matching: query)
-            return results.matchResults.first?.0.1
+            if let firstResult = results.matchResults.first {
+                switch firstResult.1 {
+                case .success(let record):
+                    return record
+                case .failure:
+                    return nil
+                }
+            }
+            return nil
         } catch {
             print("Error fetching user profile: \(error)")
             throw error
@@ -109,7 +117,15 @@ class CloudKitUserManager: ObservableObject {
         
         do {
             let results = try await database.records(matching: query)
-            return results.matchResults.first?.0.1
+            if let firstResult = results.matchResults.first {
+                switch firstResult.1 {
+                case .success(let record):
+                    return record
+                case .failure:
+                    return nil
+                }
+            }
+            return nil
         } catch {
             print("Error fetching user profile by username: \(error)")
             throw error
@@ -121,7 +137,7 @@ class CloudKitUserManager: ObservableObject {
     func updateProfileImage(_ image: UIImage) async throws {
         guard let userID = try await getCurrentUserID(),
               let profile = try await fetchUserProfile(userID: userID) else {
-            throw CloudKitError.notAuthenticated
+            throw CloudKitUserError.notAuthenticated
         }
         
         let imageAsset = try await createImageAsset(from: image)
@@ -134,7 +150,7 @@ class CloudKitUserManager: ObservableObject {
     func updateBio(_ bio: String) async throws {
         guard let userID = try await getCurrentUserID(),
               let profile = try await fetchUserProfile(userID: userID) else {
-            throw CloudKitError.notAuthenticated
+            throw CloudKitUserError.notAuthenticated
         }
         
         profile[UserProfileFields.bio] = bio
@@ -148,7 +164,7 @@ class CloudKitUserManager: ObservableObject {
     func incrementRecipesShared() async throws {
         guard let userID = try await getCurrentUserID(),
               let profile = try await fetchUserProfile(userID: userID) else {
-            throw CloudKitError.notAuthenticated
+            throw CloudKitUserError.notAuthenticated
         }
         
         let currentCount = profile[UserProfileFields.recipesShared] as? Int ?? 0
@@ -161,7 +177,7 @@ class CloudKitUserManager: ObservableObject {
     func updatePoints(_ points: Int) async throws {
         guard let userID = try await getCurrentUserID(),
               let profile = try await fetchUserProfile(userID: userID) else {
-            throw CloudKitError.notAuthenticated
+            throw CloudKitUserError.notAuthenticated
         }
         
         profile[UserProfileFields.totalPoints] = points
@@ -184,7 +200,7 @@ class CloudKitUserManager: ObservableObject {
     
     private func createImageAsset(from image: UIImage) async throws -> CKAsset {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            throw CloudKitError.invalidData
+            throw CloudKitUserError.invalidData
         }
         
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
@@ -195,15 +211,20 @@ class CloudKitUserManager: ObservableObject {
     
     // MARK: - Search Users
     
-    func searchUsers(query: String) async throws -> [UserProfile] {
+    func searchUsers(query: String) async throws -> [CloudKitUserProfile] {
         let predicate = NSPredicate(format: "\(UserProfileFields.username) CONTAINS[cd] %@ OR \(UserProfileFields.displayName) CONTAINS[cd] %@", query, query)
         let ckQuery = CKQuery(recordType: userProfileRecordType, predicate: predicate)
         ckQuery.sortDescriptors = [NSSortDescriptor(key: UserProfileFields.totalPoints, ascending: false)]
         
         do {
             let results = try await database.records(matching: ckQuery)
-            return results.matchResults.compactMap { _, record in
-                UserProfile(from: record)
+            return results.matchResults.compactMap { _, result in
+                switch result {
+                case .success(let record):
+                    return CloudKitUserProfile(from: record)
+                case .failure:
+                    return nil
+                }
             }
         } catch {
             print("Error searching users: \(error)")
@@ -212,9 +233,9 @@ class CloudKitUserManager: ObservableObject {
     }
 }
 
-// MARK: - UserProfile Model
+// MARK: - CloudKitUserProfile Model
 
-struct UserProfile {
+struct CloudKitUserProfile {
     let recordID: CKRecord.ID
     let username: String
     let userID: String
@@ -259,9 +280,9 @@ struct UserProfile {
     }
 }
 
-// MARK: - CloudKit Errors
+// MARK: - CloudKit User Errors
 
-enum CloudKitError: LocalizedError {
+enum CloudKitUserError: LocalizedError {
     case notAuthenticated
     case invalidData
     case usernameTaken
