@@ -200,55 +200,62 @@ struct StreakSummaryCard: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("🔥 Streak Summary")
-                    .font(.headline)
-                
-                Spacer()
-                
-                NavigationLink(destination: StreakDetailView()) {
-                    Text("View All")
-                        .font(.caption)
-                        .foregroundColor(.blue)
+        NavigationLink(destination: StreakDetailView()) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text("🔥 Streak Summary")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 4) {
+                        Text("View All")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
                 }
+                
+                HStack(spacing: 20) {
+                    StatItem(
+                        value: "\(activeStreakCount)",
+                        label: "Active",
+                        color: .green
+                    )
+                    
+                    StatItem(
+                        value: "\(totalStreakDays)",
+                        label: "Total Days",
+                        color: .orange
+                    )
+                    
+                    StatItem(
+                        value: "\(longestStreak)",
+                        label: "Longest",
+                        color: .purple
+                    )
+                    
+                    StatItem(
+                        value: String(format: "%.1fx", streakManager.globalMultiplier),
+                        label: "Multiplier",
+                        color: .blue
+                    )
+                }
+                
+                // Quick streak badges
+                AllStreaksIndicator()
+                    .padding(.top, 8)
             }
-            
-            HStack(spacing: 20) {
-                StatItem(
-                    value: "\(activeStreakCount)",
-                    label: "Active",
-                    color: .green
-                )
-                
-                StatItem(
-                    value: "\(totalStreakDays)",
-                    label: "Total Days",
-                    color: .orange
-                )
-                
-                StatItem(
-                    value: "\(longestStreak)",
-                    label: "Longest",
-                    color: .purple
-                )
-                
-                StatItem(
-                    value: String(format: "%.1fx", streakManager.globalMultiplier),
-                    label: "Multiplier",
-                    color: .blue
-                )
-            }
-            
-            // Quick streak badges
-            AllStreaksIndicator()
-                .padding(.top, 8)
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(UIColor.secondarySystemBackground))
+            )
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(UIColor.secondarySystemBackground))
-        )
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

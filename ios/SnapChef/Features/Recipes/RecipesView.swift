@@ -2,10 +2,14 @@ import SwiftUI
 
 struct RecipesView: View {
     @EnvironmentObject var appState: AppState
+    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @State private var selectedCategory = "All"
     @State private var searchText = ""
     @State private var contentVisible = false
     @State private var showingFilters = false
+    @State private var cloudKitRecipes: [Recipe] = []
+    @State private var isLoadingCloudKit = false
     
     // Filter states
     @State private var selectedDifficulty: Recipe.Difficulty?
@@ -59,13 +63,30 @@ struct RecipesView: View {
                                 .staggeredFade(index: 3, isShowing: contentVisible)
                         }
                         
+                        // Loading indicator for CloudKit
+                        if isLoadingCloudKit {
+                            HStack {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "#667eea")))
+                                Text("Loading saved recipes...")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.white.opacity(0.1))
+                            )
+                            .staggeredFade(index: 4, isShowing: contentVisible)
+                        }
+                        
                         // Recipe Grid
                         RecipeGridView(recipes: filteredRecipes)
                             .padding(.horizontal, 20)
                             .staggeredFade(index: 4, isShowing: contentVisible)
                         
                         // Empty State
-                        if filteredRecipes.isEmpty {
+                        if filteredRecipes.isEmpty && !isLoadingCloudKit {
                             EmptyRecipesView()
                                 .padding(.top, 50)
                                 .staggeredFade(index: 5, isShowing: contentVisible)
@@ -96,6 +117,16 @@ struct RecipesView: View {
             withAnimation(.easeOut(duration: 0.5)) {
                 contentVisible = true
             }
+            // Load CloudKit recipes if authenticated
+            if cloudKitAuth.isAuthenticated {
+                loadCloudKitRecipes()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // Reload CloudKit recipes when app comes to foreground
+            if cloudKitAuth.isAuthenticated {
+                loadCloudKitRecipes()
+            }
         }
         .sheet(isPresented: $showingFilters) {
             RecipeFiltersView(
@@ -117,7 +148,9 @@ struct RecipesView: View {
     }
     
     var filteredRecipes: [Recipe] {
-        appState.recentRecipes.filter { recipe in
+        // Combine local and CloudKit recipes
+        let allRecipes = appState.recentRecipes + cloudKitRecipes
+        return allRecipes.filter { recipe in
             // Search filter
             let matchesSearch = searchText.isEmpty || 
                 recipe.name.localizedCaseInsensitiveContains(searchText) ||
@@ -184,6 +217,45 @@ struct RecipesView: View {
         case "Dessert": return recipe.name.localizedCaseInsensitiveContains("dessert") || recipe.name.localizedCaseInsensitiveContains("sweet")
         case "Trending": return true // Would use actual trending logic
         default: return true
+        }
+    }
+    
+    // MARK: - CloudKit Integration
+    private func loadCloudKitRecipes() {
+        guard !isLoadingCloudKit else { return }
+        isLoadingCloudKit = true
+        
+        Task {
+            do {
+                // Load user's saved recipes from CloudKit
+                let savedRecipes = try await cloudKitRecipeManager.getUserSavedRecipes()
+                
+                // Also load user's created recipes (recipes generated via LLM)
+                let createdRecipes = try await cloudKitRecipeManager.getUserCreatedRecipes()
+                
+                // Combine and deduplicate
+                var uniqueRecipes: [Recipe] = []
+                var seenIds = Set<UUID>()
+                
+                for recipe in savedRecipes + createdRecipes {
+                    if !seenIds.contains(recipe.id) {
+                        seenIds.insert(recipe.id)
+                        uniqueRecipes.append(recipe)
+                    }
+                }
+                
+                await MainActor.run {
+                    self.cloudKitRecipes = uniqueRecipes
+                    self.isLoadingCloudKit = false
+                }
+                
+                print("✅ Loaded \(uniqueRecipes.count) recipes from CloudKit")
+            } catch {
+                print("❌ Failed to load CloudKit recipes: \(error)")
+                await MainActor.run {
+                    self.isLoadingCloudKit = false
+                }
+            }
         }
     }
 }
@@ -477,6 +549,7 @@ struct RecipeGridCard: View {
     @State private var showingUserProfile = false
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     
     var body: some View {
         GlassmorphicCard {
@@ -661,6 +734,26 @@ struct RecipeGridCard: View {
             Button("Delete", role: .destructive) {
                 withAnimation(.spring()) {
                     appState.deleteRecipe(recipe)
+                    // Also remove from CloudKit if it's a CloudKit recipe
+                    if cloudKitAuth.isAuthenticated {
+                        Task {
+                            do {
+                                // Remove from saved recipes in CloudKit
+                                try await cloudKitRecipeManager.removeRecipeFromUserProfile(
+                                    recipe.id.uuidString, 
+                                    type: .saved
+                                )
+                                // Also remove from created if it was created by user
+                                try await cloudKitRecipeManager.removeRecipeFromUserProfile(
+                                    recipe.id.uuidString, 
+                                    type: .created
+                                )
+                                print("✅ Removed recipe from CloudKit")
+                            } catch {
+                                print("❌ Failed to remove recipe from CloudKit: \(error)")
+                            }
+                        }
+                    }
                 }
             }
         } message: {

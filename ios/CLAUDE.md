@@ -46,6 +46,13 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
   - CloudKit integration for storing proof images as CKAssets
   - Fixed Xcode project corruption (duplicate GUIDs and broken proxies)
   - Resolved naming conflicts (ImagePicker renamed across multiple views)
+- **FIXED: Recipe Book CloudKit Integration (Feb 2, 2025)**
+  - Recipe book now loads saved CloudKit recipes for authenticated users
+  - Automatically syncs user's saved and created recipes from CloudKit
+  - Recipe deletion now syncs back to CloudKit to remove from user's profile
+  - Added loading indicator while fetching CloudKit recipes
+  - Recipes refresh when app returns to foreground
+  - Combined local and CloudKit recipes with deduplication
 
 ### Documentation
 - **APP_ARCHITECTURE_DOCUMENTATION.md** - Complete system overview

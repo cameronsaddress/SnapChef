@@ -644,7 +644,7 @@ struct EnhancedChallengeCard: View {
                 // CTA Button
                 Button(action: action) {
                     HStack {
-                        Text(gamificationManager.isChallengeJoinedByTitle(title) ? "View Progress" : "Join Challenge")
+                        Text(gamificationManager.isChallengeJoinedByTitle(title) ? "View Progress" : "View Challenge")
                             .font(.system(size: 18, weight: .semibold))
                         Image(systemName: gamificationManager.isChallengeJoinedByTitle(title) ? "checkmark.circle.fill" : "arrow.right.circle.fill")
                             .font(.system(size: 18))
