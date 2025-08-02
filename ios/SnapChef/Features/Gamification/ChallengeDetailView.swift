@@ -43,19 +43,7 @@ struct ChallengeDetailView: View {
                         }
                         .padding(.horizontal, 20)
                         
-                        // Requirements
-                        RequirementsCard(challenge: displayChallenge)
-                            .padding(.horizontal, 20)
-                        
-                        // Rewards
-                        RewardsCard(challenge: displayChallenge)
-                            .padding(.horizontal, 20)
-                        
-                        // Leaderboard preview
-                        MiniLeaderboardCard(challenge: displayChallenge)
-                            .padding(.horizontal, 20)
-                        
-                        // Progress or Join button
+                        // Join button or Progress at the top
                         if !displayChallenge.isCompleted {
                             let isAlreadyJoined = displayChallenge.isJoined || gamificationManager.isChallengeJoined(displayChallenge.id)
                             
@@ -74,6 +62,18 @@ struct ChallengeDetailView: View {
                                 .disabled(isJoining || joinSuccess)
                             }
                         }
+                        
+                        // Requirements
+                        RequirementsCard(challenge: displayChallenge)
+                            .padding(.horizontal, 20)
+                        
+                        // Rewards
+                        RewardsCard(challenge: displayChallenge)
+                            .padding(.horizontal, 20)
+                        
+                        // Leaderboard preview
+                        MiniLeaderboardCard(challenge: displayChallenge)
+                            .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 40)
                 }
@@ -248,6 +248,8 @@ struct RewardsCard: View {
 // MARK: - Mini Leaderboard Card
 struct MiniLeaderboardCard: View {
     let challenge: Challenge
+    @State private var leaderboardEntries: [LeaderboardEntry] = []
+    @State private var isLoading = true
     
     var body: some View {
         GlassmorphicCard {
@@ -264,35 +266,79 @@ struct MiniLeaderboardCard: View {
                         .foregroundColor(.white.opacity(0.6))
                 }
                 
-                // Top 3 placeholder
-                VStack(spacing: 12) {
-                    ForEach(1...3, id: \.self) { rank in
-                        HStack {
-                            Text("\(rank)")
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .foregroundColor(rankColor(rank))
-                                .frame(width: 30)
-                            
-                            Circle()
-                                .fill(Color.white.opacity(0.2))
-                                .frame(width: 32, height: 32)
-                            
-                            Text("Chef \(rank)")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.white.opacity(0.8))
-                            
-                            Spacer()
-                            
-                            Text("\(1000 - rank * 100) pts")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(Color(hex: "#f093fb"))
+                // Leaderboard entries
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .frame(height: 100)
+                } else if leaderboardEntries.isEmpty {
+                    Text("Be the first to complete this challenge!")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
+                        .frame(height: 100)
+                } else {
+                    VStack(spacing: 12) {
+                        ForEach(Array(leaderboardEntries.prefix(3).enumerated()), id: \.element.id) { index, entry in
+                            HStack {
+                                Text("\(index + 1)")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundColor(rankColor(index + 1))
+                                    .frame(width: 30)
+                                
+                                // Profile image placeholder
+                                Circle()
+                                    .fill(Color.white.opacity(0.2))
+                                    .frame(width: 32, height: 32)
+                                    .overlay(
+                                        Text(String(entry.username.prefix(1)).uppercased())
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(.white)
+                                    )
+                                
+                                Text(entry.username)
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .lineLimit(1)
+                                
+                                Spacer()
+                                
+                                Text("\(entry.points) pts")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(Color(hex: "#f093fb"))
+                            }
                         }
                     }
+                    .padding(.top, 8)
                 }
-                .padding(.top, 8)
             }
             .padding(20)
         }
+        .onAppear {
+            loadLeaderboard()
+        }
+    }
+    
+    private func loadLeaderboard() {
+        Task {
+            // For now, use mock data or fetch from CloudKit
+            // The CloudKit query was failing because recordName isn't queryable
+            // We need to query by totalPoints instead
+            let entries = await fetchLeaderboardEntries()
+            await MainActor.run {
+                self.leaderboardEntries = entries
+                self.isLoading = false
+            }
+        }
+    }
+    
+    private func fetchLeaderboardEntries() async -> [LeaderboardEntry] {
+        // For now, return mock data
+        // TODO: Implement proper CloudKit query
+        return [
+            LeaderboardEntry(rank: 1, username: "ChefMaster", avatar: "👨‍🍳", points: 1250, level: 12, country: "USA", isCurrentUser: false),
+            LeaderboardEntry(rank: 2, username: "CookieQueen", avatar: "👩‍🍳", points: 980, level: 10, country: "UK", isCurrentUser: false),
+            LeaderboardEntry(rank: 3, username: "PastaKing", avatar: "🍝", points: 875, level: 9, country: "Italy", isCurrentUser: false)
+        ]
     }
     
     private func rankColor(_ rank: Int) -> Color {
@@ -308,6 +354,7 @@ struct MiniLeaderboardCard: View {
 // MARK: - Progress Card
 struct ProgressCard: View {
     let challenge: Challenge
+    @State private var showProofSubmission = false
     
     private var progressPercentage: Int {
         Int(challenge.currentProgress * 100)
@@ -398,8 +445,39 @@ struct ProgressCard: View {
                     }
                     .padding(.top, 8)
                 }
+                
+                // Submit Proof Button
+                Button(action: {
+                    showProofSubmission = true
+                }) {
+                    HStack {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 18))
+                        Text("Submit Proof")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#667eea"),
+                                Color(hex: "#764ba2")
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(12)
+                }
+                .disabled(challenge.currentProgress >= 1.0)
+                .opacity(challenge.currentProgress >= 1.0 ? 0.5 : 1.0)
             }
             .padding(20)
+        }
+        .sheet(isPresented: $showProofSubmission) {
+            ChallengeProofSubmissionView(challenge: challenge)
         }
     }
 }

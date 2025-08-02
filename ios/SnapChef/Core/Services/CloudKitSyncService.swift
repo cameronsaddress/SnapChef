@@ -1,6 +1,7 @@
 import Foundation
 import CloudKit
 import Combine
+import UIKit
 
 @MainActor
 class CloudKitSyncService: ObservableObject {
@@ -598,6 +599,112 @@ class CloudKitSyncService: ObservableObject {
         try await CloudKitManager.shared.saveTeam(team)
         print("✅ Created team: \(team.name)")
         return team
+    }
+    
+    // MARK: - Challenge Proof Submission
+    
+    func submitChallengeProof(challengeID: String, proofImage: UIImage, notes: String? = nil) async throws {
+        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
+            throw CloudKitAuthError.notAuthenticated
+        }
+        
+        // Find or create UserChallenge record
+        let predicate = NSPredicate(format: "%K == %@ AND %K == %@",
+                                  CKField.UserChallenge.userID, userID,
+                                  "challengeID", challengeID)
+        let query = CKQuery(recordType: CloudKitConfig.userChallengeRecordType, predicate: predicate)
+        
+        let results = try await publicDatabase.records(matching: query)
+        
+        var userChallengeRecord: CKRecord
+        
+        if let (_, result) = results.matchResults.first,
+           case .success(let record) = result {
+            userChallengeRecord = record
+        } else {
+            // Create new UserChallenge record
+            userChallengeRecord = CKRecord(recordType: CloudKitConfig.userChallengeRecordType)
+            userChallengeRecord[CKField.UserChallenge.userID] = userID
+            userChallengeRecord["challengeID"] = CKRecord.Reference(recordID: CKRecord.ID(recordName: challengeID), action: .none)
+            userChallengeRecord[CKField.UserChallenge.startedAt] = Date()
+        }
+        
+        // Update progress
+        userChallengeRecord[CKField.UserChallenge.status] = "completed"
+        userChallengeRecord[CKField.UserChallenge.progress] = 1.0
+        userChallengeRecord[CKField.UserChallenge.completedAt] = Date()
+        
+        // Add notes if provided
+        if let notes = notes {
+            userChallengeRecord[CKField.UserChallenge.notes] = notes
+        }
+        
+        // Upload proof image
+        if let imageData = proofImage.jpegData(compressionQuality: 0.8) {
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).jpg")
+            try imageData.write(to: tempURL)
+            let imageAsset = CKAsset(fileURL: tempURL)
+            userChallengeRecord["proofImage"] = imageAsset
+            
+            // Also store URL for quick access
+            userChallengeRecord[CKField.UserChallenge.proofImageURL] = tempURL.absoluteString
+        }
+        
+        // Save to CloudKit
+        _ = try await publicDatabase.save(userChallengeRecord)
+        
+        // Update challenge participant/completion counts
+        await updateChallengeStats(challengeID: challengeID, completed: true)
+        
+        // Award points and coins
+        if let challenge = GamificationManager.shared.getChallenge(by: challengeID) {
+            await awardChallengeRewards(challenge: challenge, userID: userID)
+        }
+        
+        print("✅ Challenge proof submitted successfully")
+    }
+    
+    private func updateChallengeStats(challengeID: String, completed: Bool) async {
+        do {
+            let recordID = CKRecord.ID(recordName: challengeID)
+            let record = try await publicDatabase.record(for: recordID)
+            
+            if completed {
+                let currentCount = record[CKField.Challenge.completionCount] as? Int64 ?? 0
+                record[CKField.Challenge.completionCount] = currentCount + 1
+            } else {
+                let currentCount = record[CKField.Challenge.participantCount] as? Int64 ?? 0
+                record[CKField.Challenge.participantCount] = currentCount + 1
+            }
+            
+            _ = try await publicDatabase.save(record)
+        } catch {
+            print("Failed to update challenge stats: \(error)")
+        }
+    }
+    
+    private func awardChallengeRewards(challenge: Challenge, userID: String) async {
+        // Update user points and coins
+        var updates = UserStatUpdates()
+        
+        if let currentUser = CloudKitAuthManager.shared.currentUser {
+            updates.totalPoints = currentUser.totalPoints + challenge.points
+            updates.coinBalance = currentUser.coinBalance + challenge.coins
+            updates.challengesCompleted = currentUser.challengesCompleted + 1
+            
+            do {
+                try await CloudKitAuthManager.shared.updateUserStats(updates)
+                
+                // Update leaderboard
+                try await updateLeaderboardEntry(
+                    for: userID,
+                    points: challenge.points,
+                    challengesCompleted: currentUser.challengesCompleted + 1
+                )
+            } catch {
+                print("Failed to award challenge rewards: \(error)")
+            }
+        }
     }
     
     func updateLeaderboardEntry(for userID: String, points: Int, challengesCompleted: Int) async throws {

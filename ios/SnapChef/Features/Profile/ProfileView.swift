@@ -1012,7 +1012,7 @@ struct EditProfileView: View {
             tempName = customName
         }
         .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(selectedImage: $selectedImage)
+            ProfileImagePicker(selectedImage: $selectedImage)
         }
     }
 }
@@ -1109,7 +1109,7 @@ struct PrivacySettingsView: View {
 }
 
 // MARK: - Image Picker
-struct ImagePicker: UIViewControllerRepresentable {
+struct ProfileImagePicker: UIViewControllerRepresentable {
     @Binding var selectedImage: UIImage?
     @Environment(\.dismiss) var dismiss
     
@@ -1127,9 +1127,9 @@ struct ImagePicker: UIViewControllerRepresentable {
     }
     
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: ImagePicker
+        let parent: ProfileImagePicker
         
-        init(_ parent: ImagePicker) {
+        init(_ parent: ProfileImagePicker) {
             self.parent = parent
         }
         

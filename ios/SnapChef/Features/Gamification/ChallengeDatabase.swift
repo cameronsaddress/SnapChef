@@ -193,6 +193,17 @@ class ChallengeDatabase: ObservableObject {
         )
     }
     
+    func getChallenge(by id: String) -> Challenge? {
+        // Check active challenges
+        if let challenge = activeChallenges.first(where: { $0.id == id }) {
+            return challenge
+        }
+        
+        // For now, return nil if not found in active challenges
+        // TODO: Generate full year and search if needed
+        return nil
+    }
+    
     private func createWeekendChallenge(for dayOfYear: Int, baseDate: Date) -> Challenge {
         let weekendNumber = dayOfYear / 7
         let templates = [

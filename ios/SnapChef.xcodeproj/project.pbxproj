@@ -11,7 +11,6 @@
 		07359C705510EBDD85E2824C /* LocalRecipeDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2186F45DBCD7974F4B5B5860 /* LocalRecipeDatabase.swift */; };
 		09A7E3BFA651EF24792DAE75 /* GlassmorphicComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F190CCE2F51225F63B9697D6 /* GlassmorphicComponents.swift */; };
 		0A19D54755B00F55E24F26F3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213986243A296CEDAE62DDDA /* ContentView.swift */; };
-		0A86A7D231C9755B519CFBD5 /* SnapChef.xcodeproj in Sources */ = {isa = PBXBuildFile; fileRef = DC46189F99DD0B16542535C4 /* SnapChef.xcodeproj */; };
 		0C1EC8259C114306AB8DE1D5 /* AIProcessingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001A86FF8EC540A5B0D2A5B2 /* AIProcessingView.swift */; };
 		129C466C734C88D78563B1D1 /* UserProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B036119B51147A9160D4EFB3 /* UserProfileView.swift */; };
 		136848CD8663888DF3E1D569 /* CreateTeamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA5726F34BA2E5343C5F00D0 /* CreateTeamView.swift */; };
@@ -27,6 +26,7 @@
 		1F6B34545970A0A31EF82B46 /* DailyCheckInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F7BA94EACC90AA7F225C1D5 /* DailyCheckInView.swift */; };
 		20C81F1B946D411A830B4FCA /* CloudKitAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E456AED84984638A80E167B /* CloudKitAuthManager.swift */; };
 		2422E5C1C7E414D8FF5A0B7C /* NetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FDC970FB5C6C618DA4E006 /* NetworkManager.swift */; };
+		32271DE450E0D40801E0AC74 /* ChallengeProofSubmissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32E437105EB7EFBC8764841A /* ChallengeProofSubmissionView.swift */; };
 		329F289E15DC0969633F6332 /* StreakIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCD67D156B6A5D596758C6C7 /* StreakIndicatorView.swift */; };
 		334B8CC90B7AB6E39FFE0A5E /* LaunchAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E808FB0C31658D7A40220ACC /* LaunchAnimationView.swift */; };
 		34E4DBC84C42786C925ECF2C /* ChefCoinsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8BA7F4B7BCA4208C26D2EDB /* ChefCoinsManager.swift */; };
@@ -113,10 +113,8 @@
 		DAABE07FA987C16FB5FCA878 /* CloudKitChallengeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D754451606A66D155B291E0 /* CloudKitChallengeManager.swift */; };
 		DD5120E2956062E461518E24 /* fridge.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 258CF31CFDA34009FD6ED5D8 /* fridge.jpg */; };
 		DFB0D378B249D5BAE00DA67D /* SnapChefApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43329C15A8E8386F4370D4E /* SnapChefApp.swift */; };
-		DFFEF671CD14F671876CC91F /* SnapChef.xcodeproj in Sources */ = {isa = PBXBuildFile; fileRef = 5A4D08EED38A48531DBA4ADC /* SnapChef.xcodeproj */; };
 		E0BB37B10D2994E6DA7D7614 /* PhysicsLoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F2D011EC538362F2FA24496 /* PhysicsLoadingOverlay.swift */; };
 		E0C0DED7F06D7D768C45E08D /* CloudKitStreakManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AFC0D3DE258E136E47923E9 /* CloudKitStreakManager.swift */; };
-		E1B44DA775CAB3D2D82E4505 /* SnapChef.xcodeproj in Sources */ = {isa = PBXBuildFile; fileRef = DAB89B7B6AADB9EDA1F12B38 /* SnapChef.xcodeproj */; };
 		E43B2102D29EDE28D2BB58A9 /* ChallengeSharingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2497A406F39E88783FD77B5 /* ChallengeSharingManager.swift */; };
 		E4B11BA2E8CB07091D558EE1 /* CameraModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73E54B598DC94C797BD5CA6A /* CameraModel.swift */; };
 		E739AFE884D1320D76A37B42 /* meal4.jpg in Resources */ = {isa = PBXBuildFile; fileRef = B945ED1BEAD98D89EEB3586B /* meal4.jpg */; };
@@ -145,27 +143,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		07E8BBB928DD85AC71554922 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = DAB89B7B6AADB9EDA1F12B38 /* SnapChef.xcodeproj */;
-			proxyType = 2;
-			remoteGlobalIDString = 802069908C2ED50AACB32FA2;
-			remoteInfo = Subproject;
-		};
-		915CA52C2C8EF5B1400B4D55 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = DC46189F99DD0B16542535C4 /* SnapChef.xcodeproj */;
-			proxyType = 2;
-			remoteGlobalIDString = 802069908C2ED50AACB32FA2;
-			remoteInfo = Subproject;
-		};
-		B7F85619EC41EDE7030B62B5 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 5A4D08EED38A48531DBA4ADC /* SnapChef.xcodeproj */;
-			proxyType = 2;
-			remoteGlobalIDString = 802069908C2ED50AACB32FA2;
-			remoteInfo = Subproject;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -203,6 +180,7 @@
 		2ABAFD32A12E2DBC4056FD0F /* AIPersonalityView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AIPersonalityView.swift; path = SnapChef/Features/AIPersonality/AIPersonalityView.swift; sourceTree = "<group>"; };
 		2EFE975B2ADB5C9E261250E8 /* LeaderboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LeaderboardView.swift; path = SnapChef/Features/Gamification/Views/LeaderboardView.swift; sourceTree = "<group>"; };
 		32378086B26CBCDC88359BFC /* Recipe.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Recipe.swift; path = SnapChef/Core/Models/Recipe.swift; sourceTree = "<group>"; };
+		32E437105EB7EFBC8764841A /* ChallengeProofSubmissionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeProofSubmissionView.swift; path = SnapChef/Features/Gamification/ChallengeProofSubmissionView.swift; sourceTree = "<group>"; };
 		336E44F1C05F96398737E9E4 /* MagicalBackground.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MagicalBackground.swift; path = SnapChef/Design/MagicalBackground.swift; sourceTree = "<group>"; };
 		37C541E1BB83BA1EC25EFF3F /* RecipesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RecipesView.swift; path = SnapChef/Features/Recipes/RecipesView.swift; sourceTree = "<group>"; };
 		392BD76253A7DA8F69705F62 /* SnapchefLogo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SnapchefLogo.swift; path = SnapChef/Design/SnapchefLogo.swift; sourceTree = "<group>"; };
@@ -221,7 +199,6 @@
 		56DF24D3280D9F5229B2C67C /* MockDataProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MockDataProvider.swift; path = SnapChef/Core/Utilities/MockDataProvider.swift; sourceTree = "<group>"; };
 		573B84C17E0DAF8D9FB6BF07 /* meal5.jpg */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.jpeg; name = meal5.jpg; path = SnapChef/Resources/meal5.jpg; sourceTree = "<group>"; };
 		59FDC970FB5C6C618DA4E006 /* NetworkManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NetworkManager.swift; path = SnapChef/Core/Networking/NetworkManager.swift; sourceTree = "<group>"; };
-		5A4D08EED38A48531DBA4ADC /* SnapChef.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = SnapChef.xcodeproj; sourceTree = "<group>"; };
 		5A65851D9C0E10037334DCA0 /* CameraTabView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CameraTabView.swift; path = SnapChef/Features/Camera/CameraTabView.swift; sourceTree = "<group>"; };
 		5BEC9339B9A05BF7ED41CE98 /* ChallengeProgressTracker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeProgressTracker.swift; path = SnapChef/Features/Gamification/ChallengeProgressTracker.swift; sourceTree = "<group>"; };
 		5CFBC2797E2E29BB325A4F66 /* EmojiFlickGame.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EmojiFlickGame.swift; path = SnapChef/Features/Camera/EmojiFlickGame.swift; sourceTree = "<group>"; };
@@ -292,9 +269,7 @@
 		D196EE678D8EF55E9771CC8F /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = SnapChef/Core/ViewModels/AppState.swift; sourceTree = "<group>"; };
 		D763DE380F1DB760696FA722 /* HomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HomeView.swift; path = SnapChef/HomeView.swift; sourceTree = "<group>"; };
 		D79D60B603855BD2E41D0CFA /* RewardSystem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RewardSystem.swift; path = SnapChef/Features/Gamification/RewardSystem.swift; sourceTree = "<group>"; };
-		DAB89B7B6AADB9EDA1F12B38 /* SnapChef.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = SnapChef.xcodeproj; sourceTree = "<group>"; };
 		DC3087E3BC28593B910150BF /* ChallengeService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeService.swift; path = SnapChef/Features/Gamification/ChallengeService.swift; sourceTree = "<group>"; };
-		DC46189F99DD0B16542535C4 /* SnapChef.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = SnapChef.xcodeproj; sourceTree = "<group>"; };
 		E1DABDD7D58B482E9F2F9D14 /* CloudKitUsernameView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitUsernameView.swift; path = SnapChef/Features/Authentication/CloudKitUsernameView.swift; sourceTree = "<group>"; };
 		E39D96ACCF5D46EE6F4094CA /* MysteryMealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MysteryMealView.swift; path = SnapChef/Features/AIPersonality/MysteryMealView.swift; sourceTree = "<group>"; };
 		E4C4CDE71E399F7520469E0E /* User.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = User.swift; path = SnapChef/Core/Models/User.swift; sourceTree = "<group>"; };
@@ -386,7 +361,6 @@
 		24B4D0207EE5033AFF2DE300 /* CloudKitUserManager.swift */ = {
 			isa = PBXGroup;
 			children = (
-				5A4D08EED38A48531DBA4ADC /* SnapChef.xcodeproj */,
 			);
 			name = CloudKitUserManager.swift;
 			sourceTree = "<group>";
@@ -594,7 +568,6 @@
 		87F39F53591B3E3CCA72FBD6 /* ProfanityFilter.swift */ = {
 			isa = PBXGroup;
 			children = (
-				DC46189F99DD0B16542535C4 /* SnapChef.xcodeproj */,
 			);
 			name = ProfanityFilter.swift;
 			sourceTree = "<group>";
@@ -748,7 +721,6 @@
 		CBCCEB5B6E6253B24330BC8A /* UsernameSetupView.swift */ = {
 			isa = PBXGroup;
 			children = (
-				DAB89B7B6AADB9EDA1F12B38 /* SnapChef.xcodeproj */,
 			);
 			name = UsernameSetupView.swift;
 			sourceTree = "<group>";
@@ -776,6 +748,7 @@
 				94485059EDFCCAB264B0D728 /* ChallengeDatabase.swift */,
 				082579B6D9AC4CAB13C199E4 /* StreakManager.swift */,
 				8E2BD9959463FD88F4BE035B /* StreakManager.swift */,
+				32E437105EB7EFBC8764841A /* ChallengeProofSubmissionView.swift */,
 			);
 			name = Gamification;
 			sourceTree = "<group>";
@@ -880,15 +853,12 @@
 			projectReferences = (
 				{
 					ProductGroup = 027AD74E091AC56960637058 /* Products */;
-					ProjectRef = DAB89B7B6AADB9EDA1F12B38 /* SnapChef.xcodeproj */;
 				},
 				{
 					ProductGroup = 027AD74E091AC56960637058 /* Products */;
-					ProjectRef = DC46189F99DD0B16542535C4 /* SnapChef.xcodeproj */;
 				},
 				{
 					ProductGroup = 027AD74E091AC56960637058 /* Products */;
-					ProjectRef = 5A4D08EED38A48531DBA4ADC /* SnapChef.xcodeproj */;
 				},
 			);
 			projectRoot = "";
@@ -903,21 +873,18 @@
 			isa = PBXReferenceProxy;
 			fileType = wrapper.application;
 			path = SnapChef.app;
-			remoteRef = 915CA52C2C8EF5B1400B4D55 /* PBXContainerItemProxy */;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
 		13F448B60862378D1B3C2C0E /* SnapChef.app */ = {
 			isa = PBXReferenceProxy;
 			fileType = wrapper.application;
 			path = SnapChef.app;
-			remoteRef = 07E8BBB928DD85AC71554922 /* PBXContainerItemProxy */;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
 		AD0DCCE077C4F617880C957D /* SnapChef.app */ = {
 			isa = PBXReferenceProxy;
 			fileType = wrapper.application;
 			path = SnapChef.app;
-			remoteRef = B7F85619EC41EDE7030B62B5 /* PBXContainerItemProxy */;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
 /* End PBXReferenceProxy section */
@@ -1056,12 +1023,10 @@
 				80E2F7F7F17FFF0E8879EB5F /* StreakManager.swift in Sources */,
 				D16881E986E066F36C4AD122 /* StreakModels.swift in Sources */,
 				1C3852FAC433ED9F9E92CDD7 /* CloudKitStreakManager.swift in Sources */,
-				E1B44DA775CAB3D2D82E4505 /* SnapChef.xcodeproj in Sources */,
-				0A86A7D231C9755B519CFBD5 /* SnapChef.xcodeproj in Sources */,
-				DFFEF671CD14F671876CC91F /* SnapChef.xcodeproj in Sources */,
 				8D80E4B6DA8C2DFED3912E36 /* UsernameSetupView.swift in Sources */,
 				1E088B7D2B0CF38EA6559E3E /* CloudKitUserManager.swift in Sources */,
 				EF71D6ADE07A26494F45AE18 /* ProfanityFilter.swift in Sources */,
+				32271DE450E0D40801E0AC74 /* ChallengeProofSubmissionView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

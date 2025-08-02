@@ -34,7 +34,8 @@ files_to_add = {
   'Gamification' => [
     'GamificationManager.swift',
     'ChallengesView.swift',
-    'LeaderboardView.swift'
+    'LeaderboardView.swift',
+    'ChallengeProofSubmissionView.swift'
   ],
   'AIPersonality' => [
     'AIPersonalityManager.swift',

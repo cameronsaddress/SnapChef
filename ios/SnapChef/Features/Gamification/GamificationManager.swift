@@ -443,6 +443,34 @@ class GamificationManager: ObservableObject {
         }
     }
     
+    func getChallenge(by id: String) -> Challenge? {
+        // Check active challenges first
+        if let challenge = activeChallenges.first(where: { $0.id == id }) {
+            return challenge
+        }
+        
+        // Check completed challenges
+        if let challenge = completedChallenges.first(where: { $0.id == id }) {
+            return challenge
+        }
+        
+        // Check database for all challenges
+        return challengeDatabase.getChallenge(by: id)
+    }
+    
+    func updateChallengeProgress(_ challengeID: String, progress: Double) {
+        if let index = activeChallenges.firstIndex(where: { $0.id == challengeID }) {
+            activeChallenges[index].currentProgress = progress
+            
+            if progress >= 1.0 {
+                activeChallenges[index].isCompleted = true
+                // Move to completed
+                let challenge = activeChallenges.remove(at: index)
+                completedChallenges.append(challenge)
+            }
+        }
+    }
+    
     func syncChallengeProgress(for challengeID: String, progress: Double) async {
         guard let userID = AuthenticationManager().currentUser?.id else { return }
         
@@ -539,20 +567,6 @@ class GamificationManager: ObservableObject {
                completedChallenges.contains(where: { $0.title == title })
     }
     
-    func updateChallengeProgress(_ challengeId: String, progress: Double) {
-        if let index = activeChallenges.firstIndex(where: { $0.id == challengeId }) {
-            activeChallenges[index].currentProgress = progress
-            
-            if progress >= 1.0 {
-                completeChallenge(activeChallenges[index])
-            }
-            
-            // Sync with CloudKit
-            Task {
-                await syncChallengeProgress(for: challengeId, progress: progress)
-            }
-        }
-    }
     
     func completeChallenge(challengeId: String) {
         // Find challenge by title (used as ID in some cases)
