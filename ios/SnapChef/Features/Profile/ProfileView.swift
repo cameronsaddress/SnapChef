@@ -1,4 +1,5 @@
 import SwiftUI
+import CloudKit
 
 enum SubscriptionTier: String, CaseIterable {
     case free = "Free"
@@ -33,6 +34,8 @@ struct ProfileView: View {
     @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
     @EnvironmentObject var gamificationManager: GamificationManager
     @State private var showingSubscriptionView = false
+    @State private var showingRecipes = false
+    @State private var showingFavorites = false
     @State private var contentVisible = false
     @State private var profileImageScale: CGFloat = 0
     
@@ -108,6 +111,26 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showingSubscriptionView) {
             SubscriptionView()
+        }
+        .sheet(isPresented: $showingRecipes) {
+            NavigationStack {
+                RecipesView()
+                    .navigationTitle("Your Recipes")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarItems(trailing: Button("Done") {
+                        showingRecipes = false
+                    })
+            }
+        }
+        .sheet(isPresented: $showingFavorites) {
+            NavigationStack {
+                FavoritesView()
+                    .navigationTitle("Favorites")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarItems(trailing: Button("Done") {
+                        showingFavorites = false
+                    })
+            }
         }
     }
 }
@@ -412,6 +435,8 @@ struct GamificationStatsView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
     @State private var animateValues = false
+    @State private var showingRecipes = false
+    @State private var showingFavorites = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -430,7 +455,10 @@ struct GamificationStatsView: View {
                     value: animateValues ? appState.allRecipes.count : 0,
                     icon: "sparkles",
                     color: Color(hex: "#667eea"),
-                    suffix: ""
+                    suffix: "",
+                    action: {
+                        showingRecipes = true
+                    }
                 )
                 
                 AnimatedStatCard(
@@ -446,7 +474,10 @@ struct GamificationStatsView: View {
                     value: animateValues ? appState.favoritedRecipeIds.count : 0,
                     icon: "heart.fill",
                     color: Color(hex: "#4facfe"),
-                    suffix: ""
+                    suffix: "",
+                    action: {
+                        showingFavorites = true
+                    }
                 )
                 
                 AnimatedStatCard(
@@ -463,6 +494,26 @@ struct GamificationStatsView: View {
                 animateValues = true
             }
         }
+        .sheet(isPresented: $showingRecipes) {
+            NavigationStack {
+                RecipesView()
+                    .navigationTitle("Your Recipes")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarItems(trailing: Button("Done") {
+                        showingRecipes = false
+                    })
+            }
+        }
+        .sheet(isPresented: $showingFavorites) {
+            NavigationStack {
+                FavoritesView()
+                    .navigationTitle("Favorites")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarItems(trailing: Button("Done") {
+                        showingFavorites = false
+                    })
+            }
+        }
     }
 }
 
@@ -473,11 +524,12 @@ struct AnimatedStatCard: View {
     let icon: String
     let color: Color
     let suffix: String
+    var action: (() -> Void)? = nil
     
     @State private var isPressed = false
     
     var body: some View {
-        Button(action: {}) {
+        Button(action: { action?() }) {
             GlassmorphicCard(content: {
                 VStack(spacing: 8) {
                     // Icon with glow - made smaller
@@ -1419,18 +1471,25 @@ struct ProviderOptionCard: View {
 struct CollectionProgressView: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @State private var animateProgress = false
     
     var totalRecipes: Int {
-        if let cloudKitUser = cloudKitAuthManager.currentUser {
-            return cloudKitUser.recipesCreated
+        // Use CloudKit recipe counts when available
+        if cloudKitAuthManager.isAuthenticated {
+            return cloudKitRecipeManager.userCreatedRecipeIDs.count + cloudKitRecipeManager.userSavedRecipeIDs.count
         } else {
             return appState.allRecipes.count
         }
     }
     
     var favoriteRecipes: Int {
-        appState.favoritedRecipeIds.count
+        // Use CloudKit favorites when available
+        if cloudKitAuthManager.isAuthenticated {
+            return cloudKitRecipeManager.userFavoritedRecipeIDs.count
+        } else {
+            return appState.favoritedRecipeIds.count
+        }
     }
     
     var sharedRecipes: Int {
@@ -1563,15 +1622,62 @@ struct ProfileAchievementGalleryView: View {
     @EnvironmentObject var gamificationManager: GamificationManager
     @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
     @State private var selectedAchievement: ProfileAchievement?
+    @State private var cloudKitAchievements: [ProfileAchievement] = []
     
-    let achievements = [
-        ProfileAchievement(id: "first_recipe", title: "First Recipe", description: "Create your first recipe", icon: "🍳", isUnlocked: false, unlockedDate: nil),
-        ProfileAchievement(id: "recipe_explorer", title: "Recipe Explorer", description: "Create 10 recipes", icon: "🧭", isUnlocked: false, unlockedDate: nil),
-        ProfileAchievement(id: "master_chef", title: "Master Chef", description: "Create 50 recipes", icon: "👨‍🍳", isUnlocked: false, unlockedDate: nil),
-        ProfileAchievement(id: "week_streak", title: "Week Warrior", description: "7 day streak", icon: "🔥", isUnlocked: false, unlockedDate: nil),
-        ProfileAchievement(id: "month_streak", title: "Dedicated Chef", description: "30 day streak", icon: "💪", isUnlocked: false, unlockedDate: nil),
-        ProfileAchievement(id: "social_butterfly", title: "Social Butterfly", description: "Share 10 recipes", icon: "🦋", isUnlocked: false, unlockedDate: nil)
-    ]
+    var achievements: [ProfileAchievement] {
+        // Use CloudKit achievements if available, otherwise use defaults
+        if !cloudKitAchievements.isEmpty {
+            return cloudKitAchievements
+        } else {
+            return [
+                ProfileAchievement(id: "first_recipe", title: "First Recipe", description: "Create your first recipe", icon: "🍳", isUnlocked: false, unlockedDate: nil),
+                ProfileAchievement(id: "recipe_explorer", title: "Recipe Explorer", description: "Create 10 recipes", icon: "🧭", isUnlocked: false, unlockedDate: nil),
+                ProfileAchievement(id: "master_chef", title: "Master Chef", description: "Create 50 recipes", icon: "👨‍🍳", isUnlocked: false, unlockedDate: nil),
+                ProfileAchievement(id: "week_streak", title: "Week Warrior", description: "7 day streak", icon: "🔥", isUnlocked: false, unlockedDate: nil),
+                ProfileAchievement(id: "month_streak", title: "Dedicated Chef", description: "30 day streak", icon: "💪", isUnlocked: false, unlockedDate: nil),
+                ProfileAchievement(id: "social_butterfly", title: "Social Butterfly", description: "Share 10 recipes", icon: "🦋", isUnlocked: false, unlockedDate: nil)
+            ]
+        }
+    }
+    
+    private func loadCloudKitAchievements() {
+        Task {
+            do {
+                guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { return }
+                
+                let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+                let privateDB = container.privateCloudDatabase
+                
+                let predicate = NSPredicate(format: "userID == %@", userID)
+                let query = CKQuery(recordType: "Achievement", predicate: predicate)
+                
+                let (results, _) = try await privateDB.records(matching: query)
+                
+                var loadedAchievements: [ProfileAchievement] = []
+                for (_, result) in results {
+                    if let record = try? result.get() {
+                        let achievement = ProfileAchievement(
+                            id: record["id"] as? String ?? UUID().uuidString,
+                            title: record["name"] as? String ?? "Unknown",
+                            description: record["description"] as? String ?? "",
+                            icon: record["iconName"] as? String ?? "🏆",
+                            isUnlocked: true,
+                            unlockedDate: record["earnedAt"] as? Date
+                        )
+                        loadedAchievements.append(achievement)
+                    }
+                }
+                
+                await MainActor.run {
+                    self.cloudKitAchievements = loadedAchievements
+                }
+                
+                print("✅ Loaded \(loadedAchievements.count) achievements from CloudKit")
+            } catch {
+                print("❌ Failed to load CloudKit achievements: \(error)")
+            }
+        }
+    }
     
     private func isAchievementUnlocked(_ achievement: ProfileAchievement) -> Bool {
         let recipeCount = cloudKitAuthManager.currentUser?.recipesCreated ?? appState.allRecipes.count
@@ -1617,6 +1723,11 @@ struct ProfileAchievementGalleryView: View {
                         selectedAchievement = achievement
                     }
                 }
+            }
+        }
+        .onAppear {
+            if cloudKitAuthManager.isAuthenticated {
+                loadCloudKitAchievements()
             }
         }
         .sheet(item: $selectedAchievement) { achievement in
@@ -1787,6 +1898,91 @@ struct ProfileAchievementDetailView: View {
 struct ActiveChallengesSection: View {
     @StateObject private var gamificationManager = GamificationManager.shared
     @State private var showingChallengeHub = false
+    @State private var cloudKitChallenges: [Challenge] = []
+    @State private var isLoadingChallenges = false
+    
+    private var allActiveChallenges: [Challenge] {
+        // Combine local and CloudKit challenges
+        var combined = gamificationManager.activeChallenges + cloudKitChallenges
+        // Remove duplicates by ID
+        var seenIds = Set<String>()
+        combined = combined.filter { challenge in
+            if seenIds.contains(challenge.id) {
+                return false
+            }
+            seenIds.insert(challenge.id)
+            return true
+        }
+        return combined
+    }
+    
+    private func loadCloudKitChallenges() {
+        guard !isLoadingChallenges else { return }
+        isLoadingChallenges = true
+        
+        Task {
+            do {
+                guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { 
+                    await MainActor.run { isLoadingChallenges = false }
+                    return 
+                }
+                
+                let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+                let privateDB = container.privateCloudDatabase
+                
+                // Fetch user's active challenges
+                let predicate = NSPredicate(format: "userID == %@ AND status == %@", userID, "active")
+                let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
+                
+                let (results, _) = try await privateDB.records(matching: query)
+                
+                var loadedChallenges: [Challenge] = []
+                for (_, result) in results {
+                    if let record = try? result.get(),
+                       let challengeRef = record["challengeID"] as? CKRecord.Reference {
+                        // Fetch the actual challenge details
+                        let challengeRecord = try await container.publicCloudDatabase.record(for: challengeRef.recordID)
+                        
+                        // Create Challenge object from CloudKit record
+                        let challenge = Challenge(
+                            id: challengeRecord["id"] as? String ?? UUID().uuidString,
+                            title: challengeRecord["title"] as? String ?? "Unknown Challenge",
+                            description: challengeRecord["description"] as? String ?? "",
+                            type: ChallengeType(rawValue: challengeRecord["type"] as? String ?? "Daily Challenge") ?? .daily,
+                            category: challengeRecord["category"] as? String ?? "general",
+                            difficulty: DifficultyLevel(rawValue: challengeRecord["difficulty"] as? Int ?? 1) ?? .easy,
+                            points: challengeRecord["points"] as? Int ?? 0,
+                            coins: challengeRecord["coins"] as? Int ?? 0,
+                            startDate: challengeRecord["startDate"] as? Date ?? Date(),
+                            endDate: challengeRecord["endDate"] as? Date ?? Date(),
+                            requirements: [],
+                            currentProgress: 0,
+                            isCompleted: false,
+                            isActive: true,
+                            isJoined: true, // User has joined if it's in their UserChallenge records
+                            participants: challengeRecord["participantCount"] as? Int ?? 0,
+                            completions: challengeRecord["completionCount"] as? Int ?? 0,
+                            imageURL: challengeRecord["imageURL"] as? String,
+                            isPremium: challengeRecord["isPremium"] as? Bool ?? false
+                        )
+                        loadedChallenges.append(challenge)
+                    }
+                }
+                
+                await MainActor.run {
+                    self.cloudKitChallenges = loadedChallenges
+                    self.isLoadingChallenges = false
+                }
+                
+                print("✅ Loaded \(loadedChallenges.count) active challenges from CloudKit")
+            } catch {
+                print("❌ Failed to load CloudKit challenges: \(error)")
+                await MainActor.run {
+                    self.isLoadingChallenges = false
+                }
+            }
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1797,7 +1993,7 @@ struct ActiveChallengesSection: View {
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     
-                    Text("\(gamificationManager.activeChallenges.count) challenges active")
+                    Text("\(allActiveChallenges.count) challenges active")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
@@ -1812,7 +2008,7 @@ struct ActiveChallengesSection: View {
             }
             
             // Active Challenges List
-            if gamificationManager.activeChallenges.isEmpty {
+            if allActiveChallenges.isEmpty && !isLoadingChallenges {
                 HStack {
                     Spacer()
                     VStack(spacing: 12) {
@@ -1826,10 +2022,18 @@ struct ActiveChallengesSection: View {
                     .padding(.vertical, 30)
                     Spacer()
                 }
+            } else if isLoadingChallenges {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "#667eea")))
+                        .padding(.vertical, 30)
+                    Spacer()
+                }
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
-                        ForEach(Array(gamificationManager.activeChallenges.prefix(3))) { challenge in
+                        ForEach(Array(allActiveChallenges.prefix(3))) { challenge in
                             CompactChallengeCard(challenge: challenge) {
                                 showingChallengeHub = true
                             }
@@ -1857,6 +2061,11 @@ struct ActiveChallengesSection: View {
                         )
                 )
         )
+        .onAppear {
+            if CloudKitAuthManager.shared.isAuthenticated {
+                loadCloudKitChallenges()
+            }
+        }
         .sheet(isPresented: $showingChallengeHub) {
             ChallengeHubView()
         }

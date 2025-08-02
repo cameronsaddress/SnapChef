@@ -41,6 +41,9 @@ files_to_add = {
     'AIPersonalityManager.swift',
     'AIPersonalityView.swift',
     'MysteryMealView.swift'
+  ],
+  'Recipes' => [
+    'FavoritesView.swift'
   ]
 }
 

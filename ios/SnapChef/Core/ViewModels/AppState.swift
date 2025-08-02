@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import CloudKit
 
 @MainActor
 class AppState: ObservableObject {
@@ -101,6 +102,28 @@ class AppState: ObservableObject {
     
     func incrementShares() {
         totalShares += 1
+        
+        // Update CloudKit user profile if authenticated
+        if CloudKitAuthManager.shared.isAuthenticated {
+            Task {
+                do {
+                    if let userID = UserDefaults.standard.string(forKey: "currentUserID") {
+                        let profileID = CKRecord.ID(recordName: "profile_\(userID)")
+                        let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+                        let privateDB = container.privateCloudDatabase
+                        
+                        let profileRecord = try await privateDB.record(for: profileID)
+                        let currentShares = profileRecord["recipesShared"] as? Int64 ?? 0
+                        profileRecord["recipesShared"] = currentShares + 1
+                        
+                        _ = try await privateDB.save(profileRecord)
+                        print("✅ Updated share count in CloudKit")
+                    }
+                } catch {
+                    print("❌ Failed to update share count in CloudKit: \(error)")
+                }
+            }
+        }
     }
     
     func incrementLikes() {
@@ -117,15 +140,40 @@ class AppState: ObservableObject {
     }
     
     func toggleFavorite(_ recipeId: UUID) {
+        let wasAdded: Bool
         if favoritedRecipeIds.contains(recipeId) {
             favoritedRecipeIds.remove(recipeId)
+            wasAdded = false
         } else {
             favoritedRecipeIds.insert(recipeId)
+            wasAdded = true
         }
         
         // Save to UserDefaults
         if let encoded = try? JSONEncoder().encode(favoritedRecipeIds) {
             userDefaults.set(encoded, forKey: favoritedRecipesKey)
+        }
+        
+        // Sync with CloudKit if authenticated
+        if CloudKitAuthManager.shared.isAuthenticated {
+            Task {
+                do {
+                    if wasAdded {
+                        try await CloudKitRecipeManager.shared.addRecipeToUserProfile(
+                            recipeId.uuidString,
+                            type: .favorited
+                        )
+                    } else {
+                        try await CloudKitRecipeManager.shared.removeRecipeFromUserProfile(
+                            recipeId.uuidString,
+                            type: .favorited
+                        )
+                    }
+                    print("✅ Synced favorite status to CloudKit")
+                } catch {
+                    print("❌ Failed to sync favorite to CloudKit: \(error)")
+                }
+            }
         }
     }
     

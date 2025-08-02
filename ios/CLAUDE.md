@@ -11,6 +11,15 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
 ### Latest Updates (Feb 2, 2025)
+- **NEW: Complete CloudKit Bidirectional Sync**
+  - All user data now syncs both ways (push and pull) with CloudKit
+  - Recipes: Automatically uploaded when created, synced across devices
+  - Profile Stats: Real-time sync of recipes created, favorites, and shares
+  - Challenges: Start/progress/completion synced to CloudKit
+  - Achievements: Automatically saved to CloudKit when earned
+  - Leaderboards: Updated in real-time with challenge completions
+  - ProfileView: Now loads active challenges and achievements from CloudKit
+  - Interactive profile tiles for recipes and favorites navigation
 - **FIXED: Authentication & Username Setup Flow**
   - Fixed username setup view not showing after Sign in with Apple
   - Added username check for both new and existing users

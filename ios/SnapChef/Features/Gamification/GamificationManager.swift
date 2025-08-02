@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import CloudKit
 
 // MARK: - Challenge Types
 enum ChallengeType: String, CaseIterable {
@@ -218,6 +219,13 @@ class GamificationManager: ObservableObject {
         // Subscribe to database updates
         challengeDatabase.$activeChallenges
             .assign(to: &$activeChallenges)
+        
+        // Also sync with CloudKit if authenticated
+        if CloudKitAuthManager.shared.isAuthenticated {
+            Task {
+                await syncChallengesFromCloudKit()
+            }
+        }
     }
     
     // MARK: - Challenge Database Loading
@@ -226,6 +234,42 @@ class GamificationManager: ObservableObject {
         // The database automatically updates its active challenges
         // We just need to trigger an initial update
         challengeDatabase.updateActiveChallenges()
+    }
+    
+    // MARK: - CloudKit Sync
+    
+    @MainActor
+    private func syncChallengesFromCloudKit() async {
+        do {
+            // Sync challenges from CloudKit
+            try await CloudKitManager.shared.syncChallenges()
+            
+            // Also sync user's challenge progress
+            if let userID = UserDefaults.standard.string(forKey: "currentUserID") {
+                // Fetch user's active challenges from CloudKit
+                let predicate = NSPredicate(format: "userID == %@ AND status != %@", userID, "completed")
+                let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+                let privateDB = container.privateCloudDatabase
+                
+                let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
+                let (results, _) = try await privateDB.records(matching: query)
+                
+                for (_, result) in results {
+                    if let record = try? result.get() {
+                        // Update local challenge progress
+                        if let challengeIDRef = record["challengeID"] as? CKRecord.Reference,
+                           let progress = record["progress"] as? Double {
+                            let challengeID = challengeIDRef.recordID.recordName
+                            updateChallengeProgress(challengeID, progress: progress)
+                        }
+                    }
+                }
+                
+                print("✅ Synced \(results.count) active challenges from CloudKit")
+            }
+        } catch {
+            print("❌ Failed to sync challenges from CloudKit: \(error)")
+        }
     }
     
     // MARK: - Local Challenge Loading (Legacy - kept for reference)
@@ -710,6 +754,33 @@ class GamificationManager: ObservableObject {
     func awardBadge(_ badgeName: String) {
         // Award badge logic
         print("Awarded badge: \(badgeName)")
+        
+        // Save achievement to CloudKit if authenticated
+        if CloudKitAuthManager.shared.isAuthenticated {
+            Task {
+                do {
+                    guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { return }
+                    
+                    let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+                    let privateDB = container.privateCloudDatabase
+                    
+                    // Create achievement record
+                    let achievementRecord = CKRecord(recordType: "Achievement")
+                    achievementRecord["id"] = UUID().uuidString
+                    achievementRecord["userID"] = userID
+                    achievementRecord["name"] = badgeName
+                    achievementRecord["description"] = "Earned \(badgeName) badge"
+                    achievementRecord["iconName"] = "🏆"
+                    achievementRecord["earnedAt"] = Date()
+                    achievementRecord["points"] = 100
+                    
+                    _ = try await privateDB.save(achievementRecord)
+                    print("✅ Achievement saved to CloudKit: \(badgeName)")
+                } catch {
+                    print("❌ Failed to save achievement to CloudKit: \(error)")
+                }
+            }
+        }
     }
     
     // MARK: - Streak Management
