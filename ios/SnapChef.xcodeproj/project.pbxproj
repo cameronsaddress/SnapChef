@@ -111,6 +111,7 @@
 		DAABE07FA987C16FB5FCA875 /* CloudKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D754451606A66D155B291DD /* CloudKitSyncService.swift */; };
 		DAABE07FA987C16FB5FCA876 /* CloudKitDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D754451606A66D155B291DE /* CloudKitDataManager.swift */; };
 		DAABE07FA987C16FB5FCA877 /* CloudKitRecipeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D754451606A66D155B291DF /* CloudKitRecipeManager.swift */; };
+		DAABE07FA987C16FB5FCA879 /* FakeUserDataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D754451606A66D155B291E1 /* FakeUserDataService.swift */; };
 		DAABE07FA987C16FB5FCA878 /* CloudKitChallengeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D754451606A66D155B291E0 /* CloudKitChallengeManager.swift */; };
 		DD5120E2956062E461518E24 /* fridge.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 258CF31CFDA34009FD6ED5D8 /* fridge.jpg */; };
 		DFB0D378B249D5BAE00DA67D /* SnapChefApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43329C15A8E8386F4370D4E /* SnapChefApp.swift */; };
@@ -156,6 +157,7 @@
 		0D754451606A66D155B291DE /* CloudKitDataManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitDataManager.swift; path = SnapChef/Core/Services/CloudKitDataManager.swift; sourceTree = "<group>"; };
 		0D754451606A66D155B291DF /* CloudKitRecipeManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitRecipeManager.swift; path = SnapChef/Core/Services/CloudKitRecipeManager.swift; sourceTree = "<group>"; };
 		0D754451606A66D155B291E0 /* CloudKitChallengeManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitChallengeManager.swift; path = SnapChef/Core/Services/CloudKitChallengeManager.swift; sourceTree = "<group>"; };
+		0D754451606A66D155B291E1 /* FakeUserDataService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FakeUserDataService.swift; path = SnapChef/Core/Services/FakeUserDataService.swift; sourceTree = "<group>"; };
 		0F7BA94EACC90AA7F225C1D5 /* DailyCheckInView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DailyCheckInView.swift; path = SnapChef/Features/Gamification/Views/DailyCheckInView.swift; sourceTree = "<group>"; };
 		0FCC9F8D9AE29902BE9D1FB5 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		12BAEE733C681CFD14DD29A3 /* ProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProfileView.swift; path = SnapChef/Features/Profile/ProfileView.swift; sourceTree = "<group>"; };
@@ -602,6 +604,7 @@
 				0D754451606A66D155B291DD /* CloudKitSyncService.swift */,
 				0D754451606A66D155B291DE /* CloudKitDataManager.swift */,
 				0D754451606A66D155B291DF /* CloudKitRecipeManager.swift */,
+				0D754451606A66D155B291E1 /* FakeUserDataService.swift */,
 				0D754451606A66D155B291E0 /* CloudKitChallengeManager.swift */,
 				D04AFD20AB4905F391B03625 /* CloudKitModels.swift */,
 				3AFC0D3DE258E136E47923E9 /* CloudKitStreakManager.swift */,
@@ -1000,6 +1003,7 @@
 				DAABE07FA987C16FB5FCA875 /* CloudKitSyncService.swift in Sources */,
 				DAABE07FA987C16FB5FCA876 /* CloudKitDataManager.swift in Sources */,
 				DAABE07FA987C16FB5FCA877 /* CloudKitRecipeManager.swift in Sources */,
+				DAABE07FA987C16FB5FCA879 /* FakeUserDataService.swift in Sources */,
 				DAABE07FA987C16FB5FCA878 /* CloudKitChallengeManager.swift in Sources */,
 				46E291AE1F4B2262295DE565 /* CloudKitModels.swift in Sources */,
 				5C0F70E2A3EC925B75F91A49 /* TeamChallengeView.swift in Sources */,

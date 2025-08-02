@@ -144,6 +144,7 @@ struct EnhancedProfileHeader: View {
     @State private var customName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
     @State private var customPhotoData: Data? = ProfilePhotoHelper.loadCustomPhotoFromFile()
     @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var gamificationManager: GamificationManager
     @EnvironmentObject var authManager: AuthenticationManager
@@ -434,9 +435,30 @@ struct StatusPill: View {
 struct GamificationStatsView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
+    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @State private var animateValues = false
     @State private var showingRecipes = false
     @State private var showingFavorites = false
+    
+    private func getTotalRecipeCount() -> Int {
+        // Combine local recipes with CloudKit recipes
+        let localRecipeCount = appState.allRecipes.count
+        let cloudKitSavedCount = cloudKitRecipeManager.userSavedRecipeIDs.count
+        let cloudKitCreatedCount = cloudKitRecipeManager.userCreatedRecipeIDs.count
+        
+        // Return the sum of local and CloudKit recipes
+        // Note: CloudKit includes both saved and created recipes
+        return localRecipeCount + cloudKitSavedCount + cloudKitCreatedCount
+    }
+    
+    private func getTotalFavoritesCount() -> Int {
+        // Combine local favorites with CloudKit favorites
+        let localFavoritesCount = appState.favoritedRecipeIds.count
+        let cloudKitFavoritesCount = cloudKitRecipeManager.userFavoritedRecipeIDs.count
+        
+        // Return the max to avoid duplicates (CloudKit likely includes all favorites)
+        return max(localFavoritesCount, cloudKitFavoritesCount)
+    }
     
     var body: some View {
         VStack(spacing: 20) {
@@ -452,7 +474,7 @@ struct GamificationStatsView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                 AnimatedStatCard(
                     title: "Your Recipes",
-                    value: animateValues ? appState.allRecipes.count : 0,
+                    value: animateValues ? getTotalRecipeCount() : 0,
                     icon: "sparkles",
                     color: Color(hex: "#667eea"),
                     suffix: "",
@@ -471,7 +493,7 @@ struct GamificationStatsView: View {
                 
                 AnimatedStatCard(
                     title: "Favorites",
-                    value: animateValues ? appState.favoritedRecipeIds.count : 0,
+                    value: animateValues ? getTotalFavoritesCount() : 0,
                     icon: "heart.fill",
                     color: Color(hex: "#4facfe"),
                     suffix: "",
@@ -493,6 +515,8 @@ struct GamificationStatsView: View {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.3)) {
                 animateValues = true
             }
+            // Load CloudKit recipe references to ensure counts are accurate
+            cloudKitRecipeManager.loadUserRecipeReferences()
         }
         .sheet(isPresented: $showingRecipes) {
             NavigationStack {

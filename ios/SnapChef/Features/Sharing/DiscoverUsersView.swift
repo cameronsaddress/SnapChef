@@ -8,12 +8,19 @@ struct UserProfile: Identifiable {
     let displayName: String
     let profileImageURL: String?
     let profileImage: UIImage?
-    let followerCount: Int
-    let followingCount: Int
+    var followerCount: Int
+    var followingCount: Int
     let recipesShared: Int
     let isVerified: Bool
-    let isFollowing: Bool
+    var isFollowing: Bool
     let bio: String?
+    
+    // Additional properties for enhanced profiles
+    var isLocal: Bool = false  // Indicates if this is a local fake user
+    var joinedDate: Date? = nil
+    var lastActive: Date? = nil
+    var cuisineSpecialty: String? = nil
+    var cookingLevel: String? = nil
     
     var followerText: String {
         if followerCount == 1 {
@@ -61,6 +68,15 @@ struct DiscoverUsersView: View {
                     SearchBarView(searchText: $searchText)
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
+                        .onChange(of: searchText) { newValue in
+                            // Debounced search
+                            Task {
+                                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                                if searchText == newValue {
+                                    await viewModel.searchUsers(newValue)
+                                }
+                            }
+                        }
                     
                     // Category Pills
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -153,9 +169,12 @@ struct DiscoverUsersView: View {
     }
     
     private var filteredUsers: [UserProfile] {
-        if searchText.isEmpty {
+        if !searchText.isEmpty && !viewModel.searchResults.isEmpty {
+            return viewModel.searchResults
+        } else if searchText.isEmpty {
             return viewModel.users
         } else {
+            // Local filtering as fallback
             return viewModel.users.filter {
                 $0.username.localizedCaseInsensitiveContains(searchText) ||
                 $0.displayName.localizedCaseInsensitiveContains(searchText)
@@ -395,22 +414,167 @@ class DiscoverUsersViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var hasMore = true
     @Published var selectedUser: UserProfile?
+    @Published var searchResults: [UserProfile] = []
+    @Published var isSearching = false
     
     private let cloudKitAuth = CloudKitAuthManager.shared
     private let cloudKitSync = CloudKitSyncService.shared
     private var lastFetchedRecord: CKRecord?
+    private var fakeUsers: [UserProfile] = []
+    private var cloudKitUsers: [UserProfile] = []
+    
+    init() {
+        // Load fake users on initialization
+        loadFakeUsers()
+    }
+    
+    private func loadFakeUsers() {
+        let fakeUserData = FakeUserDataService.shared.generateFakeUsers()
+        fakeUsers = fakeUserData.map { userData in
+            UserProfile(
+                id: userData.id,
+                username: userData.username,
+                displayName: userData.displayName,
+                profileImageURL: userData.profileImageURL,
+                profileImage: userData.profileImage,
+                followerCount: userData.followerCount,
+                followingCount: userData.followingCount,
+                recipesShared: userData.recipesShared,
+                isVerified: userData.isVerified,
+                isFollowing: userData.isFollowing,
+                bio: userData.bio,
+                isLocal: userData.isLocal,
+                joinedDate: userData.joinedDate,
+                lastActive: userData.lastActive,
+                cuisineSpecialty: userData.cuisineSpecialty,
+                cookingLevel: userData.cookingLevel
+            )
+        }
+    }
     
     func loadUsers(for category: DiscoverUsersView.DiscoverCategory) async {
         isLoading = true
         users = []
         lastFetchedRecord = nil
         
-        // For now, load mock data
-        // TODO: Implement CloudKit queries for different categories
-        users = generateMockUsers(for: category)
-        hasMore = false
+        // Load CloudKit users
+        await loadCloudKitUsers(for: category)
         
+        // Combine with fake users based on category
+        let filteredFakeUsers = filterFakeUsers(for: category)
+        
+        // Merge CloudKit and fake users
+        users = mergeUsers(cloudKit: cloudKitUsers, fake: filteredFakeUsers)
+        
+        hasMore = false
         isLoading = false
+    }
+    
+    private func loadCloudKitUsers(for category: DiscoverUsersView.DiscoverCategory) async {
+        do {
+            switch category {
+            case .suggested:
+                let suggestedUsers = try await cloudKitAuth.getSuggestedUsers(limit: 20)
+                cloudKitUsers = suggestedUsers.map { convertToUserProfile($0) }
+            case .trending:
+                let trendingUsers = try await cloudKitAuth.getTrendingUsers(limit: 20)
+                cloudKitUsers = trendingUsers.map { convertToUserProfile($0) }
+            case .newChefs:
+                // Get users who joined recently
+                let newUsers = try await cloudKitAuth.searchUsers(query: "")
+                cloudKitUsers = newUsers.prefix(20).map { convertToUserProfile($0) }
+            case .verified:
+                let verifiedUsers = try await cloudKitAuth.getVerifiedUsers(limit: 20)
+                cloudKitUsers = verifiedUsers.map { convertToUserProfile($0) }
+            }
+        } catch {
+            print("Failed to load CloudKit users: \(error)")
+            cloudKitUsers = []
+        }
+    }
+    
+    private func filterFakeUsers(for category: DiscoverUsersView.DiscoverCategory) -> [UserProfile] {
+        switch category {
+        case .suggested:
+            // Return top 30 fake users by follower count
+            return Array(fakeUsers.prefix(30))
+        case .trending:
+            // Return users with recent activity
+            return fakeUsers.filter { user in
+                if let lastActive = user.lastActive {
+                    return Date().timeIntervalSince(lastActive) < 86400 // Active in last 24 hours
+                }
+                return false
+            }.prefix(20).map { $0 }
+        case .newChefs:
+            // Return users who joined recently
+            return fakeUsers.filter { user in
+                if let joinedDate = user.joinedDate {
+                    return Date().timeIntervalSince(joinedDate) < 604800 // Joined in last week
+                }
+                return false
+            }.prefix(20).map { $0 }
+        case .verified:
+            // Return only verified fake users
+            return fakeUsers.filter { $0.isVerified }.prefix(20).map { $0 }
+        }
+    }
+    
+    private func mergeUsers(cloudKit: [UserProfile], fake: [UserProfile]) -> [UserProfile] {
+        // Combine and sort by follower count
+        let combined = cloudKit + fake
+        return combined.sorted { $0.followerCount > $1.followerCount }
+    }
+    
+    private func convertToUserProfile(_ cloudKitUser: CloudKitUser) -> UserProfile {
+        UserProfile(
+            id: cloudKitUser.recordID ?? "",
+            username: cloudKitUser.username ?? cloudKitUser.displayName.lowercased().replacingOccurrences(of: " ", with: ""),
+            displayName: cloudKitUser.displayName,
+            profileImageURL: cloudKitUser.profileImageURL,
+            profileImage: nil,
+            followerCount: cloudKitUser.followerCount,
+            followingCount: cloudKitUser.followingCount,
+            recipesShared: cloudKitUser.recipesShared,
+            isVerified: cloudKitUser.isVerified,
+            isFollowing: false, // Will be updated based on actual follow status
+            bio: nil,
+            isLocal: false,
+            joinedDate: cloudKitUser.createdAt,
+            lastActive: cloudKitUser.lastLoginAt,
+            cuisineSpecialty: nil,
+            cookingLevel: nil
+        )
+    }
+    
+    func searchUsers(_ query: String) async {
+        guard !query.isEmpty else {
+            searchResults = []
+            return
+        }
+        
+        isSearching = true
+        
+        // Search fake users locally
+        let matchingFakeUsers = fakeUsers.filter {
+            $0.username.localizedCaseInsensitiveContains(query) ||
+            $0.displayName.localizedCaseInsensitiveContains(query) ||
+            ($0.bio?.localizedCaseInsensitiveContains(query) ?? false) ||
+            ($0.cuisineSpecialty?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+        
+        // Search CloudKit users
+        var matchingCloudKitUsers: [UserProfile] = []
+        do {
+            let cloudKitResults = try await cloudKitAuth.searchUsers(query: query)
+            matchingCloudKitUsers = cloudKitResults.map { convertToUserProfile($0) }
+        } catch {
+            print("Failed to search CloudKit users: \(error)")
+        }
+        
+        // Combine and sort results
+        searchResults = mergeUsers(cloudKit: matchingCloudKitUsers, fake: matchingFakeUsers)
+        isSearching = false
     }
     
     func loadMore() async {
@@ -424,126 +588,38 @@ class DiscoverUsersViewModel: ObservableObject {
     }
     
     func toggleFollow(_ user: UserProfile) async {
-        do {
-            if user.isFollowing {
-                try await cloudKitAuth.unfollowUser(user.id)
-            } else {
-                try await cloudKitAuth.followUser(user.id)
-            }
-            
-            // Update local state
+        // Only allow following for CloudKit users, not local fake users
+        if user.isLocal {
+            // For local users, just update the UI state
             if let index = users.firstIndex(where: { $0.id == user.id }) {
-                users[index] = UserProfile(
-                    id: user.id,
-                    username: user.username,
-                    displayName: user.displayName,
-                    profileImageURL: user.profileImageURL,
-                    profileImage: user.profileImage,
-                    followerCount: user.followerCount + (user.isFollowing ? -1 : 1),
-                    followingCount: user.followingCount,
-                    recipesShared: user.recipesShared,
-                    isVerified: user.isVerified,
-                    isFollowing: !user.isFollowing,
-                    bio: user.bio
-                )
+                users[index].isFollowing.toggle()
+                users[index].followerCount += users[index].isFollowing ? 1 : -1
             }
-        } catch {
-            print("Failed to toggle follow: \(error)")
-        }
-    }
-    
-    private func generateMockUsers(for category: DiscoverUsersView.DiscoverCategory) -> [UserProfile] {
-        switch category {
-        case .suggested:
-            return [
-                UserProfile(
-                    id: "user1",
-                    username: "chefjulia",
-                    displayName: "Julia Child",
-                    profileImageURL: nil,
-                    profileImage: nil,
-                    followerCount: 125000,
-                    followingCount: 50,
-                    recipesShared: 342,
-                    isVerified: true,
-                    isFollowing: false,
-                    bio: "Bringing French cuisine to your kitchen"
-                ),
-                UserProfile(
-                    id: "user2",
-                    username: "ramseycooks",
-                    displayName: "Gordon Ramsay",
-                    profileImageURL: nil,
-                    profileImage: nil,
-                    followerCount: 2500000,
-                    followingCount: 100,
-                    recipesShared: 1523,
-                    isVerified: true,
-                    isFollowing: false,
-                    bio: "Michelin star chef | Hell's Kitchen"
-                ),
-                UserProfile(
-                    id: "user3",
-                    username: "homecookjoe",
-                    displayName: "Joe's Kitchen",
-                    profileImageURL: nil,
-                    profileImage: nil,
-                    followerCount: 850,
-                    followingCount: 432,
-                    recipesShared: 67,
-                    isVerified: false,
-                    isFollowing: false,
-                    bio: "Weekend warrior in the kitchen"
-                )
-            ]
-        case .trending:
-            return [
-                UserProfile(
-                    id: "user4",
-                    username: "tiktokvegan",
-                    displayName: "Vegan Vibes",
-                    profileImageURL: nil,
-                    profileImage: nil,
-                    followerCount: 45000,
-                    followingCount: 200,
-                    recipesShared: 128,
-                    isVerified: false,
-                    isFollowing: false,
-                    bio: "Plant-based recipes that don't suck"
-                )
-            ]
-        case .newChefs:
-            return [
-                UserProfile(
-                    id: "user5",
-                    username: "newbiechef",
-                    displayName: "Kitchen Newbie",
-                    profileImageURL: nil,
-                    profileImage: nil,
-                    followerCount: 12,
-                    followingCount: 85,
-                    recipesShared: 3,
-                    isVerified: false,
-                    isFollowing: false,
-                    bio: "Learning one recipe at a time"
-                )
-            ]
-        case .verified:
-            return [
-                UserProfile(
-                    id: "user6",
-                    username: "jamieoliver",
-                    displayName: "Jamie Oliver",
-                    profileImageURL: nil,
-                    profileImage: nil,
-                    followerCount: 1800000,
-                    followingCount: 150,
-                    recipesShared: 892,
-                    isVerified: true,
-                    isFollowing: false,
-                    bio: "Making cooking accessible for everyone"
-                )
-            ]
+            if let index = searchResults.firstIndex(where: { $0.id == user.id }) {
+                searchResults[index].isFollowing.toggle()
+                searchResults[index].followerCount += searchResults[index].isFollowing ? 1 : -1
+            }
+        } else {
+            // For CloudKit users, actually perform the follow/unfollow
+            do {
+                if user.isFollowing {
+                    try await cloudKitAuth.unfollowUser(user.id)
+                } else {
+                    try await cloudKitAuth.followUser(user.id)
+                }
+                
+                // Update local state
+                if let index = users.firstIndex(where: { $0.id == user.id }) {
+                    users[index].isFollowing.toggle()
+                    users[index].followerCount += users[index].isFollowing ? 1 : -1
+                }
+                if let index = searchResults.firstIndex(where: { $0.id == user.id }) {
+                    searchResults[index].isFollowing.toggle()
+                    searchResults[index].followerCount += searchResults[index].isFollowing ? 1 : -1
+                }
+            } catch {
+                print("Failed to toggle follow: \(error)")
+            }
         }
     }
 }

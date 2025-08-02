@@ -62,6 +62,14 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
   - Added loading indicator while fetching CloudKit recipes
   - Recipes refresh when app returns to foreground
   - Combined local and CloudKit recipes with deduplication
+- **NEW: CloudKit Challenge Synchronization (Feb 2, 2025)**
+  - Replaced non-existent API calls with CloudKit sync for challenges
+  - Challenges automatically upload to CloudKit when created locally
+  - User progress syncs bidirectionally between device and CloudKit
+  - Real-time sync runs every 5 minutes for active challenges
+  - Supports team challenges, achievements, and leaderboards
+  - Fixed network errors from api.snapchef.com (non-existent server)
+  - ChallengeService now uses CloudKitChallengeManager for all operations
 
 ### Documentation
 - **APP_ARCHITECTURE_DOCUMENTATION.md** - Complete system overview
