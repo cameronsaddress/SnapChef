@@ -424,6 +424,10 @@ struct CameraView: View {
                             do {
                                 let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true)
                                 print("✅ Recipe saved to CloudKit with ID: \(recipeID)")
+                                
+                                // Also add to user's saved recipes list
+                                try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
+                                print("✅ Recipe added to user's saved list")
                             } catch {
                                 print("❌ Failed to save recipe to CloudKit: \(error)")
                             }

@@ -453,7 +453,7 @@ struct ProgressCard: View {
                     HStack {
                         Image(systemName: "camera.fill")
                             .font(.system(size: 18))
-                        Text("Submit Proof")
+                        Text("Submit Completed Challenge")
                             .font(.system(size: 16, weight: .semibold))
                     }
                     .foregroundColor(.white)

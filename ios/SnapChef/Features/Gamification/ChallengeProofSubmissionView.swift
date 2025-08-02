@@ -178,7 +178,7 @@ struct ChallengeProofSubmissionView: View {
                                 } else {
                                     Image(systemName: submissionSuccess ? "checkmark.circle.fill" : "paperplane.fill")
                                         .font(.system(size: 18))
-                                    Text(submissionSuccess ? "Submitted!" : "Submit Proof")
+                                    Text(submissionSuccess ? "Submitted!" : "Submit Completed Challenge")
                                         .font(.system(size: 18, weight: .bold))
                                 }
                             }
