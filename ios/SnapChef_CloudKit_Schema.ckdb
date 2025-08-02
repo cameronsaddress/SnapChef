@@ -1,3 +1,26 @@
+-- SnapChef CloudKit Schema Definition
+-- Version: 2.0
+-- Last Updated: February 2, 2025
+--
+-- DEPLOYMENT INSTRUCTIONS:
+-- 1. Open CloudKit Dashboard: https://icloud.developer.apple.com/dashboard
+-- 2. Select container: iCloud.com.snapchefapp.app
+-- 3. Go to Schema > Record Types
+-- 4. Import this schema or manually create each record type
+-- 5. Deploy to Development environment first
+-- 6. Test thoroughly
+-- 7. Deploy to Production environment
+--
+-- PERMISSION MODEL:
+-- "_world" = Any user (authenticated or not) can read
+-- "_icloud" = Any authenticated iCloud user can create new records
+-- "_creator" = Only the user who created the record can modify/delete it
+--
+-- This allows users to:
+-- - Create their own challenges, teams, and activities
+-- - Read all public content
+-- - Only modify their own records
+
 DEFINE SCHEMA
 
     -- Note: Photo storage is disabled pending appropriateness scanning implementation
@@ -65,6 +88,7 @@ DEFINE SCHEMA
         minTeamSize     INT64,
         maxTeamSize     INT64,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -109,6 +133,7 @@ DEFINE SCHEMA
         isPublic        INT64,
         maxMembers      INT64,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -148,6 +173,7 @@ DEFINE SCHEMA
         lastUpdated     TIMESTAMP SORTABLE,
         region          STRING QUERYABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -257,6 +283,7 @@ DEFINE SCHEMA
         recipeOwnerID     STRING,
         likedAt           TIMESTAMP SORTABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -321,6 +348,7 @@ DEFINE SCHEMA
         timestamp          TIMESTAMP SORTABLE,
         isRead             INT64 QUERYABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
