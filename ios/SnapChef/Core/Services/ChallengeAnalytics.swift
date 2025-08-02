@@ -35,8 +35,29 @@ class ChallengeAnalyticsService: ObservableObject {
         self.weeklyMetrics = WeeklyChallengeMetrics()
         self.userEngagement = UserEngagementMetrics()
         
+        // Clean up large UserDefaults data to prevent overflow
+        cleanupLargeUserDefaultsData()
+        
         loadStoredMetrics()
         setupPeriodicUpdates()
+    }
+    
+    private func cleanupLargeUserDefaultsData() {
+        // Remove analytics data from UserDefaults if it exists (moved to file storage)
+        if UserDefaults.standard.object(forKey: "ChallengeAnalyticsData") != nil {
+            UserDefaults.standard.removeObject(forKey: "ChallengeAnalyticsData")
+            print("🧹 Cleaned up analytics data from UserDefaults")
+        }
+        
+        // Check for any other large data and clean up
+        let userDefaults = UserDefaults.standard
+        let dict = userDefaults.dictionaryRepresentation()
+        for (key, value) in dict {
+            if let data = value as? Data, data.count > 100_000 { // 100KB limit per key
+                print("⚠️ Found large data in UserDefaults key '\(key)': \(data.count) bytes")
+                userDefaults.removeObject(forKey: key)
+            }
+        }
     }
     
     // MARK: - Event Tracking

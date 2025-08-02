@@ -313,7 +313,8 @@ class CloudKitRecipeManager: ObservableObject {
     }
     
     private func checkRecipeExists(_ name: String, _ description: String) async -> String? {
-        let predicate = NSPredicate(format: "title == %@ AND description == %@", name, description)
+        // Only use title for query since description is not queryable
+        let predicate = NSPredicate(format: "title == %@", name)
         let query = CKQuery(recordType: "Recipe", predicate: predicate)
         
         do {
