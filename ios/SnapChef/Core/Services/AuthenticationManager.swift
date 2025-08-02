@@ -9,6 +9,9 @@ class AuthenticationManager: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var currentUser: User?
     @Published var showAuthSheet: Bool = false
+    @Published var showUsernameSetup: Bool = false
+    @Published var temporaryUsername: String = "Chef\(Int.random(in: 10000...99999))"
+    @Published var profileImage: UIImage?
     
     private let keychain = KeychainService()
     private let authTokenKey = "com.snapchef.authToken"
@@ -121,6 +124,12 @@ class AuthenticationManager: ObservableObject {
         self.currentUser = response.user
         self.isAuthenticated = true
         self.showAuthSheet = false
+        
+        // Check if user needs to set up username
+        if response.user.username.hasPrefix("Chef") && response.user.username.count == 10 {
+            // User has a temporary username, show setup
+            self.showUsernameSetup = true
+        }
     }
     
     func signOut() {
@@ -146,6 +155,39 @@ class AuthenticationManager: ObservableObject {
         case .basicRecipes:
             return false // Basic recipe generation doesn't require auth
         }
+    }
+    
+    // Update username after setup
+    func updateUsername(_ username: String) {
+        if var user = currentUser {
+            var updatedUser = user
+            // Create a new user with updated username
+            currentUser = User(
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                username: username,
+                profileImageURL: user.profileImageURL,
+                subscription: user.subscription,
+                credits: user.credits,
+                deviceId: user.deviceId,
+                createdAt: user.createdAt,
+                lastLoginAt: user.lastLoginAt,
+                totalPoints: user.totalPoints,
+                currentStreak: user.currentStreak,
+                longestStreak: user.longestStreak,
+                challengesCompleted: user.challengesCompleted,
+                recipesShared: user.recipesShared,
+                isProfilePublic: user.isProfilePublic,
+                showOnLeaderboard: user.showOnLeaderboard
+            )
+        }
+    }
+    
+    // Update profile image
+    func updateProfileImage(_ image: UIImage) {
+        self.profileImage = image
+        // In a real app, you'd upload this to CloudKit or your backend
     }
     
     func promptAuthForFeature(_ feature: AuthRequiredFeature) {

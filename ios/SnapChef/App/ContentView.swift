@@ -39,6 +39,7 @@ struct ContentView: View {
 
 struct MainTabView: View {
     @State private var selectedTab = 0
+    @EnvironmentObject var authManager: AuthenticationManager
     
     var body: some View {
         // Single NavigationStack at the root level
@@ -101,6 +102,10 @@ struct MainTabView: View {
                 }
             }
             .navigationBarHidden(true) // Hide the default navigation bar
+        }
+        .sheet(isPresented: $authManager.showUsernameSetup) {
+            UsernameSetupView()
+                .environmentObject(authManager)
         }
     }
 }

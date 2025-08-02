@@ -123,11 +123,14 @@ struct EnhancedProfileHeader: View {
     @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var gamificationManager: GamificationManager
+    @EnvironmentObject var authManager: AuthenticationManager
     
     // Computed properties for display
     private var displayName: String {
-        // Priority: CloudKit username > CloudKit display name > Custom name > User name > Guest
-        if let cloudKitUser = cloudKitAuthManager.currentUser {
+        // Priority: Auth username > CloudKit username > Custom name > User name > Guest
+        if let authUser = authManager.currentUser {
+            return authUser.username
+        } else if let cloudKitUser = cloudKitAuthManager.currentUser {
             // Prefer username if set, otherwise use display name
             if let username = cloudKitUser.username, !username.isEmpty {
                 return username
@@ -139,7 +142,7 @@ struct EnhancedProfileHeader: View {
         } else if let userName = user?.name {
             return userName
         } else {
-            return "Guest Chef"
+            return authManager.temporaryUsername
         }
     }
     
@@ -270,7 +273,13 @@ struct EnhancedProfileHeader: View {
                             .frame(width: 120, height: 120)
                             .overlay(
                                 Group {
-                                    if let photoData = customPhotoData,
+                                    if let profileImage = authManager.profileImage {
+                                        Image(uiImage: profileImage)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 120, height: 120)
+                                            .clipShape(Circle())
+                                    } else if let photoData = customPhotoData,
                                        let uiImage = UIImage(data: photoData) {
                                         Image(uiImage: uiImage)
                                             .resizable()
@@ -278,7 +287,7 @@ struct EnhancedProfileHeader: View {
                                             .frame(width: 120, height: 120)
                                             .clipShape(Circle())
                                     } else {
-                                        Text((customName.isEmpty ? (user?.name ?? "Guest") : customName).prefix(1).uppercased())
+                                        Text(displayName.prefix(1).uppercased())
                                             .font(.system(size: 48, weight: .bold, design: .rounded))
                                             .foregroundColor(.white)
                                     }
@@ -304,7 +313,7 @@ struct EnhancedProfileHeader: View {
             // User info with gradient text
             VStack(spacing: 8) {
                 Button(action: { showingEditProfile = true }) {
-                    Text(customName.isEmpty ? (user?.name ?? "Guest Chef") : customName)
+                    Text(displayName)
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
@@ -316,7 +325,7 @@ struct EnhancedProfileHeader: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 
-                Text(user?.email ?? "Start your culinary journey")
+                Text(emailDisplay)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white.opacity(0.8))
                 
