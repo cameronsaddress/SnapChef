@@ -8,7 +8,7 @@ import Combine
 class CloudKitDataManager: ObservableObject {
     static let shared = CloudKitDataManager()
     
-    private let container = CKContainer(identifier: "iCloud.com.snapchef.app")
+    private let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
     private let publicDB: CKDatabase
     private let privateDB: CKDatabase
     

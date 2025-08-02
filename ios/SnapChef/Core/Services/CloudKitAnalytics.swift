@@ -5,8 +5,8 @@ import CloudKit
 /// Only tracks high-value, low-storage events
 class CloudKitAnalytics {
     static let shared = CloudKitAnalytics()
-    private let container = CKContainer(identifier: "iCloud.com.snapchef.app")
-    private let database = CKContainer(identifier: "iCloud.com.snapchef.app").publicCloudDatabase
+    private let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+    private let database = CKContainer(identifier: "iCloud.com.snapchefapp.app").publicCloudDatabase
     
     // Batch events to reduce API calls
     private var eventQueue: [AnalyticsEvent] = []

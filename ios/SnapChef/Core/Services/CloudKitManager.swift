@@ -173,7 +173,12 @@ class CloudKitManager: ObservableObject {
         for record in records {
             // Check if challenge already exists
             let fetchRequest: NSFetchRequest<ChallengeEntity> = ChallengeEntity.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "id == %@", record.recordID.recordName)
+            // Use id field for predicate instead of recordName (which isn't queryable)
+            if let entityID = record["id"] as? String {
+                fetchRequest.predicate = NSPredicate(format: "id == %@", entityID)
+            } else {
+                fetchRequest.predicate = NSPredicate(format: "id == %@", record.recordID.recordName)
+            }
             
             let existingChallenges = try context.fetch(fetchRequest)
             let challenge = existingChallenges.first ?? ChallengeEntity(context: context)
@@ -406,7 +411,12 @@ class CloudKitManager: ObservableObject {
         
         for record in records {
             let fetchRequest: NSFetchRequest<ChallengeParticipantEntity> = ChallengeParticipantEntity.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "id == %@", record.recordID.recordName)
+            // Use id field for predicate instead of recordName (which isn't queryable)
+            if let entityID = record["id"] as? String {
+                fetchRequest.predicate = NSPredicate(format: "id == %@", entityID)
+            } else {
+                fetchRequest.predicate = NSPredicate(format: "id == %@", record.recordID.recordName)
+            }
             
             let existingParticipants = try context.fetch(fetchRequest)
             let participant = existingParticipants.first ?? ChallengeParticipantEntity(context: context)
@@ -427,7 +437,12 @@ class CloudKitManager: ObservableObject {
         
         for record in records {
             let fetchRequest: NSFetchRequest<ChallengeProgressEntity> = ChallengeProgressEntity.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "id == %@", record.recordID.recordName)
+            // Use id field for predicate instead of recordName (which isn't queryable)
+            if let entityID = record["id"] as? String {
+                fetchRequest.predicate = NSPredicate(format: "id == %@", entityID)
+            } else {
+                fetchRequest.predicate = NSPredicate(format: "id == %@", record.recordID.recordName)
+            }
             
             let existingProgress = try context.fetch(fetchRequest)
             let progress = existingProgress.first ?? ChallengeProgressEntity(context: context)

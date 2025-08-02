@@ -8,7 +8,7 @@ import SwiftUI
 class CloudKitRecipeManager: ObservableObject {
     static let shared = CloudKitRecipeManager()
     
-    private let container = CKContainer(identifier: "iCloud.com.snapchef.app")
+    private let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
     private let publicDB: CKDatabase
     private let privateDB: CKDatabase
     

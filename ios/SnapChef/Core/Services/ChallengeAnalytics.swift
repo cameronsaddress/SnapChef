@@ -319,6 +319,7 @@ class ChallengeAnalyticsService: ObservableObject {
     
     private func storeEvent(_ event: AnalyticsEventData) {
         // Store event for historical analysis
+        // Limit data size to prevent UserDefaults overflow (max 4MB)
         let storedData = StoredAnalyticsData(
             userEngagement: userEngagement,
             dailyMetrics: dailyMetrics,
@@ -326,8 +327,22 @@ class ChallengeAnalyticsService: ObservableObject {
         )
         
         if let encoded = try? JSONEncoder().encode(storedData) {
-            UserDefaults.standard.set(encoded, forKey: "ChallengeAnalyticsData")
+            // Check size before storing
+            if encoded.count < 100_000 { // Store only if less than 100KB
+                UserDefaults.standard.set(encoded, forKey: "ChallengeAnalyticsData")
+            } else {
+                // If data is too large, store to file instead
+                storeAnalyticsToFile(encoded)
+                // Clear UserDefaults to prevent overflow
+                UserDefaults.standard.removeObject(forKey: "ChallengeAnalyticsData")
+            }
         }
+    }
+    
+    private func storeAnalyticsToFile(_ data: Data) {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let analyticsPath = documentsPath.appendingPathComponent("analytics_data.json")
+        try? data.write(to: analyticsPath)
     }
     
     private func setupPeriodicUpdates() {
