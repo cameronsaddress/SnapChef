@@ -143,21 +143,38 @@ struct CloudKitAuthView: View {
     }
     
     private func handleSignInWithApple(_ result: Result<ASAuthorization, Error>) {
-        isLoading = true
-        
         Task {
             do {
                 switch result {
                 case .success(let authorization):
+                    isLoading = true
                     try await authManager.signInWithApple(authorization: authorization)
-                    dismiss()
+                    
+                    // Check if we need username setup
+                    if authManager.showUsernameSelection {
+                        // Username selection will be shown via sheet
+                        isLoading = false
+                    } else {
+                        dismiss()
+                    }
                 case .failure(let error):
-                    throw error
+                    // Handle specific error codes
+                    let nsError = error as NSError
+                    if nsError.code == 1001 {
+                        // User cancelled - just dismiss loading
+                        print("User cancelled Sign in with Apple")
+                    } else {
+                        errorMessage = "Sign in failed: \(error.localizedDescription)"
+                        showError = true
+                    }
+                    isLoading = false
                 }
             } catch {
-                errorMessage = error.localizedDescription
-                showError = true
-                isLoading = false
+                await MainActor.run {
+                    errorMessage = "Authentication failed: \(error.localizedDescription)"
+                    showError = true
+                    isLoading = false
+                }
             }
         }
     }

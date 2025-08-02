@@ -69,6 +69,21 @@ class CloudKitAuthManager: ObservableObject {
             // Store user ID
             UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
             
+            // Check if user has a username set
+            if self.currentUser?.username == nil || self.currentUser?.username?.isEmpty == true {
+                // Show username selection for users without username
+                self.showUsernameSelection = true
+            } else {
+                // User has username, close auth sheet and call completion handler
+                self.showAuthSheet = false
+                
+                // Call completion handler if set (e.g., to join challenge after auth)
+                if let handler = authCompletionHandler {
+                    handler()
+                    authCompletionHandler = nil
+                }
+            }
+            
         } catch {
             // User doesn't exist, create new
             let newRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: recordID)
@@ -106,9 +121,6 @@ class CloudKitAuthManager: ObservableObject {
             // Show username selection for new users
             self.showUsernameSelection = true
         }
-        
-        // Close auth sheet
-        self.showAuthSheet = false
     }
     
     func signInWithGoogle(user: GIDGoogleUser) async throws {
@@ -164,6 +176,21 @@ class CloudKitAuthManager: ObservableObject {
             
             // Store user ID
             UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
+            
+            // Check if user has a username set
+            if self.currentUser?.username == nil || self.currentUser?.username?.isEmpty == true {
+                // Show username selection for users without username
+                self.showUsernameSelection = true
+            } else {
+                // User has username, close auth sheet and call completion handler
+                self.showAuthSheet = false
+                
+                // Call completion handler if set (e.g., to join challenge after auth)
+                if let handler = authCompletionHandler {
+                    handler()
+                    authCompletionHandler = nil
+                }
+            }
             
         } catch {
             // Create new user

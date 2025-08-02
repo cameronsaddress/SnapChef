@@ -10,7 +10,12 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
-### Latest Updates (Feb 1, 2025)
+### Latest Updates (Feb 2, 2025)
+- **FIXED: Authentication & Username Setup Flow**
+  - Fixed username setup view not showing after Sign in with Apple
+  - Added username check for both new and existing users
+  - Properly handles auth flow completion with username validation
+  - Fixed error 1001 handling for Sign in with Apple cancellation
 - **NEW: Local Challenge System with 365 Days of Content**
   - Embedded full year of challenges directly in app (no CloudKit needed)
   - Automatic daily/weekly challenge rotation
@@ -32,6 +37,7 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
   - Social features including teams and sharing
   - Full integration with recipe creation and sharing
   - Premium challenges and analytics tracking
+  - CloudKit user profiles with username management
 
 ### Documentation
 - **APP_ARCHITECTURE_DOCUMENTATION.md** - Complete system overview
@@ -72,6 +78,8 @@ swift-format -i -r SnapChef/
 5. **Core/ViewModels/AppState.swift** - Global app state management
 6. **Features/Sharing/ShareGeneratorView.swift** - Social media share creation
 7. **Features/Gamification/EnhancedGamificationManager.swift** - Points and badges
+8. **Core/Services/CloudKitAuthManager.swift** - Authentication with Apple, Google, Facebook
+9. **Features/Authentication/UsernameSetupView.swift** - Profile setup after authentication
 
 ### API Integration
 
@@ -142,6 +150,30 @@ struct RecipeAPI {
 - AI Chef personalities (8 unique personas)
 - Offline recipe storage
 - Social media integration (Instagram, TikTok, Twitter/X)
+- Multi-provider authentication (Apple, Google, Facebook)
+- CloudKit-based user profiles and social features
+
+### Authentication System
+
+#### Authentication Flow
+1. User triggers auth-required feature (challenges, teams, sharing)
+2. CloudKitAuthView presents sign-in options
+3. User authenticates with Apple/Google/Facebook
+4. System checks if user exists in CloudKit:
+   - **New User**: Creates profile, shows UsernameSetupView
+   - **Existing User without username**: Shows UsernameSetupView
+   - **Existing User with username**: Proceeds to requested feature
+5. Username validation includes:
+   - Availability check in CloudKit
+   - Profanity filtering with leetspeak detection
+   - 3-20 character alphanumeric requirement
+6. Profile photo upload (optional) stored as CKAsset
+
+#### Key Components
+- **CloudKitAuthManager**: Central authentication service
+- **CloudKitUserManager**: Username and profile management
+- **ProfanityFilter**: Content moderation for usernames
+- **UsernameSetupView**: Onboarding UI for new users
 
 ### Challenge System Architecture
 
