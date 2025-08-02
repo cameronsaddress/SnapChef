@@ -167,7 +167,21 @@ class ChallengeService {
                     _ = try await cloudKitManager.uploadChallenge(challenge)
                     print("✅ Uploaded challenge to CloudKit: \(challenge.title)")
                 } catch {
-                    print("❌ Failed to upload challenge: \(error)")
+                    // Handle permission errors gracefully
+                    if let ckError = error as? CKError {
+                        switch ckError.code {
+                        case .permissionFailure:
+                            print("⚠️ CloudKit permission error - challenges will remain local only. See CLOUDKIT_SETUP.md for configuration steps.")
+                            return // Stop trying to upload more challenges
+                        case .quotaExceeded:
+                            print("⚠️ CloudKit quota exceeded - will retry later")
+                            return
+                        default:
+                            print("❌ Failed to upload challenge: \(error)")
+                        }
+                    } else {
+                        print("❌ Failed to upload challenge: \(error)")
+                    }
                 }
             }
         }
