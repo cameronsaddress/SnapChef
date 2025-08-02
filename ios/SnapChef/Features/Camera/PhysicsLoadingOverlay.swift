@@ -216,15 +216,20 @@ struct MagicalProcessingOverlay: View {
     var body: some View {
         if useGameMode {
             if showAIProcessingView {
-                AIProcessingView()
-                    .onAppear {
-                        // Hide AI processing view after 6 seconds
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
-                            withAnimation(.easeOut(duration: 0.5)) {
-                                showAIProcessingView = false
-                            }
+                AIProcessingView(onPlayGameTapped: {
+                    // User tapped the play game button - transition immediately
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        showAIProcessingView = false
+                    }
+                })
+                .onAppear {
+                    // Auto-hide AI processing view after 6 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+                        withAnimation(.easeOut(duration: 0.5)) {
+                            showAIProcessingView = false
                         }
                     }
+                }
             } else {
                 EmojiFlickGameOverlay(capturedImage: capturedImage)
             }

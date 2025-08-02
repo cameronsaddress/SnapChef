@@ -5,6 +5,9 @@ struct AIProcessingView: View {
     @State private var textOpacity = 0.0
     @State private var sparkleScale: CGFloat = 1.0
     
+    // Callback for when user taps play game button
+    var onPlayGameTapped: (() -> Void)? = nil
+    
     var body: some View {
         ZStack {
             // Background
@@ -116,7 +119,9 @@ struct AIProcessingView: View {
                         .animation(.easeInOut(duration: 0.5).delay(0.8), value: textOpacity)
                     
                     // Prominent game button
-                    VStack(spacing: 8) {
+                    Button(action: {
+                        onPlayGameTapped?()
+                    }) {
                         ZStack {
                             // Pulsing background
                             RoundedRectangle(cornerRadius: 16)
@@ -127,7 +132,7 @@ struct AIProcessingView: View {
                                         endPoint: .trailing
                                     )
                                 )
-                                .frame(width: 260, height: 56)
+                                .frame(width: 280, height: 56)
                                 .scaleEffect(isAnimating ? 1.05 : 1.0)
                                 .opacity(isAnimating ? 0.9 : 1.0)
                                 .animation(
@@ -136,18 +141,20 @@ struct AIProcessingView: View {
                                     value: isAnimating
                                 )
                             
-                            HStack(spacing: 8) {
+                            HStack(spacing: 10) {
                                 Image(systemName: "gamecontroller.fill")
-                                    .font(.system(size: 22))
+                                    .font(.system(size: 24))
                                 Text("Play a quick game on us!")
                                     .font(.system(size: 20, weight: .bold, design: .rounded))
                             }
                             .foregroundColor(.white)
+                            .padding(.horizontal, 20)
                         }
-                        .opacity(textOpacity)
-                        .scaleEffect(textOpacity)
-                        .animation(.spring(response: 0.8, dampingFraction: 0.6).delay(1.0), value: textOpacity)
                     }
+                    .buttonStyle(PlainButtonStyle()) // Remove default button styling
+                    .opacity(textOpacity)
+                    .scaleEffect(textOpacity)
+                    .animation(.spring(response: 0.8, dampingFraction: 0.6).delay(1.0), value: textOpacity)
                     .padding(.top, 8)
                 }
                 .padding(.horizontal, 30)
