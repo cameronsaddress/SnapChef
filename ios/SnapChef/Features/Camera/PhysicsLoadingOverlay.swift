@@ -222,14 +222,6 @@ struct MagicalProcessingOverlay: View {
                         showAIProcessingView = false
                     }
                 })
-                .onAppear {
-                    // Auto-hide AI processing view after 6 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
-                        withAnimation(.easeOut(duration: 0.5)) {
-                            showAIProcessingView = false
-                        }
-                    }
-                }
             } else {
                 EmojiFlickGameOverlay(capturedImage: capturedImage)
             }

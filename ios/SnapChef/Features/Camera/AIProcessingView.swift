@@ -4,6 +4,7 @@ struct AIProcessingView: View {
     @State private var isAnimating = false
     @State private var textOpacity = 0.0
     @State private var sparkleScale: CGFloat = 1.0
+    @State private var buttonShake: CGFloat = 0
     
     // Callback for when user taps play game button
     var onPlayGameTapped: (() -> Void)? = nil
@@ -111,7 +112,7 @@ struct AIProcessingView: View {
                     .padding(.vertical, 4)
                     
                     Text("While our chef prepares\nyour recipes...")
-                        .font(.system(size: 19, weight: .semibold, design: .rounded))
+                        .font(.system(size: 28, weight: .semibold, design: .rounded))
                         .foregroundColor(Color(hex: "#f093fb"))
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
@@ -143,17 +144,21 @@ struct AIProcessingView: View {
                             
                             HStack(spacing: 10) {
                                 Image(systemName: "gamecontroller.fill")
-                                    .font(.system(size: 24))
-                                Text("Play a quick game on us!")
-                                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                                    .font(.system(size: 20))
+                                Text("Play a game with your fridge while you wait!")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
                             }
                             .foregroundColor(.white)
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, 10)
                         }
                     }
                     .buttonStyle(PlainButtonStyle()) // Remove default button styling
                     .opacity(textOpacity)
                     .scaleEffect(textOpacity)
+                    .rotation3DEffect(
+                        .degrees(buttonShake),
+                        axis: (x: 0, y: 0, z: 1)
+                    )
                     .animation(.spring(response: 0.8, dampingFraction: 0.6).delay(1.0), value: textOpacity)
                     .padding(.top, 8)
                 }
@@ -175,6 +180,20 @@ struct AIProcessingView: View {
             
             withAnimation(.easeInOut(duration: 0.6)) {
                 textOpacity = 1.0
+            }
+            
+            // Start button shake animation every 2 seconds
+            Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+                withAnimation(
+                    Animation.easeInOut(duration: 0.1)
+                        .repeatCount(5, autoreverses: true)
+                ) {
+                    buttonShake = 3
+                }
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    buttonShake = 0
+                }
             }
         }
     }
