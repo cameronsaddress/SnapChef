@@ -133,7 +133,7 @@ struct AIProcessingView: View {
                                         endPoint: .trailing
                                     )
                                 )
-                                .frame(width: 280, height: 56)
+                                .frame(width: 336, height: 56)
                                 .scaleEffect(isAnimating ? 1.05 : 1.0)
                                 .opacity(isAnimating ? 0.9 : 1.0)
                                 .animation(
