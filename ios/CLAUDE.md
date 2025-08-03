@@ -10,7 +10,7 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
-### Latest Updates (Feb 2, 2025)
+### Latest Updates (Feb 3, 2025)
 - **NEW: Complete CloudKit Bidirectional Sync**
   - All user data now syncs both ways (push and pull) with CloudKit
   - Recipes: Automatically uploaded when created, synced across devices
@@ -70,6 +70,25 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
   - Supports team challenges, achievements, and leaderboards
   - Fixed network errors from api.snapchef.com (non-existent server)
   - ChallengeService now uses CloudKitChallengeManager for all operations
+- **FIXED: Social Features & Real-time Sync (Feb 3, 2025)**
+  - Fixed ProfileView recipe count showing only local recipes
+  - Added 200 fake local user accounts with realistic distribution
+  - Follower/following counts now update immediately in FeedView
+  - Recipe counts sync with CloudKit in real-time
+  - Pull-to-refresh added to FeedView for manual stat updates
+  - Fixed range error in fake user generation
+  - Unified search across local and CloudKit users
+- **IMPROVED: AI Processing Screen UI (Feb 3, 2025)**
+  - Increased "While our chef prepares" text size by 50% for better readability
+  - Changed button text to "Play a game with your fridge while you wait!"
+  - Button now shakes every 2 seconds to draw attention
+  - Removed auto-navigation to emoji game (requires user tap)
+  - Widened game button by 20% for better text fit
+- **CloudKit Schema & Permissions Fixed (Feb 3, 2025)**
+  - Added CREATE permissions for authenticated users (_icloud)
+  - Fixed permission errors for Challenge, Team, Leaderboard, RecipeLike, Activity
+  - Created detailed setup documentation (CLOUDKIT_SETUP.md)
+  - Added specific permission change guide (CLOUDKIT_PERMISSION_CHANGES.md)
 
 ### Documentation
 - **APP_ARCHITECTURE_DOCUMENTATION.md** - Complete system overview
