@@ -160,6 +160,21 @@ class ShareService: ObservableObject {
     
     private init() {}
     
+    // MARK: - Create Share Content with CloudKit Photos
+    
+    /// Create share content with photos fetched from CloudKit
+    func createShareContentWithPhotos(for recipe: Recipe) async throws -> ShareContent {
+        // Fetch photos from CloudKit
+        let photos = try await CloudKitRecipeManager.shared.fetchRecipePhotos(for: recipe.id.uuidString)
+        
+        // Create share content with the fetched photos
+        return ShareContent(
+            type: .recipe(recipe),
+            beforeImage: photos.before,
+            afterImage: photos.after
+        )
+    }
+    
     // MARK: - Public Methods
     
     func shareContent(_ content: ShareContent, from viewController: UIViewController? = nil) {

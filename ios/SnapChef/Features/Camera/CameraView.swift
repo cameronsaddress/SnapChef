@@ -419,19 +419,22 @@ struct CameraView: View {
                         // Track feature usage
                         await cloudKitDataManager.trackFeatureUse("recipe_generation")
                         
-                        // Save recipes to CloudKit
-                        for recipe in recipes {
+                        // Save recipes to CloudKit with the captured fridge photo
+                        print("📸 Uploading \(recipes.count) recipes with the same fridge photo to CloudKit...")
+                        for (index, recipe) in recipes.enumerated() {
                             do {
-                                let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true)
-                                print("✅ Recipe saved to CloudKit with ID: \(recipeID)")
+                                print("📸 Uploading recipe \(index + 1)/\(recipes.count): '\(recipe.name)'")
+                                let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: image)
+                                print("✅ Recipe \(index + 1)/\(recipes.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
                                 
                                 // Also add to user's saved recipes list
                                 try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
                                 print("✅ Recipe added to user's saved list")
                             } catch {
-                                print("❌ Failed to save recipe to CloudKit: \(error)")
+                                print("❌ Failed to save recipe \(index + 1)/\(recipes.count) to CloudKit: \(error)")
                             }
                         }
+                        print("✅ All \(recipes.count) recipes have been saved with the same fridge photo")
                         
                         // Increment snaps taken counter
                         self.appState.incrementSnapsTaken()

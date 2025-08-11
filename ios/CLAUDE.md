@@ -10,6 +10,29 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 11, 2025) - Part 2
+- **CloudKit Photo Storage Implementation**
+  - Added `beforePhotoAsset` and `afterPhotoAsset` fields to Recipe record in CloudKit schema
+  - Implemented automatic upload of fridge photos to all generated recipes
+  - Each recipe from the same generation gets its own copy of the fridge photo (CloudKit requirement)
+  - Created `AfterPhotoCaptureView` for capturing meal completion photos
+  - Added comprehensive photo management methods to `CloudKitRecipeManager`:
+    - `uploadImageAsset()` - Uploads UIImage as CKAsset with compression
+    - `updateAfterPhoto()` - Updates recipe with after photo
+    - `fetchRecipePhotos()` - Retrieves both photos for a recipe
+  - Enhanced TikTok video generation to use CloudKit-stored photos:
+    - Automatically fetches before (fridge) photo if not provided
+    - Fetches after (meal) photo from CloudKit if available
+    - Prompts user to capture after photo if missing
+  - Added detailed console logging for all photo operations:
+    - Upload progress with file sizes and recipe details
+    - Download status with success/failure indicators
+    - Photo availability tracking for video generation
+  - Fixed TikTok video to properly display both before/after photos with:
+    - `drawImage()` helper for rendering UIImages in video frames
+    - Shadow support for text overlays on images
+    - Vignette effects for better text visibility
+
 ### Latest Updates (Jan 11, 2025)
 - **CRITICAL FIX: Resolved Swift 6 Build Failure**
   - **Root Cause**: Naming conflict - `struct Scene` in TikTokVideoGeneratorEnhanced.swift was conflicting with SwiftUI's `Scene` protocol

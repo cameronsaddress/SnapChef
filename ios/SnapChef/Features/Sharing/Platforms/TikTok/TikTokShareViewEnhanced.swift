@@ -13,6 +13,9 @@ struct TikTokShareViewEnhanced: View {
     let content: ShareContent
     @Environment(\.dismiss) var dismiss
     @StateObject private var videoGenerator = TikTokVideoGeneratorEnhanced()
+    @State private var showingAfterPhotoCapture = false
+    @State private var afterPhoto: UIImage?
+    @State private var beforePhoto: UIImage?
     
     // Template selection
     @State private var selectedTemplate: TikTokTemplate = .beforeAfterReveal
@@ -90,7 +93,7 @@ struct TikTokShareViewEnhanced: View {
                         Button("Share") {
                             shareToTikTok()
                         }
-                        .foregroundColor(Color(hex: "#FF0050"))
+                        .foregroundColor(Color(hex: "#FF0050") ?? .red)
                         .fontWeight(.bold)
                     }
                 }
@@ -115,6 +118,20 @@ struct TikTokShareViewEnhanced: View {
         } message: {
             if let error = errorMessage {
                 Text(error)
+            }
+        }
+        .fullScreenCover(isPresented: $showingAfterPhotoCapture) {
+            if case .recipe(let recipe) = content.type {
+                AfterPhotoCaptureView(
+                    afterPhoto: $afterPhoto,
+                    recipeID: recipe.id.uuidString
+                )
+                .onDisappear {
+                    // When photo capture is done, continue with video generation
+                    if afterPhoto != nil {
+                        startVideoGeneration()
+                    }
+                }
             }
         }
     }
@@ -529,14 +546,81 @@ struct TikTokShareViewEnhanced: View {
     }
     
     private func generateVideo() {
+        // For before/after template, fetch both photos from CloudKit if needed
+        if selectedTemplate == .beforeAfterReveal {
+            if case .recipe(let recipe) = content.type {
+                Task {
+                    do {
+                        print("🎬 TikTok: Fetching photos from CloudKit for recipe '\(recipe.name)' (ID: \(recipe.id.uuidString))")
+                        let photos = try await CloudKitRecipeManager.shared.fetchRecipePhotos(for: recipe.id.uuidString)
+                        
+                        // Update before photo if we don't have it
+                        if content.beforeImage == nil, let cloudBeforePhoto = photos.before {
+                            print("🎬 TikTok: Using BEFORE (fridge) photo from CloudKit")
+                            beforePhoto = cloudBeforePhoto
+                        }
+                        
+                        // Check after photo
+                        if content.afterImage == nil && afterPhoto == nil {
+                            if let cloudAfterPhoto = photos.after {
+                                print("🎬 TikTok: Found existing AFTER photo in CloudKit, using it for video")
+                                afterPhoto = cloudAfterPhoto
+                                startVideoGeneration()
+                            } else {
+                                print("🎬 TikTok: No AFTER photo found in CloudKit, prompting user to take one")
+                                showingAfterPhotoCapture = true
+                            }
+                        } else {
+                            startVideoGeneration()
+                        }
+                    } catch {
+                        print("🎬 TikTok: Error fetching photos from CloudKit: \(error.localizedDescription)")
+                        // If we have no after photo, prompt for it
+                        if content.afterImage == nil && afterPhoto == nil {
+                            showingAfterPhotoCapture = true
+                        } else {
+                            // Continue with what we have
+                            startVideoGeneration()
+                        }
+                    }
+                }
+            } else {
+                // Not a recipe, continue without CloudKit photos
+                if content.afterImage == nil && afterPhoto == nil {
+                    showingAfterPhotoCapture = true
+                } else {
+                    startVideoGeneration()
+                }
+            }
+            return
+        }
+        
+        startVideoGeneration()
+    }
+    
+    private func startVideoGeneration() {
         isGenerating = true
         generationProgress = 0
+        
+        // Create updated content with photos from CloudKit or state if available
+        let finalBeforePhoto = beforePhoto ?? content.beforeImage
+        let finalAfterPhoto = afterPhoto ?? content.afterImage
+        
+        print("🎬 TikTok: Starting video generation with:")
+        print("    - Before (fridge) photo: \(finalBeforePhoto != nil ? "✓ Available" : "✗ Missing")")
+        print("    - After (meal) photo: \(finalAfterPhoto != nil ? "✓ Available" : "✗ Missing")")
+        
+        let updatedContent = ShareContent(
+            type: content.type,
+            beforeImage: finalBeforePhoto,
+            afterImage: finalAfterPhoto
+        )
         
         Task {
             do {
                 let videoURL = try await videoGenerator.generateVideo(
                     template: selectedTemplate,
-                    content: content,
+                    content: updatedContent,
                     selectedAudio: selectedAudio,
                     selectedHashtags: Array(selectedHashtags),
                     progress: { progress in

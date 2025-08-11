@@ -177,6 +177,8 @@ import CloudKit
  - title: String (Queryable)
  - description: String
  - imageURL: String
+ - beforePhotoAsset: Asset // CKAsset for fridge photo
+ - afterPhotoAsset: Asset // CKAsset for completed meal photo
  - createdAt: Date/Time (Indexed, Sortable)
  - likeCount: Int64 (Indexed, Sortable)
  - commentCount: Int64 (Indexed, Sortable)
@@ -414,6 +416,8 @@ struct CKField {
         static let title = "title"
         static let description = "description"
         static let imageURL = "imageURL"
+        static let beforePhotoAsset = "beforePhotoAsset"
+        static let afterPhotoAsset = "afterPhotoAsset"
         static let createdAt = "createdAt"
         static let likeCount = "likeCount"
         static let commentCount = "commentCount"

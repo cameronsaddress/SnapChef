@@ -562,15 +562,31 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
     }
     
     private func drawBeforeScene(in context: CGContext, content: ShareContent) {
-        // Draw fridge/ingredients representation
-        drawText(
-            "🥗 Random Fridge Items",
-            in: context,
-            at: CGPoint(x: videoSize.width / 2, y: videoSize.height / 2),
-            fontSize: 48,
-            color: .white,
-            weight: .bold
-        )
+        // Draw the before photo if available
+        if let beforeImage = content.beforeImage {
+            drawImage(beforeImage, in: context, fitting: videoSize)
+            
+            // Add text overlay
+            drawText(
+                "Can you turn THIS...",
+                in: context,
+                at: CGPoint(x: videoSize.width / 2, y: videoSize.height - 200),
+                fontSize: 48,
+                color: .white,
+                weight: .bold,
+                shadow: true
+            )
+        } else {
+            // Fallback to text if no image
+            drawText(
+                "🥗 Random Fridge Items",
+                in: context,
+                at: CGPoint(x: videoSize.width / 2, y: videoSize.height / 2),
+                fontSize: 48,
+                color: .white,
+                weight: .bold
+            )
+        }
     }
     
     private func drawTransitionScene(in context: CGContext, progress: Double) {
@@ -582,24 +598,53 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
     }
     
     private func drawAfterScene(in context: CGContext, content: ShareContent) {
-        if case .recipe(let recipe) = content.type {
-            drawText(
-                "Into THIS! 🍽",
-                in: context,
-                at: CGPoint(x: videoSize.width / 2, y: videoSize.height / 2 - 100),
-                fontSize: 48,
-                color: .white,
-                weight: .black
-            )
+        // Draw the after photo if available
+        if let afterImage = content.afterImage {
+            drawImage(afterImage, in: context, fitting: videoSize)
             
-            drawText(
-                recipe.name,
-                in: context,
-                at: CGPoint(x: videoSize.width / 2, y: videoSize.height / 2 + 50),
-                fontSize: 42,
-                color: UIColor(hex: "#00F2EA") ?? .cyan,
-                weight: .bold
-            )
+            if case .recipe(let recipe) = content.type {
+                // Add text overlay on the image
+                drawText(
+                    "Into THIS! 🍽",
+                    in: context,
+                    at: CGPoint(x: videoSize.width / 2, y: 150),
+                    fontSize: 48,
+                    color: .white,
+                    weight: .black,
+                    shadow: true
+                )
+                
+                drawText(
+                    recipe.name,
+                    in: context,
+                    at: CGPoint(x: videoSize.width / 2, y: videoSize.height - 200),
+                    fontSize: 42,
+                    color: UIColor(hex: "#00F2EA") ?? .cyan,
+                    weight: .bold,
+                    shadow: true
+                )
+            }
+        } else {
+            // Fallback to text-only if no after image
+            if case .recipe(let recipe) = content.type {
+                drawText(
+                    "Into THIS! 🍽",
+                    in: context,
+                    at: CGPoint(x: videoSize.width / 2, y: videoSize.height / 2 - 100),
+                    fontSize: 48,
+                    color: .white,
+                    weight: .black
+                )
+                
+                drawText(
+                    recipe.name,
+                    in: context,
+                    at: CGPoint(x: videoSize.width / 2, y: videoSize.height / 2 + 50),
+                    fontSize: 42,
+                    color: UIColor(hex: "#00F2EA") ?? .cyan,
+                    weight: .bold
+                )
+            }
         }
     }
     
@@ -701,16 +746,31 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
         at point: CGPoint,
         fontSize: CGFloat,
         color: UIColor,
-        weight: UIFont.Weight = .regular
+        weight: UIFont.Weight = .regular,
+        shadow: Bool = false
     ) {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = .center
         
-        let attributes: [NSAttributedString.Key: Any] = [
+        var attributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: fontSize, weight: weight),
             .foregroundColor: color,
             .paragraphStyle: paragraphStyle
         ]
+        
+        // Add shadow if requested (for text over images)
+        if shadow {
+            let shadowColor = UIColor.black.withAlphaComponent(0.8)
+            let shadow = NSShadow()
+            shadow.shadowColor = shadowColor
+            shadow.shadowOffset = CGSize(width: 2, height: 2)
+            shadow.shadowBlurRadius = 4
+            attributes[.shadow] = shadow
+            
+            // Add stroke for better visibility
+            attributes[.strokeColor] = UIColor.black
+            attributes[.strokeWidth] = -2.0
+        }
         
         let size = text.size(withAttributes: attributes)
         let rect = CGRect(
@@ -738,6 +798,71 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
         UIGraphicsPushContext(context)
         text.draw(in: flippedRect, withAttributes: attributes)
         UIGraphicsPopContext()
+        
+        // Restore the context state
+        context.restoreGState()
+    }
+    
+    private func drawImage(
+        _ image: UIImage,
+        in context: CGContext,
+        fitting targetSize: CGSize,
+        contentMode: UIView.ContentMode = .scaleAspectFill
+    ) {
+        let imageSize = image.size
+        var drawRect = CGRect(origin: .zero, size: targetSize)
+        
+        if contentMode == .scaleAspectFill {
+            // Calculate aspect fill
+            let widthRatio = targetSize.width / imageSize.width
+            let heightRatio = targetSize.height / imageSize.height
+            let scale = max(widthRatio, heightRatio)
+            
+            let scaledWidth = imageSize.width * scale
+            let scaledHeight = imageSize.height * scale
+            
+            // Center the image
+            drawRect = CGRect(
+                x: (targetSize.width - scaledWidth) / 2,
+                y: (targetSize.height - scaledHeight) / 2,
+                width: scaledWidth,
+                height: scaledHeight
+            )
+        } else if contentMode == .scaleAspectFit {
+            // Calculate aspect fit
+            let widthRatio = targetSize.width / imageSize.width
+            let heightRatio = targetSize.height / imageSize.height
+            let scale = min(widthRatio, heightRatio)
+            
+            let scaledWidth = imageSize.width * scale
+            let scaledHeight = imageSize.height * scale
+            
+            // Center the image
+            drawRect = CGRect(
+                x: (targetSize.width - scaledWidth) / 2,
+                y: (targetSize.height - scaledHeight) / 2,
+                width: scaledWidth,
+                height: scaledHeight
+            )
+        }
+        
+        // Save the current context state
+        context.saveGState()
+        
+        // Flip the coordinate system for image rendering
+        context.translateBy(x: 0, y: targetSize.height)
+        context.scaleBy(x: 1.0, y: -1.0)
+        
+        // Draw the image
+        if let cgImage = image.cgImage {
+            context.draw(cgImage, in: drawRect)
+        }
+        
+        // Add a subtle vignette effect for better text visibility
+        let vignettePath = CGPath(rect: CGRect(origin: .zero, size: targetSize), transform: nil)
+        context.addPath(vignettePath)
+        context.setFillColor(UIColor.black.withAlphaComponent(0.2).cgColor)
+        context.fillPath()
         
         // Restore the context state
         context.restoreGState()

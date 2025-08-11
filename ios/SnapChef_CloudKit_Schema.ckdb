@@ -266,6 +266,8 @@ DEFINE SCHEMA
         cuisine           STRING QUERYABLE,
         mealType          STRING QUERYABLE,
         imageAsset        ASSET,
+        beforePhotoAsset  ASSET,
+        afterPhotoAsset   ASSET,
         -- Future: Multiple food photos after moderation
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"

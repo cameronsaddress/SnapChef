@@ -97,15 +97,12 @@ struct ShareGeneratorView: View {
                 ShareSheet(items: buildShareItems(image: image))
             }
         }
-        // TODO: SimplePhotoCaptureView was moved to archive
-        /*
         .fullScreenCover(isPresented: $showingCamera) {
-            SimplePhotoCaptureView { image in
-                afterPhoto = image
-                showingCamera = false
-            }
+            AfterPhotoCaptureView(
+                afterPhoto: $afterPhoto,
+                recipeID: recipe.id.uuidString
+            )
         }
-        */
         .onAppear {
             // Fast spin that slows down to 30 degrees
             withAnimation(.easeOut(duration: 1.0)) {

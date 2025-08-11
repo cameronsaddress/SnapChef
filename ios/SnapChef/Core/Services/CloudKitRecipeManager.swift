@@ -27,7 +27,7 @@ class CloudKitRecipeManager: ObservableObject {
     // MARK: - Recipe Upload (Single Instance)
     
     /// Upload a recipe to CloudKit (creates single master record)
-    func uploadRecipe(_ recipe: Recipe, fromLLM: Bool = false) async throws -> String {
+    func uploadRecipe(_ recipe: Recipe, fromLLM: Bool = false, beforePhoto: UIImage? = nil) async throws -> String {
         // Check if recipe already exists
         if let existingID = await checkRecipeExists(recipe.name, recipe.description) {
             print("✅ Recipe already exists with ID: \(existingID)")
@@ -70,6 +70,17 @@ class CloudKitRecipeManager: ObservableObject {
         record["saveCount"] = Int64(0)
         record["rating"] = 0.0
         record["ratingCount"] = Int64(0)
+        
+        // Upload before photo if provided (this is the fridge photo shared by all recipes from the same generation)
+        if let beforePhoto = beforePhoto {
+            print("📸 CloudKit: Uploading BEFORE (fridge) photo for recipe '\(recipe.name)' with ID: \(recipeID)")
+            let beforePhotoAsset = try await uploadImageAsset(beforePhoto, named: "before_\(recipeID)")
+            record["beforePhotoAsset"] = beforePhotoAsset
+            print("✅ CloudKit: BEFORE (fridge) photo uploaded successfully for recipe '\(recipe.name)' (ID: \(recipeID))")
+            print("    ℹ️ This fridge photo is shared across all recipes from the same generation")
+        } else {
+            print("⚠️ CloudKit: No BEFORE (fridge) photo provided for recipe '\(recipe.name)' (ID: \(recipeID))")
+        }
         
         // Save to CloudKit - use private database for user's own recipes
         // This avoids permission issues with public database
@@ -552,6 +563,137 @@ class CloudKitRecipeManager: ObservableObject {
         } catch {
             print("Failed to increment save count: \(error)")
         }
+    }
+    
+    // MARK: - Photo Management
+    
+    /// Upload an image as a CKAsset
+    private func uploadImageAsset(_ image: UIImage, named filename: String) async throws -> CKAsset {
+        let isBeforePhoto = filename.starts(with: "before_")
+        let photoType = isBeforePhoto ? "FRIDGE" : "MEAL"
+        
+        print("🔧 CloudKit: Preparing \(photoType) image asset '\(filename)' for upload")
+        
+        // Compress image to reduce size (JPEG at 80% quality)
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            print("❌ CloudKit: Failed to compress \(photoType) image '\(filename)'")
+            throw RecipeError.uploadFailed
+        }
+        
+        let imageSizeInMB = Double(imageData.count) / (1024.0 * 1024.0)
+        print("📏 CloudKit: \(photoType) image '\(filename)' compressed to \(String(format: "%.2f", imageSizeInMB)) MB")
+        
+        // Create temporary file
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL = tempDir.appendingPathComponent("\(filename).jpg")
+        
+        try imageData.write(to: fileURL)
+        print("💾 CloudKit: Temporary file created for \(photoType) photo at: \(fileURL.lastPathComponent)")
+        
+        // Create CKAsset
+        let asset = CKAsset(fileURL: fileURL)
+        print("📦 CloudKit: CKAsset created for \(photoType) photo '\(filename)', ready for upload")
+        
+        // Clean up will happen automatically when asset is saved
+        return asset
+    }
+    
+    /// Update the after photo for a recipe
+    func updateAfterPhoto(for recipeID: String, afterPhoto: UIImage) async throws {
+        let recordID = CKRecord.ID(recordName: recipeID)
+        
+        print("📸 CloudKit: Starting AFTER photo upload for recipe ID: \(recipeID)")
+        
+        do {
+            // Try private database first (user's own recipes)
+            let record = try await privateDB.record(for: recordID)
+            let recipeTitle = record["title"] as? String ?? "Unknown Recipe"
+            
+            print("📸 CloudKit: Uploading AFTER photo for recipe '\(recipeTitle)' with ID: \(recipeID)")
+            
+            // Upload after photo
+            let afterPhotoAsset = try await uploadImageAsset(afterPhoto, named: "after_\(recipeID)")
+            record["afterPhotoAsset"] = afterPhotoAsset
+            
+            // Save updated record
+            _ = try await privateDB.save(record)
+            print("✅ CloudKit: AFTER photo uploaded successfully for recipe '\(recipeTitle)' (ID: \(recipeID)) - Private DB")
+        } catch {
+            // If not in private, try public database
+            let record = try await publicDB.record(for: recordID)
+            let recipeTitle = record["title"] as? String ?? "Unknown Recipe"
+            
+            print("📸 CloudKit: Uploading AFTER photo for recipe '\(recipeTitle)' with ID: \(recipeID)")
+            
+            // Upload after photo
+            let afterPhotoAsset = try await uploadImageAsset(afterPhoto, named: "after_\(recipeID)")
+            record["afterPhotoAsset"] = afterPhotoAsset
+            
+            // Save updated record
+            _ = try await publicDB.save(record)
+            print("✅ CloudKit: AFTER photo uploaded successfully for recipe '\(recipeTitle)' (ID: \(recipeID)) - Public DB")
+        }
+    }
+    
+    /// Fetch photos for a recipe
+    func fetchRecipePhotos(for recipeID: String) async throws -> (before: UIImage?, after: UIImage?) {
+        let recordID = CKRecord.ID(recordName: recipeID)
+        
+        print("🔍 CloudKit: Fetching photos for recipe ID: \(recipeID)")
+        
+        do {
+            // Try private database first
+            let record = try await privateDB.record(for: recordID)
+            let recipeTitle = record["title"] as? String ?? "Unknown Recipe"
+            print("🔍 CloudKit: Found recipe '\(recipeTitle)' in Private DB, fetching photos...")
+            let photos = await fetchPhotosFromRecord(record, recipeTitle: recipeTitle, recipeID: recipeID)
+            return photos
+        } catch {
+            // Try public database
+            let record = try await publicDB.record(for: recordID)
+            let recipeTitle = record["title"] as? String ?? "Unknown Recipe"
+            print("🔍 CloudKit: Found recipe '\(recipeTitle)' in Public DB, fetching photos...")
+            let photos = await fetchPhotosFromRecord(record, recipeTitle: recipeTitle, recipeID: recipeID)
+            return photos
+        }
+    }
+    
+    /// Helper to fetch photos from a CKRecord
+    private func fetchPhotosFromRecord(_ record: CKRecord, recipeTitle: String = "Unknown", recipeID: String = "Unknown") async -> (before: UIImage?, after: UIImage?) {
+        var beforePhoto: UIImage? = nil
+        var afterPhoto: UIImage? = nil
+        
+        // Fetch before photo
+        if let beforeAsset = record["beforePhotoAsset"] as? CKAsset,
+           let fileURL = beforeAsset.fileURL {
+            print("📥 CloudKit: Downloading BEFORE photo for recipe '\(recipeTitle)' (ID: \(recipeID))")
+            if let imageData = try? Data(contentsOf: fileURL) {
+                beforePhoto = UIImage(data: imageData)
+                print("✅ CloudKit: BEFORE photo retrieved successfully for recipe '\(recipeTitle)' (ID: \(recipeID))")
+            } else {
+                print("❌ CloudKit: Failed to load BEFORE photo data for recipe '\(recipeTitle)' (ID: \(recipeID))")
+            }
+        } else {
+            print("⚠️ CloudKit: No BEFORE photo found for recipe '\(recipeTitle)' (ID: \(recipeID))")
+        }
+        
+        // Fetch after photo
+        if let afterAsset = record["afterPhotoAsset"] as? CKAsset,
+           let fileURL = afterAsset.fileURL {
+            print("📥 CloudKit: Downloading AFTER photo for recipe '\(recipeTitle)' (ID: \(recipeID))")
+            if let imageData = try? Data(contentsOf: fileURL) {
+                afterPhoto = UIImage(data: imageData)
+                print("✅ CloudKit: AFTER photo retrieved successfully for recipe '\(recipeTitle)' (ID: \(recipeID))")
+            } else {
+                print("❌ CloudKit: Failed to load AFTER photo data for recipe '\(recipeTitle)' (ID: \(recipeID))")
+            }
+        } else {
+            print("⚠️ CloudKit: No AFTER photo found for recipe '\(recipeTitle)' (ID: \(recipeID))")
+        }
+        
+        print("📊 CloudKit: Photo fetch complete for recipe '\(recipeTitle)' - Before: \(beforePhoto != nil ? "✓" : "✗"), After: \(afterPhoto != nil ? "✓" : "✗")")
+        
+        return (beforePhoto, afterPhoto)
     }
 }
 

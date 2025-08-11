@@ -4,6 +4,47 @@ All notable changes to the SnapChef iOS app will be documented in this file.
 
 ## [Unreleased]
 
+### January 11, 2025 - Part 3 - CloudKit Photo Storage & TikTok Video Enhancement
+
+#### Added
+- **CloudKit Photo Storage System**:
+  - Added `beforePhotoAsset` and `afterPhotoAsset` fields to Recipe CloudKit schema
+  - Created `AfterPhotoCaptureView` for capturing meal completion photos
+  - Photo upload and retrieval methods in `CloudKitRecipeManager`:
+    - `uploadImageAsset()` - Compresses and uploads UIImage as CKAsset
+    - `updateAfterPhoto()` - Adds after photo to existing recipe
+    - `fetchRecipePhotos()` - Retrieves both photos from CloudKit
+  - Automatic association of fridge photo with all generated recipes
+  - JPEG compression at 80% quality for optimal storage
+
+- **Enhanced Console Logging**:
+  - Detailed photo upload tracking with file sizes and compression stats
+  - Recipe title and ID logging for all photo operations
+  - Photo type identification (FRIDGE vs MEAL)
+  - Success/failure indicators for upload and download operations
+  - Multi-recipe upload progress tracking (1/3, 2/3, 3/3)
+
+#### Changed
+- **TikTok Video Generation Improvements**:
+  - Automatic fetching of before/after photos from CloudKit
+  - `drawImage()` helper method for rendering photos in video frames
+  - Text shadow support for better visibility over images
+  - Vignette effect on photos for improved text readability
+  - Proper aspect fill scaling for images in videos
+  - State management for CloudKit-fetched photos
+
+- **CameraView Recipe Upload**:
+  - Now uploads fridge photo to all generated recipes
+  - Clear progress tracking for multi-recipe uploads
+  - Confirmation that same fridge photo is intentionally shared
+
+#### Fixed
+- **TikTok Video Photo Display**:
+  - Before (fridge) photo now properly displays in videos
+  - After (meal) photo correctly rendered with overlays
+  - Coordinate system transformation for proper image orientation
+  - Photos fetched from CloudKit if not provided initially
+
 ### January 11, 2025 - Part 2 - Swift 6 Dispatch Queue Fixes & TikTok Video Improvements
 
 #### Fixed
