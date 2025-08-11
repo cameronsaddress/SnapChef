@@ -110,16 +110,21 @@ struct ParticleExplosion: ViewModifier {
             )
         }
         
-        Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { timer in
-            updateParticles()
-            
-            if particles.isEmpty {
-                timer.invalidate()
-                trigger = false
+        var particleTimer: Timer?
+        particleTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
+            Task { @MainActor in
+                updateParticles()
+                
+                if particles.isEmpty {
+                    particleTimer?.invalidate()
+                    particleTimer = nil
+                    trigger = false
+                }
             }
         }
     }
     
+    @MainActor
     private func updateParticles() {
         particles = particles.compactMap { particle in
             var updated = particle
@@ -157,7 +162,7 @@ struct MorphingShapeTransition: ViewModifier {
 struct MorphingShape: Shape {
     var progress: CGFloat
     
-    var animatableData: CGFloat {
+    nonisolated var animatableData: CGFloat {
         get { progress }
         set { progress = newValue }
     }
@@ -253,12 +258,12 @@ struct StaggeredFade: ViewModifier {
 struct PortalTransition: GeometryEffect {
     var progress: Double
     
-    var animatableData: Double {
+    nonisolated var animatableData: Double {
         get { progress }
         set { progress = newValue }
     }
     
-    func effectValue(size: CGSize) -> ProjectionTransform {
+    nonisolated func effectValue(size: CGSize) -> ProjectionTransform {
         let scaled = 1 - (1 - progress) * 0.5
         let rotation = progress * .pi * 2
         
@@ -316,7 +321,7 @@ struct SpringChain: ViewModifier {
 struct ElasticBounce: AnimatableModifier {
     var progress: CGFloat
     
-    var animatableData: CGFloat {
+    nonisolated var animatableData: CGFloat {
         get { progress }
         set { progress = newValue }
     }

@@ -197,7 +197,7 @@ struct LeaderboardEntry: Identifiable {
 
 // MARK: - Gamification Manager
 @MainActor
-class GamificationManager: ObservableObject {
+final class GamificationManager: ObservableObject {
     static let shared = GamificationManager()
     
     @Published var userStats = UserGameStats()

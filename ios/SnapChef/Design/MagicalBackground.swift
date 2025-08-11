@@ -246,14 +246,17 @@ struct FloatingOrb: View {
 }
 
 // MARK: - Particle System
-class ParticleSystem: ObservableObject {
+@MainActor
+final class ParticleSystem: ObservableObject {
     @Published var particles: [Particle] = []
     private var timer: Timer?
     
     func start() {
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-            self.createParticle()
-            self.updateParticles()
+            Task { @MainActor in
+                self.createParticle()
+                self.updateParticles()
+            }
         }
     }
     

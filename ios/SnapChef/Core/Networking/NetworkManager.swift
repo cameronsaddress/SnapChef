@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 
+@MainActor
 class NetworkManager {
     static let shared = NetworkManager()
     

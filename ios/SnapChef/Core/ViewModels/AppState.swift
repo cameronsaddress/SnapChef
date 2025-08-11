@@ -3,7 +3,7 @@ import Combine
 import CloudKit
 
 @MainActor
-class AppState: ObservableObject {
+final class AppState: ObservableObject {
     @Published var isFirstLaunch: Bool
     @Published var currentUser: User?
     @Published var isLoading: Bool = false

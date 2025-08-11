@@ -17,16 +17,22 @@ struct RecipeResultsView: View {
     @State private var savedRecipeIds: Set<UUID> = []
     @State private var showingExitConfirmation = false
     
+    // New states for branded share
+    @State private var showBrandedShare = false
+    @State private var shareContent: ShareContent?
+    
     enum ActiveSheet: Identifiable {
         case recipeDetail(Recipe)
         case shareGenerator(Recipe)
         case fridgeInventory
+        case brandedShare(Recipe)  // Add this for branded share
         
         var id: String {
             switch self {
             case .recipeDetail(let recipe): return "detail_\(recipe.id)"
             case .shareGenerator(let recipe): return "share_\(recipe.id)"
             case .fridgeInventory: return "fridge_inventory"
+            case .brandedShare(let recipe): return "branded_\(recipe.id)"
             }
         }
     }
@@ -71,7 +77,13 @@ struct RecipeResultsView: View {
                                     confettiTrigger = true
                                 },
                                 onShare: {
-                                    activeSheet = .shareGenerator(recipe)
+                                    // Use branded share popup instead
+                                    shareContent = ShareContent(
+                                        type: .recipe(recipe),
+                                        beforeImage: capturedImage,
+                                        afterImage: nil
+                                    )
+                                    showBrandedShare = true
                                 },
                                 onSave: {
                                     saveRecipe(recipe)
@@ -83,7 +95,13 @@ struct RecipeResultsView: View {
                         // Viral share prompt
                         ViralSharePrompt(action: {
                             if let firstRecipe = recipes.first {
-                                activeSheet = .shareGenerator(firstRecipe)
+                                // Use branded share for viral prompt too
+                                shareContent = ShareContent(
+                                    type: .recipe(firstRecipe),
+                                    beforeImage: capturedImage,
+                                    afterImage: nil
+                                )
+                                showBrandedShare = true
                             }
                         })
                         .staggeredFade(index: recipes.count + (ingredients.isEmpty ? 1 : 2), isShowing: contentVisible)
@@ -142,8 +160,18 @@ struct RecipeResultsView: View {
                     ingredients: ingredients,
                     capturedImage: capturedImage
                 )
+            case .brandedShare(let recipe):
+                // This case is handled by the separate sheet below
+                EmptyView()
             }
         }
+        // Add branded share popup sheet
+        .sheet(isPresented: $showBrandedShare) {
+            if let content = shareContent {
+                BrandedSharePopup(content: content)
+            }
+        }
+        // Keep old sheets for backward compatibility (not used but available)
         .sheet(isPresented: $showSocialShare) {
             if let recipe = selectedRecipe ?? recipes.first,
                let shareImage = generatedShareImage {
@@ -584,11 +612,12 @@ struct ShareFloatingButton: View {
         }
         .onAppear {
             Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
-                withAnimation(.easeOut(duration: 1)) {
-                    bounceAnimation = true
-                }
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                Task { @MainActor in
+                    withAnimation(.easeOut(duration: 1)) {
+                        bounceAnimation = true
+                    }
+                    
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
                     bounceAnimation = false
                 }
             }
@@ -649,11 +678,15 @@ struct ConfettiView: View {
             )
         }
         
-        Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { timer in
-            updateConfetti()
-            
-            if confettiPieces.isEmpty {
-                timer.invalidate()
+        var confettiTimer: Timer?
+        confettiTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
+            Task { @MainActor in
+                updateConfetti()
+                
+                if confettiPieces.isEmpty {
+                    confettiTimer?.invalidate()
+                    confettiTimer = nil
+                }
             }
         }
     }

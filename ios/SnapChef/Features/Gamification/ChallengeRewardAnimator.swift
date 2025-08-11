@@ -40,6 +40,7 @@ enum RewardAnimationType {
 }
 
 // MARK: - Confetti Scene
+@MainActor
 class ConfettiScene: SKScene {
     var animationType: RewardAnimationType = .confetti
     var emitterNode: SKEmitterNode?
@@ -374,8 +375,13 @@ struct LevelUpAnimationOverlay: View {
 }
 
 // MARK: - Challenge Reward Animator
-class ChallengeRewardAnimator: ObservableObject {
-    static let shared = ChallengeRewardAnimator()
+@MainActor
+final class ChallengeRewardAnimator: ObservableObject {
+    // Fix for Swift concurrency issue with @MainActor singletons
+    static let shared: ChallengeRewardAnimator = {
+        let instance = ChallengeRewardAnimator()
+        return instance
+    }()
     
     @Published var currentAnimation: RewardAnimationType?
     @Published var isAnimating = false

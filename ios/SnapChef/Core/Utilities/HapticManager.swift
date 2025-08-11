@@ -1,5 +1,6 @@
 import UIKit
 
+@MainActor
 class HapticManager {
     static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
         let generator = UIImpactFeedbackGenerator(style: style)

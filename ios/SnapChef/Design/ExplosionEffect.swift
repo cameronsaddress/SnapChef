@@ -148,7 +148,8 @@ struct ChromaticAberrationView: View {
 }
 
 // MARK: - Explosion Manager
-class ExplosionManager: ObservableObject {
+@MainActor
+final class ExplosionManager: ObservableObject {
     @Published var particles: [ExplosionParticle] = []
     @Published var shockwaves: [UUID] = []
     private var displayLink: CADisplayLink?
@@ -184,8 +185,8 @@ class ExplosionManager: ObservableObject {
         shockwaves.append(shockwaveId)
         
         // Remove shockwave after animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            self.shockwaves.removeAll { $0 == shockwaveId }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.shockwaves.removeAll { $0 == shockwaveId }
         }
         
         // Create particles
@@ -234,8 +235,9 @@ class ExplosionManager: ObservableObject {
         }
     }
     
-    deinit {
+    func cleanup() {
         displayLink?.invalidate()
+        displayLink = nil
     }
 }
 

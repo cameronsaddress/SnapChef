@@ -22,6 +22,10 @@ struct RecipeDetailView: View {
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @StateObject private var commentsViewModel = RecipeCommentsViewModel()
     
+    // New states for branded share
+    @State private var showBrandedShare = false
+    @State private var shareContent: ShareContent?
+    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -55,25 +59,16 @@ struct RecipeDetailView: View {
                             
                             Spacer()
                             
-                            // Share button
-                            Menu {
-                                Button(action: { shareVia("instagram") }) {
-                                    Label("Instagram", systemImage: "camera")
-                                }
-                                Button(action: { shareVia("tiktok") }) {
-                                    Label("TikTok", systemImage: "music.note")
-                                }
-                                Button(action: { shareVia("twitter") }) {
-                                    Label("X (Twitter)", systemImage: "bubble.left")
-                                }
-                                Button(action: { shareVia("whatsapp") }) {
-                                    Label("WhatsApp", systemImage: "message")
-                                }
-                                Divider()
-                                Button(action: { shareRecipe() }) {
-                                    Label("More Options", systemImage: "ellipsis")
-                                }
-                            } label: {
+                            // Share button - opens branded popup directly
+                            Button(action: { 
+                                // Use branded share popup with all platforms
+                                shareContent = ShareContent(
+                                    type: .recipe(recipe),
+                                    beforeImage: nil,
+                                    afterImage: nil
+                                )
+                                showBrandedShare = true
+                            }) {
                                 VStack(spacing: 4) {
                                     Image(systemName: "square.and.arrow.up")
                                         .font(.system(size: 24, weight: .medium))
@@ -282,6 +277,12 @@ struct RecipeDetailView: View {
             .sheet(isPresented: $showingAllComments) {
                 RecipeCommentsView(recipe: recipe)
             }
+            // Add branded share popup
+            .sheet(isPresented: $showBrandedShare) {
+                if let content = shareContent {
+                    BrandedSharePopup(content: content)
+                }
+            }
             .task {
                 await loadLikeStatus()
                 await loadAuthorInfo()
@@ -373,21 +374,7 @@ struct RecipeDetailView: View {
     }
     
     // MARK: - Share Functions
-    
-    private func shareVia(_ platform: String) {
-        let recipeText = """
-        Check out this amazing \(recipe.name) recipe I found on SnapChef! 
-        
-        ⏱ \(recipe.prepTime + recipe.cookTime) minutes
-        🍽 \(recipe.servings) servings
-        \(recipe.difficulty.emoji) \(recipe.difficulty.rawValue) difficulty
-        
-        #SnapChef #HomeCooking #FoodLove
-        """
-        
-        // For now, just use the system share sheet
-        shareRecipe()
-    }
+    // shareVia function removed - now using branded popup directly
     
     private func shareRecipe() {
         let recipeText = """

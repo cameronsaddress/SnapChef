@@ -5,7 +5,10 @@ struct AchievementGalleryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedCategory: AchievementCategory = .all
     @State private var selectedBadge: GameBadge?
-    @State private var showingShareSheet = false
+    
+    // New states for branded share
+    @State private var showBrandedShare = false
+    @State private var shareContent: ShareContent?
     
     private enum AchievementCategory: String, CaseIterable {
         case all = "All"
@@ -82,7 +85,13 @@ struct AchievementGalleryView: View {
                 }
             }
             .sheet(item: $selectedBadge) { badge in
-                BadgeDetailView(badge: badge)
+                BadgeDetailView(badge: badge, showBrandedShare: $showBrandedShare, shareContent: $shareContent)
+            }
+            // Add branded share popup
+            .sheet(isPresented: $showBrandedShare) {
+                if let content = shareContent {
+                    BrandedSharePopup(content: content)
+                }
             }
         }
     }
@@ -99,7 +108,16 @@ struct AchievementGalleryView: View {
                     Spacer()
                     
                     // Share button
-                    Button(action: { showingShareSheet = true }) {
+                    Button(action: { 
+                        // Use branded share popup for achievements
+                        let achievementText = "🏆 I've unlocked \(gamificationManager.userStats.badges.count) achievements on SnapChef!"
+                        shareContent = ShareContent(
+                            type: .achievement(achievementText),
+                            beforeImage: nil,
+                            afterImage: nil
+                        )
+                        showBrandedShare = true
+                    }) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.title3)
                             .foregroundColor(.primary)
@@ -317,6 +335,8 @@ private struct CategoryChip: View {
 // MARK: - Badge Detail View
 private struct BadgeDetailView: View {
     let badge: GameBadge
+    @Binding var showBrandedShare: Bool
+    @Binding var shareContent: ShareContent?
     @Environment(\.dismiss) private var dismiss
     @State private var rotationAngle: Double = 0
     
@@ -389,6 +409,41 @@ private struct BadgeDetailView: View {
                             }
                         }
                     }
+                    
+                    // Share button for individual badge
+                    Button(action: {
+                        let achievementText = "🎯 Just unlocked the \(badge.name) badge on SnapChef!"
+                        shareContent = ShareContent(
+                            type: .achievement(achievementText),
+                            beforeImage: nil,
+                            afterImage: nil
+                        )
+                        dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            showBrandedShare = true
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 16, weight: .medium))
+                            Text("Share Achievement")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#f093fb"), Color(hex: "#667eea")],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                        )
+                    }
+                    .padding(.horizontal)
                     
                     Spacer()
                 }

@@ -5,8 +5,12 @@ import Combine
 
 /// Comprehensive CloudKit data manager for full app synchronization
 @MainActor
-class CloudKitDataManager: ObservableObject {
-    static let shared = CloudKitDataManager()
+final class CloudKitDataManager: ObservableObject {
+    // Fix for Swift concurrency issue with @MainActor singletons
+    static let shared: CloudKitDataManager = {
+        let instance = CloudKitDataManager()
+        return instance
+    }()
     
     private let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
     private let publicDB: CKDatabase

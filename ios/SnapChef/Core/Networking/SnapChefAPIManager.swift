@@ -73,6 +73,7 @@ extension Data {
 
 // MARK: - API Response Models (to match FastAPI Pydantic models)
 
+@MainActor
 struct APIResponse: Codable {
     let data: GrokParsedResponse
     let message: String
@@ -134,8 +135,13 @@ struct NutritionAPI: Codable {
 }
 
 // MARK: - SnapChefAPIManager
-class SnapChefAPIManager {
-    static let shared = SnapChefAPIManager() // Singleton instance
+@MainActor
+final class SnapChefAPIManager {
+    // Fix for Swift concurrency issue with @MainActor singletons
+    static let shared: SnapChefAPIManager = {
+        let instance = SnapChefAPIManager()
+        return instance
+    }()
     
     private let serverBaseURL = "https://snapchef-server.onrender.com"
     private let session: URLSession

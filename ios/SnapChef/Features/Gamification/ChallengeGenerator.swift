@@ -515,8 +515,10 @@ extension ChallengeGenerator {
     
     private func scheduleDailyGeneration() {
         let timer = Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { _ in
-            let challenge = self.generateDailyChallenge()
-            self.gamificationManager.saveChallenge(challenge)
+            Task { @MainActor in
+                let challenge = self.generateDailyChallenge()
+                self.gamificationManager.saveChallenge(challenge)
+            }
         }
         
         RunLoop.current.add(timer, forMode: .common)
@@ -524,8 +526,10 @@ extension ChallengeGenerator {
     
     private func scheduleWeeklyGeneration() {
         let timer = Timer.scheduledTimer(withTimeInterval: 604800, repeats: true) { _ in
-            let challenge = self.generateWeeklyChallenge()
-            self.gamificationManager.saveChallenge(challenge)
+            Task { @MainActor in
+                let challenge = self.generateWeeklyChallenge()
+                self.gamificationManager.saveChallenge(challenge)
+            }
         }
         
         RunLoop.current.add(timer, forMode: .common)
@@ -534,8 +538,10 @@ extension ChallengeGenerator {
     private func scheduleSpecialEventGeneration() {
         // Check daily for special events
         let timer = Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { _ in
-            if let challenge = self.generateSpecialEventChallenge() {
-                self.gamificationManager.saveChallenge(challenge)
+            Task { @MainActor in
+                if let challenge = self.generateSpecialEventChallenge() {
+                    self.gamificationManager.saveChallenge(challenge)
+                }
             }
         }
         

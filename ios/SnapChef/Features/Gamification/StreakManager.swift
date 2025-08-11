@@ -19,7 +19,7 @@ class StreakManager: ObservableObject {
     
     // MARK: - Private Properties
     private let userDefaults = UserDefaults.standard
-    private let notificationCenter = UNUserNotificationCenter.current()
+    private lazy var notificationCenter = UNUserNotificationCenter.current()
     private var updateTimer: Timer?
     private var midnightTimer: Timer?
     
@@ -33,14 +33,24 @@ class StreakManager: ObservableObject {
     private init() {
         loadStreaksFromCache()
         setupTimers()
-        setupNotifications()
+        // Don't setup notifications in init to avoid dispatch queue issues
+        // setupNotifications() - removed, will be called lazily
         checkAllStreaks()
     }
     
     // MARK: - Public Methods
     
+    private var hasSetupNotifications = false
+    
+    private func ensureNotificationsSetup() {
+        guard !hasSetupNotifications else { return }
+        hasSetupNotifications = true
+        setupNotifications()
+    }
+    
     /// Record an activity for a streak type
     func recordActivity(for type: StreakType) async {
+        ensureNotificationsSetup()
         var streak = currentStreaks[type] ?? StreakData(type: type)
         let calendar = Calendar.current
         
@@ -504,18 +514,24 @@ class StreakManager: ObservableObject {
     // MARK: - Notifications
     
     private func setupNotifications() {
-        // Request permission
-        notificationCenter.requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-            if granted {
-                print("✅ Notification permission granted")
+        Task.detached {
+            // Request permission on background queue
+            let center = UNUserNotificationCenter.current()
+            do {
+                let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
+                if granted {
+                    print("✅ Notification permission granted")
+                }
+            } catch {
+                print("Notification permission error: \(error)")
             }
+            
+            // Schedule daily reminder
+            await self.scheduleDailyReminder()
         }
-        
-        // Schedule daily reminder
-        scheduleDailyReminder()
     }
     
-    private func scheduleDailyReminder() {
+    private func scheduleDailyReminder() async {
         let content = UNMutableNotificationContent()
         content.title = "🔥 Keep Your Streak Alive!"
         content.body = "Don't forget to complete today's activities"
@@ -533,27 +549,31 @@ class StreakManager: ObservableObject {
             trigger: trigger
         )
         
-        notificationCenter.add(request)
+        let center = UNUserNotificationCenter.current()
+        try? await center.add(request)
     }
     
     private func scheduleNotification(title: String, body: String, date: Date) {
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = .default
-        
-        let trigger = UNTimeIntervalNotificationTrigger(
-            timeInterval: date.timeIntervalSinceNow,
-            repeats: false
-        )
-        
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: trigger
-        )
-        
-        notificationCenter.add(request)
+        Task.detached {
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: date.timeIntervalSinceNow,
+                repeats: false
+            )
+            
+            let request = UNNotificationRequest(
+                identifier: UUID().uuidString,
+                content: content,
+                trigger: trigger
+            )
+            
+            let center = UNUserNotificationCenter.current()
+            try? await center.add(request)
+        }
     }
     
     // MARK: - Analytics

@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 class AnalyticsManager {
     static let shared = AnalyticsManager()
     

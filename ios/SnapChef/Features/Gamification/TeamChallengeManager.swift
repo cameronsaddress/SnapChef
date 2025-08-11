@@ -176,8 +176,8 @@ class TeamChallengeManager: ObservableObject {
     @Published var teamChat: [TeamChatMessage] = []
     @Published var isLoadingTeams = false
     
-    private let cloudKitManager = CloudKitManager.shared
-    private let notificationManager = ChallengeNotificationManager.shared
+    private lazy var cloudKitManager = CloudKitManager.shared
+    private lazy var notificationManager = ChallengeNotificationManager.shared
     
     private init() {
         loadMockData()
@@ -629,6 +629,9 @@ extension ChallengeNotificationManager {
             trigger: nil
         )
         
-        UNUserNotificationCenter.current().add(request)
+        Task.detached {
+            let center = UNUserNotificationCenter.current()
+            try? await center.add(request)
+        }
     }
 }

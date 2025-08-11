@@ -2,6 +2,7 @@ import Foundation
 import Security
 
 /// Manages secure storage of sensitive data in the iOS Keychain
+@MainActor
 class KeychainManager {
     static let shared = KeychainManager()
     

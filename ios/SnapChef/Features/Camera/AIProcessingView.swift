@@ -184,14 +184,15 @@ struct AIProcessingView: View {
             
             // Start button shake animation every 2 seconds
             Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-                withAnimation(
-                    Animation.easeInOut(duration: 0.1)
-                        .repeatCount(5, autoreverses: true)
-                ) {
-                    buttonShake = 3
-                }
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                Task { @MainActor in
+                    withAnimation(
+                        Animation.easeInOut(duration: 0.1)
+                            .repeatCount(5, autoreverses: true)
+                    ) {
+                        buttonShake = 3
+                    }
+                    
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                     buttonShake = 0
                 }
             }

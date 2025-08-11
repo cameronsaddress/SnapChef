@@ -636,24 +636,27 @@ struct EmojiFlickGame: View {
         let targetMaxY = screenHeight * 0.6
         
         // Check every 0.1 seconds for emojis at target position
-        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-            // Find emojis in the middle zone
-            let readyEmojis = self.emojis.filter { emoji in
-                emoji.position.y >= targetMinY && emoji.position.y <= targetMaxY && !emoji.isFlicked
-            }
-            
-            guard readyEmojis.count > 0 else { return }
-            
-            timer.invalidate()
-            
-            // Flick first emoji
-            if let firstEmoji = readyEmojis.first {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    self.tutorialFingerPosition = CGPoint(
-                        x: firstEmoji.position.x - 50,
-                        y: firstEmoji.position.y
-                    )
+        var tutorialTimer: Timer?
+        tutorialTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            Task { @MainActor in
+                // Find emojis in the middle zone
+                let readyEmojis = self.emojis.filter { emoji in
+                    emoji.position.y >= targetMinY && emoji.position.y <= targetMaxY && !emoji.isFlicked
                 }
+                
+                guard readyEmojis.count > 0 else { return }
+                
+                tutorialTimer?.invalidate()
+                tutorialTimer = nil
+                
+                // Flick first emoji
+                if let firstEmoji = readyEmojis.first {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        self.tutorialFingerPosition = CGPoint(
+                            x: firstEmoji.position.x - 50,
+                            y: firstEmoji.position.y
+                        )
+                    }
                 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -730,6 +733,7 @@ struct EmojiFlickGame: View {
                     self.showTutorial = false
                 }
             }
+            } // End Task
         }
     }
 }

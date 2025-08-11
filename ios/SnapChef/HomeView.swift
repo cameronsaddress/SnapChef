@@ -494,8 +494,10 @@ struct ViralChallengeSection: View {
     
     private func startAutoScroll() {
         autoTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { _ in
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                currentChallenge = (currentChallenge + 1) % max(displayChallenges.count, 1)
+            Task { @MainActor in
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    currentChallenge = (currentChallenge + 1) % max(displayChallenges.count, 1)
+                }
             }
         }
     }
@@ -956,7 +958,7 @@ struct MysteryMealButton: View {
 struct ShakeEffect: AnimatableModifier {
     var shakeNumber: CGFloat = 0
     
-    var animatableData: CGFloat {
+    nonisolated var animatableData: CGFloat {
         get { shakeNumber }
         set { shakeNumber = newValue }
     }
@@ -968,7 +970,8 @@ struct ShakeEffect: AnimatableModifier {
 }
 
 // MARK: - Falling Food Manager
-class FallingFoodManager: ObservableObject {
+@MainActor
+final class FallingFoodManager: ObservableObject {
     @Published var emojis: [FallingFoodEmoji] = []
     private let foodEmojis = ["🍕", "🍔", "🌮", "🍜", "🍝", "🥗", "🍣", "🥘", "🍛", "🥙", "🍱", "🥪", "🌯", "🍖", "🍗", "🥓", "🧀", "🥚", "🍳", "🥞"]
     private var buttonFrames: [CGRect] = []
@@ -1009,8 +1012,9 @@ class FallingFoodManager: ObservableObject {
         }
     }
     
-    deinit {
+    func cleanup() {
         displayLink?.invalidate()
+        displayLink = nil
     }
     
     private func dropEmoji() {

@@ -1,8 +1,8 @@
 import Foundation
 
 struct AuthConfiguration {
-    // Google Sign-In Configuration
-    static let googleClientID = "YOUR_GOOGLE_CLIENT_ID" // TODO: Add from Google Cloud Console
+    // Google Sign-In Configuration (Not currently implemented)
+    // static let googleClientID = "YOUR_GOOGLE_CLIENT_ID" // TODO: Add from Google Cloud Console when implementing
     
     // Facebook App Configuration
     static let facebookAppID = "YOUR_FACEBOOK_APP_ID" // TODO: Add from Facebook Developer Console

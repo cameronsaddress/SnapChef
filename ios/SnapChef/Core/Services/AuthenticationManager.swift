@@ -5,7 +5,7 @@ import AuthenticationServices
 // import FBSDKLoginKit
 
 @MainActor
-class AuthenticationManager: ObservableObject {
+final class AuthenticationManager: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var currentUser: User?
     @Published var showAuthSheet: Bool = false

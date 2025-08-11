@@ -251,6 +251,7 @@ enum SharePlatform {
         }
     }
     
+    @MainActor
     func share(recipe: Recipe, message: String) {
         // We'll handle the view controller lookup inside each share method
         switch self {
@@ -265,6 +266,7 @@ enum SharePlatform {
         }
     }
     
+    @MainActor
     private func shareTikTok(recipe: Recipe, message: String) {
         let text = formatShareText(recipe: recipe, message: message)
         UIPasteboard.general.string = text
@@ -274,6 +276,7 @@ enum SharePlatform {
         }
     }
     
+    @MainActor
     private func shareInstagram(recipe: Recipe, message: String) {
         let text = formatShareText(recipe: recipe, message: message)
         UIPasteboard.general.string = text
@@ -285,6 +288,7 @@ enum SharePlatform {
         }
     }
     
+    @MainActor
     private func shareTwitter(recipe: Recipe, message: String) {
         let text = formatShareText(recipe: recipe, message: message)
         let encodedText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""

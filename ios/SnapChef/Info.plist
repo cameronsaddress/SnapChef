@@ -23,7 +23,9 @@
     <key>NSCameraUsageDescription</key>
     <string>SnapChef needs camera access to take photos of your fridge and pantry for recipe generation.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>SnapChef needs photo library access to save your recipe photos.</string>
+    <string>SnapChef needs photo library access to save your recipe photos and videos.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>SnapChef needs permission to save recipe videos to your photo library.</string>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>

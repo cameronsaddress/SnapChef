@@ -298,8 +298,10 @@ struct OriginalProcessingOverlay: View {
             }
             
             Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
-                withAnimation {
-                    messageIndex = (messageIndex + 1) % messages.count
+                Task { @MainActor in
+                    withAnimation {
+                        messageIndex = (messageIndex + 1) % messages.count
+                    }
                 }
             }
         }

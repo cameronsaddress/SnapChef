@@ -179,28 +179,117 @@ Custom card component:
 
 ### Sharing Module (`Features/Sharing/`)
 
-#### ShareGeneratorView.swift
+#### Core Share Infrastructure
+```swift
+// ShareService.swift - Central coordinator
+class ShareService: ObservableObject {
+    - Platform detection and routing
+    - Deep link generation for all platforms
+    - Analytics tracking
+    - CloudKit upload
+    - Fallback to web for uninstalled apps
+}
+
+// BrandedSharePopup.swift - Main UI
+struct BrandedSharePopup: View {
+    - Branded platform icons
+    - Availability detection
+    - Platform-specific routing
+    - Animated entrance/exit
+}
+```
+
+#### Platform-Specific Implementations
+
+##### TikTok Integration
+```swift
+// TikTokShareView.swift
+- Template selection (5 viral formats)
+- Trending audio suggestions
+- Hashtag recommendations
+- Video preview with export progress
+
+// TikTokVideoGenerator.swift
+- AVFoundation video generation
+- 9:16 aspect ratio
+- 30fps frame rendering
+- Template-based content creation
+
+// TikTokTemplates.swift
+- Before/After Reveal
+- 60-Second Recipe
+- 360° Ingredients
+- Cooking Timelapse
+- Split Screen
+```
+
+##### Instagram Integration
+```swift
+// InstagramShareView.swift
+- Story and post creation modes
+- Template selection (5 styles)
+- Sticker support for stories
+- Caption generator with hashtags
+
+// InstagramContentGenerator.swift
+- SwiftUI to UIImage rendering
+- 1:1 for posts, 9:16 for stories
+- Carousel generation support
+- Template-based designs
+
+// InstagramTemplates.swift
+- Classic, Modern, Minimal
+- Bold, Gradient styles
+- Instagram color palette
+```
+
+##### X (Twitter) Integration
+```swift
+// XShareView.swift
+- Tweet composer with preview
+- Character counter (280 limit)
+- Style selection (5 formats)
+- Hashtag management
+
+// XContentGenerator.swift
+- 16:9 card generation
+- Thread card creation
+- Style templates
+- Nutrition info cards
+```
+
+##### Messages Integration
+```swift
+// MessagesShareView.swift
+- Interactive rotating card
+- 3D effect preview
+- Auto-rotate toggle
+- MFMessageComposeViewController
+
+// MessageCardGenerator.swift
+- High-res card rendering
+- Multiple card styles:
+  - Rotating 3D
+  - Flip animation
+  - Stack view
+  - Carousel
+```
+
+#### ShareGeneratorView.swift (Legacy)
 Creates social media-ready images:
 ```swift
 struct ShareGeneratorView: View {
     let recipe: Recipe
     let ingredientsPhoto: UIImage?
     @State private var afterPhoto: UIImage?
-    @State private var selectedStyle: ShareStyle
     
     // Features:
     // - Style selector (4 themes)
     // - Before/after photo comparison
     // - Custom branding
-    // - One-tap sharing
+    // - CloudKit integration
 }
 ```
-
-#### Key Changes:
-- **Animation**: Single 15° rotation instead of continuous spin
-- **Photo Capture**: Clickable after photo area
-- **Layout**: "Share for Credits" below style selector
-- **Removed**: Challenge text editor section
 
 ### Gamification Module (`Features/Gamification/`)
 

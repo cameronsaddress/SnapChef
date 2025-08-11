@@ -5,7 +5,7 @@ import AdSupport
 import AppTrackingTransparency
 
 @MainActor
-class DeviceManager: ObservableObject {
+final class DeviceManager: ObservableObject {
     @Published var deviceId: String = ""
     @Published var freeUsesRemaining: Int = 10 // Increased for testing
     @Published var freeSavesRemaining: Int = 10 // Increased for testing
@@ -89,10 +89,8 @@ class DeviceManager: ObservableObject {
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         
         // Decrement the free uses locally
-        DispatchQueue.main.async {
-            self.freeUsesRemaining -= 1
-            self.isBlocked = false
-        }
+        self.freeUsesRemaining -= 1
+        self.isBlocked = false
         
         return true
         #else
@@ -119,18 +117,14 @@ class DeviceManager: ObservableObject {
         try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
         
         // Decrement the free saves locally
-        DispatchQueue.main.async {
-            self.freeSavesRemaining -= 1
-            UserDefaults.standard.set(self.freeSavesRemaining, forKey: self.freeSavesKey)
-        }
+        self.freeSavesRemaining -= 1
+        UserDefaults.standard.set(self.freeSavesRemaining, forKey: self.freeSavesKey)
         
         return true
         #else
         // In production, this would call the API
-        DispatchQueue.main.async {
-            self.freeSavesRemaining -= 1
-            UserDefaults.standard.set(self.freeSavesRemaining, forKey: self.freeSavesKey)
-        }
+        self.freeSavesRemaining -= 1
+        UserDefaults.standard.set(self.freeSavesRemaining, forKey: self.freeSavesKey)
         return true
         #endif
     }

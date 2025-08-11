@@ -4,8 +4,12 @@ import Combine
 import UIKit
 
 @MainActor
-class CloudKitSyncService: ObservableObject {
-    static let shared = CloudKitSyncService()
+final class CloudKitSyncService: ObservableObject {
+    // Fix for Swift concurrency issue with @MainActor singletons
+    static let shared: CloudKitSyncService = {
+        let instance = CloudKitSyncService()
+        return instance
+    }()
     
     private let container: CKContainer
     private let publicDatabase: CKDatabase

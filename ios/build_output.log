@@ -1,0 +1,8 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project SnapChef.xcodeproj -scheme SnapChef -configuration Debug -destination "platform=iOS Simulator,name=iPhone 16 Pro" build
+
+2025-08-11 08:56:27.576 xcodebuild[62288:47790873] Writing error result bundle to /var/folders/qw/w_9s1rjs74bgbxwpw0wvzqrc0000gn/T/ResultBundle_2025-11-08_08-56-0027.xcresult
+xcodebuild: error: Unable to read project 'SnapChef.xcodeproj'.
+	Reason: Failed to load project at '/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef.xcodeproj' for an unknown reason.
+
+

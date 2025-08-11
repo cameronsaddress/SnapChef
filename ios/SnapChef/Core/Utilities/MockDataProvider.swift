@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 class MockDataProvider {
     static let shared = MockDataProvider()
     

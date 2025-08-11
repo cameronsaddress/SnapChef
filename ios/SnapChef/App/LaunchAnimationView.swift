@@ -10,7 +10,8 @@ struct FallingEmoji: Identifiable {
     let shouldBounce: Bool // Only some emojis will bounce
 }
 
-class EmojiAnimator: ObservableObject {
+@MainActor
+final class EmojiAnimator: ObservableObject {
     @Published var emojis: [FallingEmoji] = []
 }
 
@@ -53,49 +54,44 @@ struct LaunchAnimationView: View {
         }
     }
     
+    @MainActor
     private func startFallingEmojis() {
         let screenWidth = UIScreen.main.bounds.width
         
-        // Start physics animation immediately
-        let animationTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
-            DispatchQueue.main.async {
-                self.updatePhysics()
-                self.removeOffscreenEmojis()
-            }
-        }
-        
-        // Drop 10 emojis total with staggered timing
+        // Create initial emojis
         for i in 0..<10 {
-            let delay = Double(i) * 0.3 // Stagger by 0.3 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                let emoji = FallingEmoji(
-                    position: CGPoint(
-                        x: CGFloat.random(in: 30...screenWidth - 30),
-                        y: -50
-                    ),
-                    velocity: CGVector(
-                        dx: CGFloat.random(in: -20...20),
-                        dy: CGFloat.random(in: 50...150)
-                    ),
-                    emoji: self.foodEmojis.randomElement() ?? "🍕",
-                    shouldBounce: false
-                )
-                self.emojiAnimator.emojis.append(emoji)
-            }
+            let emoji = FallingEmoji(
+                position: CGPoint(
+                    x: CGFloat.random(in: 30...screenWidth - 30),
+                    y: CGFloat(i) * -100 - 50  // Stagger vertically
+                ),
+                velocity: CGVector(
+                    dx: CGFloat.random(in: -20...20),
+                    dy: CGFloat.random(in: 50...150)
+                ),
+                emoji: self.foodEmojis.randomElement() ?? "🍕",
+                shouldBounce: false
+            )
+            self.emojiAnimator.emojis.append(emoji)
         }
         
-        // End animation after 3 seconds total
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            animationTimer.invalidate()
+        // Start physics updates
+        Task { @MainActor in
+            // Run physics simulation for 3 seconds
+            for _ in 0..<180 { // 3 seconds at 60fps
+                updatePhysics()
+                removeOffscreenEmojis()
+                try? await Task.sleep(nanoseconds: 16_666_667) // ~60fps
+            }
             
+            // Complete animation
             withAnimation(.easeOut(duration: 0.3)) {
                 animationComplete = true
             }
             
             // Notify completion
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                onAnimationComplete()
-            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            onAnimationComplete()
         }
     }
     
@@ -104,6 +100,7 @@ struct LaunchAnimationView: View {
         // This creates a continuous rain effect
     }
     
+    @MainActor
     private func updatePhysics() {
         let deltaTime = 0.016
         let screenHeight = UIScreen.main.bounds.height
@@ -154,6 +151,7 @@ struct LaunchAnimationView: View {
         }
     }
     
+    @MainActor
     private func checkEmojiCollision(i: Int, j: Int) -> Bool {
         let distance = hypot(
             emojiAnimator.emojis[i].position.x - emojiAnimator.emojis[j].position.x,
@@ -162,6 +160,7 @@ struct LaunchAnimationView: View {
         return distance < 35 // Emoji radius ~17.5 each
     }
     
+    @MainActor
     private func resolveEmojiCollision(i: Int, j: Int) {
         let dx = emojiAnimator.emojis[i].position.x - emojiAnimator.emojis[j].position.x
         let dy = emojiAnimator.emojis[i].position.y - emojiAnimator.emojis[j].position.y

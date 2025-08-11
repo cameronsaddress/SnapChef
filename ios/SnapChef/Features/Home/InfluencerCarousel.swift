@@ -116,9 +116,11 @@ struct InfluencerCarousel: View {
     private func startAutoScroll() {
         stopAutoScroll()
         timer = Timer.scheduledTimer(withTimeInterval: autoScrollInterval, repeats: true) { _ in
-            if !isDragging {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    currentIndex = (currentIndex + 1) % influencers.count
+            Task { @MainActor in
+                if !isDragging {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        currentIndex = (currentIndex + 1) % influencers.count
+                    }
                 }
             }
         }

@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 class ProfanityFilter {
     static let shared = ProfanityFilter()
     

@@ -2,6 +2,7 @@ import Foundation
 import CloudKit
 import UIKit
 
+@MainActor
 class CloudKitUserManager: ObservableObject {
     static let shared = CloudKitUserManager()
     

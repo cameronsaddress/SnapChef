@@ -6,6 +6,7 @@ import CloudKit
 // Since we can't import from another Swift file directly, we'll need to define a method that returns the data
 
 // MARK: - Fake User Data Service
+@MainActor
 class FakeUserDataService {
     static let shared = FakeUserDataService()
     

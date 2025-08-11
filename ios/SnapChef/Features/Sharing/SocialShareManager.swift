@@ -43,8 +43,12 @@ enum SocialPlatform: String, CaseIterable {
 
 // MARK: - Social Share Manager
 @MainActor
-class SocialShareManager: ObservableObject {
-    static let shared = SocialShareManager()
+final class SocialShareManager: ObservableObject {
+    // Fix for Swift concurrency issue with @MainActor singletons
+    static let shared: SocialShareManager = {
+        let instance = SocialShareManager()
+        return instance
+    }()
     
     @Published var isSharing = false
     @Published var shareProgress: Double = 0

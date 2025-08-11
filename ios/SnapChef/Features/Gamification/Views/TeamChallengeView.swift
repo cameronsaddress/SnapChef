@@ -10,6 +10,10 @@ struct TeamChallengeView: View {
     @State private var joinCode = ""
     @State private var isLoadingTeams = false
     
+    // New states for branded share
+    @State private var showBrandedShare = false
+    @State private var shareContent: ShareContent?
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -19,7 +23,11 @@ struct TeamChallengeView: View {
                     VStack(spacing: 24) {
                         // Header Section
                         if let currentTeam = teamManager.currentTeam {
-                            CurrentTeamCard(team: currentTeam)
+                            CurrentTeamCard(
+                                team: currentTeam,
+                                showBrandedShare: $showBrandedShare,
+                                shareContent: $shareContent
+                            )
                                 .padding(.horizontal)
                         } else {
                             NoTeamCard(
@@ -69,6 +77,12 @@ struct TeamChallengeView: View {
             .sheet(isPresented: $showJoinTeam) {
                 JoinTeamView(team: selectedTeam, joinCode: $joinCode)
             }
+            // Add branded share popup
+            .sheet(isPresented: $showBrandedShare) {
+                if let content = shareContent {
+                    BrandedSharePopup(content: content)
+                }
+            }
         }
     }
 }
@@ -77,6 +91,8 @@ struct TeamChallengeView: View {
 struct CurrentTeamCard: View {
     let team: Team
     @State private var showTeamDetails = false
+    @Binding var showBrandedShare: Bool
+    @Binding var shareContent: ShareContent?
     
     var body: some View {
         GlassmorphicCard {
@@ -177,16 +193,13 @@ struct CurrentTeamCard: View {
     }
     
     private func shareTeamCode() {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first,
-              let rootViewController = window.rootViewController else { return }
-        
-        let activityController = UIActivityViewController(
-            activityItems: ["Join my SnapChef team '\(team.name)' with code: \(team.joinCode)"],
-            applicationActivities: nil
+        // Use branded share popup for team invites
+        shareContent = ShareContent(
+            type: .teamInvite(teamName: team.name, joinCode: team.joinCode),
+            beforeImage: nil,
+            afterImage: nil
         )
-        
-        rootViewController.present(activityController, animated: true)
+        showBrandedShare = true
     }
 }
 

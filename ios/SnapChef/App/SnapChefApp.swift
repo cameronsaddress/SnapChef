@@ -1,44 +1,67 @@
+//
+//  SnapChefApp.swift
+//  SnapChef
+//
+//  Created by Apple on 2024-07-25.
+//
+
 import SwiftUI
+import CloudKit
+import Combine
 
 @main
 struct SnapChefApp: App {
+
+    // Create new instances for @StateObject to manage their lifecycle.
     @StateObject private var appState = AppState()
     @StateObject private var authManager = AuthenticationManager()
     @StateObject private var deviceManager = DeviceManager()
     @StateObject private var gamificationManager = GamificationManager()
+
+    // Use the shared singleton instances, managed by @StateObject, to ensure
+    // SwiftUI observes changes and triggers view updates.
     @StateObject private var socialShareManager = SocialShareManager.shared
-    @StateObject private var cloudKitSync = CloudKitSyncService.shared
+    @StateObject private var cloudKitSyncService = CloudKitSyncService.shared
     @StateObject private var cloudKitDataManager = CloudKitDataManager.shared
-    
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                // Inject all dependencies into the environment.
                 .environmentObject(appState)
                 .environmentObject(authManager)
                 .environmentObject(deviceManager)
                 .environmentObject(gamificationManager)
                 .environmentObject(socialShareManager)
+                .environmentObject(cloudKitSyncService)
                 .environmentObject(cloudKitDataManager)
-                .preferredColorScheme(.dark) // Force dark mode
+
+                .preferredColorScheme(.dark)
+
                 .onAppear {
                     setupApp()
                 }
+                
                 .onOpenURL { url in
                     handleIncomingURL(url)
                 }
+
+                // The sheet is now presented using the singleton's property, and
+                // its environment objects are passed down from SnapChefApp,
+                // ensuring consistency.
                 .sheet(isPresented: $socialShareManager.showRecipeFromDeepLink) {
                     DeepLinkRecipeView()
+                        // These are the instances managed by this App struct.
                         .environmentObject(socialShareManager)
-                        .environmentObject(cloudKitSync)
+                        .environmentObject(cloudKitSyncService)
                 }
+
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-                    // App is going to background
                     Task {
                         await cloudKitDataManager.endAppSession()
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
-                    // App is terminating
                     Task {
                         await cloudKitDataManager.endAppSession()
                     }
@@ -46,40 +69,28 @@ struct SnapChefApp: App {
         }
     }
     
+    // MARK: - App Setup Functions
+
     private func setupApp() {
-        // Configure appearance
         configureNavigationBar()
         configureTableView()
         configureWindow()
         
-        // Ensure API key is securely stored in Keychain
         KeychainManager.shared.ensureAPIKeyExists()
-        
-        // Initialize services
         NetworkManager.shared.configure()
-        
-        // Check device fingerprint
         deviceManager.checkDeviceStatus()
         
-        // Setup notifications for challenges
         Task {
             _ = await ChallengeNotificationManager.shared.requestNotificationPermission()
         }
         
-        // Initialize CloudKit data synchronization
         Task {
-            // Start app session tracking
-            let sessionID = await cloudKitDataManager.startAppSession()
+            let sessionID = cloudKitDataManager.startAppSession()
             appState.currentSessionID = sessionID
             
-            // Register device for multi-device sync
             try? await cloudKitDataManager.registerDevice()
-            
-            // Perform initial sync
             await cloudKitDataManager.performFullSync()
-            
-            // Track app launch
-            await cloudKitDataManager.trackScreenView("AppLaunch")
+            cloudKitDataManager.trackScreenView("AppLaunch")
         }
     }
     
@@ -96,22 +107,17 @@ struct SnapChefApp: App {
     }
     
     private func configureTableView() {
-        // Make table views transparent
         UITableView.appearance().backgroundColor = .clear
         UITableViewCell.appearance().backgroundColor = .clear
-        
-        // Make collection views transparent
         UICollectionView.appearance().backgroundColor = .clear
     }
     
     private func configureWindow() {
-        // Configure scroll view appearances
         UIScrollView.appearance().backgroundColor = .clear
     }
     
     private func handleIncomingURL(_ url: URL) {
         if socialShareManager.handleIncomingURL(url) {
-            // URL was handled successfully
             socialShareManager.resolvePendingDeepLink()
         }
     }
@@ -126,13 +132,13 @@ struct DeepLinkRecipeView: View {
     @State private var recipe: Recipe?
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var showRecipeDetail = false
     
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
+                
                 
                 if isLoading {
                     VStack(spacing: 20) {
@@ -170,7 +176,6 @@ struct DeepLinkRecipeView: View {
                         .cornerRadius(25)
                     }
                 } else if let recipe = recipe {
-                    // Recipe loaded successfully - show detail view
                     RecipeDetailView(recipe: recipe)
                 }
             }

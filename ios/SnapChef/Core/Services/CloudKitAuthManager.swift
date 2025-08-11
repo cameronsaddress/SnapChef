@@ -1,12 +1,15 @@
 import Foundation
 import CloudKit
 import AuthenticationServices
-import GoogleSignIn
 import SwiftUI
 
 @MainActor
-class CloudKitAuthManager: ObservableObject {
-    static let shared = CloudKitAuthManager()
+final class CloudKitAuthManager: ObservableObject {
+    // Fix for Swift concurrency issue with @MainActor singletons
+    static let shared: CloudKitAuthManager = {
+        let instance = CloudKitAuthManager()
+        return instance
+    }()
     
     @Published var isAuthenticated = false
     @Published var currentUser: CloudKitUser?
@@ -123,18 +126,6 @@ class CloudKitAuthManager: ObservableObject {
             // Show username selection for new users
             self.showUsernameSelection = true
         }
-    }
-    
-    func signInWithGoogle(user: GIDGoogleUser) async throws {
-        // Use Google user ID with prefix to ensure uniqueness
-        let userID = "google_\(user.userID ?? UUID().uuidString)"
-        await signInWithProvider(
-            userID: userID,
-            provider: "google",
-            email: user.profile?.email,
-            displayName: user.profile?.name,
-            profileImageURL: user.profile?.imageURL(withDimension: 200)?.absoluteString
-        )
     }
     
     func signInWithFacebook(userID: String, email: String?, name: String?, profileImageURL: String?) async throws {
@@ -775,9 +766,7 @@ struct UserStatUpdates {
     var followingCount: Int?
 }
 
-// Google and Facebook user info are handled by their respective SDKs
-// GoogleSignIn provides GIDGoogleUser
-// Facebook SDK provides similar user objects
+// Facebook user info is handled by Facebook SDK
 
 enum CloudKitAuthError: LocalizedError {
     case invalidCredential

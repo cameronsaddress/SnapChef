@@ -19,8 +19,8 @@ class ChallengeSharingManager: ObservableObject {
     @Published var generatedShareImage: UIImage?
     @Published var shareProgress: Double = 0
     
-    private let gamificationManager = GamificationManager.shared
-    private let teamManager = TeamChallengeManager.shared
+    private lazy var gamificationManager = GamificationManager.shared
+    private lazy var teamManager = TeamChallengeManager.shared
     
     // Social Platform Types
     enum SocialPlatform: String, CaseIterable {
@@ -905,6 +905,9 @@ extension ChallengeNotificationManager {
             trigger: nil
         )
         
-        UNUserNotificationCenter.current().add(request)
+        Task.detached {
+            let center = UNUserNotificationCenter.current()
+            try? await center.add(request)
+        }
     }
 }
