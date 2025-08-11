@@ -4,6 +4,17 @@ All notable changes to the SnapChef iOS app will be documented in this file.
 
 ## [Unreleased]
 
+### January 11, 2025 - Part 4 - Duplicate Recipe Prevention Enhancement
+
+#### Fixed
+- **Enhanced Duplicate Recipe Prevention**:
+  - Fixed issue where only local recipes were being sent to backend for duplicate prevention
+  - Now includes both local AND CloudKit recipes when checking for duplicates
+  - Fetches user's saved and created recipes from CloudKit before generating new ones
+  - Prevents LLM from suggesting recipes that already exist in user's cloud collection
+  - Added detailed logging showing total recipe count for duplicate prevention
+  - Backend properly receives all recipe names and instructs LLM to avoid duplicates
+
 ### January 11, 2025 - Part 3 - CloudKit Photo Storage & TikTok Video Enhancement
 
 #### Added

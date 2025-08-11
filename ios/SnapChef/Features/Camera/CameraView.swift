@@ -340,7 +340,27 @@ struct CameraView: View {
             let startTime = Date()
             
             // Get existing recipe names to avoid duplicates
-            let existingRecipeNames = appState.allRecipes.map { $0.name }
+            // Include both local recipes and CloudKit recipes
+            var existingRecipeNames = appState.allRecipes.map { $0.name }
+            
+            // Fetch CloudKit recipes to include them in duplicate prevention
+            print("📱 Fetching CloudKit recipes for duplicate prevention...")
+            do {
+                let cloudKitSavedRecipes = try await cloudKitRecipeManager.getUserSavedRecipes()
+                let cloudKitCreatedRecipes = try await cloudKitRecipeManager.getUserCreatedRecipes()
+                
+                // Add CloudKit recipe names to the list
+                let cloudKitRecipeNames = (cloudKitSavedRecipes + cloudKitCreatedRecipes).map { $0.name }
+                existingRecipeNames.append(contentsOf: cloudKitRecipeNames)
+                
+                // Remove duplicates
+                existingRecipeNames = Array(Set(existingRecipeNames))
+                
+                print("✅ Total recipes for duplicate prevention: \(existingRecipeNames.count) (Local: \(appState.allRecipes.count), CloudKit: \(cloudKitRecipeNames.count))")
+            } catch {
+                print("⚠️ Failed to fetch CloudKit recipes for duplicate prevention: \(error)")
+                // Continue with just local recipes
+            }
             
             // Get food preferences from UserDefaults
             let foodPreferences = UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? []

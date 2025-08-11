@@ -10,6 +10,14 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 11, 2025) - Part 3
+- **Fixed Duplicate Recipe Prevention**
+  - Fixed issue where only local recipes were being checked for duplicates
+  - CameraView now fetches CloudKit recipes before generating new ones
+  - Sends both local and CloudKit recipe names to backend API
+  - Backend LLM properly instructed to avoid all existing recipes
+  - Prevents users from getting duplicate recipes they already have saved in cloud
+
 ### Latest Updates (Jan 11, 2025) - Part 2
 - **CloudKit Photo Storage Implementation**
   - Added `beforePhotoAsset` and `afterPhotoAsset` fields to Recipe record in CloudKit schema
