@@ -4,6 +4,15 @@ All notable changes to the SnapChef iOS app will be documented in this file.
 
 ## [Unreleased]
 
+### January 11, 2025 - Part 5 - TikTok Video Photo Orientation Fix
+
+#### Fixed
+- **TikTok Video Photo Orientation**:
+  - Fixed upside-down photos in TikTok video generation
+  - Removed unnecessary coordinate system flip in drawImage method
+  - CGContext already uses correct orientation for image drawing
+  - Photos now display right-side up in generated videos
+
 ### January 11, 2025 - Part 4 - Duplicate Recipe Prevention Enhancement
 
 #### Fixed

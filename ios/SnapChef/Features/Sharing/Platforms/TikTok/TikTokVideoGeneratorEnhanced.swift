@@ -849,11 +849,8 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
         // Save the current context state
         context.saveGState()
         
-        // Flip the coordinate system for image rendering
-        context.translateBy(x: 0, y: targetSize.height)
-        context.scaleBy(x: 1.0, y: -1.0)
-        
-        // Draw the image
+        // No need to flip coordinate system - CGContext already uses the correct orientation
+        // Draw the image directly
         if let cgImage = image.cgImage {
             context.draw(cgImage, in: drawRect)
         }

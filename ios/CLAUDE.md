@@ -10,6 +10,13 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 11, 2025) - Part 4
+- **Fixed TikTok Video Photo Orientation**
+  - Photos were appearing upside down in generated TikTok videos
+  - Removed unnecessary coordinate system flip in drawImage method
+  - CGContext already handles correct image orientation
+  - Images now display correctly in all video templates
+
 ### Latest Updates (Jan 11, 2025) - Part 3
 - **Fixed Duplicate Recipe Prevention**
   - Fixed issue where only local recipes were being checked for duplicates
