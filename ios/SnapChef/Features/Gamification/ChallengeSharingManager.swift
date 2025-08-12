@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import Social
 import UserNotifications
+import Photos
 
 // MARK: - Notification Category
 enum NotificationCategory: String {
@@ -244,8 +245,8 @@ class ChallengeSharingManager: ObservableObject {
     private func shareToInstagram(image: UIImage?, from viewController: UIViewController) {
         guard let image = image else { return }
         
-        // Save to camera roll first
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+        // Save to camera roll with permission handling
+        saveImageToPhotoLibrary(image)
         
         // Open Instagram
         if let instagramURL = URL(string: "instagram://library?LocalIdentifier=\(UUID().uuidString)") {
@@ -302,8 +303,8 @@ class ChallengeSharingManager: ObservableObject {
     private func shareToSnapchat(image: UIImage?, from viewController: UIViewController) {
         guard let image = image else { return }
         
-        // Save to camera roll
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+        // Save to camera roll with permission handling
+        saveImageToPhotoLibrary(image)
         
         // Open Snapchat
         if let snapchatURL = URL(string: "snapchat://") {
@@ -318,8 +319,8 @@ class ChallengeSharingManager: ObservableObject {
     private func shareToTikTok(image: UIImage?, from viewController: UIViewController) {
         guard let image = image else { return }
         
-        // Save to camera roll
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+        // Save to camera roll with permission handling
+        saveImageToPhotoLibrary(image)
         
         // Open TikTok
         if let tiktokURL = URL(string: "tiktok://") {
@@ -342,6 +343,43 @@ class ChallengeSharingManager: ObservableObject {
         }
         
         viewController.present(activityController, animated: true)
+    }
+    
+    private func saveImageToPhotoLibrary(_ image: UIImage) {
+        // Check current authorization status first
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        switch status {
+        case .authorized, .limited:
+            // Already have permission, save the image
+            PHPhotoLibrary.shared().performChanges({
+                _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
+            }) { success, error in
+                if !success {
+                    print("Failed to save challenge image: \(error?.localizedDescription ?? "Unknown error")")
+                }
+            }
+            
+        case .notDetermined:
+            // Need to request permission
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
+                if newStatus == .authorized || newStatus == .limited {
+                    PHPhotoLibrary.shared().performChanges({
+                        _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
+                    }) { success, error in
+                        if !success {
+                            print("Failed to save challenge image: \(error?.localizedDescription ?? "Unknown error")")
+                        }
+                    }
+                }
+            }
+            
+        case .denied, .restricted:
+            print("Photo library access denied for challenge sharing")
+            
+        @unknown default:
+            print("Unknown photo library authorization status")
+        }
     }
     
     private func showAlert(title: String, message: String, on viewController: UIViewController) {

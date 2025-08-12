@@ -8,6 +8,7 @@
 import SwiftUI
 import UIKit
 import MessageUI
+import Photos
 
 struct MessagesShareView: View {
     let content: ShareContent
@@ -255,9 +256,9 @@ struct MessagesShareView: View {
                     if MFMessageComposeViewController.canSendText() {
                         showingMessageComposer = true
                     } else {
-                        // Fallback: Save to photos
-                        UIImageWriteToSavedPhotosAlbum(card, nil, nil, nil)
-                        errorMessage = "Messages not available. Card saved to Photos."
+                        // Fallback: Save to photos with permission handling
+                        saveImageToPhotoLibrary(card)
+                        errorMessage = "Messages not available. Card will be saved to Photos."
                     }
                 }
             } catch {
@@ -266,6 +267,57 @@ struct MessagesShareView: View {
                     isGenerating = false
                 }
             }
+        }
+    }
+    
+    private func saveImageToPhotoLibrary(_ image: UIImage) {
+        // Check current authorization status first
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        switch status {
+        case .authorized, .limited:
+            // Already have permission, save the image
+            PHPhotoLibrary.shared().performChanges({
+                _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
+            }) { success, error in
+                if success {
+                    DispatchQueue.main.async {
+                        self.errorMessage = "Card saved to Photos successfully!"
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.errorMessage = "Failed to save: \(error?.localizedDescription ?? "Unknown error")"
+                    }
+                }
+            }
+            
+        case .notDetermined:
+            // Need to request permission
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
+                if newStatus == .authorized || newStatus == .limited {
+                    PHPhotoLibrary.shared().performChanges({
+                        _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
+                    }) { success, error in
+                        DispatchQueue.main.async {
+                            if success {
+                                self.errorMessage = "Card saved to Photos successfully!"
+                            } else {
+                                self.errorMessage = "Failed to save: \(error?.localizedDescription ?? "Unknown error")"
+                            }
+                        }
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.errorMessage = "Photo library access denied. Please enable in Settings."
+                    }
+                }
+            }
+            
+        case .denied, .restricted:
+            errorMessage = "Photo library access denied. Please enable in Settings > Privacy > Photos."
+            
+        @unknown default:
+            errorMessage = "Unable to access photo library."
         }
     }
 }

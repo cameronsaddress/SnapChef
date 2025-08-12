@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit
+import Photos
 
 struct XShareView: View {
     let content: ShareContent
@@ -344,8 +345,8 @@ struct XShareView: View {
                     await MainActor.run {
                         generatedImage = image
                         
-                        // Save image to photos
-                        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+                        // Save image to photos with proper permission handling
+                        saveImageToPhotoLibrary(image)
                     }
                 } catch {
                     print("Failed to generate image: \(error)")
@@ -373,6 +374,43 @@ struct XShareView: View {
                     }
                 }
             }
+        }
+    }
+    
+    private func saveImageToPhotoLibrary(_ image: UIImage) {
+        // Check current authorization status first
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        switch status {
+        case .authorized, .limited:
+            // Already have permission, save the image
+            PHPhotoLibrary.shared().performChanges({
+                _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
+            }) { success, error in
+                if !success {
+                    print("Failed to save image to X share: \(error?.localizedDescription ?? "Unknown error")")
+                }
+            }
+            
+        case .notDetermined:
+            // Need to request permission
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
+                if newStatus == .authorized || newStatus == .limited {
+                    PHPhotoLibrary.shared().performChanges({
+                        _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
+                    }) { success, error in
+                        if !success {
+                            print("Failed to save image to X share: \(error?.localizedDescription ?? "Unknown error")")
+                        }
+                    }
+                }
+            }
+            
+        case .denied, .restricted:
+            print("Photo library access denied for X share")
+            
+        @unknown default:
+            print("Unknown photo library authorization status")
         }
     }
 }
