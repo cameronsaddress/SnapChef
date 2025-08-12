@@ -151,9 +151,12 @@ struct RecipeResultsView: View {
             case .recipeDetail(let recipe):
                 RecipeDetailView(recipe: recipe)
             case .shareGenerator(let recipe):
-                ShareGeneratorView(
-                    recipe: recipe,
-                    ingredientsPhoto: capturedImage
+                BrandedSharePopup(
+                    content: ShareContent(
+                        type: .recipe(recipe),
+                        beforeImage: capturedImage,
+                        afterImage: nil
+                    )
                 )
             case .fridgeInventory:
                 SimpleFridgeInventoryView(
@@ -268,24 +271,13 @@ struct MagicalRecipeCard: View {
                 
                 // Header with image
                 HStack(spacing: 20) {
-                    // Recipe image placeholder
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#667eea"),
-                                        Color(hex: "#764ba2")
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 100, height: 100)
-                        
-                        Text(recipe.difficulty.emoji)
-                            .font(.system(size: 40))
-                    }
+                    // Recipe before/after photos
+                    RecipePhotoView(
+                        recipe: recipe,
+                        width: 100,
+                        height: 100,
+                        showLabels: true
+                    )
                     
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {

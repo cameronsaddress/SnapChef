@@ -323,11 +323,19 @@ struct InstagramShareView: View {
     private func shareToInstagramStory(image: UIImage) {
         guard let imageData = image.pngData() else { return }
         
-        let pasteboardItems: [[String: Any]] = [[
+        // Enhanced pasteboard items with attribution
+        var pasteboardItems: [[String: Any]] = [[
             "com.instagram.sharedSticker.stickerImage": imageData,
-            "com.instagram.sharedSticker.backgroundTopColor": "#833AB4",
-            "com.instagram.sharedSticker.backgroundBottomColor": "#E1306C"
+            "com.instagram.sharedSticker.backgroundTopColor": "#FF0050",  // SnapChef brand colors
+            "com.instagram.sharedSticker.backgroundBottomColor": "#00F2EA"
         ]]
+        
+        // Add deep link for attribution
+        if let deepLink = content.deepLink {
+            pasteboardItems[0]["com.instagram.sharedSticker.contentURL"] = deepLink.absoluteString
+        } else {
+            pasteboardItems[0]["com.instagram.sharedSticker.contentURL"] = "https://snapchef.app"
+        }
         
         let pasteboardOptions = [
             UIPasteboard.OptionsKey.expirationDate: Date().addingTimeInterval(300)
@@ -335,21 +343,42 @@ struct InstagramShareView: View {
         
         UIPasteboard.general.setItems(pasteboardItems, options: pasteboardOptions)
         
-        if let url = URL(string: "instagram-stories://share") {
-            UIApplication.shared.open(url)
+        // Try with source application parameter for better attribution
+        if let url = URL(string: "instagram-stories://share?source_application=com.snapchefapp.app") {
+            UIApplication.shared.open(url) { success in
+                if !success {
+                    // Fallback to basic Instagram Stories
+                    if let fallbackURL = URL(string: "instagram-stories://share") {
+                        UIApplication.shared.open(fallbackURL)
+                    }
+                }
+            }
         }
     }
     
     private func shareToInstagramFeed(image: UIImage) {
+        // Enhanced caption with call-to-action
+        var fullCaption = captionText
+        fullCaption += "\n\n📱 Try SnapChef: snapchef.app"
+        fullCaption += "\n#MadeWithSnapChef"
+        
         // Copy caption to clipboard
-        UIPasteboard.general.string = captionText
+        UIPasteboard.general.string = fullCaption
         
         // Save image to photo library first, then open Instagram
         UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
         
-        // Open Instagram
-        if let url = URL(string: "instagram://") {
-            UIApplication.shared.open(url)
+        // Open Instagram library instead of just the app
+        // This guides users to select the photo they just saved
+        if let url = URL(string: "instagram://library") {
+            UIApplication.shared.open(url) { success in
+                if !success {
+                    // Fallback to basic Instagram open
+                    if let fallbackURL = URL(string: "instagram://") {
+                        UIApplication.shared.open(fallbackURL)
+                    }
+                }
+            }
         }
     }
 }

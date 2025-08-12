@@ -10,6 +10,35 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 12, 2025)
+- **Unified Share Experience with BrandedSharePopup**
+  - Replaced ShareGeneratorView with BrandedSharePopup across all recipe views
+  - Recipe cards, featured recipes, and recipe results now use consistent share UI
+  - SMS/Messages integrated into main share flow with platform icons
+  - Added helper methods to retrieve before/after photos from saved recipes
+  - All share buttons now present the same branded popup with social platforms
+
+- **Enhanced TikTok Quick Share Functionality**
+  - Quick Post now generates a branded share card image (1080x1920)
+  - Image includes recipe photo, name, details, and SnapChef branding
+  - Automatically saves image to photo library for easy selection
+  - Pre-formatted caption with hashtags copied to clipboard
+  - Smart deep linking attempts multiple URL schemes:
+    - `snssdk1233://create` - International TikTok create screen
+    - `tiktok://library` - Library for selecting saved content
+    - Falls back through multiple options to find best entry point
+  - Added `snssdk1233` to Info.plist for international TikTok support
+  - Users can now quickly share with pre-prepared content
+
+### Latest Updates (Jan 11, 2025) - Part 5
+- **Enhanced Deep Linking for Social Media**
+  - Improved deep linking to properly open specific sections of social apps
+  - TikTok now opens library view after video save for easier selection
+  - Instagram opens library for feed posts, better Stories integration
+  - Added multiple URL scheme support for app version compatibility
+  - Extended Info.plist with additional URL schemes for broader support
+  - Enhanced captions with recipe details and app attribution
+
 ### Latest Updates (Jan 11, 2025) - Part 4
 - **Fixed TikTok Video Photo Orientation**
   - Photos were appearing upside down in generated TikTok videos

@@ -281,7 +281,14 @@ struct EnhancedProfileHeader: View {
                     .opacity(glowAnimation ? 0.8 : 1)
                 
                 // Profile container
-                Button(action: { showingEditProfile = true }) {
+                Button(action: { 
+                    // If not authenticated, show auth view instead of edit profile
+                    if !cloudKitAuthManager.isAuthenticated {
+                        cloudKitAuthManager.showAuthSheet = true
+                    } else {
+                        showingEditProfile = true
+                    }
+                }) {
                     GlassmorphicCard(content: {
                         Circle()
                             .fill(
@@ -336,7 +343,14 @@ struct EnhancedProfileHeader: View {
             
             // User info with gradient text
             VStack(spacing: 8) {
-                Button(action: { showingEditProfile = true }) {
+                Button(action: { 
+                    // If not authenticated, show auth view instead of edit profile
+                    if !cloudKitAuthManager.isAuthenticated {
+                        cloudKitAuthManager.showAuthSheet = true
+                    } else {
+                        showingEditProfile = true
+                    }
+                }) {
                     Text(displayName)
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(
@@ -359,6 +373,34 @@ struct EnhancedProfileHeader: View {
                     StatusPill(text: calculateUserStatus(), color: Color(hex: "#4facfe"))
                 }
                 
+                // Sign in with Apple button if not authenticated
+                if !cloudKitAuthManager.isAuthenticated {
+                    Button(action: {
+                        cloudKitAuthManager.showAuthSheet = true
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "apple.logo")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(.white)
+                            
+                            Text("Sign in with Apple")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.black)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                )
+                        )
+                    }
+                    .padding(.top, 16)
+                }
+                
                 // Food Preferences Card
                 FoodPreferencesCard()
                     .padding(.top, 16)
@@ -370,6 +412,15 @@ struct EnhancedProfileHeader: View {
                 customName: $customName,
                 customPhotoData: $customPhotoData
             )
+        }
+        .sheet(isPresented: $cloudKitAuthManager.showAuthSheet) {
+            CloudKitAuthView()
+                .onDisappear {
+                    // Refresh profile data after authentication
+                    if cloudKitAuthManager.isAuthenticated {
+                        // The displayName will automatically update from cloudKitAuthManager.currentUser
+                    }
+                }
         }
         .onAppear {
             withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {

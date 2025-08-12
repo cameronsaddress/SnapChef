@@ -8,6 +8,7 @@
 import SwiftUI
 import AVKit
 import Photos
+import QuartzCore
 
 struct TikTokShareViewEnhanced: View {
     let content: ShareContent
@@ -567,30 +568,22 @@ struct TikTokShareViewEnhanced: View {
                                 afterPhoto = cloudAfterPhoto
                                 startVideoGeneration()
                             } else {
-                                print("🎬 TikTok: No AFTER photo found in CloudKit, prompting user to take one")
-                                showingAfterPhotoCapture = true
+                                print("🎬 TikTok: No AFTER photo found in CloudKit, continuing without it")
+                                // Don't wait for photo capture, just continue with what we have
+                                startVideoGeneration()
                             }
                         } else {
                             startVideoGeneration()
                         }
                     } catch {
                         print("🎬 TikTok: Error fetching photos from CloudKit: \(error.localizedDescription)")
-                        // If we have no after photo, prompt for it
-                        if content.afterImage == nil && afterPhoto == nil {
-                            showingAfterPhotoCapture = true
-                        } else {
-                            // Continue with what we have
-                            startVideoGeneration()
-                        }
+                        // Continue with what we have, don't wait for photo
+                        startVideoGeneration()
                     }
                 }
             } else {
                 // Not a recipe, continue without CloudKit photos
-                if content.afterImage == nil && afterPhoto == nil {
-                    showingAfterPhotoCapture = true
-                } else {
-                    startVideoGeneration()
-                }
+                startVideoGeneration()
             }
             return
         }
@@ -647,30 +640,219 @@ struct TikTokShareViewEnhanced: View {
     }
     
     private func performQuickShare() {
-        // Quick share implementation - simple card with link
-        let shareText = """
-        🍳 I just turned my fridge into an amazing recipe with @snapchef!
+        // Quick share implementation - create image and copy caption
+        isGenerating = true
         
-        \(selectedHashtags.map { "#\($0)" }.joined(separator: " "))
-        
-        Download SnapChef: https://snapchef.app
-        """
-        
-        UIPasteboard.general.string = shareText
-        
-        // Open TikTok
-        if let url = URL(string: "tiktok://") {
-            UIApplication.shared.open(url) { success in
-                if !success {
-                    // Fallback to web
-                    if let webURL = URL(string: "https://www.tiktok.com") {
-                        UIApplication.shared.open(webURL)
+        Task {
+            do {
+                // Generate a share card image
+                let shareImage = await generateQuickShareCard()
+                
+                // Save image to photo library
+                try await saveImageToPhotoLibrary(shareImage)
+                
+                // Prepare caption text
+                var captionText = ""
+                if case .recipe(let recipe) = content.type {
+                    captionText = """
+                    🍳 FRIDGE TO FEAST CHALLENGE!
+                    
+                    I just turned random fridge items into \(recipe.name)!
+                    ⏱ Ready in \(recipe.prepTime + recipe.cookTime) minutes
+                    
+                    \(selectedHashtags.map { "#\($0)" }.joined(separator: " "))
+                    
+                    Made with @snapchef 🍳
+                    Download: snapchef.app
+                    """
+                } else {
+                    captionText = """
+                    🍳 I just turned my fridge into an amazing recipe with @snapchef!
+                    
+                    \(selectedHashtags.map { "#\($0)" }.joined(separator: " "))
+                    
+                    Download SnapChef: snapchef.app
+                    """
+                }
+                
+                // Copy to clipboard
+                await MainActor.run {
+                    UIPasteboard.general.string = captionText
+                    
+                    // Show success message
+                    videoGenerator.statusMessage = "Image saved! Caption copied! Opening TikTok..."
+                    
+                    // Small delay for user to see the message
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        // Try different TikTok URL schemes for better deep linking
+                        // These URLs attempt to open the create/camera screen
+                        let tiktokSchemes = [
+                            "snssdk1233://create", // International TikTok create screen
+                            "tiktok://create",      // Alternative create screen
+                            "snssdk1233://camera",  // Camera screen
+                            "tiktok://camera",      // Alternative camera
+                            "snssdk1233://publish", // Publish screen
+                            "tiktok://publish",     // Alternative publish
+                            "tiktok://library",     // Library (for selecting saved content)
+                            "snssdk1233://",        // Fallback to main app
+                            "tiktok://"            // Final fallback
+                        ]
+                        
+                        var opened = false
+                        for scheme in tiktokSchemes {
+                            if let url = URL(string: scheme),
+                               UIApplication.shared.canOpenURL(url) {
+                                UIApplication.shared.open(url)
+                                opened = true
+                                break
+                            }
+                        }
+                        
+                        // Fallback to web if app not found
+                        if !opened {
+                            if let webURL = URL(string: "https://www.tiktok.com/upload") {
+                                UIApplication.shared.open(webURL)
+                            }
+                        }
+                        
+                        self.dismiss()
                     }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to prepare share: \(error.localizedDescription)"
+                    isGenerating = false
                 }
             }
         }
+    }
+    
+    @MainActor
+    private func generateQuickShareCard() async -> UIImage {
+        // Create a visually appealing share card
+        let size = CGSize(width: 1080, height: 1920) // TikTok aspect ratio
         
-        dismiss()
+        return UIGraphicsImageRenderer(size: size).image { context in
+            // Background gradient
+            let gradient = CAGradientLayer()
+            gradient.frame = CGRect(origin: .zero, size: size)
+            gradient.colors = [
+                UIColor(hex: "#FF0050")?.cgColor ?? UIColor.red.cgColor,
+                UIColor(hex: "#00F2EA")?.cgColor ?? UIColor.cyan.cgColor
+            ]
+            gradient.startPoint = CGPoint(x: 0, y: 0)
+            gradient.endPoint = CGPoint(x: 1, y: 1)
+            
+            if let gradientImage = gradient.toImage(of: size) {
+                gradientImage.draw(at: .zero)
+            }
+            
+            // Add content based on type
+            if case .recipe(let recipe) = content.type {
+                // Add recipe photo if available
+                if let beforeImage = content.beforeImage ?? beforePhoto {
+                    let photoRect = CGRect(x: 90, y: 200, width: 900, height: 600)
+                    
+                    // Draw photo with rounded corners
+                    let path = UIBezierPath(roundedRect: photoRect, cornerRadius: 30)
+                    context.cgContext.addPath(path.cgPath)
+                    context.cgContext.clip()
+                    beforeImage.draw(in: photoRect)
+                    context.cgContext.resetClip()
+                    
+                    // Add shadow overlay for text visibility
+                    let shadowPath = UIBezierPath(roundedRect: photoRect, cornerRadius: 30)
+                    UIColor.black.withAlphaComponent(0.3).setFill()
+                    shadowPath.fill(with: .normal, alpha: 0.3)
+                }
+                
+                // Add SnapChef logo/branding
+                let snapChefText = "SnapChef"
+                let snapChefAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 72, weight: .bold),
+                    .foregroundColor: UIColor.white
+                ]
+                let snapChefSize = snapChefText.size(withAttributes: snapChefAttributes)
+                let snapChefRect = CGRect(
+                    x: (size.width - snapChefSize.width) / 2,
+                    y: 100,
+                    width: snapChefSize.width,
+                    height: snapChefSize.height
+                )
+                snapChefText.draw(in: snapChefRect, withAttributes: snapChefAttributes)
+                
+                // Add recipe name
+                let recipeAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 64, weight: .bold),
+                    .foregroundColor: UIColor.white
+                ]
+                let recipeRect = CGRect(x: 90, y: 900, width: 900, height: 200)
+                recipe.name.draw(in: recipeRect, withAttributes: recipeAttributes)
+                
+                // Add recipe details
+                let detailsText = """
+                ⏱ \(recipe.prepTime + recipe.cookTime) minutes
+                🔥 \(recipe.nutrition.calories) calories
+                📊 \(recipe.difficulty.rawValue.capitalized)
+                """
+                let detailsAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 48, weight: .medium),
+                    .foregroundColor: UIColor.white.withAlphaComponent(0.9)
+                ]
+                let detailsRect = CGRect(x: 90, y: 1100, width: 900, height: 300)
+                detailsText.draw(in: detailsRect, withAttributes: detailsAttributes)
+                
+                // Add call to action
+                let ctaText = "Turn your fridge into magic!"
+                let ctaAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 56, weight: .semibold),
+                    .foregroundColor: UIColor.white
+                ]
+                let ctaSize = ctaText.size(withAttributes: ctaAttributes)
+                let ctaRect = CGRect(
+                    x: (size.width - ctaSize.width) / 2,
+                    y: 1500,
+                    width: ctaSize.width,
+                    height: ctaSize.height
+                )
+                ctaText.draw(in: ctaRect, withAttributes: ctaAttributes)
+                
+                // Add website
+                let websiteText = "snapchef.app"
+                let websiteAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 44, weight: .regular),
+                    .foregroundColor: UIColor.white.withAlphaComponent(0.8)
+                ]
+                let websiteSize = websiteText.size(withAttributes: websiteAttributes)
+                let websiteRect = CGRect(
+                    x: (size.width - websiteSize.width) / 2,
+                    y: 1700,
+                    width: websiteSize.width,
+                    height: websiteSize.height
+                )
+                websiteText.draw(in: websiteRect, withAttributes: websiteAttributes)
+            }
+        }
+    }
+    
+    private func saveImageToPhotoLibrary(_ image: UIImage) async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                if status == .authorized || status == .limited {
+                    PHPhotoLibrary.shared().performChanges({
+                        _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
+                    }) { success, error in
+                        if success {
+                            continuation.resume()
+                        } else {
+                            continuation.resume(throwing: error ?? NSError(domain: "TikTokShare", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to save image"]))
+                        }
+                    }
+                } else {
+                    continuation.resume(throwing: NSError(domain: "TikTokShare", code: -2, userInfo: [NSLocalizedDescriptionKey: "Photo library access denied"]))
+                }
+            }
+        }
     }
     
     private func shareToTikTok() {
@@ -684,21 +866,51 @@ struct TikTokShareViewEnhanced: View {
                 }) { success, error in
                     DispatchQueue.main.async {
                         if success {
-                            // Copy hashtags to clipboard
-                            let hashtagText = selectedHashtags.map { "#\($0)" }.joined(separator: " ")
-                            UIPasteboard.general.string = """
-                            \(hashtagText)
+                            // Prepare full caption with hashtags and description
+                            var captionText = ""
                             
-                            Made with @snapchef 🍳
-                            """
+                            // Add recipe-specific content
+                            if case .recipe(let recipe) = self.content.type {
+                                captionText = """
+                                🍳 FRIDGE TO FEAST CHALLENGE!
+                                
+                                I just turned random fridge items into \(recipe.name)!
+                                ⏱ Ready in \(recipe.prepTime + recipe.cookTime) minutes
+                                
+                                """
+                            }
                             
-                            // Open TikTok
-                            if let url = URL(string: "tiktok://") {
-                                UIApplication.shared.open(url)
+                            // Add hashtags
+                            let hashtagText = self.selectedHashtags.map { "#\($0)" }.joined(separator: " ")
+                            captionText += hashtagText
+                            captionText += "\n\nMade with @snapchef 🍳"
+                            captionText += "\nDownload: snapchef.app"
+                            
+                            UIPasteboard.general.string = captionText
+                            
+                            // Try different TikTok URL schemes for better compatibility
+                            // tiktok://library opens the user's video library (best for uploaded videos)
+                            let tiktokSchemes = ["tiktok://library", "snssdk1128://", "tiktok://"]
+                            
+                            var opened = false
+                            for scheme in tiktokSchemes {
+                                if let url = URL(string: scheme),
+                                   UIApplication.shared.canOpenURL(url) {
+                                    UIApplication.shared.open(url)
+                                    opened = true
+                                    break
+                                }
+                            }
+                            
+                            // Fallback to web if app not found
+                            if !opened {
+                                if let webURL = URL(string: "https://www.tiktok.com/upload") {
+                                    UIApplication.shared.open(webURL)
+                                }
                             }
                             
                             HapticFeedback.success()
-                            dismiss()
+                            self.dismiss()
                         } else {
                             errorMessage = "Failed to save video: \(error?.localizedDescription ?? "Unknown error")"
                             HapticFeedback.error()
@@ -1090,5 +1302,21 @@ struct ScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
             .animation(.spring(response: 0.3), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Helper Extensions
+
+extension CAGradientLayer {
+    func toImage(of size: CGSize) -> UIImage? {
+        UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
+        defer { UIGraphicsEndImageContext() }
+        
+        guard let context = UIGraphicsGetCurrentContext() else { return nil }
+        
+        self.frame = CGRect(origin: .zero, size: size)
+        self.render(in: context)
+        
+        return UIGraphicsGetImageFromCurrentImageContext()
     }
 }

@@ -4,6 +4,65 @@ All notable changes to the SnapChef iOS app will be documented in this file.
 
 ## [Unreleased]
 
+### January 12, 2025 - Unified Share Experience & Enhanced TikTok Integration
+
+#### Added
+- **Enhanced TikTok Quick Share**:
+  - Quick Post now generates branded share card image (1080x1920 TikTok aspect ratio)
+  - Share card includes recipe photo, name, cooking time, calories, and difficulty
+  - Automatic image save to photo library for easy selection in TikTok
+  - Pre-formatted caption with hashtags copied to clipboard
+  - Smart deep linking with multiple URL scheme attempts:
+    - `snssdk1233://create` for international TikTok create screen
+    - `tiktok://library` for accessing saved content
+    - Multiple fallback options to find best entry point
+  - Added `snssdk1233` to Info.plist for international TikTok support
+  - CAGradientLayer extension for gradient image generation
+
+#### Changed
+- **Unified Share Experience**:
+  - Replaced ShareGeneratorView with BrandedSharePopup across entire app
+  - RecipesView: Updated recipe cards and context menu to use BrandedSharePopup
+  - RecipeResultsView: Now uses BrandedSharePopup for consistency
+  - All share buttons present same branded popup with social platform icons
+  - SMS/Messages fully integrated into main share flow
+  - Added helper methods to retrieve before/after photos from saved recipes
+  - Consistent share experience across all recipe-related views
+
+#### Technical Improvements
+- Added QuartzCore import for gradient functionality
+- Created async image generation and save functionality
+- Implemented smart URL scheme detection with graceful fallbacks
+- Enhanced user flow with status messages during share process
+
+### January 11, 2025 - Part 6 - Enhanced Deep Linking for Social Media Sharing
+
+#### Added
+- **Improved Deep Linking Support**:
+  - Created ImprovedShareService with enhanced deep linking capabilities
+  - Added multiple URL scheme support for better app compatibility
+  - TikTok: Now opens library view after saving video for easier selection
+  - Instagram: Opens library view for feed posts, enhanced Stories integration
+  - Added fallback URL schemes for different app versions
+  - Extended LSApplicationQueriesSchemes in Info.plist for broader compatibility
+
+#### Changed
+- **TikTok Sharing**:
+  - Enhanced caption with recipe details and cooking time
+  - Better URL scheme detection (tries multiple schemes)
+  - Opens video library instead of just the app
+  - Improved fallback to web upload page
+- **Instagram Sharing**:
+  - Stories now include attribution links and brand colors
+  - Feed posts open library for easier photo selection
+  - Added source application parameter for better tracking
+  - Enhanced captions with call-to-action
+- **URL Schemes Configuration**:
+  - Added snssdk1128, snssdk1180 for TikTok variants
+  - Added x-com for new X app
+  - Added fbapi20130214 for Facebook SDK
+  - Added whatsapp-business and wa schemes
+
 ### January 11, 2025 - Part 5 - TikTok Video Photo Orientation Fix
 
 #### Fixed

@@ -192,6 +192,21 @@ final class AppState: ObservableObject {
         }
     }
     
+    func updateAfterPhoto(for recipeId: UUID, afterPhoto: UIImage) {
+        // Find the saved recipe and update its after photo
+        if let index = savedRecipesWithPhotos.firstIndex(where: { $0.recipe.id == recipeId }) {
+            let existingRecipe = savedRecipesWithPhotos[index]
+            // Create a new SavedRecipe with the updated after photo
+            let updatedRecipe = SavedRecipe(
+                recipe: existingRecipe.recipe,
+                beforePhoto: existingRecipe.beforePhoto,
+                afterPhoto: afterPhoto
+            )
+            savedRecipesWithPhotos[index] = updatedRecipe
+            saveToDisk()
+        }
+    }
+    
     func deleteRecipe(_ recipe: Recipe) {
         // Remove from all arrays
         recentRecipes.removeAll { $0.id == recipe.id }

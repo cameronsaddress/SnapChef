@@ -449,24 +449,13 @@ struct FeaturedRecipeCard: View {
                 
                 // Recipe content
                 HStack(spacing: 20) {
-                    // Image placeholder
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#f093fb"),
-                                        Color(hex: "#f5576c")
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 120, height: 120)
-                        
-                        Text(recipe.difficulty.emoji)
-                            .font(.system(size: 50))
-                    }
+                    // Recipe before/after photos
+                    RecipePhotoView(
+                        recipe: recipe,
+                        width: 120,
+                        height: 120,
+                        showLabels: true
+                    )
                     
                     VStack(alignment: .leading, spacing: 12) {
                         Text(recipe.name)
@@ -527,8 +516,8 @@ struct FeaturedRecipeCard: View {
 struct RecipeGridView: View {
     let recipes: [Recipe]
     let columns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
+        GridItem(.fixed(UIScreen.main.bounds.width / 2 - 28), spacing: 16),
+        GridItem(.fixed(UIScreen.main.bounds.width / 2 - 28), spacing: 16)
     ]
     
     var body: some View {
@@ -551,7 +540,7 @@ struct RecipeGridCard: View {
     let recipe: Recipe
     @State private var isPressed = false
     @State private var showDetail = false
-    @State private var showShareGenerator = false
+    @State private var showSharePopup = false
     @State private var showDeleteAlert = false
     @State private var deleteOffset: CGFloat = 0
     @State private var showingUserProfile = false
@@ -561,65 +550,59 @@ struct RecipeGridCard: View {
     
     var body: some View {
         GlassmorphicCard {
-            VStack(alignment: .leading, spacing: 12) {
-                // Image placeholder
-                Button(action: {
-                    showDetail = true
-                }) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#667eea"),
-                                        Color(hex: "#764ba2")
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(height: 140)
-                        
-                        Text(recipe.difficulty.emoji)
-                            .font(.system(size: 40))
-                        
-                        // Difficulty badge and favorite button
-                        VStack {
-                            HStack {
-                                // Favorite button
-                                Button(action: {
-                                    appState.toggleFavorite(recipe.id)
-                                    let generator = UIImpactFeedbackGenerator(style: .light)
-                                    generator.impactOccurred()
-                                }) {
-                                    Image(systemName: appState.isFavorited(recipe.id) ? "heart.fill" : "heart")
-                                        .font(.system(size: 20, weight: .medium))
-                                        .foregroundColor(appState.isFavorited(recipe.id) ? Color(hex: "#ff6b6b") : .white)
-                                        .padding(8)
-                                        .background(
-                                            Circle()
-                                                .fill(Color.black.opacity(0.3))
-                                        )
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                
-                                Spacer()
-                                DifficultyBadge(difficulty: recipe.difficulty)
+            VStack(alignment: .leading, spacing: 8) {
+                // Recipe before/after photos
+                ZStack {
+                    Button(action: {
+                        showDetail = true
+                    }) {
+                        RecipePhotoView(
+                            recipe: recipe,
+                            width: UIScreen.main.bounds.width / 2 - 44, // Account for padding
+                            height: 120,
+                            showLabels: true
+                        )
+                        .frame(height: 120) // Ensure consistent height
+                        .clipped()
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    // Difficulty badge and favorite button overlay
+                    VStack {
+                        HStack {
+                            // Favorite button
+                            Button(action: {
+                                appState.toggleFavorite(recipe.id)
+                                let generator = UIImpactFeedbackGenerator(style: .light)
+                                generator.impactOccurred()
+                            }) {
+                                Image(systemName: appState.isFavorited(recipe.id) ? "heart.fill" : "heart")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundColor(appState.isFavorited(recipe.id) ? Color(hex: "#ff6b6b") : .white)
+                                    .padding(8)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.black.opacity(0.3))
+                                    )
                             }
-                            .padding(8)
+                            .buttonStyle(PlainButtonStyle())
+                            
                             Spacer()
+                            DifficultyBadge(difficulty: recipe.difficulty)
                         }
+                        .padding(8)
+                        Spacer()
                     }
                 }
-                .buttonStyle(PlainButtonStyle())
                 
                 // Content
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                         Text(recipe.name)
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
+                            .frame(minHeight: 40, alignment: .topLeading)
                         
                         // Author row
                         Button(action: {
@@ -629,25 +612,25 @@ struct RecipeGridCard: View {
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "person.circle.fill")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 11))
                                     .foregroundColor(.white.opacity(0.6))
                                 Text(cloudKitAuth.currentUser?.displayName ?? "Me")
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.system(size: 12, weight: .medium))
                                     .foregroundColor(.white.opacity(0.8))
-                                    .underline()
+                                    .lineLimit(1)
                             }
                         }
                         .buttonStyle(PlainButtonStyle())
                         
                         HStack {
                             Label("\(recipe.cookTime)m", systemImage: "clock")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
                             
                             Spacer()
                             
                             Label("\(recipe.nutrition.calories)", systemImage: "flame")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
                         }
                         
@@ -655,7 +638,7 @@ struct RecipeGridCard: View {
                         HStack {
                             Spacer()
                             Button(action: {
-                                showShareGenerator = true
+                                showSharePopup = true
                             }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "square.and.arrow.up")
@@ -679,8 +662,10 @@ struct RecipeGridCard: View {
                         }
                     }
             }
-            .padding(16)
+            .padding(12)
         }
+        .frame(height: 280) // Ensure consistent card height
+        .clipped() // Prevent content overflow
         .scaleEffect(isPressed ? 0.95 : 1)
         .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
             withAnimation(.easeInOut(duration: 0.1)) {
@@ -695,7 +680,7 @@ struct RecipeGridCard: View {
             }
             
             Button(action: {
-                showShareGenerator = true
+                showSharePopup = true
             }) {
                 Label("Share Recipe", systemImage: "square.and.arrow.up")
             }
@@ -734,8 +719,14 @@ struct RecipeGridCard: View {
         .sheet(isPresented: $showDetail) {
             RecipeDetailView(recipe: recipe)
         }
-        .sheet(isPresented: $showShareGenerator) {
-            ShareGeneratorView(recipe: recipe, ingredientsPhoto: nil)
+        .sheet(isPresented: $showSharePopup) {
+            BrandedSharePopup(
+                content: ShareContent(
+                    type: .recipe(recipe),
+                    beforeImage: getBeforePhotoForRecipe(),
+                    afterImage: getAfterPhotoForRecipe()
+                )
+            )
         }
         .alert("Delete Recipe?", isPresented: $showDeleteAlert) {
             Button("Cancel", role: .cancel) { }
@@ -785,6 +776,22 @@ struct RecipeGridCard: View {
         // Haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
+    }
+    
+    private func getBeforePhotoForRecipe() -> UIImage? {
+        // Check if we have a saved recipe with photos
+        if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }) {
+            return savedRecipe.beforePhoto
+        }
+        return nil
+    }
+    
+    private func getAfterPhotoForRecipe() -> UIImage? {
+        // Check if we have a saved recipe with photos
+        if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }) {
+            return savedRecipe.afterPhoto
+        }
+        return nil
     }
 }
 

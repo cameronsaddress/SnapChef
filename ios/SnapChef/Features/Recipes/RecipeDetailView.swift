@@ -30,24 +30,14 @@ struct RecipeDetailView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Recipe Image Placeholder
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#667eea"),
-                                        Color(hex: "#764ba2")
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(height: 250)
-                        
-                        Text(recipe.difficulty.emoji)
-                            .font(.system(size: 80))
-                    }
+                    // Recipe before/after photos
+                    RecipePhotoView(
+                        recipe: recipe,
+                        width: UIScreen.main.bounds.width - 40,
+                        height: 250,
+                        showLabels: true
+                    )
+                    .padding(.horizontal, 20)
                     
                     // Recipe Info
                     VStack(alignment: .leading, spacing: 16) {
