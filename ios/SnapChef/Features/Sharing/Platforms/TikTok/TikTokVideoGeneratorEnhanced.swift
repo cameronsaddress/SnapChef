@@ -783,20 +783,10 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
         // Save the current context state
         context.saveGState()
         
-        // Flip the coordinate system for text rendering
-        context.translateBy(x: 0, y: videoSize.height)
-        context.scaleBy(x: 1.0, y: -1.0)
-        
-        // Adjust the rect for the flipped coordinate system
-        let flippedRect = CGRect(
-            x: rect.origin.x,
-            y: videoSize.height - rect.origin.y - rect.height,
-            width: rect.width,
-            height: rect.height
-        )
-        
+        // No need to flip - CGContext already has correct orientation
+        // Just draw the text directly
         UIGraphicsPushContext(context)
-        text.draw(in: flippedRect, withAttributes: attributes)
+        text.draw(in: rect, withAttributes: attributes)
         UIGraphicsPopContext()
         
         // Restore the context state
