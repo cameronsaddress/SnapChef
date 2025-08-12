@@ -175,8 +175,8 @@ struct InstagramShareView: View {
                         }
                         .padding(.horizontal, 20)
                         
-                        // Generate Button
-                        Button(action: generateContent) {
+                        // Generate and Share Button
+                        Button(action: generateAndShare) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 12)
                                     .fill(
@@ -200,9 +200,12 @@ struct InstagramShareView: View {
                                             .foregroundColor(.white)
                                     }
                                 } else {
-                                    Text(isStory ? "Create Story" : "Create Post")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(.white)
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "square.and.arrow.up")
+                                        Text(isStory ? "Share to Story" : "Share to Instagram")
+                                    }
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
                                 }
                             }
                         }
@@ -222,13 +225,11 @@ struct InstagramShareView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if generatedImage != nil {
-                        Button("Share") {
-                            shareToInstagram()
-                        }
-                        .foregroundColor(.white)
-                        .fontWeight(.semibold)
+                    Button("Share") {
+                        generateAndShare()
                     }
+                    .foregroundColor(.white)
+                    .fontWeight(.semibold)
                 }
             }
         }
@@ -306,6 +307,41 @@ struct InstagramShareView: View {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
                     isGenerating = false
+                }
+            }
+        }
+    }
+    
+    private func generateAndShare() {
+        // If image is already generated, share directly
+        if let image = generatedImage {
+            shareToInstagram()
+        } else {
+            // Generate image first, then share
+            isGenerating = true
+            
+            Task {
+                do {
+                    // Generate image based on template
+                    let image = try await InstagramContentGenerator.shared.generateContent(
+                        template: selectedTemplate,
+                        content: content,
+                        isStory: isStory,
+                        backgroundColor: backgroundColor,
+                        sticker: selectedSticker
+                    )
+                    
+                    await MainActor.run {
+                        self.generatedImage = image
+                        self.isGenerating = false
+                        // Immediately share after generation
+                        self.shareToInstagram()
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.errorMessage = error.localizedDescription
+                        self.isGenerating = false
+                    }
                 }
             }
         }
