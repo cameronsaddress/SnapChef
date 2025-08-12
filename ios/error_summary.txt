@@ -1,0 +1,60 @@
+  19 46: error: missing argument label 'phase:' in call
+   5 42: error: missing argument label 'phase:' in call
+   4 35: error: capture of 'progressCallback' with non-sendable type '(Double) async -> Void' in an isolated closure
+   4 16: error: type of expression is ambiguous without a type annotation
+   3 51: error: capture of 'exportSession' with non-sendable type 'AVAssetExportSession' in an isolated closure
+   3 27: error: capture of 'progressCallback' with non-sendable type '(Double) async -> Void' in an isolated closure
+   3 19: error: value of type 'CATextLayer' has no member 'fontName'
+   2 92: error: capture of 'self' with non-sendable type 'StillWriter' in an isolated closure
+   2 68: error: reference to captured var 'frameCount' in concurrently-executing code
+   2 61: error: reference to captured var 'frameCount' in concurrently-executing code
+   2 47: error: reference to captured var 'frameCount' in concurrently-executing code
+   2 36: error: main actor-isolated property 'renderingMetrics' can not be referenced from a Sendable closure
+   2 31: error: main actor-isolated property 'renderingMetrics' can not be referenced from a Sendable closure
+   2 31: error: capture of 'videoWriter' with non-sendable type 'AVAssetWriter' in an isolated closure
+   2 25: error: mutation of captured var 'frameCount' in concurrently-executing code
+   2 23: error: call to main actor-isolated initializer 'init(style:)' in a synchronous nonisolated context
+   1 95: error: 'config' is inaccessible due to 'private' protection level
+   1 94: error: 'config' is inaccessible due to 'private' protection level
+   1 93: error: 'config' is inaccessible due to 'private' protection level
+   1 92: error: capture of 'processedImage' with non-sendable type 'CIImage' in an isolated closure
+   1 70: error: reference to property 'expectedFrames' in closure requires explicit use of 'self' to make capture semantics explicit
+   1 67: error: reference to property 'expectedFrames' in closure requires explicit use of 'self' to make capture semantics explicit
+   1 65: error: 'config' is inaccessible due to 'private' protection level
+   1 60: error: 'config' is inaccessible due to 'private' protection level
+   1 56: error: main actor-isolated static property 'shared' can not be referenced from a nonisolated context
+   1 56: error: argument type 'Any' does not conform to expected type 'MXMetricManagerSubscriber'
+   1 55: error: non-sendable result type 'ErrorRecoveryManager.RecoveryAction' cannot be sent from nonisolated context in call to instance method 'handleRenderingError(_:template:recipe:media:)'
+   1 55: error: missing argument label 'phase:' in call
+   1 54: error: cannot assign value of type 'FilterVideoCompositor.Type' to type '(any AVVideoCompositing.Type)?'
+   1 53: error: reference to property 'sessionMetrics' in closure requires explicit use of 'self' to make capture semantics explicit
+   1 50: error: cannot assign value of type 'ProductionVideoCompositor.Type' to type '(any AVVideoCompositing.Type)?'
+   1 49: error: reference to property 'actualFrames' in closure requires explicit use of 'self' to make capture semantics explicit
+   1 48: error: non-sendable result type 'RenderPlan' cannot be sent from nonisolated context in call to instance method 'createRenderPlan(template:recipe:media:)'
+   1 47: error: capture of 'pixelBufferAdaptor' with non-sendable type 'AVAssetWriterInputPixelBufferAdaptor' in an isolated closure
+   1 46: error: missing arguments for parameters 'localIdentifiers', 'mediaType', 'redirectURI' in call
+   1 43: error: capture of 'pixelBufferAdaptor' with non-sendable type 'AVAssetWriterInputPixelBufferAdaptor' in an isolated closure
+   1 40: error: capture of 'self' with non-sendable type 'OverlayFactory' in an isolated closure
+   1 39: error: capture of 'self' with non-sendable type 'ViralVideoExporter' in an isolated closure
+   1 39: error: capture of 'ciImages' with non-sendable type '[(ciImage: CIImage, duration: CMTime, transform: CGAffineTransform)]' in an isolated closure
+   1 35: error: cannot infer contextual base in reference to member 'video'
+   1 34: error: main actor-isolated class property 'shared' can not be referenced from a nonisolated context
+   1 32: error: value of type 'AVMutableCompositionTrack' has no member 'setTransform'
+   1 30: error: expression is 'async' but is not marked with 'await'
+   1 28: error: reference to captured var 'frameCount' in concurrently-executing code
+   1 26: error: cannot find 'UIDevice' in scope
+   1 24: error: cannot find 'UIDevice' in scope
+   1 24: error: call to main actor-isolated initializer 'init(style:)' in a synchronous nonisolated context
+   1 24: error: call to main actor-isolated initializer 'init()' in a synchronous nonisolated context
+   1 23: error: cannot call value of non-function type 'UISelectionFeedbackGenerator'
+   1 23: error: 'selection' is inaccessible due to 'private' protection level
+   1 21: error: call to main actor-isolated initializer 'init()' in a synchronous nonisolated context
+   1 20: error: value of type 'CATextLayer' has no member 'fontName'
+   1 19: error: call to main actor-isolated instance method 'handleMemoryWarning()' in a synchronous nonisolated context
+   1 19: error: binary operator '*' cannot be applied to operands of type 'String' and 'Int'
+   1 18: error: main actor-isolated property 'sessionMetrics' can not be referenced from a Sendable closure
+   1 18: error: main actor-isolated property 'renderingMetrics' can not be mutated from a Sendable closure
+   1 18: error: call to main actor-isolated instance method 'logRenderingMetricSummary' in a synchronous nonisolated context
+   1 18: error: call to main actor-isolated instance method 'checkPerformanceViolations' in a synchronous nonisolated context
+   1 17: error: error is not handled because the enclosing function is not declared 'throws'
+   1 13: error: cannot call value of non-function type 'UISelectionFeedbackGenerator'

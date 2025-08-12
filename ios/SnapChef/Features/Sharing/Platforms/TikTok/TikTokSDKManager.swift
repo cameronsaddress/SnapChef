@@ -36,16 +36,20 @@ final class TikTokSDKManager: SocialShareSDKProtocol {
     }
     
     func share(content: SDKShareContent) async throws {
-        // Use the proper TikTok OpenSDK wrapper
-        return try await withCheckedThrowingContinuation { continuation in
-            TikTokOpenSDKWrapper.shared.share(content: content) { success, error in
-                if success {
-                    continuation.resume()
-                } else {
-                    let sdkError = SDKError.unknown(error ?? "TikTok sharing failed")
-                    continuation.resume(throwing: sdkError)
-                }
+        // Use the new ShareService implementation for TikTok
+        switch content.type {
+        case .video(let url):
+            try await shareVideo(url, caption: content.caption, hashtags: content.hashtags)
+        case .image(let image):
+            try await shareImage(image, caption: content.caption, hashtags: content.hashtags)
+        case .multipleImages(let images):
+            if let firstImage = images.first {
+                try await shareImage(firstImage, caption: content.caption, hashtags: content.hashtags)
+            } else {
+                throw SDKError.unknown("No images to share")
             }
+        default:
+            throw SDKError.unknown("Content type not supported")
         }
     }
     
@@ -68,53 +72,73 @@ final class TikTokSDKManager: SocialShareSDKProtocol {
     // MARK: - Private Methods
     
     private func shareImage(_ image: UIImage, caption: String?, hashtags: [String]?) async throws {
-        // Save image to photo library first
-        let saved = await saveImageToLibrary(image)
-        guard saved else {
-            throw SDKError.permissionDenied
-        }
-        
         // Prepare caption with hashtags
         let fullCaption = prepareCaption(caption: caption, hashtags: hashtags)
         
-        // Copy caption to clipboard
-        UIPasteboard.general.string = fullCaption
+        print("🎬 TikTok SDK: Starting image share process")
+        print("📋 Caption: \(fullCaption)")
         
-        // Try to open TikTok with deep link
-        let opened = await openTikTokForSharing(mediaType: "photo")
-        if !opened {
-            throw SDKError.notInstalled
+        // Save image to photo library and get localIdentifier
+        let result = await withCheckedContinuation { continuation in
+            var localIdentifier: String?
+            
+            PHPhotoLibrary.shared().performChanges({
+                let request = PHAssetCreationRequest.forAsset()
+                request.addResource(with: .photo, data: image.jpegData(compressionQuality: 0.9) ?? Data(), options: nil)
+                localIdentifier = request.placeholderForCreatedAsset?.localIdentifier
+            }) { success, error in
+                continuation.resume(returning: (success, localIdentifier, error))
+            }
         }
+        
+        guard result.0, let identifier = result.1 else {
+            throw SDKError.permissionDenied
+        }
+        
+        print("✅ Image saved with identifier: \(identifier)")
+        
+        // Share using TikTokShareService
+        try await withCheckedThrowingContinuation { continuation in
+            TikTokShareService.shareToTikTok(localIdentifiers: [identifier], caption: fullCaption) { shareResult in
+                switch shareResult {
+                case .success():
+                    print("✅ TikTok image share completed successfully")
+                    continuation.resume()
+                case .failure(let error):
+                    print("❌ TikTok image share failed: \(error.localizedDescription)")
+                    continuation.resume(throwing: SDKError.unknown(error.localizedDescription))
+                }
+            }
+        }
+        
+        print("🎬 TikTok SDK: Image share process completed")
     }
     
     private func shareVideo(_ videoURL: URL, caption: String?, hashtags: [String]?) async throws {
-        // Save video to photo library first
-        let saved = await saveVideoToLibrary(videoURL)
-        guard saved else {
-            throw SDKError.permissionDenied
-        }
-        
         // Prepare caption with hashtags
         let fullCaption = prepareCaption(caption: caption, hashtags: hashtags)
         
-        // Copy caption to clipboard
-        UIPasteboard.general.string = fullCaption
-        
-        // Log for debugging
-        print("🎬 TikTok SDK: Video saved to library")
-        print("🎬 TikTok SDK: Caption copied to clipboard")
+        print("🎬 TikTok SDK: Starting video share process")
         print("📋 Caption: \(fullCaption)")
         
-        // Add a small delay to ensure video is fully saved
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-        
-        // Try to open TikTok with deep link
-        let opened = await openTikTokForSharing(mediaType: "video")
-        if !opened {
-            throw SDKError.notInstalled
+        // Use the new TikTokShareService for the complete pipeline
+        try await withCheckedThrowingContinuation { continuation in
+            TikTokShareService.shareRecipeToTikTok(
+                videoURL: videoURL,
+                customCaption: fullCaption
+            ) { result in
+                switch result {
+                case .success():
+                    print("✅ TikTok share completed successfully")
+                    continuation.resume()
+                case .failure(let error):
+                    print("❌ TikTok share failed: \(error.localizedDescription)")
+                    continuation.resume(throwing: SDKError.unknown(error.localizedDescription))
+                }
+            }
         }
         
-        print("🎬 TikTok SDK: TikTok app opened successfully")
+        print("🎬 TikTok SDK: Share process completed")
     }
     
     private func saveImageToLibrary(_ image: UIImage) async -> Bool {

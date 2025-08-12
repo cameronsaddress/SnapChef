@@ -12,8 +12,9 @@ import Photos
 struct TikTokShareView: View {
     let content: ShareContent
     @Environment(\.dismiss) var dismiss
-    @StateObject private var videoGenerator = TikTokVideoGenerator()
-    @State private var selectedTemplate: TikTokTemplate = .beforeAfterReveal
+    @StateObject private var viralEngine = ViralVideoSDK()  // Use the new viral video engine
+    @State private var selectedTemplate: ViralTemplate = .beatSyncedCarousel  // Use ViralTemplate
+    @StateObject private var videoGenerator = TikTokVideoGenerator()  // Keep for fallback
     @State private var isGenerating = false
     @State private var generatedVideoURL: URL?
     @State private var showingVideoPreview = false
@@ -52,16 +53,16 @@ struct TikTokShareView: View {
                         }
                         .padding(.top, 20)
                         
-                        // Template Selection
+                        // Template Selection - VIRAL TEMPLATES
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("Choose a template")
+                            Text("Choose a viral template")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
-                                    ForEach(TikTokTemplate.allCases, id: \.self) { template in
-                                        TemplateCard(
+                                    ForEach(ViralTemplate.allCases, id: \.self) { template in
+                                        ViralTemplateCard(
                                             template: template,
                                             isSelected: selectedTemplate == template,
                                             action: {
@@ -219,9 +220,14 @@ struct TikTokShareView: View {
         
         Task {
             do {
-                // Generate video based on template
+                // Convert content to required format
+                let (viralRecipe, mediaBundle) = try await convertContentToViralFormat(content)
+                
+                // For now, use the old video generator as fallback
+                // TODO: Fix ViralVideoSDK integration
+                let oldTemplate = mapToOldTemplate(selectedTemplate)
                 let videoURL = try await videoGenerator.generateVideo(
-                    template: selectedTemplate,
+                    template: oldTemplate,
                     content: content,
                     progress: { progress in
                         await MainActor.run {
@@ -233,8 +239,13 @@ struct TikTokShareView: View {
                 await MainActor.run {
                     generatedVideoURL = videoURL
                     isGenerating = false
-                    showingVideoPreview = true
                 }
+                
+                // Progress is tracked via the callback in videoGenerator
+                
+                // Automatically save and open TikTok
+                await saveAndShareToTikTok(videoURL: videoURL)
+                
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
@@ -242,6 +253,159 @@ struct TikTokShareView: View {
                 }
             }
         }
+    }
+    
+    private func convertContentToViralFormat(_ content: ShareContent) async throws -> (ViralRecipe, MediaBundle) {
+        // Convert Recipe to viral format
+        var viralRecipe: ViralRecipe
+        
+        switch content.type {
+        case .recipe(let recipe):
+            // Convert recipe steps to viral format
+            let steps = recipe.instructions.enumerated().map { index, instruction in
+                ViralRecipe.Step(
+                    title: instruction,
+                    secondsHint: Double(30 + index * 15) // Estimate time per step
+                )
+            }
+            
+            viralRecipe = ViralRecipe(
+                title: recipe.name,
+                hook: "Turn your fridge chaos into \(recipe.name) in \(recipe.prepTime + recipe.cookTime) minutes!",
+                steps: Array(steps.prefix(7)), // Limit to 7 steps max
+                timeMinutes: recipe.prepTime + recipe.cookTime,
+                costDollars: 10, // Estimate
+                calories: recipe.nutrition.calories,
+                ingredients: recipe.ingredients.map { $0.name }
+            )
+            
+        default:
+            // Fallback for non-recipe content
+            viralRecipe = ViralRecipe(
+                title: "SnapChef Creation",
+                hook: "Check out what I made with SnapChef!",
+                steps: [
+                    ViralRecipe.Step(title: "Open fridge", secondsHint: 5),
+                    ViralRecipe.Step(title: "Take photo", secondsHint: 5),
+                    ViralRecipe.Step(title: "Get recipe", secondsHint: 5),
+                    ViralRecipe.Step(title: "Cook", secondsHint: 30),
+                    ViralRecipe.Step(title: "Enjoy!", secondsHint: 5)
+                ],
+                timeMinutes: 15,
+                costDollars: 10,
+                calories: 400,
+                ingredients: ["Your fridge ingredients"]
+            )
+        }
+        
+        // Create media bundle
+        let beforeImage = content.beforeImage ?? createPlaceholderImage(text: "BEFORE")
+        let afterImage = content.afterImage ?? createPlaceholderImage(text: "AFTER")
+        let cookedMeal = afterImage // Use after image as cooked meal if available
+        
+        let mediaBundle = MediaBundle(
+            beforeFridge: beforeImage,
+            afterFridge: afterImage,
+            cookedMeal: cookedMeal
+        )
+        
+        return (viralRecipe, mediaBundle)
+    }
+    
+    private func createPlaceholderImage(text: String) -> UIImage {
+        let size = CGSize(width: 1080, height: 1920)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        
+        return renderer.image { context in
+            // Black background
+            UIColor.black.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            
+            // Draw text
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 120, weight: .bold),
+                .foregroundColor: UIColor.white
+            ]
+            
+            let textSize = text.size(withAttributes: attributes)
+            let textRect = CGRect(
+                x: (size.width - textSize.width) / 2,
+                y: (size.height - textSize.height) / 2,
+                width: textSize.width,
+                height: textSize.height
+            )
+            
+            text.draw(in: textRect, withAttributes: attributes)
+        }
+    }
+    
+    private func mapToOldTemplate(_ viralTemplate: ViralTemplate) -> TikTokTemplate {
+        switch viralTemplate {
+        case .beatSyncedCarousel:
+            return .beforeAfterReveal
+        case .splitScreenSwipe:
+            return .splitScreen
+        case .kineticTextSteps:
+            return .quickRecipe
+        case .priceTimeChallenge:
+            return .timelapse
+        case .greenScreenPIP:
+            return .ingredients360
+        }
+    }
+    
+    private func saveAndShareToTikTok(videoURL: URL) async {
+        // Generate caption with hashtags
+        let caption = generateCaption()
+        
+        // Copy caption to clipboard
+        await MainActor.run {
+            UIPasteboard.general.string = caption
+        }
+        
+        // Use TikTokShareService to save and open TikTok
+        await MainActor.run {
+            TikTokShareService.shareRecipeToTikTok(
+                videoURL: videoURL,
+                customCaption: caption
+            ) { result in
+                switch result {
+                case .success():
+                    // Successfully saved and opened TikTok
+                    DispatchQueue.main.async {
+                        // Dismiss the view after successful share
+                        self.dismiss()
+                    }
+                case .failure(let error):
+                    DispatchQueue.main.async {
+                        self.errorMessage = "Failed to share: \(error.localizedDescription)"
+                    }
+                }
+            }
+        }
+    }
+    
+    private func generateCaption() -> String {
+        var caption = ""
+        
+        // Add content-specific text
+        switch content.type {
+        case .recipe(let recipe):
+            caption = "🔥 MY FRIDGE CHALLENGE 🔥\n"
+            caption += "Just made \(recipe.name) in \(recipe.prepTime + recipe.cookTime) minutes!\n\n"
+        case .challenge(let challenge):
+            caption = "🏆 CHALLENGE COMPLETED 🏆\n"
+            caption += "\(challenge.title)\n\n"
+        default:
+            caption = "Check out what I made with SnapChef! 🍳\n\n"
+        }
+        
+        // Add hashtags
+        let hashtags = recommendedHashtags.map { "#\($0)" }.joined(separator: " ")
+        caption += hashtags
+        caption += "\n\n📱 Made with @SnapChef"
+        
+        return caption
     }
     
     private func shareToTikTok() {
@@ -273,7 +437,86 @@ struct TikTokShareView: View {
     }
 }
 
-// MARK: - Template Card
+// MARK: - Viral Template Card
+struct ViralTemplateCard: View {
+    let template: ViralTemplate
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                // Template preview thumbnail
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        LinearGradient(
+                            colors: gradientColors(for: template),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 100, height: 150)
+                    .overlay(
+                        Image(systemName: icon(for: template))
+                            .font(.system(size: 32))
+                            .foregroundColor(.white)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(
+                                isSelected ? Color(hex: "#FF0050") : Color.clear,
+                                lineWidth: 3
+                            )
+                    )
+                
+                Text(name(for: template))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(isSelected ? .white : .gray)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 100)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func gradientColors(for template: ViralTemplate) -> [Color] {
+        switch template {
+        case .beatSyncedCarousel:
+            return [Color(hex: "#FF0050"), Color(hex: "#00F2EA")]
+        case .splitScreenSwipe:
+            return [Color(hex: "#F77737"), Color(hex: "#F9A825")]
+        case .kineticTextSteps:
+            return [Color(hex: "#667eea"), Color(hex: "#764ba2")]
+        case .priceTimeChallenge:
+            return [Color(hex: "#43e97b"), Color(hex: "#38f9d7")]
+        case .greenScreenPIP:
+            return [Color(hex: "#fa709a"), Color(hex: "#fee140")]
+        }
+    }
+    
+    private func icon(for template: ViralTemplate) -> String {
+        switch template {
+        case .beatSyncedCarousel: return "music.note"
+        case .splitScreenSwipe: return "arrow.left.arrow.right"
+        case .kineticTextSteps: return "text.bubble"
+        case .priceTimeChallenge: return "dollarsign.circle"
+        case .greenScreenPIP: return "camera.on.rectangle"
+        }
+    }
+    
+    private func name(for template: ViralTemplate) -> String {
+        switch template {
+        case .beatSyncedCarousel: return "Beat Sync"
+        case .splitScreenSwipe: return "Split Screen"
+        case .kineticTextSteps: return "Kinetic Text"
+        case .priceTimeChallenge: return "Price Challenge"
+        case .greenScreenPIP: return "Green Screen"
+        }
+    }
+}
+
+// MARK: - Template Card (Old - Keep for compatibility)
 struct TemplateCard: View {
     let template: TikTokTemplate
     let isSelected: Bool
@@ -319,7 +562,7 @@ struct TemplateCard: View {
 
 // MARK: - Template Preview
 struct TemplatePreview: View {
-    let template: TikTokTemplate
+    let template: ViralTemplate
     let content: ShareContent
     
     var body: some View {
@@ -336,8 +579,24 @@ struct TemplatePreview: View {
                     .padding()
                 
                 // Mock preview based on template
-                template.previewContent(content)
+                previewContent(for: template, content: content)
             }
+        }
+    }
+    
+    @ViewBuilder
+    private func previewContent(for template: ViralTemplate, content: ShareContent) -> some View {
+        switch template {
+        case .beatSyncedCarousel:
+            BeforeAfterPreview(content: content)
+        case .splitScreenSwipe:
+            SplitScreenPreview(content: content)
+        case .kineticTextSteps:
+            QuickRecipePreview(content: content)
+        case .priceTimeChallenge:
+            TimelapsePreview(content: content)
+        case .greenScreenPIP:
+            Ingredients360Preview(content: content)
         }
     }
 }

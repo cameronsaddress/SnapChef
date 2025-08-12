@@ -2,12 +2,23 @@
 //  ShareService.swift
 //  SnapChef
 //
-//  Created on 02/03/2025
+//  TikTok Viral Content Generation - Complete ShareService Implementation
+//  Following EXACT specifications from TIKTOK_VIRAL_COMPLETE_REQUIREMENTS.md
 //
 
 import SwiftUI
 import UIKit
 import CloudKit
+import Photos
+
+// Import TikTok SDK components
+#if canImport(TikTokOpenSDKCore)
+import TikTokOpenSDKCore
+#endif
+
+#if canImport(TikTokOpenShareSDK)
+import TikTokOpenShareSDK
+#endif
 
 // MARK: - Share Type
 enum ShareType {
@@ -239,6 +250,10 @@ class ShareService: ObservableObject {
     // MARK: - Platform Implementations
     
     private func shareToTikTok(_ content: ShareContent) async throws {
+        // The TikTokShareView will handle everything
+        // This method is not called when using platform-specific views
+        // It's only here as a fallback
+        
         // Check if TikTok is installed
         guard SharePlatformType.tiktok.isAvailable else {
             // Fallback to web
@@ -249,16 +264,9 @@ class ShareService: ObservableObject {
             throw ShareError.appNotInstalled("TikTok")
         }
         
-        // Deep link to TikTok with content
-        var urlString = "tiktok://create"
-        if let deepLink = content.deepLink {
-            let encodedLink = deepLink.absoluteString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            urlString = "tiktok://create?url=\(encodedLink)"
-        }
-        
-        if let url = URL(string: urlString) {
-            await UIApplication.shared.open(url)
-        }
+        // This path should not be reached since BrandedSharePopup
+        // shows TikTokShareView for TikTok platform
+        print("⚠️ Direct TikTok share called - should use TikTokShareView instead")
     }
     
     private func shareToInstagram(_ content: ShareContent, asStory: Bool) async throws {
@@ -482,8 +490,13 @@ class ShareService: ObservableObject {
     }
 }
 
-// MARK: - Share Errors
-enum ShareError: LocalizedError {
+// MARK: - Share Errors (EXACT SPECIFICATION)
+enum ShareError: Error, LocalizedError {
+    case photoAccessDenied
+    case saveFailed
+    case fetchFailed
+    case tiktokNotInstalled
+    case shareFailed(String)
     case appNotInstalled(String)
     case missingImage
     case imageProcessingFailed
@@ -492,6 +505,16 @@ enum ShareError: LocalizedError {
     
     var errorDescription: String? {
         switch self {
+        case .photoAccessDenied:
+            return "Photo library access denied. Please enable it in Settings."
+        case .saveFailed:
+            return "Failed to save video to Photos"
+        case .fetchFailed:
+            return "Failed to fetch PHAssets from photo library"
+        case .tiktokNotInstalled:
+            return "TikTok is not installed on this device"
+        case .shareFailed(let message):
+            return "Share failed: \(message)"
         case .appNotInstalled(let app):
             return "\(app) is not installed on this device"
         case .missingImage:

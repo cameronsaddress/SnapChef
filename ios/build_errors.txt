@@ -1,0 +1,103 @@
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoEngine.swift:119:42: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoEngine.swift:124:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoEngine.swift:136:48: error: non-sendable result type 'RenderPlan' cannot be sent from nonisolated context in call to instance method 'createRenderPlan(template:recipe:media:)'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoEngine.swift:230:17: error: error is not handled because the enclosing function is not declared 'throws'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoEngine.swift:276:27: error: capture of 'progressCallback' with non-sendable type '(Double) async -> Void' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoEngine.swift:276:51: error: capture of 'exportSession' with non-sendable type 'AVAssetExportSession' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoEngine.swift:332:19: error: call to main actor-isolated instance method 'handleMemoryWarning()' in a synchronous nonisolated context
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoRenderer.swift:43:42: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoRenderer.swift:89:32: error: value of type 'AVMutableCompositionTrack' has no member 'setTransform'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoRenderer.swift:116:42: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoRenderer.swift:239:27: error: capture of 'progressCallback' with non-sendable type '(Double) async -> Void' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoRenderer.swift:239:51: error: capture of 'exportSession' with non-sendable type 'AVAssetExportSession' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoRenderer.swift:328:54: error: cannot assign value of type 'FilterVideoCompositor.Type' to type '(any AVVideoCompositing.Type)?'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoRenderer.swift:388:27: error: capture of 'progressCallback' with non-sendable type '(Double) async -> Void' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoRenderer.swift:388:51: error: capture of 'exportSession' with non-sendable type 'AVAssetExportSession' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoExporter.swift:112:46: error: missing arguments for parameters 'localIdentifiers', 'mediaType', 'redirectURI' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoExporter.swift:114:35: error: cannot infer contextual base in reference to member 'video'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoExporter.swift:98:34: error: main actor-isolated class property 'shared' can not be referenced from a nonisolated context
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoExporter.swift:142:30: error: expression is 'async' but is not marked with 'await'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoExporter.swift:232:39: error: capture of 'self' with non-sendable type 'ViralVideoExporter' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoExporter.swift:263:50: error: cannot assign value of type 'ProductionVideoCompositor.Type' to type '(any AVVideoCompositing.Type)?'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoPolishManager.swift:79:23: error: cannot call value of non-function type 'UISelectionFeedbackGenerator'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoPolishManager.swift:79:23: error: 'selection' is inaccessible due to 'private' protection level
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoPolishManager.swift:183:60: error: 'config' is inaccessible due to 'private' protection level
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoPolishManager.swift:184:65: error: 'config' is inaccessible due to 'private' protection level
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoPolishManager.swift:187:95: error: 'config' is inaccessible due to 'private' protection level
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoPolishManager.swift:188:94: error: 'config' is inaccessible due to 'private' protection level
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoPolishManager.swift:189:93: error: 'config' is inaccessible due to 'private' protection level
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoPolishManager.swift:214:55: error: non-sendable result type 'ErrorRecoveryManager.RecoveryAction' cannot be sent from nonisolated context in call to instance method 'handleRenderingError(_:template:recipe:media:)'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoPolishManager.swift:471:19: error: binary operator '*' cannot be applied to operands of type 'String' and 'Int'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/RenderPlanner.swift:711:19: error: value of type 'CATextLayer' has no member 'fontName'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/RenderPlanner.swift:871:19: error: value of type 'CATextLayer' has no member 'fontName'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/RenderPlanner.swift:899:20: error: value of type 'CATextLayer' has no member 'fontName'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/RenderPlanner.swift:964:19: error: value of type 'CATextLayer' has no member 'fontName'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:41:26: error: cannot find 'UIDevice' in scope
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:42:24: error: cannot find 'UIDevice' in scope
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:46:53: error: reference to property 'sessionMetrics' in closure requires explicit use of 'self' to make capture semantics explicit
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:77:18: error: main actor-isolated property 'renderingMetrics' can not be mutated from a Sendable closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:91:36: error: main actor-isolated property 'renderingMetrics' can not be referenced from a Sendable closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:95:31: error: main actor-isolated property 'renderingMetrics' can not be referenced from a Sendable closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:99:18: error: call to main actor-isolated instance method 'checkPerformanceViolations' in a synchronous nonisolated context
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:110:36: error: main actor-isolated property 'renderingMetrics' can not be referenced from a Sendable closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:114:31: error: main actor-isolated property 'renderingMetrics' can not be referenced from a Sendable closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:117:18: error: call to main actor-isolated instance method 'logRenderingMetricSummary' in a synchronous nonisolated context
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:120:18: error: main actor-isolated property 'sessionMetrics' can not be referenced from a Sendable closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift:147:56: error: argument type 'Any' does not conform to expected type 'MXMetricManagerSubscriber'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ErrorRecoveryManager.swift:182:16: error: type of expression is ambiguous without a type annotation
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ErrorRecoveryManager.swift:237:16: error: type of expression is ambiguous without a type annotation
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ErrorRecoveryManager.swift:244:16: error: type of expression is ambiguous without a type annotation
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ErrorRecoveryManager.swift:251:16: error: type of expression is ambiguous without a type annotation
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/MemoryOptimizer.swift:444:70: error: reference to property 'expectedFrames' in closure requires explicit use of 'self' to make capture semantics explicit
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/MemoryOptimizer.swift:446:49: error: reference to property 'actualFrames' in closure requires explicit use of 'self' to make capture semantics explicit
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/MemoryOptimizer.swift:446:67: error: reference to property 'expectedFrames' in closure requires explicit use of 'self' to make capture semantics explicit
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:51:42: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:108:61: error: reference to captured var 'frameCount' in concurrently-executing code
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:110:92: error: capture of 'self' with non-sendable type 'StillWriter' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:113:92: error: capture of 'processedImage' with non-sendable type 'CIImage' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:114:47: error: capture of 'pixelBufferAdaptor' with non-sendable type 'AVAssetWriterInputPixelBufferAdaptor' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:133:35: error: capture of 'progressCallback' with non-sendable type '(Double) async -> Void' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:110:68: error: reference to captured var 'frameCount' in concurrently-executing code
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:128:25: error: mutation of captured var 'frameCount' in concurrently-executing code
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:131:47: error: reference to captured var 'frameCount' in concurrently-executing code
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:133:35: error: capture of 'progressCallback' with non-sendable type '(Double) async -> Void' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:137:28: error: reference to captured var 'frameCount' in concurrently-executing code
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:149:31: error: capture of 'videoWriter' with non-sendable type 'AVAssetWriter' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:221:61: error: reference to captured var 'frameCount' in concurrently-executing code
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:223:92: error: capture of 'self' with non-sendable type 'StillWriter' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:227:39: error: capture of 'ciImages' with non-sendable type '[(ciImage: CIImage, duration: CMTime, transform: CGAffineTransform)]' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:232:43: error: capture of 'pixelBufferAdaptor' with non-sendable type 'AVAssetWriterInputPixelBufferAdaptor' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:247:35: error: capture of 'progressCallback' with non-sendable type '(Double) async -> Void' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:223:68: error: reference to captured var 'frameCount' in concurrently-executing code
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:242:25: error: mutation of captured var 'frameCount' in concurrently-executing code
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:245:47: error: reference to captured var 'frameCount' in concurrently-executing code
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:247:35: error: capture of 'progressCallback' with non-sendable type '(Double) async -> Void' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/StillWriter.swift:256:31: error: capture of 'videoWriter' with non-sendable type 'AVAssetWriter' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PolishUIComponents.swift:476:23: error: call to main actor-isolated initializer 'init(style:)' in a synchronous nonisolated context
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PolishUIComponents.swift:477:24: error: call to main actor-isolated initializer 'init(style:)' in a synchronous nonisolated context
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PolishUIComponents.swift:478:23: error: call to main actor-isolated initializer 'init(style:)' in a synchronous nonisolated context
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PolishUIComponents.swift:479:21: error: call to main actor-isolated initializer 'init()' in a synchronous nonisolated context
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PolishUIComponents.swift:480:24: error: call to main actor-isolated initializer 'init()' in a synchronous nonisolated context
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/PolishUIComponents.swift:514:13: error: cannot call value of non-function type 'UISelectionFeedbackGenerator'
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/OverlayFactory.swift:30:56: error: main actor-isolated static property 'shared' can not be referenced from a nonisolated context
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/OverlayFactory.swift:43:42: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/OverlayFactory.swift:82:55: error: missing argument label 'phase:' in call
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/OverlayFactory.swift:950:40: error: capture of 'self' with non-sendable type 'OverlayFactory' in an isolated closure
+/Users/cameronanderson/SnapChef/snapchef/ios/SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoSDK.swift:295:46: error: missing argument label 'phase:' in call

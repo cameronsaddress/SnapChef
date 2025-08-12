@@ -175,14 +175,14 @@ struct CurrentTeamCard: View {
                             .font(.subheadline)
                             .fontWeight(.medium)
                     }
-                    .buttonStyle(SecondaryButtonStyle())
+                    .buttonStyle(TeamSecondaryButtonStyle())
                     
                     Button(action: shareTeamCode) {
                         Label("Invite", systemImage: "person.badge.plus")
                             .font(.subheadline)
                             .fontWeight(.medium)
                     }
-                    .buttonStyle(PrimaryButtonStyle())
+                    .buttonStyle(TeamPrimaryButtonStyle())
                 }
             }
             .padding()
@@ -226,10 +226,10 @@ struct NoTeamCard: View {
                 
                 HStack(spacing: 16) {
                     Button("Create Team", action: onCreateTeam)
-                        .buttonStyle(PrimaryButtonStyle())
+                        .buttonStyle(TeamPrimaryButtonStyle())
                     
                     Button("Join Team", action: onJoinTeam)
-                        .buttonStyle(SecondaryButtonStyle())
+                        .buttonStyle(TeamSecondaryButtonStyle())
                 }
             }
             .padding()
@@ -493,7 +493,7 @@ struct DiscoverTeamCard: View {
 }
 
 // MARK: - Button Styles
-struct PrimaryButtonStyle: ButtonStyle {
+struct TeamPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .padding(.horizontal, 20)
@@ -511,7 +511,7 @@ struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
-struct SecondaryButtonStyle: ButtonStyle {
+struct TeamSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .padding(.horizontal, 20)

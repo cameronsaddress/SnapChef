@@ -15,12 +15,20 @@ import TikTokOpenShareSDK
 import TikTokOpenSDKCore
 #endif
 
+#if canImport(TikTokOpenAuthSDK)
+import TikTokOpenAuthSDK
+#endif
+
 class AppDelegate: NSObject, UIApplicationDelegate {
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         
-        // TikTok SDK initialization happens automatically when creating share requests
-        // No explicit initialization needed according to latest SDK
+        // TikTok SDK initialization with sandbox credentials
+        // The SDK will be initialized when first used
+        #if canImport(TikTokOpenShareSDK)
+        print("✅ TikTok OpenShareSDK available for use")
+        #endif
+        
         print("✅ AppDelegate initialized")
         
         return true
@@ -28,11 +36,14 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
         
-        // Handle TikTok callbacks through our wrapper
+        // Handle TikTok callbacks through URL schemes
+        // The TikTok SDK handles callbacks internally when sharing
+        
+        // Handle TikTok callbacks through our wrapper as fallback
         if url.absoluteString.contains("tiktok") || url.absoluteString.contains("sbawj0946ft24i4wjv") {
             let handled = TikTokOpenSDKWrapper.shared.handleOpenURL(url)
             if handled {
-                print("✅ TikTok callback handled: \(url)")
+                print("✅ TikTok callback handled by wrapper: \(url)")
                 return true
             }
         }

@@ -202,7 +202,7 @@ struct BrandedSharePopup: View {
     private func platformSpecificView(for platform: SharePlatformType) -> some View {
         switch platform {
         case .tiktok:
-            TikTokShareViewEnhanced(content: content)
+            TikTokShareView(content: content)  // Use the template selection view
         case .instagram:
             InstagramShareView(content: content, isStory: false)
         case .instagramStory:

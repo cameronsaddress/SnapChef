@@ -1,0 +1,366 @@
+//
+//  ViralVideoDataModels.swift
+//  SnapChef
+//
+//  Created on 12/01/2025
+//  Core data models for TikTok viral video generation as specified in requirements
+//
+
+import UIKit
+import AVFoundation
+import CoreMedia
+
+// MARK: - Recipe Data Model
+/// Recipe data model exactly as specified in requirements
+public struct ViralRecipe: Codable, Sendable {
+    public struct Step: Codable, Sendable { 
+        public let title: String
+        public let secondsHint: Double? 
+    }
+    
+    public let title: String
+    public let hook: String?                 // e.g., "Fridge chaos → dinner in 15"
+    public let steps: [Step]                  // 3–7 steps works best
+    public let timeMinutes: Int?              // e.g., 15
+    public let costDollars: Int?              // e.g., 7
+    public let calories: Int?                 // optional
+    public let ingredients: [String]          // ["eggs", "spinach", "garlic", ...]
+    
+    public init(
+        title: String,
+        hook: String? = nil,
+        steps: [Step],
+        timeMinutes: Int? = nil,
+        costDollars: Int? = nil,
+        calories: Int? = nil,
+        ingredients: [String]
+    ) {
+        self.title = title
+        self.hook = hook
+        self.steps = steps
+        self.timeMinutes = timeMinutes
+        self.costDollars = costDollars
+        self.calories = calories
+        self.ingredients = ingredients
+    }
+}
+
+// MARK: - Media Bundle
+/// Media bundle containing all visual assets for video generation
+public struct MediaBundle: Sendable {
+    public let beforeFridge: UIImage
+    public let afterFridge: UIImage
+    public let cookedMeal: UIImage            // plated beauty
+    public let brollClips: [URL]              // optional cooking clips (vertical)
+    public let musicURL: URL?                 // optional; otherwise silent
+    
+    public init(
+        beforeFridge: UIImage,
+        afterFridge: UIImage,
+        cookedMeal: UIImage,
+        brollClips: [URL] = [],
+        musicURL: URL? = nil
+    ) {
+        self.beforeFridge = beforeFridge
+        self.afterFridge = afterFridge
+        self.cookedMeal = cookedMeal
+        self.brollClips = brollClips
+        self.musicURL = musicURL
+    }
+}
+
+// MARK: - Render Configuration
+/// Configuration settings for video rendering with exact specifications
+public struct RenderConfig: Sendable {
+    public var size = CGSize(width: 1080, height: 1920)
+    public var fps: Int32 = 30
+    public var safeInsets = UIEdgeInsets(top: 192, left: 72, bottom: 192, right: 72)
+    public var maxDuration: CMTime = CMTime(seconds: 15, preferredTimescale: 600)
+    public var fontNameBold: String = "SF-Pro-Display-Bold"
+    public var fontNameRegular: String = "SF-Pro-Display-Regular"
+    public var textStrokeEnabled: Bool = true
+    public var brandTint: UIColor = .white
+    public var brandShadow: UIColor = .black
+    
+    // Typography hierarchy from requirements
+    public var hookFontSize: CGFloat = 64        // 60-72pt bold
+    public var stepsFontSize: CGFloat = 48       // 44-52pt bold
+    public var countersFontSize: CGFloat = 42    // 36-48pt regular
+    public var ctaFontSize: CGFloat = 40         // 40pt bold in rounded stickers
+    public var ingredientFontSize: CGFloat = 42  // 42pt bold
+    
+    // Animation timing from requirements
+    public var fadeDuration: TimeInterval = 0.25      // 200-300ms
+    public var springDamping: CGFloat = 13            // 12-14 for pop animations
+    public var scaleRange: ClosedRange<CGFloat> = 0.6...1.0  // entrance scale
+    public var staggerDelay: TimeInterval = 0.15     // 150ms between elements (Template 2 requirement)
+    
+    public init() {}
+}
+
+// MARK: - Viral Template Enum
+/// Five viral video templates as specified in requirements
+public enum ViralTemplate: String, CaseIterable, Sendable {
+    case beatSyncedCarousel = "Beat-Synced Photo Carousel"
+    case splitScreenSwipe = "Split-Screen Swipe Before/After"
+    case kineticTextSteps = "Kinetic-Text Recipe Steps"
+    case priceTimeChallenge = "Price & Time Challenge"
+    case greenScreenPIP = "Green-Screen My Fridge → My Plate"
+    
+    public var duration: CMTime {
+        switch self {
+        case .beatSyncedCarousel:
+            return CMTime(seconds: 11, preferredTimescale: 600)  // 10-12 seconds
+        case .splitScreenSwipe:
+            return CMTime(seconds: 9, preferredTimescale: 600)   // 9 seconds
+        case .kineticTextSteps:
+            return CMTime(seconds: 15, preferredTimescale: 600)  // 15 seconds
+        case .priceTimeChallenge:
+            return CMTime(seconds: 12, preferredTimescale: 600)  // 12 seconds
+        case .greenScreenPIP:
+            return CMTime(seconds: 15, preferredTimescale: 600)  // 15 seconds
+        }
+    }
+    
+    public var description: String {
+        switch self {
+        case .beatSyncedCarousel:
+            return "Hook on blurred BEFORE → ingredient snaps → cooked meal → AFTER"
+        case .splitScreenSwipe:
+            return "BEFORE full screen → AFTER masked reveal → ingredient counters → CTA"
+        case .kineticTextSteps:
+            return "Hook overlay → animated step text → background motion → auto-captioned"
+        case .priceTimeChallenge:
+            return "BEFORE with stickers → progress bar → AFTER with CTA"
+        case .greenScreenPIP:
+            return "Picture-in-picture face overlay → BEFORE → B-ROLL → AFTER"
+        }
+    }
+}
+
+// MARK: - Render Plan Structure
+/// Render plan structure exactly as specified in requirements
+public struct RenderPlan: @unchecked Sendable {
+    public struct TrackItem: @unchecked Sendable {
+        public enum Kind: Sendable { 
+            case still(UIImage)
+            case video(URL) 
+        }
+        public let kind: Kind
+        public let timeRange: CMTimeRange
+        public let transform: CGAffineTransform
+        public let filters: [CIFilter]
+        
+        public init(
+            kind: Kind,
+            timeRange: CMTimeRange,
+            transform: CGAffineTransform = .identity,
+            filters: [CIFilter] = []
+        ) {
+            self.kind = kind
+            self.timeRange = timeRange
+            self.transform = transform
+            self.filters = filters
+        }
+    }
+    
+    public struct Overlay: @unchecked Sendable {
+        public let start: CMTime
+        public let duration: CMTime
+        public let layerBuilder: (_ config: RenderConfig) -> CALayer
+        
+        public init(
+            start: CMTime,
+            duration: CMTime,
+            layerBuilder: @escaping (_ config: RenderConfig) -> CALayer
+        ) {
+            self.start = start
+            self.duration = duration
+            self.layerBuilder = layerBuilder
+        }
+    }
+    
+    public let items: [TrackItem]
+    public let overlays: [Overlay]
+    public let audio: URL?
+    public let outputDuration: CMTime
+    
+    public init(
+        items: [TrackItem],
+        overlays: [Overlay],
+        audio: URL? = nil,
+        outputDuration: CMTime
+    ) {
+        self.items = items
+        self.overlays = overlays
+        self.audio = audio
+        self.outputDuration = outputDuration
+    }
+}
+
+// MARK: - Render Progress
+/// Progress tracking for video rendering
+public struct RenderProgress: Sendable {
+    public let phase: RenderPhase
+    public let progress: Double  // 0.0 to 1.0
+    public let currentFrame: Int?
+    public let totalFrames: Int?
+    public let memoryUsage: UInt64?  // bytes
+    
+    public init(
+        phase: RenderPhase,
+        progress: Double,
+        currentFrame: Int? = nil,
+        totalFrames: Int? = nil,
+        memoryUsage: UInt64? = nil
+    ) {
+        self.phase = phase
+        self.progress = progress
+        self.currentFrame = currentFrame
+        self.totalFrames = totalFrames
+        self.memoryUsage = memoryUsage
+    }
+}
+
+public enum RenderPhase: String, CaseIterable, Sendable {
+    case planning = "Planning"
+    case preparingAssets = "Preparing Assets"
+    case renderingFrames = "Rendering Frames"
+    case compositing = "Compositing"
+    case addingOverlays = "Adding Overlays"
+    case encoding = "Encoding"
+    case finalizing = "Finalizing"
+    case complete = "Complete"
+}
+
+// MARK: - Export Settings
+/// Export settings for production quality as specified in requirements
+public struct ExportSettings {
+    // Video compression settings
+    public static let videoCodec = AVVideoCodecType.h264
+    public static let videoProfile = "kVTProfileLevel_H264_High_AutoLevel"
+    public static let videoBitrate: Int = 8_000_000  // Optimized 8 Mbps for better compression
+    public static let videoPreset = AVAssetExportPresetHighestQuality
+    
+    // Adaptive bitrate settings for file size optimization
+    public static let adaptiveBitrateThresholds: [Int64: Int] = [
+        20_000_000: 8_000_000,   // <20MB: 8 Mbps
+        15_000_000: 6_000_000,   // <15MB: 6 Mbps
+        10_000_000: 4_000_000    // <10MB: 4 Mbps
+    ]
+    
+    // Audio compression settings
+    public static let audioCodec = kAudioFormatMPEG4AAC
+    public static let audioBitrate: Int = 128_000    // Optimized 128 kbps
+    public static let audioSampleRate: Double = 44100.0
+    
+    // Frame writing settings
+    public static let pixelFormat = kCVPixelFormatType_32ARGB
+    public static let maxFileSize: Int64 = 50_000_000  // 50MB max
+    public static let targetFileSize: Int64 = 20_000_000  // 20MB target
+    
+    // Performance requirements
+    public static let maxMemoryUsage: UInt64 = 150_000_000  // 150MB
+    public static let maxRenderTime: TimeInterval = 5.0     // 5 seconds
+    
+    // Compression optimization settings
+    public static func optimizedVideoSettings(
+        for size: CGSize,
+        targetFileSize: Int64,
+        duration: TimeInterval
+    ) -> [String: Any] {
+        let targetBitrate = calculateOptimalBitrate(
+            targetFileSize: targetFileSize,
+            duration: duration
+        )
+        
+        return [
+            AVVideoCodecKey: videoCodec,
+            AVVideoWidthKey: size.width,
+            AVVideoHeightKey: size.height,
+            AVVideoCompressionPropertiesKey: [
+                AVVideoAverageBitRateKey: targetBitrate,
+                AVVideoProfileLevelKey: videoProfile,
+                AVVideoH264EntropyModeKey: AVVideoH264EntropyModeCABAC,
+                AVVideoExpectedSourceFrameRateKey: 30,
+                AVVideoAllowFrameReorderingKey: true,
+                AVVideoMaxKeyFrameIntervalKey: 30,
+                // Optimize for file size
+                AVVideoQualityKey: 0.8 // Slight quality reduction for better compression
+            ]
+        ]
+    }
+    
+    public static func optimizedAudioSettings() -> [String: Any] {
+        return [
+            AVFormatIDKey: audioCodec,
+            AVSampleRateKey: audioSampleRate,
+            AVNumberOfChannelsKey: 2,
+            AVEncoderBitRateKey: audioBitrate,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
+    }
+    
+    private static func calculateOptimalBitrate(targetFileSize: Int64, duration: TimeInterval) -> Int {
+        // Calculate bitrate needed to achieve target file size
+        // File size (bytes) = (video bitrate + audio bitrate) * duration / 8
+        let targetBitsPerSecond = (Double(targetFileSize * 8) / duration) * 0.9 // 90% for video, 10% for audio
+        let calculatedBitrate = Int(targetBitsPerSecond)
+        
+        // Clamp to reasonable range
+        return max(2_000_000, min(calculatedBitrate, videoBitrate))
+    }
+}
+
+// MARK: - Caption Generation
+/// Caption generation utilities as specified in requirements
+public struct CaptionGenerator {
+    /// Generate default caption from recipe as specified in requirements
+    public static func defaultCaption(from recipe: ViralRecipe) -> String {
+        let title = recipe.title
+        let mins = recipe.timeMinutes.map { "\($0) min" } ?? "quick"
+        let cost = recipe.costDollars.map { "$\($0)" } ?? ""
+        let tags = ["#FridgeGlowUp", "#BeforeAfter", "#DinnerHack", "#HomeCooking"].joined(separator: " ")
+        return "\(title) — \(mins) \(cost)\nComment \"RECIPE\" for details 👇\n\(tags)"
+    }
+    
+    /// CTA rotation pool as specified in requirements
+    public static let ctaPool = [
+        "Comment 'RECIPE' for details",
+        "Save for grocery day 🛒",
+        "Try this tonight? 👇",
+        "Save & try this tonight ✨",
+        "From fridge → plate 😎"
+    ]
+    
+    /// Get random CTA from pool
+    public static func randomCTA() -> String {
+        return ctaPool.randomElement() ?? ctaPool[0]
+    }
+    
+    /// Generate hook text with fallback
+    public static func generateHook(from recipe: ViralRecipe) -> String {
+        if let hook = recipe.hook {
+            return hook
+        }
+        
+        let time = recipe.timeMinutes ?? 15
+        let cost = recipe.costDollars.map { "$\($0)" } ?? ""
+        return "Fridge chaos → dinner in \(time) min \(cost)"
+    }
+    
+    /// Process step text for display (max 5-7 words)
+    public static func processStepText(_ step: ViralRecipe.Step, index: Int) -> String {
+        let words = step.title.components(separatedBy: .whitespaces)
+        let truncated = Array(words.prefix(7)).joined(separator: " ")
+        return "\(index + 1). \(truncated)"
+    }
+    
+    /// Process ingredient text for display
+    public static func processIngredientText(_ ingredients: [String]) -> [String] {
+        return ingredients.prefix(3).map { ingredient in
+            let capitalized = ingredient.prefix(1).capitalized + ingredient.dropFirst()
+            return String(capitalized.prefix(20)) + (capitalized.count > 20 ? "..." : "")
+        }
+    }
+}
