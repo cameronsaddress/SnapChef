@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit
+import Photos
 
 struct InstagramShareView: View {
     let content: ShareContent
@@ -365,18 +366,59 @@ struct InstagramShareView: View {
         // Copy caption to clipboard
         UIPasteboard.general.string = fullCaption
         
-        // Save image to photo library first, then open Instagram
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+        // Save image to photo library with proper permission handling
+        saveImageAndOpenInstagram(image: image)
+    }
+    
+    private func saveImageAndOpenInstagram(image: UIImage) {
+        // Check current authorization status first
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
         
-        // Open Instagram library instead of just the app
-        // This guides users to select the photo they just saved
-        if let url = URL(string: "instagram://library") {
-            UIApplication.shared.open(url) { success in
-                if !success {
-                    // Fallback to basic Instagram open
-                    if let fallbackURL = URL(string: "instagram://") {
-                        UIApplication.shared.open(fallbackURL)
+        switch status {
+        case .authorized, .limited:
+            // Already have permission, save the image
+            saveImageToLibrary(image)
+            
+        case .notDetermined:
+            // Need to request permission
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
+                DispatchQueue.main.async {
+                    if newStatus == .authorized || newStatus == .limited {
+                        self.saveImageToLibrary(image)
+                    } else {
+                        self.errorMessage = "Photo library access denied. Please enable in Settings to share to Instagram."
                     }
+                }
+            }
+            
+        case .denied, .restricted:
+            errorMessage = "Photo library access denied. Please enable in Settings > Privacy > Photos."
+            
+        @unknown default:
+            errorMessage = "Unable to access photo library."
+        }
+    }
+    
+    private func saveImageToLibrary(_ image: UIImage) {
+        PHPhotoLibrary.shared().performChanges({
+            _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
+        }) { success, error in
+            DispatchQueue.main.async {
+                if success {
+                    // Open Instagram library after saving
+                    if let url = URL(string: "instagram://library") {
+                        UIApplication.shared.open(url) { success in
+                            if !success {
+                                // Fallback to basic Instagram open
+                                if let fallbackURL = URL(string: "instagram://") {
+                                    UIApplication.shared.open(fallbackURL)
+                                }
+                            }
+                        }
+                    }
+                    self.dismiss()
+                } else {
+                    self.errorMessage = "Failed to save image: \(error?.localizedDescription ?? "Unknown error")"
                 }
             }
         }
