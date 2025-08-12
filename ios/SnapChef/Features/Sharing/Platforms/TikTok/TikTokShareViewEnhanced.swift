@@ -7,7 +7,6 @@
 
 import SwiftUI
 import AVKit
-import Photos
 import QuartzCore
 
 struct TikTokShareViewEnhanced: View {
@@ -837,45 +836,18 @@ struct TikTokShareViewEnhanced: View {
     
     private func saveImageToPhotoLibrary(_ image: UIImage) async throws {
         return try await withCheckedThrowingContinuation { continuation in
-            // Check current authorization status first
-            let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-            
-            switch status {
-            case .authorized, .limited:
-                // Already have permission, save the image
-                PHPhotoLibrary.shared().performChanges({
-                    _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
-                }) { success, error in
-                    if success {
-                        continuation.resume()
-                    } else {
-                        continuation.resume(throwing: error ?? NSError(domain: "TikTokShare", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to save image"]))
-                    }
+            // Use SafePhotoSaver which doesn't use PHPhotoLibrary directly
+            SafePhotoSaver.shared.saveImageToPhotoLibrary(image) { success, errorMessage in
+                if success {
+                    continuation.resume()
+                } else {
+                    let error = NSError(
+                        domain: "TikTokShare",
+                        code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: errorMessage ?? "Failed to save image"]
+                    )
+                    continuation.resume(throwing: error)
                 }
-                
-            case .notDetermined:
-                // Need to request permission
-                PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
-                    if newStatus == .authorized || newStatus == .limited {
-                        PHPhotoLibrary.shared().performChanges({
-                            _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
-                        }) { success, error in
-                            if success {
-                                continuation.resume()
-                            } else {
-                                continuation.resume(throwing: error ?? NSError(domain: "TikTokShare", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to save image"]))
-                            }
-                        }
-                    } else {
-                        continuation.resume(throwing: NSError(domain: "TikTokShare", code: -2, userInfo: [NSLocalizedDescriptionKey: "Photo library access denied"]))
-                    }
-                }
-                
-            case .denied, .restricted:
-                continuation.resume(throwing: NSError(domain: "TikTokShare", code: -2, userInfo: [NSLocalizedDescriptionKey: "Photo library access denied. Please enable in Settings."]))
-                
-            @unknown default:
-                continuation.resume(throwing: NSError(domain: "TikTokShare", code: -3, userInfo: [NSLocalizedDescriptionKey: "Unknown photo library authorization status"]))
             }
         }
     }
