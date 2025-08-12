@@ -409,8 +409,8 @@ struct InstagramShareView: View {
         // First normalize the image to ensure it's in the right format
         let normalizedImage = normalizeImage(image)
         
-        // Use the safe PhotoLibraryHelper to handle permissions and saving
-        PhotoLibraryHelper.shared.requestPermissionAndSaveImage(normalizedImage) { success, error in
+        // Use the SafePhotoSaver which doesn't import Photos framework
+        SafePhotoSaver.shared.saveImageToPhotoLibrary(normalizedImage) { success, error in
             if success {
                 // Open Instagram library after saving
                 if let url = URL(string: "instagram://library") {

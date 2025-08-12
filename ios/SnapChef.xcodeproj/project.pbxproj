@@ -103,6 +103,7 @@
 		AE5F6AEEE75CF80D8EEFA941 /* meal1.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 749D158D8EA5E056935EE338 /* meal1.jpg */; };
 		AF3C8AFEFB5CA30CE60ECDCE /* EnhancedShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8103A852FBC4CF00812CAAC6 /* EnhancedShareSheet.swift */; };
 		AF51A831B3A7238B0290CA00 /* SnapChefAPIManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7404C47F3CED5EDB38FF9CD8 /* SnapChefAPIManager.swift */; };
+		B282BE29CE39BC736D380011 /* SafePhotoSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 329277F6AA3FB9884C3C5E88 /* SafePhotoSaver.swift */; };
 		B75CC470EA549992E359A6B7 /* Recipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32378086B26CBCDC88359BFC /* Recipe.swift */; };
 		B779654B4D028F23A7B210DB /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D763DE380F1DB760696FA722 /* HomeView.swift */; };
 		BAE2DDC8774AE62C070431AC /* CloudKitRecipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60199635F2175797D9C53234 /* CloudKitRecipe.swift */; };
@@ -194,6 +195,7 @@
 		2F6FE58424A5D8B35EE43810 /* TikTokShareView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TikTokShareView.swift; path = SnapChef/Features/Sharing/Platforms/TikTok/TikTokShareView.swift; sourceTree = "<group>"; };
 		30ABFB571B2AB700D84210E5 /* XContentGenerator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = XContentGenerator.swift; path = SnapChef/Features/Sharing/Platforms/X/XContentGenerator.swift; sourceTree = "<group>"; };
 		32378086B26CBCDC88359BFC /* Recipe.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Recipe.swift; path = SnapChef/Core/Models/Recipe.swift; sourceTree = "<group>"; };
+		329277F6AA3FB9884C3C5E88 /* SafePhotoSaver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SafePhotoSaver.swift; path = SnapChef/Features/Sharing/Core/SafePhotoSaver.swift; sourceTree = "<group>"; };
 		32E437105EB7EFBC8764841A /* ChallengeProofSubmissionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeProofSubmissionView.swift; path = SnapChef/Features/Gamification/ChallengeProofSubmissionView.swift; sourceTree = "<group>"; };
 		336E44F1C05F96398737E9E4 /* MagicalBackground.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MagicalBackground.swift; path = SnapChef/Design/MagicalBackground.swift; sourceTree = "<group>"; };
 		37C541E1BB83BA1EC25EFF3F /* RecipesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RecipesView.swift; path = SnapChef/Features/Recipes/RecipesView.swift; sourceTree = "<group>"; };
@@ -422,6 +424,7 @@
 				BE202DAE23E874A006903A6E /* ShareService.swift */,
 				3CEE3D68AC446021275855DA /* BrandedSharePopup.swift */,
 				DFBF9C08DA973B611D990FBF /* PhotoLibraryHelper.swift */,
+				329277F6AA3FB9884C3C5E88 /* SafePhotoSaver.swift */,
 			);
 			name = Core;
 			sourceTree = "<group>";
@@ -1131,6 +1134,7 @@
 				0399D987D73C608B7C987316 /* AfterPhotoCaptureView.swift in Sources */,
 				3C3278A3D090C132E5A698CA /* RecipePhotoView.swift in Sources */,
 				8CF4B86D085DB79938D29D67 /* PhotoLibraryHelper.swift in Sources */,
+				B282BE29CE39BC736D380011 /* SafePhotoSaver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
