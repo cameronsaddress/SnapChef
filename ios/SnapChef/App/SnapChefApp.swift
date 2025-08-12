@@ -11,6 +11,8 @@ import Combine
 
 @main
 struct SnapChefApp: App {
+    // Connect the UIKit AppDelegate for TikTok SDK
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     // Create new instances for @StateObject to manage their lifecycle.
     @StateObject private var appState = AppState()
@@ -76,6 +78,10 @@ struct SnapChefApp: App {
         configureTableView()
         configureWindow()
         
+        // Initialize social media SDKs
+        SDKInitializer.initializeSDKs()
+        SDKInitializer.verifyURLSchemes()
+        
         KeychainManager.shared.ensureAPIKeyExists()
         NetworkManager.shared.configure()
         deviceManager.checkDeviceStatus()
@@ -117,6 +123,12 @@ struct SnapChefApp: App {
     }
     
     private func handleIncomingURL(_ url: URL) {
+        // First check if it's an SDK callback
+        if SDKInitializer.handleOpenURL(url) {
+            return
+        }
+        
+        // Otherwise handle as a deep link
         if socialShareManager.handleIncomingURL(url) {
             socialShareManager.resolvePendingDeepLink()
         }

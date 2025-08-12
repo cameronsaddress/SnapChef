@@ -58,6 +58,8 @@
     <key>LSApplicationQueriesSchemes</key>
     <array>
         <string>tiktok</string>
+        <string>tiktokopensdk</string>
+        <string>tiktoksharesdk</string>
         <string>snssdk1128</string>
         <string>snssdk1233</string>
         <string>snssdk1180</string>
@@ -81,7 +83,19 @@
                 <string>com.googleusercontent.apps.YOUR_GOOGLE_CLIENT_ID</string>
             </array>
         </dict>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>tiktok-sandbox</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>sbawj0946ft24i4wjv</string>
+            </array>
+        </dict>
     </array>
+    <key>TikTokClientKey</key>
+    <string>sbawj0946ft24i4wjv</string>
+    <key>TikTokClientSecret</key>
+    <string>1BsqJsVa6bKjzlt2BvJgrapjgfNw7Ewk</string>
     <key>GOOGLE_CLIENT_ID</key>
     <string>YOUR_GOOGLE_CLIENT_ID</string>
     <key>API_BASE_URL</key>
