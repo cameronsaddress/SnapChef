@@ -36,15 +36,19 @@ class InstagramContentGenerator: ObservableObject {
             isStory: isStory
         )
         
-        // Render to image
+        // Render to image with proper format
         let renderer = ImageRenderer(content: contentView)
         renderer.scale = 1.0 // Use device scale
         
-        guard let image = renderer.uiImage else {
+        // Configure renderer to produce opaque image
+        renderer.isOpaque = true
+        
+        guard let renderedImage = renderer.uiImage else {
             throw InstagramError.renderingFailed
         }
         
-        return image
+        // Ensure the image is in the correct format
+        return normalizeRenderedImage(renderedImage)
     }
     
     func generateCarousel(
@@ -117,7 +121,31 @@ class InstagramContentGenerator: ObservableObject {
                 .frame(width: size.width, height: size.height)
         )
         renderer.scale = 1.0
-        return renderer.uiImage
+        renderer.isOpaque = true
+        
+        guard let image = renderer.uiImage else { return nil }
+        return normalizeRenderedImage(image)
+    }
+    
+    private func normalizeRenderedImage(_ image: UIImage) -> UIImage {
+        // Create a new opaque image context (true = opaque, no alpha channel)
+        UIGraphicsBeginImageContextWithOptions(image.size, true, image.scale)
+        defer { UIGraphicsEndImageContext() }
+        
+        // Fill with white background first
+        UIColor.white.setFill()
+        UIRectFill(CGRect(origin: .zero, size: image.size))
+        
+        // Draw the image on top with normal blend mode
+        image.draw(in: CGRect(origin: .zero, size: image.size), blendMode: .normal, alpha: 1.0)
+        
+        // Get the normalized image
+        guard let normalizedImage = UIGraphicsGetImageFromCurrentImageContext() else {
+            // If normalization fails, return original
+            return image
+        }
+        
+        return normalizedImage
     }
 }
 

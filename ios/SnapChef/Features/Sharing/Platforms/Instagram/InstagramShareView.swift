@@ -435,9 +435,33 @@ struct InstagramShareView: View {
         }
     }
     
+    private func normalizeImage(_ image: UIImage) -> UIImage {
+        // Create a new opaque image context (true = opaque, no alpha channel)
+        UIGraphicsBeginImageContextWithOptions(image.size, true, image.scale)
+        defer { UIGraphicsEndImageContext() }
+        
+        // Fill with white background first
+        UIColor.white.setFill()
+        UIRectFill(CGRect(origin: .zero, size: image.size))
+        
+        // Draw the image on top with normal blend mode
+        image.draw(in: CGRect(origin: .zero, size: image.size), blendMode: .normal, alpha: 1.0)
+        
+        // Get the normalized image
+        guard let normalizedImage = UIGraphicsGetImageFromCurrentImageContext() else {
+            // If normalization fails, return original
+            return image
+        }
+        
+        return normalizedImage
+    }
+    
     private func saveImageToLibrary(_ image: UIImage) {
+        // Convert image to proper format to avoid rendering issues
+        let properImage = normalizeImage(image)
+        
         PHPhotoLibrary.shared().performChanges({
-            _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
+            _ = PHAssetChangeRequest.creationRequestForAsset(from: properImage)
         }) { success, error in
             DispatchQueue.main.async {
                 if success {
