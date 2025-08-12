@@ -407,31 +407,31 @@ struct InstagramShareView: View {
     }
     
     private func saveImageAndOpenInstagram(image: UIImage) {
-        // Check current authorization status first
-        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        // First normalize the image to ensure it's in the right format
+        let normalizedImage = normalizeImage(image)
         
-        switch status {
-        case .authorized, .limited:
-            // Already have permission, save the image
-            saveImageToLibrary(image)
-            
-        case .notDetermined:
-            // Need to request permission
-            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
-                DispatchQueue.main.async {
-                    if newStatus == .authorized || newStatus == .limited {
-                        self.saveImageToLibrary(image)
-                    } else {
-                        self.errorMessage = "Photo library access denied. Please enable in Settings to share to Instagram."
-                    }
+        // Request authorization directly - don't check status first as it might crash
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized, .limited:
+                    // Have permission, save the image
+                    self.performImageSave(normalizedImage)
+                    
+                case .denied:
+                    self.errorMessage = "Photo library access denied. Please go to Settings > Privacy & Security > Photos and allow SnapChef to add photos."
+                    
+                case .restricted:
+                    self.errorMessage = "Photo library access is restricted on this device."
+                    
+                case .notDetermined:
+                    // This shouldn't happen after requestAuthorization, but handle it
+                    self.errorMessage = "Unable to determine photo library permission status."
+                    
+                @unknown default:
+                    self.errorMessage = "Unable to access photo library."
                 }
             }
-            
-        case .denied, .restricted:
-            errorMessage = "Photo library access denied. Please enable in Settings > Privacy > Photos."
-            
-        @unknown default:
-            errorMessage = "Unable to access photo library."
         }
     }
     
@@ -456,12 +456,10 @@ struct InstagramShareView: View {
         return normalizedImage
     }
     
-    private func saveImageToLibrary(_ image: UIImage) {
-        // Convert image to proper format to avoid rendering issues
-        let properImage = normalizeImage(image)
-        
+    private func performImageSave(_ image: UIImage) {
+        // Image is already normalized before being passed here
         PHPhotoLibrary.shared().performChanges({
-            _ = PHAssetChangeRequest.creationRequestForAsset(from: properImage)
+            _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
         }) { success, error in
             DispatchQueue.main.async {
                 if success {
