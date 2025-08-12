@@ -313,7 +313,7 @@ struct InstagramShareView: View {
     
     private func generateAndShare() {
         // If image is already generated, share directly
-        if let image = generatedImage {
+        if generatedImage != nil {
             shareToInstagram()
         } else {
             // Generate image first, then share
