@@ -855,70 +855,57 @@ struct TikTokShareViewEnhanced: View {
     private func shareToTikTok() {
         guard let videoURL = generatedVideoURL else { return }
         
-        // Save to photo library using completion handler API (more compatible)
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-            if status == .authorized || status == .limited {
-                PHPhotoLibrary.shared().performChanges({
-                    _ = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
-                }) { success, error in
-                    DispatchQueue.main.async {
-                        if success {
-                            // Prepare full caption with hashtags and description
-                            var captionText = ""
-                            
-                            // Add recipe-specific content
-                            if case .recipe(let recipe) = self.content.type {
-                                captionText = """
-                                🍳 FRIDGE TO FEAST CHALLENGE!
-                                
-                                I just turned random fridge items into \(recipe.name)!
-                                ⏱ Ready in \(recipe.prepTime + recipe.cookTime) minutes
-                                
-                                """
-                            }
-                            
-                            // Add hashtags
-                            let hashtagText = self.selectedHashtags.map { "#\($0)" }.joined(separator: " ")
-                            captionText += hashtagText
-                            captionText += "\n\nMade with @snapchef 🍳"
-                            captionText += "\nDownload: snapchef.app"
-                            
-                            UIPasteboard.general.string = captionText
-                            
-                            // Try different TikTok URL schemes for better compatibility
-                            // tiktok://library opens the user's video library (best for uploaded videos)
-                            let tiktokSchemes = ["tiktok://library", "snssdk1128://", "tiktok://"]
-                            
-                            var opened = false
-                            for scheme in tiktokSchemes {
-                                if let url = URL(string: scheme),
-                                   UIApplication.shared.canOpenURL(url) {
-                                    UIApplication.shared.open(url)
-                                    opened = true
-                                    break
-                                }
-                            }
-                            
-                            // Fallback to web if app not found
-                            if !opened {
-                                if let webURL = URL(string: "https://www.tiktok.com/upload") {
-                                    UIApplication.shared.open(webURL)
-                                }
-                            }
-                            
-                            HapticFeedback.success()
-                            self.dismiss()
-                        } else {
-                            errorMessage = "Failed to save video: \(error?.localizedDescription ?? "Unknown error")"
-                            HapticFeedback.error()
-                        }
+        // Use SafeVideoSaver which doesn't import Photos framework
+        SafeVideoSaver.shared.saveVideoToPhotoLibrary(videoURL) { success, errorMessage in
+            if success {
+                // Prepare full caption with hashtags and description
+                var captionText = ""
+                
+                // Add recipe-specific content
+                if case .recipe(let recipe) = self.content.type {
+                    captionText = """
+                    🍳 FRIDGE TO FEAST CHALLENGE!
+                    
+                    I just turned random fridge items into \(recipe.name)!
+                    ⏱ Ready in \(recipe.prepTime + recipe.cookTime) minutes
+                    
+                    """
+                }
+                
+                // Add hashtags
+                let hashtagText = self.selectedHashtags.map { "#\($0)" }.joined(separator: " ")
+                captionText += hashtagText
+                captionText += "\n\nMade with @snapchef 🍳"
+                captionText += "\nDownload: snapchef.app"
+                
+                UIPasteboard.general.string = captionText
+                
+                // Try different TikTok URL schemes for better compatibility
+                // tiktok://library opens the user's video library (best for uploaded videos)
+                let tiktokSchemes = ["tiktok://library", "snssdk1128://", "tiktok://"]
+                
+                var opened = false
+                for scheme in tiktokSchemes {
+                    if let url = URL(string: scheme),
+                       UIApplication.shared.canOpenURL(url) {
+                        UIApplication.shared.open(url)
+                        opened = true
+                        break
                     }
                 }
-            } else {
-                DispatchQueue.main.async {
-                    errorMessage = "Photo library access denied. Please enable in Settings."
-                    HapticFeedback.error()
+                
+                // Fallback to web if app not found
+                if !opened {
+                    if let webURL = URL(string: "https://www.tiktok.com/upload") {
+                        UIApplication.shared.open(webURL)
+                    }
                 }
+                
+                HapticFeedback.success()
+                self.dismiss()
+            } else {
+                self.errorMessage = errorMessage ?? "Failed to save video"
+                HapticFeedback.error()
             }
         }
     }
