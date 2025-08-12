@@ -1,4 +1,5 @@
 # SnapChef iOS App - Complete Architecture Documentation
+*Last Updated: January 12, 2025*
 
 ## Table of Contents
 1. [Overview](#overview)
@@ -17,13 +18,16 @@
 SnapChef is an AI-powered iOS app that transforms photos of ingredients into personalized recipes. The app uses computer vision to identify ingredients in fridge/pantry photos and generates culturally diverse, dietary-conscious recipes through the Grok Vision API.
 
 ### Key Features
-- 📸 **Smart Camera**: Captures and analyzes fridge/pantry contents
-- 🎮 **Gamification**: Points, badges, challenges, and leaderboards
-- 🎨 **Share Generator**: Create stunning social media posts
-- 👨‍🍳 **AI Chef Personas**: 8 unique chef personalities
+- 📸 **Smart Camera**: Captures and analyzes fridge/pantry contents with AI
+- 🎮 **Gamification**: 365 daily challenges, points, badges, and leaderboards
+- 🎨 **Social Sharing**: Multi-platform sharing with TikTok SDK integration
+- 👨‍🍳 **AI Chef Personas**: 8 unique chef personalities for varied recipes
 - 🌍 **Cultural Diversity**: Recipes from around the world
-- 🥗 **Dietary Support**: Handles various dietary restrictions
-- 🏆 **Social Features**: Share achievements and compete with friends
+- 🥗 **Dietary Support**: Comprehensive dietary restrictions and preferences
+- 🏆 **CloudKit Sync**: Cross-device synchronization and social features
+- 💰 **Virtual Currency**: Chef Coins system with rewards and unlockables
+- 🔥 **Viral Challenges**: TikTok-inspired cooking challenges
+- 📱 **Deep Linking**: Share recipes with custom URLs
 
 ## App Architecture
 
@@ -63,40 +67,80 @@ ios/
 ```swift
 @main
 struct SnapChefApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
+    @StateObject private var authManager = AuthenticationManager()
     @StateObject private var deviceManager = DeviceManager()
-    @StateObject private var gamificationManager = EnhancedGamificationManager()
+    @StateObject private var gamificationManager = GamificationManager()
+    @StateObject private var socialShareManager = SocialShareManager.shared
+    @StateObject private var cloudKitSyncService = CloudKitSyncService.shared
+    @StateObject private var cloudKitDataManager = CloudKitDataManager.shared
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .environmentObject(authManager)
                 .environmentObject(deviceManager)
                 .environmentObject(gamificationManager)
+                .environmentObject(socialShareManager)
+                .environmentObject(cloudKitSyncService)
+                .environmentObject(cloudKitDataManager)
+                .onOpenURL { url in
+                    handleIncomingURL(url)
+                }
         }
     }
 }
 ```
-- Initializes global state objects
-- Sets up environment for dependency injection
-- Configures app lifecycle
+- Initializes all global state managers
+- Sets up SDK integrations (TikTok, Google, Facebook)
+- Handles deep linking and URL schemes
+- Manages CloudKit synchronization
+- Configures app lifecycle events
 
 ### 2. Navigation (`ContentView.swift`)
 ```swift
 struct ContentView: View {
     @State private var selectedTab = 0
+    @State private var showingLaunchAnimation = true
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            EnhancedHomeView()
-                .tabItem { Label("Home", systemImage: "house.fill") }
-                .tag(0)
-            
-            Text("Recipes")
-                .tabItem { Label("Recipes", systemImage: "book.fill") }
-                .tag(1)
-            
-            // Camera is accessed via modal from home
+        ZStack {
+            if showingLaunchAnimation {
+                LaunchAnimationView()
+            } else {
+                MagicalBackground()
+                MainTabView(selectedTab: $selectedTab)
+            }
+        }
+    }
+}
+
+struct MainTabView: View {
+    @Binding var selectedTab: Int
+    
+    var body: some View {
+        NavigationStack {
+            Group {
+                switch selectedTab {
+                case 0: HomeView()
+                case 1: CameraView(selectedTab: $selectedTab)
+                case 2: RecipesView()
+                case 3: SocialFeedView()
+                case 4: ProfileView()
+                default: HomeView()
+                }
+            }
+            MorphingTabBar(selectedTab: $selectedTab) // Custom animated tab bar
+        }
+    }
+}
+```
+- Launch animation on app start
+- Custom morphing tab bar with 5 tabs
+- NavigationStack for proper navigation
+- Camera tab hides tab bar when active
             
             ProfileView()
                 .tabItem { Label("Profile", systemImage: "person.fill") }
