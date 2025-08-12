@@ -1143,8 +1143,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to take photos of your food.";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SnapChef/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "SnapChef needs camera access to take photos of your fridge and pantry for recipe generation.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "SnapChef needs photo library access to save your recipe photos and videos.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "SnapChef needs permission to save recipe photos and videos to your photo library for sharing on social media.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -1302,8 +1305,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to take photos of your food.";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SnapChef/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "SnapChef needs camera access to take photos of your fridge and pantry for recipe generation.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "SnapChef needs photo library access to save your recipe photos and videos.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "SnapChef needs permission to save recipe photos and videos to your photo library for sharing on social media.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

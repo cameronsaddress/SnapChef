@@ -7,7 +7,6 @@
 
 import SwiftUI
 import UIKit
-import Photos
 
 struct InstagramShareView: View {
     let content: ShareContent
@@ -410,27 +409,23 @@ struct InstagramShareView: View {
         // First normalize the image to ensure it's in the right format
         let normalizedImage = normalizeImage(image)
         
-        // Request authorization directly - don't check status first as it might crash
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-            DispatchQueue.main.async {
-                switch status {
-                case .authorized, .limited:
-                    // Have permission, save the image
-                    self.performImageSave(normalizedImage)
-                    
-                case .denied:
-                    self.errorMessage = "Photo library access denied. Please go to Settings > Privacy & Security > Photos and allow SnapChef to add photos."
-                    
-                case .restricted:
-                    self.errorMessage = "Photo library access is restricted on this device."
-                    
-                case .notDetermined:
-                    // This shouldn't happen after requestAuthorization, but handle it
-                    self.errorMessage = "Unable to determine photo library permission status."
-                    
-                @unknown default:
-                    self.errorMessage = "Unable to access photo library."
+        // Use the safe PhotoLibraryHelper to handle permissions and saving
+        PhotoLibraryHelper.shared.requestPermissionAndSaveImage(normalizedImage) { success, error in
+            if success {
+                // Open Instagram library after saving
+                if let url = URL(string: "instagram://library") {
+                    UIApplication.shared.open(url) { success in
+                        if !success {
+                            // Fallback to basic Instagram open
+                            if let fallbackURL = URL(string: "instagram://") {
+                                UIApplication.shared.open(fallbackURL)
+                            }
+                        }
+                    }
                 }
+                self.dismiss()
+            } else {
+                self.errorMessage = error ?? "Failed to save image"
             }
         }
     }
@@ -456,31 +451,6 @@ struct InstagramShareView: View {
         return normalizedImage
     }
     
-    private func performImageSave(_ image: UIImage) {
-        // Image is already normalized before being passed here
-        PHPhotoLibrary.shared().performChanges({
-            _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
-        }) { success, error in
-            DispatchQueue.main.async {
-                if success {
-                    // Open Instagram library after saving
-                    if let url = URL(string: "instagram://library") {
-                        UIApplication.shared.open(url) { success in
-                            if !success {
-                                // Fallback to basic Instagram open
-                                if let fallbackURL = URL(string: "instagram://") {
-                                    UIApplication.shared.open(fallbackURL)
-                                }
-                            }
-                        }
-                    }
-                    self.dismiss()
-                } else {
-                    self.errorMessage = "Failed to save image: \(error?.localizedDescription ?? "Unknown error")"
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Template Card
