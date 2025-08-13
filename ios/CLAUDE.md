@@ -10,6 +10,16 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 13, 2025) - Part 11
+- **Fixed TikTok Video Template Photo Display Issues**
+  - Photos were showing correctly in test template but not in main templates
+  - Root cause: Preview views were using placeholder icons instead of actual photos
+  - Fixed all preview views to use content.beforeImage and content.afterImage
+  - Ensured RenderPlanner uses media.cookedMeal for after photos (not afterFridge)
+  - Fixed Swift syntax errors in TikTokTemplates.swift (missing braces, transition issues)
+  - All templates now properly display actual photos in both preview and generated videos
+  - Build succeeds with all fixes applied
+
 ### Latest Updates (Jan 13, 2025) - Part 10
 - **Implemented PhotoStorageManager as Single Source of Truth**
   - Created centralized photo storage system to eliminate duplication

@@ -94,29 +94,31 @@ struct BeforeAfterPreview: View {
         ZStack {
             // Before state
             if !showAfter {
-                if let beforeImage = content.beforeImage {
-                    Image(uiImage: beforeImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .overlay(
+                Group {
+                    if let beforeImage = content.beforeImage {
+                        Image(uiImage: beforeImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .overlay(
+                                Text("BEFORE")
+                                    .font(.system(size: 24, weight: .black))
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .background(Color.black.opacity(0.7))
+                                    .cornerRadius(8)
+                                    .padding()
+                                , alignment: .top
+                            )
+                    } else {
+                        VStack(spacing: 20) {
                             Text("BEFORE")
                                 .font(.system(size: 24, weight: .black))
                                 .foregroundColor(.white)
-                                .padding()
-                                .background(Color.black.opacity(0.7))
-                                .cornerRadius(8)
-                                .padding()
-                            , alignment: .top
-                        )
-                } else {
-                    VStack(spacing: 20) {
-                        Text("BEFORE")
-                            .font(.system(size: 24, weight: .black))
-                            .foregroundColor(.white)
-                        
-                        Image(systemName: "refrigerator")
-                            .font(.system(size: 60))
-                            .foregroundColor(.white.opacity(0.8))
+                            
+                            Image(systemName: "refrigerator")
+                                .font(.system(size: 60))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
                     }
                 }
                 .transition(.opacity)
@@ -124,41 +126,44 @@ struct BeforeAfterPreview: View {
             
             // After state
             if showAfter {
-                if let afterImage = content.afterImage {
-                    Image(uiImage: afterImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .overlay(
-                            VStack(spacing: 10) {
-                                Text("AFTER")
-                                    .font(.system(size: 24, weight: .black))
-                                    .foregroundColor(.white)
-                                
-                                if case .recipe(let recipe) = content.type {
-                                    Text(recipe.name)
-                                        .font(.system(size: 16, weight: .bold))
+                Group {
+                    if let afterImage = content.afterImage {
+                        Image(uiImage: afterImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .overlay(
+                                VStack(spacing: 10) {
+                                    Text("AFTER")
+                                        .font(.system(size: 24, weight: .black))
                                         .foregroundColor(.white)
-                                        .lineLimit(2)
-                                        .multilineTextAlignment(.center)
+                                    
+                                    if case .recipe(let recipe) = content.type {
+                                        Text(recipe.name)
+                                            .font(.system(size: 16, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .lineLimit(2)
+                                            .multilineTextAlignment(.center)
+                                    }
                                 }
-                            }
-                            .padding()
-                            .background(Color.black.opacity(0.7))
-                            .cornerRadius(8)
-                            .padding()
-                            , alignment: .top
-                        )
-                } else {
-                    VStack(spacing: 20) {
-                        Text("AFTER")
-                            .font(.system(size: 24, weight: .black))
-                            .foregroundColor(.white)
-                        
-                        if case .recipe(let recipe) = content.type {
-                            Text(recipe.name)
-                                .font(.system(size: 18, weight: .bold))
+                                .padding()
+                                .background(Color.black.opacity(0.7))
+                                .cornerRadius(8)
+                                .padding()
+                                , alignment: .top
+                            )
+                    } else {
+                        VStack(spacing: 20) {
+                            Text("AFTER")
+                                .font(.system(size: 24, weight: .black))
                                 .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
+                            
+                            if case .recipe(let recipe) = content.type {
+                                Text(recipe.name)
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
                     }
                 }
                 .transition(.scale.combined(with: .opacity))

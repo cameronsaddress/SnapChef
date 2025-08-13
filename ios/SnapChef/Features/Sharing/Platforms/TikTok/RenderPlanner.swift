@@ -594,7 +594,13 @@ public final class RenderPlanner: @unchecked Sendable {
     /// Enhanced Color Pop Effect (AFTER images only)
     /// Contrast: +0.1, Saturation: +0.08, Apply via CIColorControls filter
     private func applyEnhancedColorPopEffect(to image: UIImage) -> UIImage {
-        guard let ciImage = CIImage(image: image) else { return image }
+        // First ensure we have a CGImage to work with
+        guard let cgImage = image.cgImage ?? CIContext().createCGImage(CIImage(image: image)!, from: CIImage(image: image)!.extent) else {
+            print("⚠️ RenderPlanner: Failed to get CGImage for color pop effect")
+            return image
+        }
+        
+        let ciImage = CIImage(cgImage: cgImage)
         
         let colorFilter = CIFilter.colorControls()
         colorFilter.inputImage = ciImage
@@ -602,11 +608,14 @@ public final class RenderPlanner: @unchecked Sendable {
         colorFilter.saturation = 1.08 // +0.08 saturation as specified
         
         guard let outputImage = colorFilter.outputImage,
-              let cgImage = CIContext().createCGImage(outputImage, from: outputImage.extent) else {
+              let outputCGImage = CIContext().createCGImage(outputImage, from: outputImage.extent) else {
+            print("⚠️ RenderPlanner: Failed to apply color pop effect")
             return image
         }
         
-        return UIImage(cgImage: cgImage)
+        let result = UIImage(cgImage: outputCGImage)
+        print("✅ RenderPlanner: Applied color pop effect - has CGImage: \(result.cgImage != nil)")
+        return result
     }
     
     /// Legacy Color Pop for backward compatibility
@@ -617,18 +626,29 @@ public final class RenderPlanner: @unchecked Sendable {
     /// Enhanced Blur Effect (BEFORE hook)
     /// Filter: CIGaussianBlur, Radius: 10
     private func applyEnhancedBlurEffect(to image: UIImage) -> UIImage {
-        guard let ciImage = CIImage(image: image) else { return image }
+        // First ensure we have a CGImage to work with
+        guard let cgImage = image.cgImage ?? CIContext().createCGImage(CIImage(image: image)!, from: CIImage(image: image)!.extent) else {
+            print("⚠️ RenderPlanner: Failed to get CGImage for blur effect")
+            return image
+        }
+        
+        let ciImage = CIImage(cgImage: cgImage)
         
         let blurFilter = CIFilter.gaussianBlur()
         blurFilter.inputImage = ciImage
         blurFilter.radius = 10 // EXACT radius as specified in requirements
         
-        guard let outputImage = blurFilter.outputImage,
-              let cgImage = CIContext().createCGImage(outputImage, from: outputImage.extent) else {
+        // Need to crop the output to original extent since blur expands the image
+        let originalExtent = ciImage.extent
+        guard let outputImage = blurFilter.outputImage?.cropped(to: originalExtent),
+              let outputCGImage = CIContext().createCGImage(outputImage, from: originalExtent) else {
+            print("⚠️ RenderPlanner: Failed to apply blur effect")
             return image
         }
         
-        return UIImage(cgImage: cgImage)
+        let result = UIImage(cgImage: outputCGImage)
+        print("✅ RenderPlanner: Applied blur effect - has CGImage: \(result.cgImage != nil)")
+        return result
     }
     
     /// Legacy Blur for backward compatibility
