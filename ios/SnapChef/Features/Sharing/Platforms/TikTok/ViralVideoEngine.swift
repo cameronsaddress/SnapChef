@@ -213,6 +213,16 @@ public class ViralVideoEngine: ObservableObject {
         isRendering = true
         errorMessage = nil
         
+        // Music beat sync assumption for animations
+        if let musicURL = media.musicURL {
+            // Assume 80 BPM for sync
+            let bpm = 80.0
+            let beatInterval = 60.0 / bpm  // 0.75s per beat
+            print("🎵 Music detected: \(musicURL.lastPathComponent)")
+            print("🎵 Using \(bpm) BPM for beat sync (\(beatInterval)s interval)")
+            // Note: Beat sync timing is used in RenderPlanner.getBeatTimes()
+        }
+        
         // Start comprehensive performance monitoring
         performanceMonitor.startRenderMonitoring()
         memoryOptimizer.logMemoryProfile(phase: "Render Start")

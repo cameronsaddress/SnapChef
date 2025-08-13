@@ -576,7 +576,16 @@ public final class StillWriter: @unchecked Sendable {
                 blendFilter.inputImage = alphaOutput
             }
             
-            finalImage = blendFilter.outputImage ?? currentImage.ciImage
+            // Add bloom effect to the crossfade for glow transition
+            if let blendOutput = blendFilter.outputImage {
+                let bloomFilter = CIFilter(name: "CIBloom")
+                bloomFilter?.setValue(blendOutput, forKey: kCIInputImageKey)
+                bloomFilter?.setValue(10.0, forKey: "inputRadius")
+                bloomFilter?.setValue(0.5 * easedProgress, forKey: "inputIntensity")  // Fade bloom with progress
+                finalImage = bloomFilter?.outputImage ?? blendOutput
+            } else {
+                finalImage = currentImage.ciImage
+            }
         } else {
             finalImage = currentImage.ciImage
         }

@@ -18,6 +18,7 @@ struct TikTokShareView: View {
     @State private var generatedVideoURL: URL?
     @State private var showingVideoPreview = false
     @State private var errorMessage: String?
+    @State private var showPermissionAlert = false
     
     var body: some View {
         NavigationStack {
@@ -151,6 +152,16 @@ struct TikTokShareView: View {
                 Text(error)
             }
         }
+        .alert("Photo Library Access Required", isPresented: $showPermissionAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Open Settings") {
+                if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsUrl)
+                }
+            }
+        } message: {
+            Text("SnapChef needs access to your photo library to save TikTok videos. Please grant permission in Settings.")
+        }
     }
     
     private var recommendedHashtags: [String] {
@@ -179,9 +190,21 @@ struct TikTokShareView: View {
     }
     
     private func generateVideo() {
-        isGenerating = true
-        
+        // Check photo library permission first
         Task {
+            let photoStatus = await checkPhotoLibraryPermission()
+            
+            guard photoStatus else {
+                await MainActor.run {
+                    errorMessage = "Photo library access is required to save videos. Please grant permission in Settings."
+                }
+                return
+            }
+            
+            await MainActor.run {
+                isGenerating = true
+            }
+            
             do {
                 // Convert content to required format
                 let (viralRecipe, mediaBundle) = try await convertContentToViralFormat(content)
@@ -207,6 +230,29 @@ struct TikTokShareView: View {
                     isGenerating = false
                 }
             }
+        }
+    }
+    
+    private func checkPhotoLibraryPermission() async -> Bool {
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        switch status {
+        case .authorized, .limited:
+            return true
+        case .notDetermined:
+            return await withCheckedContinuation { continuation in
+                PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
+                    continuation.resume(returning: newStatus == .authorized || newStatus == .limited)
+                }
+            }
+        case .denied, .restricted:
+            // Show alert to guide user to settings
+            await MainActor.run {
+                showPermissionAlert = true
+            }
+            return false
+        @unknown default:
+            return false
         }
     }
     

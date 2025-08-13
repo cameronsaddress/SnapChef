@@ -23,6 +23,7 @@ private final class Box<T>: @unchecked Sendable {
 // Define TikTokExportError to avoid conflicts with ShareError
 public enum TikTokExportError: Error, LocalizedError {
     case photoAccessDenied
+    case permissionDenied
     case saveFailed
     case fetchFailed
     case tiktokNotInstalled
@@ -32,6 +33,8 @@ public enum TikTokExportError: Error, LocalizedError {
         switch self {
         case .photoAccessDenied:
             return "Photo library access denied. Please enable it in Settings."
+        case .permissionDenied:
+            return "Photo library permission required. Please grant access in Settings to save TikTok videos."
         case .saveFailed:
             return "Failed to save video to Photos"
         case .fetchFailed:
@@ -66,6 +69,15 @@ public final class ViralVideoExporter: @unchecked Sendable {
     
     /// Save to Photos using PHPhotoLibrary.shared().performChanges as specified
     public static func saveToPhotos(videoURL: URL, completion: @escaping @Sendable (Result<String, TikTokExportError>) -> Void) {
+        // Check permission first
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        guard status == .authorized || status == .limited else {
+            print("❌ Photo library permission denied. Status: \(status.rawValue)")
+            completion(.failure(.permissionDenied))
+            return
+        }
+        
         // Use a thread-safe container for capturing the identifier
         let identifierBox = Box(value: nil as String?)
         

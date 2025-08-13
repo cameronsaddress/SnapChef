@@ -13,12 +13,21 @@ import CoreMedia
 import CoreText
 
 /// Creates RenderPlan for each template as specified in requirements
-public final class RenderPlanner: @unchecked Sendable {
+public actor RenderPlanner {  // Swift 6: Actor for isolated state
     
     private let config: RenderConfig
     
     public init(config: RenderConfig) {
         self.config = config
+    }
+    
+    // MARK: - Beat Sync Support
+    
+    /// Get beat times for a given duration at 80 BPM
+    private func getBeatTimes(duration: Double) -> [Double] {
+        let bpm = 80.0
+        let beatInterval = 60.0 / bpm  // 0.75s
+        return stride(from: 0.0, to: duration, by: beatInterval).map { $0 }
     }
     
     // MARK: - Public Interface
@@ -322,78 +331,125 @@ public final class RenderPlanner: @unchecked Sendable {
         media: MediaBundle
     ) async throws -> RenderPlan {
         
-        print("📝 KINETIC TEXT: Starting plan creation")
-        print("📝 KINETIC TEXT: Recipe has \(recipe.steps.count) steps")
+        print("📝 KINETIC TEXT: Starting plan creation - Redesigned template")
+        print("📝 KINETIC TEXT: Recipe has \(recipe.steps.count) steps, \(recipe.ingredients.count) ingredients")
         
         let totalDuration = CMTime(seconds: 15, preferredTimescale: 600)
         var items: [RenderPlan.TrackItem] = []
         var overlays: [RenderPlan.Overlay] = []
         
-        // Background: looping motion between images
-        let backgroundImages = [media.beforeFridge, media.cookedMeal, media.cookedMeal]  // Use cookedMeal for after
-        let segmentDuration = CMTime(seconds: 5, preferredTimescale: 600)
+        // PHASE 1: Dramatic "before" fridge reveal with dim lighting (0-3.5s with overlap)
+        // PHASE 2-4: Cinematic "after" meal with zoom and sparkles (3-15s)
+        let overlap = CMTime(seconds: 0.5, preferredTimescale: 600)
+        let firstDuration = CMTime(seconds: 3.5, preferredTimescale: 600)  // Overlap for crossfade
+        let secondDuration = CMTime(seconds: 11.5, preferredTimescale: 600)  // Adjusted for overlap
         
-        print("📝 KINETIC TEXT: Creating \(backgroundImages.count) background segments")
+        let segments = [
+            (image: media.beforeFridge, 
+             duration: firstDuration, 
+             transform: createDimGlowTransform(),
+             filters: createDimFilterSpecs()),
+            (image: media.cookedMeal, 
+             duration: secondDuration, 
+             transform: createCinematicZoomTransform(),
+             filters: createCinematicFilterSpecs())
+        ]
         
-        for (index, image) in backgroundImages.enumerated() {
-            let startTime = CMTime(seconds: Double(index) * 5, preferredTimescale: 600)
-            print("📝 KINETIC TEXT: Segment \(index): \(startTime.seconds)s - \((startTime + segmentDuration).seconds)s")
+        print("📝 KINETIC TEXT: Creating 2 premium background segments with effects")
+        
+        var currentTime = CMTime.zero
+        for (index, segment) in segments.enumerated() {
+            print("📝 KINETIC TEXT: Segment \(index): \(currentTime.seconds)s - \((currentTime + segment.duration).seconds)s")
             
             items.append(RenderPlan.TrackItem(
-                kind: .still(image),
+                kind: .still(segment.image),
                 timeRange: CMTimeRange(
-                    start: startTime,
-                    duration: segmentDuration
+                    start: currentTime,
+                    duration: segment.duration
                 ),
-                transform: .identity  // NO Ken Burns - static images for kinetic text
+                transform: segment.transform,
+                filters: segment.filters
             ))
+            currentTime = currentTime + segment.duration
         }
         
-        // Hook overlay (0-2s)
+        // PHASE 1 OVERLAY: Hook with golden glow and bounce animation (0-3s)
         overlays.append(RenderPlan.Overlay(
             start: .zero,
-            duration: CMTime(seconds: 2, preferredTimescale: 600),
+            duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { config in
-                return self.createHookOverlay(
-                    text: CaptionGenerator.generateHook(from: recipe),
+                return self.createPremiumHookOverlay(
+                    text: (recipe.hook?.isEmpty ?? true) ? CaptionGenerator.generateHook(from: recipe) : (recipe.hook ?? CaptionGenerator.generateHook(from: recipe)),
+                    config: config,
+                    fontSize: 72  // Increased from default
+                )
+            }
+        ))
+        
+        // PHASE 2 OVERLAY: Ingredient/Step Carousel with beat-synced pops (3-10s)
+        // Use beat sync for perfect timing
+        let beatTimes = getBeatTimes(duration: 7.0)  // 3-10s window
+        
+        // Combine ingredients and steps for carousel
+        let carouselTexts = recipe.ingredients.prefix(3).map { "🥘 \($0)" } + 
+                           recipe.steps.prefix(6).enumerated().map { (index, step) in
+                               "\(index + 1). \(step.title.prefix(20))..."
+                           }
+        
+        print("📝 KINETIC TEXT: Creating beat-synced carousel with \(carouselTexts.count) items")
+        print("📝 KINETIC TEXT: Beat times: \(beatTimes)")
+        
+        // Create carousel overlays synced to beats
+        for (index, text) in carouselTexts.enumerated() where index < beatTimes.count {
+            let startTime = CMTime(seconds: 3 + beatTimes[index], preferredTimescale: 600)
+            let itemDuration = CMTime(seconds: 0.75, preferredTimescale: 600)
+            
+            // Only show items that fit within the 3-10s window
+            if startTime.seconds < 10 {
+                overlays.append(RenderPlan.Overlay(
+                    start: startTime,
+                    duration: itemDuration,
+                    layerBuilder: { config in
+                        return self.createCarouselItemOverlay(
+                            text: text,
+                            index: index,
+                            config: config,
+                            fontSize: 52  // Increased from default
+                        )
+                    }
+                ))
+            }
+        }
+        
+        // PHASE 3: Cinematic achievement text (10-13s)
+        overlays.append(RenderPlan.Overlay(
+            start: CMTime(seconds: 10, preferredTimescale: 600),
+            duration: CMTime(seconds: 3, preferredTimescale: 600),
+            layerBuilder: { config in
+                return self.createCinematicRevealOverlay(
+                    text: "✨ \(recipe.title) ✨",
                     config: config
                 )
             }
         ))
         
-        // Step text overlays (2-13s, 1.6s minimum each)
-        let steps = Array(recipe.steps.prefix(6)) // Max 6 steps
-        let stepDuration = CMTime(seconds: max(1.6, 11.0 / Double(steps.count)), preferredTimescale: 600)
+        // PHASE 4: CTA with hashtags and pulse animation (13-15s)
+        let hashtags = ["#FridgeChallenge", "#SnapChef", "#\(recipe.title.replacingOccurrences(of: " ", with: ""))"]
+        let ctaText = "Try this recipe!\n\(hashtags.joined(separator: " "))"
         
-        for (index, step) in steps.enumerated() {
-            let startTime = CMTime(seconds: 2 + (Double(index) * stepDuration.seconds), preferredTimescale: 600)
-            
-            overlays.append(RenderPlan.Overlay(
-                start: startTime,
-                duration: stepDuration,
-                layerBuilder: { config in
-                    return self.createKineticStepOverlay(
-                        text: CaptionGenerator.processStepText(step, index: index),
-                        index: index,
-                        config: config
-                    )
-                }
-            ))
-        }
-        
-        // Final CTA (13-15s)
         overlays.append(RenderPlan.Overlay(
             start: CMTime(seconds: 13, preferredTimescale: 600),
             duration: CMTime(seconds: 2, preferredTimescale: 600),
             layerBuilder: { config in
-                return self.createCTAOverlay(
-                    text: CaptionGenerator.randomCTA(),
-                    config: config
+                return self.createPremiumCTAOverlay(
+                    text: ctaText,
+                    config: config,
+                    fontSize: 44  // Increased from default
                 )
             }
         ))
         
-        print("📝 KINETIC TEXT: Plan complete")
+        print("📝 KINETIC TEXT: Plan complete - Redesigned")
         print("📝 KINETIC TEXT: Total duration: \(totalDuration.seconds) seconds")
         print("📝 KINETIC TEXT: Track items: \(items.count)")
         print("📝 KINETIC TEXT: Overlays: \(overlays.count)")
@@ -1121,5 +1177,100 @@ public final class RenderPlanner: @unchecked Sendable {
             outputDuration: totalDuration,
             pip: nil       // No PIP
         )
+    }
+    
+    // MARK: - Cinematic Transform Functions
+    
+    private func createDimGlowTransform() -> CGAffineTransform {
+        // Subtle scale and pan for dramatic effect on fridge photo
+        return CGAffineTransform(scaleX: 1.05, y: 1.05)
+            .translatedBy(x: -10, y: -10)
+    }
+    
+    private func createCinematicZoomTransform() -> CGAffineTransform {
+        // Dramatic zoom in for meal reveal
+        return CGAffineTransform(scaleX: 1.2, y: 1.2)
+            .translatedBy(x: 20, y: 15)
+    }
+    
+    // MARK: - Visual Effect Filters
+    
+    private func createDimFilterSpecs() -> [FilterSpec] {
+        var filters: [FilterSpec] = []
+        
+        // Gaussian blur for dreamy effect
+        filters.append(FilterSpec(
+            name: "CIGaussianBlur",
+            params: ["inputRadius": AnyCodable(5.0)]
+        ))
+        
+        // Dim brightness for dramatic start
+        filters.append(FilterSpec(
+            name: "CIColorControls",
+            params: [
+                "inputBrightness": AnyCodable(-0.2),
+                "inputContrast": AnyCodable(1.1)
+            ]
+        ))
+        
+        return filters
+    }
+    
+    private func createCinematicFilterSpecs() -> [FilterSpec] {
+        var filters: [FilterSpec] = []
+        
+        // Bloom for glow effect
+        filters.append(FilterSpec(
+            name: "CIBloom",
+            params: [
+                "inputRadius": AnyCodable(10.0),
+                "inputIntensity": AnyCodable(0.5)
+            ]
+        ))
+        
+        // Vibrance for color pop
+        filters.append(FilterSpec(
+            name: "CIVibrance",
+            params: ["inputAmount": AnyCodable(1.2)]
+        ))
+        
+        // Sharpen for crisp details
+        filters.append(FilterSpec(
+            name: "CISharpenLuminance",
+            params: ["inputSharpness": AnyCodable(0.8)]
+        ))
+        
+        // Vignette for premium framing
+        filters.append(FilterSpec(
+            name: "CIVignette",
+            params: [
+                "inputIntensity": AnyCodable(1.5),
+                "inputRadius": AnyCodable(2.0)
+            ]
+        ))
+        
+        return filters
+    }
+    
+    // MARK: - Premium Overlay Creation Methods
+    
+    private func createPremiumHookOverlay(text: String, config: RenderConfig, fontSize: CGFloat) -> CALayer {
+        let overlayFactory = OverlayFactory(config: config)
+        return overlayFactory.createPremiumHookOverlay(text: text, config: config, fontSize: fontSize)
+    }
+    
+    private func createCarouselItemOverlay(text: String, index: Int, config: RenderConfig, fontSize: CGFloat) -> CALayer {
+        let overlayFactory = OverlayFactory(config: config)
+        return overlayFactory.createCarouselItemOverlay(text: text, index: index, config: config, fontSize: fontSize)
+    }
+    
+    private func createCinematicRevealOverlay(text: String, config: RenderConfig) -> CALayer {
+        let overlayFactory = OverlayFactory(config: config)
+        return overlayFactory.createCinematicRevealOverlay(text: text, config: config)
+    }
+    
+    private func createPremiumCTAOverlay(text: String, config: RenderConfig, fontSize: CGFloat) -> CALayer {
+        let overlayFactory = OverlayFactory(config: config)
+        return overlayFactory.createPremiumCTAOverlay(text: text, config: config, fontSize: fontSize)
     }
 }

@@ -10,6 +10,43 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 13, 2025) - Part 15
+- **Implemented Complete Kinetic Text Template Redesign with Beat Sync**
+  - Major overhaul of TikTok video generation following exact specifications:
+    1. **Beat Sync (80 BPM)** - Added fixed timing at 0.75s intervals
+    2. **Background Transitions** - 0.5s crossfade with bloom effect between scenes
+    3. **Text Formatting** - NSAttributedString for proper word wrapping
+    4. **Ingredient Carousel** - Added ingredients + scrolling animation synced to beats
+    5. **Sparkle Effects** - Converted to CAEmitterLayer with keyframed birthRate
+    6. **Proper Animations** - All animations use AVCoreAnimationBeginTimeAtZero for video export
+    7. **Music Integration** - 80 BPM beat sync assumption for animations
+  - Swift 6 Compliance:
+    - RenderPlanner converted to actor for isolated state
+    - Sendable conformance for thread safety
+    - Proper async/await patterns throughout
+  - Timeline Implementation (15 seconds):
+    - 0-3s: Dramatic fridge reveal with dim/blur effects
+    - 3-10s: Beat-synced carousel of ingredients/steps (0.75s intervals)
+    - 10-13s: Cinematic meal reveal with zoom and sparkles
+    - 13-15s: CTA with pulsing hashtags
+  - Visual Effects:
+    - Gaussian blur and dim lighting for fridge photo
+    - Bloom, vibrance, and sharpening for meal photo
+    - Golden glow effects on text overlays
+    - Particle sparkles with proper video export timing
+
+- **Fixed Address Sanitizer Library Loading Issue**
+  - Disabled Address Sanitizer in Xcode scheme to fix dylib loading error
+  - Created SnapChef-NoASAN scheme with all sanitizers explicitly disabled
+  - App now runs correctly on physical devices without library loading errors
+
+- **Added Photo Library Permission Checking**
+  - Proactive permission check when TikTok share button is tapped
+  - User-friendly alert with "Open Settings" option if permission denied
+  - Double-check in ViralVideoExporter to prevent save failures
+  - Uses minimal `.addOnly` permission for privacy
+  - Prevents video generation failures due to missing permissions
+
 ### Latest Updates (Jan 13, 2025) - Part 14
 - **Fixed AVAssetWriter Frame Timing and Buffer Errors**
   - Fixed frame 54 error (-16364) that was causing video generation to fail

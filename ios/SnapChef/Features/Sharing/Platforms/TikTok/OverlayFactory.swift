@@ -13,7 +13,7 @@ import CoreMedia
 import QuartzCore
 
 /// OverlayFactory for text and sticker generation following exact specifications
-public final class OverlayFactory: @unchecked Sendable {
+public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable for thread safety
     
     private let config: RenderConfig
     private let memoryOptimizer: MemoryOptimizer
@@ -922,13 +922,36 @@ public final class OverlayFactory: @unchecked Sendable {
         let overlayLayer = CALayer()
         overlayLayer.frame = CGRect(origin: .zero, size: config.size)
         
-        // Add all overlay layers
+        // Add all overlay layers with proper timing
         for overlay in overlays {
             let layer = overlay.layerBuilder(config)
             
-            // Set time range for overlay
-            layer.beginTime = overlay.start.seconds
-            layer.duration = overlay.duration.seconds
+            // Critical: Set up proper timing for AVVideoCompositionCoreAnimationTool
+            // We need to use AVCoreAnimationBeginTimeAtZero as the base time
+            layer.beginTime = AVCoreAnimationBeginTimeAtZero + overlay.start.seconds
+            
+            // Set opacity to 0 initially, then animate it during its time range
+            layer.opacity = 0
+            
+            // Fade in at start time
+            let fadeIn = CABasicAnimation(keyPath: "opacity")
+            fadeIn.fromValue = 0
+            fadeIn.toValue = 1
+            fadeIn.beginTime = AVCoreAnimationBeginTimeAtZero + overlay.start.seconds
+            fadeIn.duration = 0.2
+            fadeIn.fillMode = .forwards
+            fadeIn.isRemovedOnCompletion = false
+            layer.add(fadeIn, forKey: "fadeIn")
+            
+            // Fade out at end time
+            let fadeOut = CABasicAnimation(keyPath: "opacity")
+            fadeOut.fromValue = 1
+            fadeOut.toValue = 0
+            fadeOut.beginTime = AVCoreAnimationBeginTimeAtZero + overlay.start.seconds + overlay.duration.seconds - 0.2
+            fadeOut.duration = 0.2
+            fadeOut.fillMode = .forwards
+            fadeOut.isRemovedOnCompletion = false
+            layer.add(fadeOut, forKey: "fadeOut")
             
             overlayLayer.addSublayer(layer)
         }
@@ -1029,6 +1052,434 @@ public enum OverlayError: LocalizedError {
             return "Overlay export failed"
         case .exportCancelled:
             return "Overlay export was cancelled"
+        }
+    }
+}
+
+// MARK: - Premium Kinetic Text Animations
+
+extension OverlayFactory {
+    
+    /// Create premium hook overlay with golden glow and bounce animation (0-3s)
+    public func createPremiumHookOverlay(text: String, config: RenderConfig, fontSize: CGFloat = 72) -> CALayer {
+        let containerLayer = CALayer()
+        containerLayer.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Create attributed string for better formatting
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+        paragraphStyle.lineBreakMode = .byWordWrapping
+        
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.boldSystemFont(ofSize: fontSize),
+            .foregroundColor: UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0), // Golden
+            .paragraphStyle: paragraphStyle
+        ]
+        
+        let attributedString = NSAttributedString(string: text, attributes: attributes)
+        
+        // Text layer with golden tint
+        let textLayer = CATextLayer()
+        textLayer.string = attributedString
+        textLayer.fontSize = fontSize
+        textLayer.font = UIFont.boldSystemFont(ofSize: fontSize)
+        textLayer.foregroundColor = UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0).cgColor // Golden color
+        textLayer.alignmentMode = .center
+        textLayer.isWrapped = true
+        textLayer.contentsScale = 2.0 // Use fixed scale instead of UIScreen
+        textLayer.truncationMode = .end
+        
+        // Better positioning - center properly
+        let safeAreaPadding: CGFloat = 80
+        let textHeight: CGFloat = 300 // More height for wrapping
+        textLayer.frame = CGRect(
+            x: safeAreaPadding,
+            y: (config.size.height - textHeight) / 2,
+            width: config.size.width - (safeAreaPadding * 2),
+            height: textHeight
+        )
+        
+        // Add glow shadow
+        textLayer.shadowColor = UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0).cgColor
+        textLayer.shadowRadius = 20
+        textLayer.shadowOpacity = 0
+        textLayer.shadowOffset = CGSize.zero
+        
+        // Use AVCoreAnimationBeginTimeAtZero for proper video composition timing
+        let startTime = AVCoreAnimationBeginTimeAtZero
+        
+        // Initial state
+        textLayer.opacity = 0
+        textLayer.transform = CATransform3DMakeScale(0.95, 0.95, 1.0)
+        
+        // Fade in with scale bounce animation (0.95 → 1.05 → 1.0)
+        let scaleAnimation = CAKeyframeAnimation(keyPath: "transform.scale")
+        scaleAnimation.values = [0.95, 1.05, 1.0]
+        scaleAnimation.keyTimes = [0, 0.6, 1.0]
+        scaleAnimation.timingFunctions = [
+            CAMediaTimingFunction(name: .easeOut),
+            CAMediaTimingFunction(name: .easeInEaseOut)
+        ]
+        scaleAnimation.beginTime = startTime
+        scaleAnimation.duration = 1.5
+        scaleAnimation.fillMode = .forwards
+        scaleAnimation.isRemovedOnCompletion = false
+        
+        // Glow animation
+        let glowAnimation = CABasicAnimation(keyPath: "shadowOpacity")
+        glowAnimation.fromValue = 0.0
+        glowAnimation.toValue = 0.8
+        glowAnimation.beginTime = startTime
+        glowAnimation.duration = 1.5
+        glowAnimation.fillMode = .forwards
+        glowAnimation.isRemovedOnCompletion = false
+        
+        // Fade in
+        let fadeAnimation = CABasicAnimation(keyPath: "opacity")
+        fadeAnimation.fromValue = 0.0
+        fadeAnimation.toValue = 1.0
+        fadeAnimation.beginTime = startTime
+        fadeAnimation.duration = 0.5
+        fadeAnimation.fillMode = .forwards
+        fadeAnimation.isRemovedOnCompletion = false
+        
+        // Fade out at 2.8s (before 3s end)
+        let fadeOutAnimation = CABasicAnimation(keyPath: "opacity")
+        fadeOutAnimation.fromValue = 1.0
+        fadeOutAnimation.toValue = 0.0
+        fadeOutAnimation.beginTime = startTime + 2.8
+        fadeOutAnimation.duration = 0.2
+        fadeOutAnimation.fillMode = .forwards
+        fadeOutAnimation.isRemovedOnCompletion = false
+        
+        // Add animations
+        textLayer.add(scaleAnimation, forKey: "hookBounce")
+        textLayer.add(glowAnimation, forKey: "hookGlow")
+        textLayer.add(fadeAnimation, forKey: "hookFade")
+        textLayer.add(fadeOutAnimation, forKey: "hookFadeOut")
+        
+        containerLayer.addSublayer(textLayer)
+        return containerLayer
+    }
+    
+    /// Create carousel item with beat-synced pop animation (3-10s)
+    public func createCarouselItemOverlay(text: String, index: Int, config: RenderConfig, fontSize: CGFloat = 52) -> CALayer {
+        let containerLayer = CALayer()
+        containerLayer.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Create attributed string for better text formatting
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+        
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.boldSystemFont(ofSize: fontSize),
+            .foregroundColor: UIColor.white,
+            .strokeColor: UIColor(red: 1.0, green: 0.4, blue: 0.2, alpha: 1.0), // Orange brand
+            .strokeWidth: -3.0, // Negative for stroke + fill
+            .paragraphStyle: paragraphStyle
+        ]
+        
+        let attributedString = NSAttributedString(string: text, attributes: attributes)
+        
+        // Text layer
+        let textLayer = CATextLayer()
+        textLayer.string = attributedString
+        textLayer.fontSize = fontSize
+        textLayer.alignmentMode = .center
+        textLayer.isWrapped = true
+        textLayer.contentsScale = 2.0
+        
+        // Center position initially
+        let textWidth: CGFloat = 600
+        let textHeight: CGFloat = 150
+        textLayer.frame = CGRect(
+            x: (config.size.width - textWidth) / 2,
+            y: (config.size.height - textHeight) / 2,
+            width: textWidth,
+            height: textHeight
+        )
+        
+        // Beat-synced animations with proper AVFoundation timing
+        let beatTime = 0.75 // Each beat is 0.75 seconds
+        let itemStartTime = AVCoreAnimationBeginTimeAtZero + 3.0 + (Double(index) * beatTime)
+        
+        // Initial state: invisible and scaled down
+        textLayer.opacity = 0
+        textLayer.transform = CATransform3DMakeScale(0.8, 0.8, 1.0)
+        
+        // Pop in animation synced to beat
+        let popIn = CAKeyframeAnimation(keyPath: "transform.scale")
+        popIn.values = [0.8, 1.1, 1.0]
+        popIn.keyTimes = [0, 0.3, 1.0]
+        popIn.timingFunctions = [
+            CAMediaTimingFunction(name: .easeOut),
+            CAMediaTimingFunction(name: .easeInEaseOut)
+        ]
+        popIn.beginTime = itemStartTime
+        popIn.duration = beatTime * 0.5 // Half a beat for the pop
+        popIn.fillMode = .forwards
+        popIn.isRemovedOnCompletion = false
+        
+        // Fade in
+        let fadeIn = CABasicAnimation(keyPath: "opacity")
+        fadeIn.fromValue = 0
+        fadeIn.toValue = 1
+        fadeIn.beginTime = itemStartTime
+        fadeIn.duration = 0.2
+        fadeIn.fillMode = .forwards
+        fadeIn.isRemovedOnCompletion = false
+        
+        // Fade out before next item
+        let fadeOut = CABasicAnimation(keyPath: "opacity")
+        fadeOut.fromValue = 1
+        fadeOut.toValue = 0
+        fadeOut.beginTime = itemStartTime + beatTime - 0.1
+        fadeOut.duration = 0.1
+        fadeOut.fillMode = .forwards
+        fadeOut.isRemovedOnCompletion = false
+        
+        // Add glow effect on beat
+        let glowAnimation = CABasicAnimation(keyPath: "shadowOpacity")
+        glowAnimation.fromValue = 0
+        glowAnimation.toValue = 0.8
+        glowAnimation.beginTime = itemStartTime
+        glowAnimation.duration = beatTime * 0.5
+        glowAnimation.autoreverses = true
+        glowAnimation.fillMode = .forwards
+        glowAnimation.isRemovedOnCompletion = false
+        
+        textLayer.shadowColor = UIColor.white.cgColor
+        textLayer.shadowRadius = 20
+        textLayer.shadowOpacity = 0
+        
+        // Add scrolling animation for carousel effect
+        let scroll = CABasicAnimation(keyPath: "position.x")
+        scroll.fromValue = config.size.width + textWidth/2  // Start from right edge
+        scroll.toValue = -textWidth/2  // End at left edge
+        scroll.duration = 7.0  // Full carousel duration (3-10s)
+        scroll.beginTime = AVCoreAnimationBeginTimeAtZero + 3.0  // Start at 3s
+        scroll.fillMode = .forwards
+        scroll.isRemovedOnCompletion = false
+        
+        // Add all animations
+        textLayer.add(scroll, forKey: "scrollLeft")
+        textLayer.add(popIn, forKey: "popIn")
+        textLayer.add(fadeIn, forKey: "fadeIn")
+        textLayer.add(fadeOut, forKey: "fadeOut")
+        textLayer.add(glowAnimation, forKey: "glow")
+        
+        containerLayer.addSublayer(textLayer)
+        return containerLayer
+    }
+    
+    /// Create cinematic reveal overlay with sparkle particles (10-13s)
+    public func createCinematicRevealOverlay(text: String, config: RenderConfig) -> CALayer {
+        let containerLayer = CALayer()
+        containerLayer.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Main text layer
+        let textLayer = CATextLayer()
+        textLayer.string = text
+        textLayer.fontSize = 64
+        textLayer.font = UIFont.boldSystemFont(ofSize: 64)
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = .center
+        textLayer.isWrapped = true
+        textLayer.contentsScale = 2.0 // Use fixed scale instead of UIScreen
+        textLayer.frame = CGRect(
+            x: 50,
+            y: config.size.height/2 - 60,
+            width: config.size.width - 100,
+            height: 120
+        )
+        
+        // Add dramatic shadow
+        textLayer.shadowColor = UIColor.black.cgColor
+        textLayer.shadowRadius = 15
+        textLayer.shadowOpacity = 0.8
+        textLayer.shadowOffset = CGSize(width: 0, height: 5)
+        
+        // Zoom in animation
+        let zoomAnimation = CAKeyframeAnimation(keyPath: "transform.scale")
+        zoomAnimation.values = [0.3, 1.2, 1.0]
+        zoomAnimation.keyTimes = [0, 0.7, 1.0]
+        zoomAnimation.timingFunctions = [
+            CAMediaTimingFunction(name: .easeOut),
+            CAMediaTimingFunction(name: .easeInEaseOut)
+        ]
+        zoomAnimation.duration = 1.5
+        zoomAnimation.fillMode = .forwards
+        zoomAnimation.isRemovedOnCompletion = false
+        
+        // Fade in
+        let fadeAnimation = CABasicAnimation(keyPath: "opacity")
+        fadeAnimation.fromValue = 0.0
+        fadeAnimation.toValue = 1.0
+        fadeAnimation.duration = 0.5
+        fadeAnimation.fillMode = .forwards
+        fadeAnimation.isRemovedOnCompletion = false
+        
+        // Create sparkle particles
+        for _ in 0..<15 {
+            let sparkle = createSparkleLayer(in: containerLayer.bounds)
+            containerLayer.addSublayer(sparkle)
+        }
+        
+        textLayer.add(zoomAnimation, forKey: "cinematicZoom")
+        textLayer.add(fadeAnimation, forKey: "cinematicFade")
+        
+        containerLayer.addSublayer(textLayer)
+        return containerLayer
+    }
+    
+    /// Create premium CTA overlay with pulse animation (13-15s)
+    public func createPremiumCTAOverlay(text: String, config: RenderConfig, fontSize: CGFloat = 44) -> CALayer {
+        let containerLayer = CALayer()
+        containerLayer.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Translucent rounded sticker background - position at bottom with safe area
+        let stickerLayer = CALayer()
+        let stickerWidth: CGFloat = 300  // Fixed width for hashtags
+        let stickerHeight: CGFloat = 100  // Smaller height, larger font
+        stickerLayer.frame = CGRect(
+            x: config.size.width / 2 - 150,  // Centered
+            y: config.size.height - 250,  // Lower to avoid clip
+            width: stickerWidth,
+            height: stickerHeight
+        )
+        stickerLayer.backgroundColor = UIColor.black.withAlphaComponent(0.8).cgColor
+        stickerLayer.cornerRadius = 25
+        stickerLayer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
+        stickerLayer.borderWidth = 2
+        
+        // Add sparkle particles to sticker
+        for _ in 0..<8 {
+            let sparkle = createSparkleLayer(in: stickerLayer.bounds)
+            stickerLayer.addSublayer(sparkle)
+        }
+        
+        // Text layer with attributed string for better hashtag formatting
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+        paragraphStyle.lineBreakMode = .byWordWrapping
+        
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.boldSystemFont(ofSize: fontSize),
+            .foregroundColor: UIColor.white,
+            .paragraphStyle: paragraphStyle
+        ]
+        
+        let attributedString = NSAttributedString(string: text, attributes: attributes)
+        
+        let textLayer = CATextLayer()
+        textLayer.string = attributedString
+        textLayer.fontSize = fontSize
+        textLayer.font = UIFont.boldSystemFont(ofSize: fontSize)
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = .center
+        textLayer.isWrapped = true
+        textLayer.contentsScale = 2.0 // Use fixed scale instead of UIScreen
+        textLayer.frame = CGRect(
+            x: 20,
+            y: 20,
+            width: stickerWidth - 40,
+            height: stickerHeight - 40
+        )
+        
+        // Set initial opacity
+        stickerLayer.opacity = 0
+        
+        // Timing for CTA (starts at 13s)
+        let ctaStartTime = AVCoreAnimationBeginTimeAtZero + 13.0
+        
+        // Fade in
+        let fadeInAnimation = CABasicAnimation(keyPath: "opacity")
+        fadeInAnimation.fromValue = 0.0
+        fadeInAnimation.toValue = 1.0
+        fadeInAnimation.beginTime = ctaStartTime
+        fadeInAnimation.duration = 0.3
+        fadeInAnimation.fillMode = .forwards
+        fadeInAnimation.isRemovedOnCompletion = false
+        
+        // Pulse animation (1.0 → 1.1 → 1.0)
+        let pulseAnimation = CAKeyframeAnimation(keyPath: "transform.scale")
+        pulseAnimation.values = [1.0, 1.1, 1.0]
+        pulseAnimation.keyTimes = [0, 0.5, 1.0]
+        pulseAnimation.timingFunctions = [
+            CAMediaTimingFunction(name: .easeInEaseOut),
+            CAMediaTimingFunction(name: .easeInEaseOut)
+        ]
+        pulseAnimation.beginTime = ctaStartTime + 0.3
+        pulseAnimation.duration = 1.0
+        pulseAnimation.repeatCount = 2 // Pulse twice during the 2 seconds
+        pulseAnimation.fillMode = .forwards
+        pulseAnimation.isRemovedOnCompletion = false
+        
+        stickerLayer.add(pulseAnimation, forKey: "ctaPulse")
+        stickerLayer.add(fadeInAnimation, forKey: "ctaFade")
+        
+        stickerLayer.addSublayer(textLayer)
+        containerLayer.addSublayer(stickerLayer)
+        
+        return containerLayer
+    }
+    
+    /// Helper function to create sparkle emitter layer with keyframed birthRate
+    private func createSparkleLayer(in bounds: CGRect) -> CALayer {
+        let emitter = CAEmitterLayer()
+        emitter.frame = bounds
+        emitter.emitterPosition = CGPoint(x: bounds.width / 2, y: bounds.height / 2)
+        emitter.emitterSize = CGSize(width: bounds.width * 0.8, height: bounds.height * 0.8)
+        emitter.emitterShape = .rectangle
+        emitter.renderMode = .additive
+        
+        // Create sparkle cell
+        let sparkleCell = CAEmitterCell()
+        sparkleCell.name = "sparkle"
+        sparkleCell.birthRate = 0  // Start with 0, will animate
+        sparkleCell.lifetime = 2.0
+        sparkleCell.lifetimeRange = 0.5
+        sparkleCell.velocity = 50
+        sparkleCell.velocityRange = 20
+        sparkleCell.emissionRange = .pi * 2
+        sparkleCell.scale = 0.5
+        sparkleCell.scaleRange = 0.3
+        sparkleCell.scaleSpeed = -0.3
+        sparkleCell.alphaRange = 0.8
+        sparkleCell.alphaSpeed = -0.5
+        
+        // Sparkle image (white circle)
+        let sparkleImage = UIImage.circle(diameter: 8, color: .white)
+        sparkleCell.contents = sparkleImage?.cgImage
+        
+        emitter.emitterCells = [sparkleCell]
+        
+        // Keyframe birthRate animation for video export
+        let birthAnimation = CAKeyframeAnimation(keyPath: "emitterCells.sparkle.birthRate")
+        birthAnimation.values = [0, 20, 0]  // Off, on, off
+        birthAnimation.keyTimes = [0, 0.2, 1.0]
+        birthAnimation.duration = 1.0
+        birthAnimation.repeatCount = .infinity
+        birthAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
+        birthAnimation.fillMode = .forwards
+        birthAnimation.isRemovedOnCompletion = false
+        
+        emitter.add(birthAnimation, forKey: "sparkleBirth")
+        
+        return emitter
+    }
+}
+
+// MARK: - UIImage Extension for Sparkle Generation
+
+extension UIImage {
+    /// Create a circular image with the specified diameter and color
+    static func circle(diameter: CGFloat, color: UIColor) -> UIImage? {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: diameter, height: diameter))
+        return renderer.image { context in
+            color.setFill()
+            let rect = CGRect(origin: .zero, size: CGSize(width: diameter, height: diameter))
+            context.cgContext.fillEllipse(in: rect)
         }
     }
 }
