@@ -138,6 +138,74 @@ public enum ViralTemplate: String, CaseIterable, Sendable {
     }
 }
 
+// MARK: - Filter and PIP Specifications
+
+/// Codable wrapper for heterogeneous values
+public struct AnyCodable: Codable, @unchecked Sendable {
+    public let value: Any
+    
+    public init(_ value: Any) { 
+        self.value = value 
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let int = try? container.decode(Int.self) { 
+            value = int
+        } else if let double = try? container.decode(Double.self) { 
+            value = double
+        } else if let bool = try? container.decode(Bool.self) { 
+            value = bool
+        } else if let string = try? container.decode(String.self) { 
+            value = string
+        } else {
+            value = ""
+        }
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch value {
+        case let int as Int: 
+            try container.encode(int)
+        case let double as Double: 
+            try container.encode(double)
+        case let bool as Bool: 
+            try container.encode(bool)
+        case let string as String: 
+            try container.encode(string)
+        default: 
+            try container.encode(String(describing: value))
+        }
+    }
+}
+
+/// Filter specification for CI filters
+public struct FilterSpec: Codable, Sendable {
+    public let name: String
+    public let params: [String: AnyCodable]
+    
+    public init(name: String, params: [String: AnyCodable] = [:]) {
+        self.name = name
+        self.params = params
+    }
+}
+
+/// Picture-in-Picture specification
+public struct PIPSpec: @unchecked Sendable {
+    public let url: URL
+    public let frame: CGRect
+    public let cornerRadius: CGFloat
+    public let timeRange: CMTimeRange
+    
+    public init(url: URL, frame: CGRect, cornerRadius: CGFloat, timeRange: CMTimeRange) {
+        self.url = url
+        self.frame = frame
+        self.cornerRadius = cornerRadius
+        self.timeRange = timeRange
+    }
+}
+
 // MARK: - Render Plan Structure
 /// Render plan structure exactly as specified in requirements
 public struct RenderPlan: @unchecked Sendable {
@@ -149,13 +217,13 @@ public struct RenderPlan: @unchecked Sendable {
         public let kind: Kind
         public let timeRange: CMTimeRange
         public let transform: CGAffineTransform
-        public let filters: [CIFilter]
+        public let filters: [FilterSpec]  // Changed to FilterSpec for Pro renderer
         
         public init(
             kind: Kind,
             timeRange: CMTimeRange,
             transform: CGAffineTransform = .identity,
-            filters: [CIFilter] = []
+            filters: [FilterSpec] = []
         ) {
             self.kind = kind
             self.timeRange = timeRange
@@ -184,17 +252,20 @@ public struct RenderPlan: @unchecked Sendable {
     public let overlays: [Overlay]
     public let audio: URL?
     public let outputDuration: CMTime
+    public let pip: PIPSpec?  // Optional PIP for green screen effect
     
     public init(
         items: [TrackItem],
         overlays: [Overlay],
         audio: URL? = nil,
-        outputDuration: CMTime
+        outputDuration: CMTime,
+        pip: PIPSpec? = nil
     ) {
         self.items = items
         self.overlays = overlays
         self.audio = audio
         self.outputDuration = outputDuration
+        self.pip = pip
     }
 }
 

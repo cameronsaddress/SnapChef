@@ -36,6 +36,7 @@
 		22289BCD8F033A82C6D71A2A /* TikTokSDKManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAEE44490F7004BFB1A65BCD /* TikTokSDKManager.swift */; };
 		2422E5C1C7E414D8FF5A0B7C /* NetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FDC970FB5C6C618DA4E006 /* NetworkManager.swift */; };
 		2A1E6C5CC0216CD80FA81609 /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 147423E4DF08EDDC2668784C /* CloudKit.framework */; };
+		2D02CE5084479923A9D51FB0 /* ViralVideoRendererPro.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D518D2380480B66FE686C8 /* ViralVideoRendererPro.swift */; };
 		2FD07DE82208A9FDCA95D45A /* TikTokOpenSDKWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F6E499816E882396C879119 /* TikTokOpenSDKWrapper.swift */; };
 		30FC7E29B2CDCB0E173FD5CD /* ViralVideoPolishManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9FE99987A48FD029D598DB /* ViralVideoPolishManager.swift */; };
 		31B2C3E43D384FB39E4DDCA0 /* SDKInitializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBA1C719280079FC83D76F2E /* SDKInitializer.swift */; };
@@ -228,6 +229,7 @@
 		329277F6AA3FB9884C3C5E88 /* SafePhotoSaver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SafePhotoSaver.swift; path = SnapChef/Features/Sharing/Core/SafePhotoSaver.swift; sourceTree = "<group>"; };
 		32E437105EB7EFBC8764841A /* ChallengeProofSubmissionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeProofSubmissionView.swift; path = SnapChef/Features/Gamification/ChallengeProofSubmissionView.swift; sourceTree = "<group>"; };
 		336E44F1C05F96398737E9E4 /* MagicalBackground.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MagicalBackground.swift; path = SnapChef/Design/MagicalBackground.swift; sourceTree = "<group>"; };
+		33D518D2380480B66FE686C8 /* ViralVideoRendererPro.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ViralVideoRendererPro.swift; path = SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoRendererPro.swift; sourceTree = "<group>"; };
 		34771E7E9C40635B7CE1F7AA /* ViralVideoEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ViralVideoEngine.swift; path = SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoEngine.swift; sourceTree = "<group>"; };
 		37C541E1BB83BA1EC25EFF3F /* RecipesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RecipesView.swift; path = SnapChef/Features/Recipes/RecipesView.swift; sourceTree = "<group>"; };
 		392BD76253A7DA8F69705F62 /* SnapchefLogo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SnapchefLogo.swift; path = SnapChef/Design/SnapchefLogo.swift; sourceTree = "<group>"; };
@@ -482,6 +484,7 @@
 				4F0393C0F1F257E4B5EAB7DE /* StillWriter.swift */,
 				CFA84B5D82F9D7A328B39C6B /* PolishUIComponents.swift */,
 				773CAADC58BCCDAC7DC361A8 /* OverlayFactory.swift */,
+				33D518D2380480B66FE686C8 /* ViralVideoRendererPro.swift */,
 			);
 			name = TikTok;
 			sourceTree = "<group>";
@@ -1236,6 +1239,7 @@
 				D69107BADA8860B5AC593AE5 /* StillWriter.swift in Sources */,
 				8E749FC4FEE2415572774AF0 /* PolishUIComponents.swift in Sources */,
 				33044875ECAB744A48690121 /* OverlayFactory.swift in Sources */,
+				2D02CE5084479923A9D51FB0 /* ViralVideoRendererPro.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

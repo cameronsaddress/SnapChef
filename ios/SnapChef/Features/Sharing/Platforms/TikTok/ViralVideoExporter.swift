@@ -312,7 +312,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
         // Post-Export checks as specified in requirements
         
         let duration = try await asset.load(.duration)
-        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+        _ = try await asset.loadTracks(withMediaType: .video)
         
         // File size under 50MB
         // Plays at exactly 30fps (validated above)

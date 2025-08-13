@@ -10,6 +10,7 @@ import UIKit
 @preconcurrency import AVFoundation
 import CoreImage
 import CoreMedia
+@preconcurrency import Foundation
 
 /// Renderer with AVFoundation compositor as specified in requirements
 public final class ViralVideoRenderer: @unchecked Sendable {
@@ -31,6 +32,30 @@ public final class ViralVideoRenderer: @unchecked Sendable {
     }
     
     // MARK: - Public Interface
+    
+    /// Main render method that handles the complete rendering pipeline
+    public func render(
+        plan: RenderPlan,
+        config: RenderConfig,
+        progressCallback: @escaping @Sendable (Double) async -> Void = { _ in }
+    ) async throws -> URL {
+        // Render base video
+        let baseVideoURL = try await renderBaseVideo(
+            plan: plan,
+            progressCallback: { progress in
+                await progressCallback(progress * 0.7) // 0-70%
+            }
+        )
+        
+        // Composite video
+        let compositedURL = try await compositeVideo(
+            baseURL: baseVideoURL,
+            plan: plan
+        )
+        
+        await progressCallback(1.0) // 100%
+        return compositedURL
+    }
     
     /// Render base video from render plan track items
     public func renderBaseVideo(
@@ -175,21 +200,25 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         
         switch item.kind {
         case .still(let image):
+            // Convert FilterSpec to CIFilter
+            let ciFilters = convertFilterSpecsToCIFilters(item.filters)
             return try await stillWriter.createVideoFromImage(
                 image,
                 duration: item.timeRange.duration,
                 transform: item.transform,
-                filters: item.filters,
+                filters: ciFilters,
                 progressCallback: progressCallback
             )
             
         case .video(let url):
             // For video clips, we need to extract the segment and apply transforms/filters
+            // Convert FilterSpec to CIFilter
+            let ciFilters = convertFilterSpecsToCIFilters(item.filters)
             return try await processVideoSegment(
                 url: url,
                 timeRange: item.timeRange,
                 transform: item.transform,
-                filters: item.filters,
+                filters: ciFilters,
                 progressCallback: progressCallback
             )
         }
@@ -421,6 +450,22 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         let tempDir = FileManager.default.temporaryDirectory
         let filename = "rendered_segment_\(Date().timeIntervalSince1970).mp4"
         return tempDir.appendingPathComponent(filename)
+    }
+    
+    private func convertFilterSpecsToCIFilters(_ filterSpecs: [FilterSpec]) -> [CIFilter] {
+        var ciFilters: [CIFilter] = []
+        
+        for spec in filterSpecs {
+            if let filter = CIFilter(name: spec.name) {
+                // Apply parameters
+                for (key, value) in spec.params {
+                    filter.setValue(value.value, forKey: key)
+                }
+                ciFilters.append(filter)
+            }
+        }
+        
+        return ciFilters
     }
 }
 

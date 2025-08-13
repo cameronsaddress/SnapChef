@@ -634,9 +634,9 @@ public final class RenderPlanner: @unchecked Sendable {
         return applyEnhancedBlurEffect(to: image)
     }
     
-    private func createCircularWipeFilter() -> CIFilter {
+    private func createCircularWipeFilter() -> FilterSpec {
         // Placeholder for circular wipe mask filter
-        return CIFilter.colorMatrix() // Stub implementation
+        return FilterSpec(name: "CIColorMatrix", params: [:])
     }
     
     // MARK: - Enhanced Data Creation Methods for Template 4 & 5

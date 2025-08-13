@@ -24,6 +24,7 @@ public class ViralVideoEngine: ObservableObject {
     // MARK: - Core Components
     public let config: RenderConfig
     private let renderer: ViralVideoRenderer
+    private let rendererPro: ViralVideoRendererPro
     private let stillWriter: StillWriter
     private let overlayFactory: OverlayFactory
     private let planner: RenderPlanner
@@ -42,6 +43,7 @@ public class ViralVideoEngine: ObservableObject {
     public init(config: RenderConfig = RenderConfig()) {
         self.config = config
         self.renderer = ViralVideoRenderer(config: config)
+        self.rendererPro = ViralVideoRendererPro()
         self.stillWriter = StillWriter(config: config)
         self.overlayFactory = OverlayFactory(config: config)
         self.planner = RenderPlanner(config: config)
@@ -111,6 +113,93 @@ public class ViralVideoEngine: ObservableObject {
         currentProgress = RenderProgress(phase: .planning, progress: 0.0)
     }
     
+    /// Render with Pro features (transforms, filters, PIP)
+    public func renderPro(
+        template: ViralTemplate,
+        recipe: ViralRecipe,
+        media: MediaBundle,
+        selfieVideoURL: URL? = nil,  // Optional selfie for PIP
+        usePro: Bool = true,
+        progressHandler: @escaping @Sendable (RenderProgress) async -> Void = { _ in }
+    ) async throws -> URL {
+        
+        // Cancel any existing render task
+        currentRenderTask?.cancel()
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            currentRenderTask = Task {
+                do {
+                    // Create render plan
+                    var renderPlan = try await planner.createRenderPlan(
+                        template: template,
+                        recipe: recipe,
+                        media: media
+                    )
+                    
+                    // Add PIP for green screen template if selfie provided
+                    if template == .greenScreenPIP, let selfieURL = selfieVideoURL {
+                        let pipFrame = CGRect(
+                            x: config.size.width - config.safeInsets.right - 180,
+                            y: config.safeInsets.top + 60,
+                            width: 340,
+                            height: 340
+                        )
+                        let pipSpec = PIPSpec(
+                            url: selfieURL,
+                            frame: pipFrame,
+                            cornerRadius: 170,
+                            timeRange: CMTimeRange(
+                                start: .zero,
+                                duration: CMTime(seconds: 3, preferredTimescale: 600)
+                            )
+                        )
+                        renderPlan = RenderPlan(
+                            items: renderPlan.items,
+                            overlays: renderPlan.overlays,
+                            audio: renderPlan.audio,
+                            outputDuration: renderPlan.outputDuration,
+                            pip: pipSpec
+                        )
+                    }
+                    
+                    // Use Pro renderer if requested
+                    let result: URL
+                    if usePro {
+                        result = try await rendererPro.render(
+                            plan: renderPlan,
+                            config: config,
+                            progressCallback: { progress in
+                                let renderProgress = RenderProgress(
+                                    phase: .renderingFrames,
+                                    progress: progress
+                                )
+                                await progressHandler(renderProgress)
+                            }
+                        )
+                    } else {
+                        result = try await renderer.render(
+                            plan: renderPlan,
+                            config: config,
+                            progressCallback: { progress in
+                                let renderProgress = RenderProgress(
+                                    phase: .renderingFrames,
+                                    progress: progress
+                                )
+                                await progressHandler(renderProgress)
+                            }
+                        )
+                    }
+                    
+                    continuation.resume(returning: result)
+                    return result
+                } catch {
+                    continuation.resume(throwing: error)
+                    throw error
+                }
+            }
+        }
+    }
+    
     // MARK: - Private Implementation
     
     private func performRender(
@@ -162,7 +251,7 @@ public class ViralVideoEngine: ObservableObject {
             let baseVideoURL = try await renderer.renderBaseVideo(
                 plan: renderPlan,
                 progressCallback: { @Sendable frameProgress in
-                    let adjustedProgress = 0.2 + (frameProgress * 0.4) // 20% to 60%
+                    _ = 0.2 + (frameProgress * 0.4) // 20% to 60%
                     // Progress updates are handled by the renderer
                 }
             )
@@ -181,7 +270,7 @@ public class ViralVideoEngine: ObservableObject {
                 videoURL: compositedURL,
                 overlays: renderPlan.overlays,
                 progressCallback: { @Sendable overlayProgress in
-                    let adjustedProgress = 0.7 + (overlayProgress * 0.15) // 70% to 85%
+                    _ = 0.7 + (overlayProgress * 0.15) // 70% to 85%
                     // Progress updates are handled by the overlay factory
                 }
             )
@@ -191,7 +280,7 @@ public class ViralVideoEngine: ObservableObject {
             let encodedURL = try await encodeWithProductionSettings(
                 inputURL: overlayURL,
                 progressCallback: { @Sendable encodeProgress in
-                    let adjustedProgress = 0.85 + (encodeProgress * 0.1) // 85% to 95%
+                    _ = 0.85 + (encodeProgress * 0.1) // 85% to 95%
                     // Progress updates are handled by the encoder
                 }
             )
@@ -243,7 +332,7 @@ public class ViralVideoEngine: ObservableObject {
     
     private func prepareAssets(media: MediaBundle) async throws {
         // Validate images are in correct format and size
-        let targetSize = config.size
+        _ = config.size
         
         // Apply any pre-processing filters as specified in requirements
         // Color pop for AFTER images only
