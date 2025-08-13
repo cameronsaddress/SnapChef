@@ -30,6 +30,9 @@ public final class RenderPlanner: @unchecked Sendable {
         media: MediaBundle
     ) async throws -> RenderPlan {
         
+        print("🎬 RenderPlanner: Creating render plan for template: \(template.rawValue)")
+        print("🎬 RenderPlanner: Template description: \(template.description)")
+        
         switch template {
         // Commented out templates - focusing on kinetic text only
         // case .beatSyncedCarousel:
@@ -37,6 +40,7 @@ public final class RenderPlanner: @unchecked Sendable {
         // case .splitScreenSwipe:
         //     return try await createSplitScreenSwipePlan(recipe: recipe, media: media)
         case .kineticTextSteps:
+            print("✅ RenderPlanner: Using KINETIC TEXT STEPS template")
             return try await createKineticTextStepsPlan(recipe: recipe, media: media)
         // case .priceTimeChallenge:
         //     return try await createPriceTimeChallengePlan(recipe: recipe, media: media)
@@ -318,6 +322,9 @@ public final class RenderPlanner: @unchecked Sendable {
         media: MediaBundle
     ) async throws -> RenderPlan {
         
+        print("📝 KINETIC TEXT: Starting plan creation")
+        print("📝 KINETIC TEXT: Recipe has \(recipe.steps.count) steps")
+        
         let totalDuration = CMTime(seconds: 15, preferredTimescale: 600)
         var items: [RenderPlan.TrackItem] = []
         var overlays: [RenderPlan.Overlay] = []
@@ -326,14 +333,19 @@ public final class RenderPlanner: @unchecked Sendable {
         let backgroundImages = [media.beforeFridge, media.cookedMeal, media.cookedMeal]  // Use cookedMeal for after
         let segmentDuration = CMTime(seconds: 5, preferredTimescale: 600)
         
+        print("📝 KINETIC TEXT: Creating \(backgroundImages.count) background segments")
+        
         for (index, image) in backgroundImages.enumerated() {
+            let startTime = CMTime(seconds: Double(index) * 5, preferredTimescale: 600)
+            print("📝 KINETIC TEXT: Segment \(index): \(startTime.seconds)s - \((startTime + segmentDuration).seconds)s")
+            
             items.append(RenderPlan.TrackItem(
                 kind: .still(image),
                 timeRange: CMTimeRange(
-                    start: CMTime(seconds: Double(index) * 5, preferredTimescale: 600),
+                    start: startTime,
                     duration: segmentDuration
                 ),
-                transform: createKenBurnsTransform(index: index)
+                transform: .identity  // NO Ken Burns - static images for kinetic text
             ))
         }
         
@@ -380,6 +392,11 @@ public final class RenderPlanner: @unchecked Sendable {
                 )
             }
         ))
+        
+        print("📝 KINETIC TEXT: Plan complete")
+        print("📝 KINETIC TEXT: Total duration: \(totalDuration.seconds) seconds")
+        print("📝 KINETIC TEXT: Track items: \(items.count)")
+        print("📝 KINETIC TEXT: Overlays: \(overlays.count)")
         
         return RenderPlan(
             items: items,
