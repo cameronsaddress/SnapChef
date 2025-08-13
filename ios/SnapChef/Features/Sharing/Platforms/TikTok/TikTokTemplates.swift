@@ -94,29 +94,70 @@ struct BeforeAfterPreview: View {
         ZStack {
             // Before state
             if !showAfter {
-                VStack(spacing: 20) {
-                    Text("BEFORE")
-                        .font(.system(size: 24, weight: .black))
-                        .foregroundColor(.white)
-                    
-                    Image(systemName: "refrigerator")
-                        .font(.system(size: 60))
-                        .foregroundColor(.white.opacity(0.8))
+                if let beforeImage = content.beforeImage {
+                    Image(uiImage: beforeImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .overlay(
+                            Text("BEFORE")
+                                .font(.system(size: 24, weight: .black))
+                                .foregroundColor(.white)
+                                .padding()
+                                .background(Color.black.opacity(0.7))
+                                .cornerRadius(8)
+                                .padding()
+                            , alignment: .top
+                        )
+                } else {
+                    VStack(spacing: 20) {
+                        Text("BEFORE")
+                            .font(.system(size: 24, weight: .black))
+                            .foregroundColor(.white)
+                        
+                        Image(systemName: "refrigerator")
+                            .font(.system(size: 60))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
                 }
                 .transition(.opacity)
             }
             
             // After state
             if showAfter {
-                VStack(spacing: 20) {
-                    Text("AFTER")
-                        .font(.system(size: 24, weight: .black))
-                        .foregroundColor(.white)
-                    
-                    if case .recipe(let recipe) = content.type {
-                        Text(recipe.name)
-                            .font(.system(size: 18, weight: .bold))
+                if let afterImage = content.afterImage {
+                    Image(uiImage: afterImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .overlay(
+                            VStack(spacing: 10) {
+                                Text("AFTER")
+                                    .font(.system(size: 24, weight: .black))
+                                    .foregroundColor(.white)
+                                
+                                if case .recipe(let recipe) = content.type {
+                                    Text(recipe.name)
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.center)
+                                }
+                            }
+                            .padding()
+                            .background(Color.black.opacity(0.7))
+                            .cornerRadius(8)
+                            .padding()
+                            , alignment: .top
+                        )
+                } else {
+                    VStack(spacing: 20) {
+                        Text("AFTER")
+                            .font(.system(size: 24, weight: .black))
                             .foregroundColor(.white)
+                        
+                        if case .recipe(let recipe) = content.type {
+                            Text(recipe.name)
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
                             .multilineTextAlignment(.center)
                     }
                 }
@@ -138,14 +179,40 @@ struct QuickRecipePreview: View {
     let steps = ["📸 Snap", "🤖 AI Magic", "🍳 Cook", "😋 Enjoy!"]
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("60-SECOND RECIPE")
-                .font(.system(size: 18, weight: .black))
-                .foregroundColor(.white)
+        ZStack {
+            // Background with photos cycling
+            if currentStep % 2 == 0 {
+                if let beforeImage = content.beforeImage {
+                    Image(uiImage: beforeImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                        .overlay(Color.black.opacity(0.5))
+                }
+            } else {
+                if let afterImage = content.afterImage {
+                    Image(uiImage: afterImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                        .overlay(Color.black.opacity(0.5))
+                }
+            }
             
-            Text(steps[currentStep])
-                .font(.system(size: 32))
-                .transition(.slide)
+            VStack(spacing: 20) {
+                Text("60-SECOND RECIPE")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundColor(.white)
+                    .padding(8)
+                    .background(Color.black.opacity(0.7))
+                    .cornerRadius(8)
+                
+                Text(steps[currentStep])
+                    .font(.system(size: 32))
+                    .transition(.slide)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -165,15 +232,33 @@ struct Ingredients360Preview: View {
     @State private var rotation: Double = 0
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("360° VIEW")
-                .font(.system(size: 18, weight: .black))
-                .foregroundColor(.white)
+        ZStack {
+            // Rotating background photo
+            if let afterImage = content.afterImage {
+                Image(uiImage: afterImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .overlay(Color.black.opacity(0.4))
+                    .rotation3DEffect(.degrees(rotation / 2), axis: (x: 0, y: 1, z: 0))
+            }
             
-            Image(systemName: "cube.transparent")
-                .font(.system(size: 60))
-                .foregroundColor(.white)
-                .rotation3DEffect(.degrees(rotation), axis: (x: 0, y: 1, z: 0))
+            VStack(spacing: 20) {
+                Text("360° VIEW")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundColor(.white)
+                    .padding(8)
+                    .background(Color.black.opacity(0.7))
+                    .cornerRadius(8)
+                
+                if content.afterImage == nil {
+                    Image(systemName: "cube.transparent")
+                        .font(.system(size: 60))
+                        .foregroundColor(.white)
+                        .rotation3DEffect(.degrees(rotation), axis: (x: 0, y: 1, z: 0))
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -189,25 +274,51 @@ struct TimelapsePreview: View {
     @State private var progress: CGFloat = 0
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("TIMELAPSE")
-                .font(.system(size: 18, weight: .black))
-                .foregroundColor(.white)
+        ZStack {
+            // Animated background transitioning between photos
+            if progress < 0.5 {
+                if let beforeImage = content.beforeImage {
+                    Image(uiImage: beforeImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                        .overlay(Color.black.opacity(0.4))
+                }
+            } else {
+                if let afterImage = content.afterImage {
+                    Image(uiImage: afterImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                        .overlay(Color.black.opacity(0.4))
+                }
+            }
             
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.3), lineWidth: 8)
-                    .frame(width: 80, height: 80)
-                
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(Color.white, lineWidth: 8)
-                    .frame(width: 80, height: 80)
-                    .rotationEffect(.degrees(-90))
-                
-                Image(systemName: "play.fill")
-                    .font(.system(size: 30))
+            VStack(spacing: 20) {
+                Text("TIMELAPSE")
+                    .font(.system(size: 18, weight: .black))
                     .foregroundColor(.white)
+                    .padding(8)
+                    .background(Color.black.opacity(0.7))
+                    .cornerRadius(8)
+                
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.3), lineWidth: 8)
+                        .frame(width: 80, height: 80)
+                    
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(Color.white, lineWidth: 8)
+                        .frame(width: 80, height: 80)
+                        .rotationEffect(.degrees(-90))
+                    
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor(.white)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -224,15 +335,31 @@ struct SplitScreenPreview: View {
     
     var body: some View {
         HStack(spacing: 0) {
-            // Left side
-            VStack {
-                Text("PROCESS")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
+            // Left side - Before
+            ZStack {
+                if let beforeImage = content.beforeImage {
+                    Image(uiImage: beforeImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                        .overlay(Color.black.opacity(0.3))
+                }
                 
-                Image(systemName: "hands.sparkles")
-                    .font(.system(size: 40))
-                    .foregroundColor(.white.opacity(0.8))
+                VStack {
+                    Text("BEFORE")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(6)
+                        .background(Color.black.opacity(0.7))
+                        .cornerRadius(6)
+                    
+                    if content.beforeImage == nil {
+                        Image(systemName: "refrigerator")
+                            .font(.system(size: 40))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.black.opacity(0.3))
@@ -241,15 +368,31 @@ struct SplitScreenPreview: View {
                 .fill(Color.white)
                 .frame(width: 2)
             
-            // Right side
-            VStack {
-                Text("RESULT")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
+            // Right side - After
+            ZStack {
+                if let afterImage = content.afterImage {
+                    Image(uiImage: afterImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                        .overlay(Color.black.opacity(0.3))
+                }
                 
-                Image(systemName: "sparkles")
-                    .font(.system(size: 40))
-                    .foregroundColor(.white.opacity(0.8))
+                VStack {
+                    Text("AFTER")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(6)
+                        .background(Color.black.opacity(0.7))
+                        .cornerRadius(6)
+                    
+                    if content.afterImage == nil {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 40))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.black.opacity(0.3))
