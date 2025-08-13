@@ -176,6 +176,9 @@ public final class StillWriter: @unchecked Sendable {
             // Track if continuation has been resumed to prevent double resume
             let hasResumedBox = Box(value: false)
             
+            // Track last presentation time to ensure monotonic increase - use Box for thread safety
+            let lastPresentationTimeBox = Box(value: CMTime.zero)
+            
             videoInput.requestMediaDataWhenReady(on: DispatchQueue.global(qos: .userInitiated)) { [weak self] in
                 guard let self = self else { return }
                 
@@ -185,20 +188,62 @@ public final class StillWriter: @unchecked Sendable {
                 }
                 
                 while frameCountBox.value < totalFrames && !hasResumedBox.value && videoInput.isReadyForMoreMediaData {
+                    // Use much higher precision timescale (600) to avoid rounding errors
+                    // This ensures each frame has a unique presentation time
+                    let highPrecisionTimescale: Int32 = 600  // 600 ticks per second allows precise 30fps timing
+                    let ticksPerFrame = Int64(highPrecisionTimescale / self.config.fps)  // 600/30 = 20 ticks per frame
+                    let presentationTime = CMTime(value: Int64(frameCountBox.value) * ticksPerFrame, timescale: highPrecisionTimescale)
+                    
+                    // Ensure strictly monotonic increase
+                    if presentationTime <= lastPresentationTimeBox.value && frameCountBox.value > 0 {
+                        print("⚠️ WARNING: Non-monotonic time detected at frame \(frameCountBox.value)")
+                        print("   - Current time: \(presentationTime.seconds)s (value: \(presentationTime.value), timescale: \(presentationTime.timescale))")
+                        print("   - Last time: \(lastPresentationTimeBox.value.seconds)s (value: \(lastPresentationTimeBox.value.value), timescale: \(lastPresentationTimeBox.value.timescale))")
+                        // Skip this frame if time is not monotonic
+                        frameCountBox.value += 1
+                        continue
+                    }
+                    lastPresentationTimeBox.value = presentationTime
+                    
                     autoreleasepool {
-                        let presentationTime = CMTime(value: Int64(frameCountBox.value), timescale: self.config.fps)
                         
                         do {
+                            // Add a small delay every 10 frames to avoid overwhelming the system
+                            // Also add longer pause every 50 frames to prevent buffer exhaustion
+                            if frameCountBox.value > 0 && frameCountBox.value % 10 == 0 {
+                                Thread.sleep(forTimeInterval: 0.001) // 1ms pause
+                                
+                                // Every 50 frames, do a longer pause and let system recover
+                                if frameCountBox.value % 50 == 0 {
+                                    print("🔄 DEBUG StillWriter: Frame \(frameCountBox.value) - pausing 5ms for system recovery")
+                                    Thread.sleep(forTimeInterval: 0.005) // 5ms pause
+                                    // Force memory cleanup to free any lingering buffers
+                                    self.memoryOptimizer.forceMemoryCleanup()
+                                }
+                            }
+                            
                             // Create a fresh buffer for each frame on-demand
                             if let pixelBuffer = try self.createOptimizedPixelBuffer(from: imageBox.value) {
+                                
                                 // Final check right before appending
                                 if videoInput.isReadyForMoreMediaData {
                                     let success = adaptor.append(pixelBuffer, withPresentationTime: presentationTime)
+                                    
                                     if !success {
                                         print("❌ DEBUG StillWriter: Failed to append frame \(frameCountBox.value) at time \(presentationTime.seconds)s")
                                         print("❌ DEBUG StillWriter: AVAssetWriter status: \(videoWriter.status.rawValue)")
                                         if let error = videoWriter.error {
                                             print("❌ DEBUG StillWriter: AVAssetWriter error: \(error)")
+                                            // Decode the error further
+                                            if let nsError = error as NSError? {
+                                                print("❌ DEBUG StillWriter: Error domain: \(nsError.domain)")
+                                                print("❌ DEBUG StillWriter: Error code: \(nsError.code)")
+                                                if let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+                                                    print("❌ DEBUG StillWriter: Underlying error: \(underlyingError)")
+                                                    print("❌ DEBUG StillWriter: Underlying domain: \(underlyingError.domain)")
+                                                    print("❌ DEBUG StillWriter: Underlying code: \(underlyingError.code)")
+                                                }
+                                            }
                                         }
                                         if !hasResumedBox.value {
                                             hasResumedBox.value = true
@@ -209,8 +254,8 @@ public final class StillWriter: @unchecked Sendable {
                                     } else {
                                         // Record successful frame for monitoring
                                         self.frameDropMonitor.recordFrame()
-                                        if frameCountBox.value == 0 || frameCountBox.value % 30 == 0 {
-                                            print("✅ DEBUG StillWriter: Successfully wrote frame \(frameCountBox.value)/\(totalFrames)")
+                                        if frameCountBox.value == 0 || frameCountBox.value % 30 == 0 || frameCountBox.value == totalFrames - 1 {
+                                            print("✅ DEBUG StillWriter: Successfully wrote frame \(frameCountBox.value)/\(totalFrames) at \(presentationTime.seconds)s")
                                         }
                                     }
                                 }
