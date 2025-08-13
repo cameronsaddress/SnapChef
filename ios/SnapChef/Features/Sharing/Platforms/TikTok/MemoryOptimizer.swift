@@ -284,22 +284,6 @@ public final class MemoryOptimizer: @unchecked Sendable {
             
             // Draw image with aspect fill using CG-backed version (will clip edges if needed)
             uiImageWithCG.draw(in: drawRect)
-            
-            // Premium: Add subtle vignette for beatSyncedCarousel (edge darkening effect)
-            // Simple gradient vignette using Core Graphics for thread safety
-            let vignetteLayer = CAGradientLayer()
-            vignetteLayer.frame = CGRect(origin: .zero, size: targetSize)
-            vignetteLayer.colors = [
-                UIColor.black.withAlphaComponent(0.0).cgColor,
-                UIColor.black.withAlphaComponent(0.3).cgColor
-            ]
-            vignetteLayer.locations = [0.7, 1.0]
-            vignetteLayer.type = .radial
-            vignetteLayer.startPoint = CGPoint(x: 0.5, y: 0.5)
-            vignetteLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
-            
-            // Render vignette gradient onto the image
-            vignetteLayer.render(in: context.cgContext)
         }
         
         // Debug: Log the optimized image size

@@ -636,7 +636,7 @@ public final class RenderPlanner: @unchecked Sendable {
         
         let blurFilter = CIFilter.gaussianBlur()
         blurFilter.inputImage = ciImage
-        blurFilter.radius = 10 // EXACT radius as specified in requirements
+        blurFilter.radius = 3 // Reduced from 10 - more subtle blur
         
         // Need to crop the output to original extent since blur expands the image
         let originalExtent = ciImage.extent

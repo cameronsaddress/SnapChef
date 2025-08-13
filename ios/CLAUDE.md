@@ -10,6 +10,24 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 13, 2025) - Part 13
+- **Fixed White Wash Issue in TikTok Videos**
+  - Photos were appearing washed out with white overlay in generated videos
+  - Root causes identified through systematic testing:
+    1. Premium filters in StillWriter were stacking multiple CIFilter operations
+    2. Vignette effect in MemoryOptimizer was corrupting image data
+    3. Excessive blur radius (10) was making before photos too blurry
+  - Solutions applied:
+    - Removed all premium filter effects (vibrance, sharpen, contrast, glow)
+    - Deleted vignette overlay effect entirely from MemoryOptimizer
+    - Reduced blur radius from 10 to 3 for subtle effect
+    - Kept color pop effect (contrast 1.1x, saturation 1.08x) for enhancement
+  - Premium effects removed because they were:
+    - Applying multiple filter chains causing color space issues
+    - Creating improper alpha channel compositing
+    - Stacking CIImage/CGImage conversions leading to data loss
+  - Photos now display correctly with proper colors and subtle effects
+
 ### Latest Updates (Jan 13, 2025) - Part 12
 - **Fixed White Background Issue in TikTok Videos**
   - Critical bug: Photos were appearing as white backgrounds in generated TikTok videos

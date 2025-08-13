@@ -157,48 +157,9 @@ public final class StillWriter: @unchecked Sendable {
             print("❌ DEBUG StillWriter: CIImage extent is empty - image may be invalid")
         }
         
-        // Premium: Apply default vibrance and sharpen filters if premiumMode enabled
+        // Premium effects - to be implemented
         if config.premiumMode {
-            // Apply vibrance filter for rich colors
-            if let vibranceFilter = CIFilter(name: "CIVibrance") {
-                vibranceFilter.setValue(processedImage, forKey: kCIInputImageKey)
-                vibranceFilter.setValue(config.vibranceAmount, forKey: "inputAmount")
-                processedImage = vibranceFilter.outputImage ?? processedImage
-            }
-            
-            // Apply sharpen filter for crisp edges
-            if let sharpenFilter = CIFilter(name: "CISharpenLuminance") {
-                sharpenFilter.setValue(processedImage, forKey: kCIInputImageKey)
-                sharpenFilter.setValue(config.sharpnessAmount, forKey: "inputSharpness")
-                sharpenFilter.setValue(0.5, forKey: "inputRadius")  // Subtle radius
-                processedImage = sharpenFilter.outputImage ?? processedImage
-            }
-            
-            // Apply color controls for contrast and saturation
-            if let colorFilter = CIFilter(name: "CIColorControls") {
-                colorFilter.setValue(processedImage, forKey: kCIInputImageKey)
-                colorFilter.setValue(config.contrastAmount, forKey: kCIInputContrastKey)
-                colorFilter.setValue(config.saturationAmount, forKey: kCIInputSaturationKey)
-                colorFilter.setValue(1.0, forKey: kCIInputBrightnessKey)  // Keep brightness neutral
-                processedImage = colorFilter.outputImage ?? processedImage
-            }
-            
-            // Premium: Carousel-specific glow and particle effects for snaps
-            // Add subtle glow effect for premium reveals
-            if let glowFilter = CIFilter(name: "CIGaussianBlur") {
-                glowFilter.setValue(processedImage, forKey: kCIInputImageKey)
-                glowFilter.setValue(config.carouselGlowIntensity * 2.0, forKey: "inputRadius")
-                
-                if let glowImage = glowFilter.outputImage {
-                    // Composite glow behind original for halo effect
-                    let composite = CIFilter(name: "CISourceOverCompositing")
-                    composite?.setValue(processedImage, forKey: kCIInputImageKey)
-                    composite?.setValue(glowImage, forKey: kCIInputBackgroundImageKey)
-                    processedImage = composite?.outputImage ?? processedImage
-                }
-            }
-            
-            // Note: Particle effects are only applied in multi-image carousel mode
+            // TODO: Add premium effects here
         }
         
         // Pre-render all pixel buffers to avoid capturing CIImage
@@ -564,19 +525,9 @@ public final class StillWriter: @unchecked Sendable {
             finalImage = currentImage.ciImage
         }
         
-        // Premium: Template-specific glow for beatSyncedCarousel snaps
-        if config.premiumMode && currentImageIndex % 2 == 0 {  // Apply to alternating snaps
-            if let glowFilter = CIFilter(name: "CIGaussianBlur") {
-                glowFilter.setValue(finalImage, forKey: kCIInputImageKey)
-                glowFilter.setValue(3.0, forKey: "inputRadius")  // Subtle premium glow
-                if let glowed = glowFilter.outputImage {
-                    if let composite = CIFilter(name: "CISourceOverCompositing") {
-                        composite.setValue(glowed, forKey: kCIInputImageKey)
-                        composite.setValue(finalImage, forKey: kCIInputBackgroundImageKey)
-                        finalImage = composite.outputImage ?? finalImage
-                    }
-                }
-            }
+        // Premium: Template-specific effects - to be implemented
+        if config.premiumMode && currentImageIndex % 2 == 0 {
+            // TODO: Add template-specific effects here
         }
         
         // Apply transform if needed
@@ -584,21 +535,9 @@ public final class StillWriter: @unchecked Sendable {
             finalImage = finalImage.transformed(by: currentImage.transform)
         }
         
-        // Premium: Add particle effects for the last image (meal reveal)
+        // Premium: Particle effects for meal reveal - to be implemented
         if config.premiumMode && currentImageIndex == images.count - 1 {
-            if let particleFilter = CIFilter(name: "CIStarShineGenerator") {
-                particleFilter.setValue(CIVector(x: config.size.width / 2, y: config.size.height / 2), forKey: "inputCenter")
-                particleFilter.setValue(config.particleSpread * 2, forKey: "inputRadius")
-                particleFilter.setValue(NSNumber(value: config.carouselParticleCount), forKey: "inputCrossScale")
-                particleFilter.setValue(CIColor(red: 1.0, green: 0.85, blue: 0.0, alpha: 0.6), forKey: "inputColor")
-                
-                if let particles = particleFilter.outputImage {
-                    let composite = CIFilter(name: "CISourceOverCompositing")
-                    composite?.setValue(particles, forKey: kCIInputImageKey)
-                    composite?.setValue(finalImage, forKey: kCIInputBackgroundImageKey)
-                    finalImage = composite?.outputImage ?? finalImage
-                }
-            }
+            // TODO: Add particle effects here
         }
         
         guard let pixelBuffer = try createPixelBuffer(from: finalImage) else {
