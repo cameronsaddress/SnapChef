@@ -189,10 +189,16 @@ public final class StillWriter: @unchecked Sendable {
         }
         
         // Pre-render all pixel buffers to avoid capturing CIImage
+        // IMPORTANT: Create a unique buffer for each frame to avoid AVAssetWriter errors
         var preRenderedBuffers: [CVPixelBuffer] = []
-        for _ in 0..<totalFrames {
+        for frameIndex in 0..<totalFrames {
+            // Create a fresh buffer for each frame to avoid reuse issues
             if let buffer = try createOptimizedPixelBuffer(from: processedImage) {
                 preRenderedBuffers.append(buffer)
+                // Log every 30 frames to track progress
+                if frameIndex % 30 == 0 {
+                    print("📦 DEBUG StillWriter: Pre-rendered buffer \(frameIndex)/\(totalFrames)")
+                }
             }
         }
         
@@ -203,10 +209,12 @@ public final class StillWriter: @unchecked Sendable {
             // Use Box to wrap the non-Sendable array
             let buffersBox = Box(value: preRenderedBuffers)
             let adaptor = pixelBufferAdaptor
+            // Track if continuation has been resumed to prevent double resume
+            let hasResumedBox = Box(value: false)
             
             videoInput.requestMediaDataWhenReady(on: DispatchQueue.global(qos: .userInitiated)) { [weak self] in
                 guard let self = self else { return }
-                while videoInput.isReadyForMoreMediaData && frameCountBox.value < totalFrames {
+                while videoInput.isReadyForMoreMediaData && frameCountBox.value < totalFrames && !hasResumedBox.value {
                     autoreleasepool {
                         let presentationTime = CMTime(value: Int64(frameCountBox.value), timescale: self.config.fps)
                         
@@ -220,7 +228,11 @@ public final class StillWriter: @unchecked Sendable {
                                     if let error = videoWriter.error {
                                         print("❌ DEBUG StillWriter: AVAssetWriter error: \(error)")
                                     }
-                                    continuation.resume(throwing: StillWriterError.frameWriteFailed)
+                                    if !hasResumedBox.value {
+                                        hasResumedBox.value = true
+                                        videoInput.markAsFinished()
+                                        continuation.resume(throwing: StillWriterError.frameWriteFailed)
+                                    }
                                     return
                                 } else {
                                     // Record successful frame for monitoring
@@ -231,7 +243,11 @@ public final class StillWriter: @unchecked Sendable {
                                 }
                             }
                         } catch {
-                            continuation.resume(throwing: error)
+                            if !hasResumedBox.value {
+                                hasResumedBox.value = true
+                                videoInput.markAsFinished()
+                                continuation.resume(throwing: error)
+                            }
                             return
                         }
                         
@@ -252,20 +268,26 @@ public final class StillWriter: @unchecked Sendable {
                     }
                 }
                 
-                if frameCountBox.value >= totalFrames {
+                if frameCountBox.value >= totalFrames && !hasResumedBox.value {
                     videoInput.markAsFinished()
                     
                     Task { [weak videoWriter] in
                         guard let videoWriter = videoWriter else {
-                            continuation.resume(throwing: StillWriterError.writingFailed("Writer deallocated"))
+                            if !hasResumedBox.value {
+                                hasResumedBox.value = true
+                                continuation.resume(throwing: StillWriterError.writingFailed("Writer deallocated"))
+                            }
                             return
                         }
                         await videoWriter.finishWriting()
                         
-                        if videoWriter.status == .completed {
-                            continuation.resume()
-                        } else {
-                            continuation.resume(throwing: StillWriterError.writingFailed(videoWriter.error?.localizedDescription))
+                        if !hasResumedBox.value {
+                            hasResumedBox.value = true
+                            if videoWriter.status == .completed {
+                                continuation.resume()
+                            } else {
+                                continuation.resume(throwing: StillWriterError.writingFailed(videoWriter.error?.localizedDescription))
+                            }
                         }
                     }
                 }
@@ -435,30 +457,23 @@ public final class StillWriter: @unchecked Sendable {
     private func createOptimizedPixelBuffer(from ciImage: CIImage) throws -> CVPixelBuffer? {
         var pixelBuffer: CVPixelBuffer?
         
-        // Try to get buffer from optimized pool first for performance
-        if let pool = pixelBufferPool {
-            let status = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &pixelBuffer)
-            if status != kCVReturnSuccess {
-                // Fallback to direct creation
-                pixelBuffer = nil
-            }
-        }
+        // IMPORTANT: For pre-rendering multiple frames, we must NOT use the pool
+        // as it will reuse buffers which causes AVAssetWriter errors when appending
+        // Always create unique buffers for each frame
         
-        // Create buffer directly if pool failed
-        if pixelBuffer == nil {
-            let attributes = createPixelBufferAttributes()
-            let status = CVPixelBufferCreate(
-                kCFAllocatorDefault,
-                Int(config.size.width),
-                Int(config.size.height),
-                ExportSettings.pixelFormat,
-                attributes as CFDictionary,
-                &pixelBuffer
-            )
-            
-            guard status == kCVReturnSuccess else {
-                throw StillWriterError.pixelBufferCreationFailed
-            }
+        // Create buffer directly - do not use pool for pre-rendered frames
+        let attributes = createPixelBufferAttributes()
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            Int(config.size.width),
+            Int(config.size.height),
+            ExportSettings.pixelFormat,
+            attributes as CFDictionary,
+            &pixelBuffer
+        )
+        
+        guard status == kCVReturnSuccess else {
+            throw StillWriterError.pixelBufferCreationFailed
         }
         
         guard let buffer = pixelBuffer else {
