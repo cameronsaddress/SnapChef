@@ -10,6 +10,23 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 13, 2025) - Part 12
+- **Fixed White Background Issue in TikTok Videos**
+  - Critical bug: Photos were appearing as white backgrounds in generated TikTok videos
+  - Root cause: CIImage(image:) was failing to preserve pixel data from UIImage
+  - Key fixes applied:
+    1. Changed CIImage creation to prefer CGImage backing in StillWriter.swift
+    2. Added sRGB color space explicitly during pixel buffer rendering
+    3. Updated MemoryOptimizer to use Metal-backed CIContext for thread safety
+    4. Fixed image optimization to ensure CGImage backing for all photos
+  - Technical improvements:
+    - StillWriter now checks for CGImage first: `if let cgImage = image.cgImage`
+    - Falls back to CIImage only if CGImage unavailable
+    - Added proper color space: `CGColorSpace(name: CGColorSpace.sRGB)!`
+    - Renderer uses sRGB color space for correct photo colors
+  - Photos from PhotoStorageManager now display correctly in all TikTok videos
+  - Verified all templates render photos without white backgrounds
+
 ### Latest Updates (Jan 13, 2025) - Part 11
 - **Fixed TikTok Video Template Photo Display Issues**
   - Photos were showing correctly in test template but not in main templates

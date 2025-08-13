@@ -126,8 +126,21 @@ public final class StillWriter: @unchecked Sendable {
         print("    - Target size: \(config.size)")
         
         // Prepare CIImage with filters applied
-        guard let ciImage = CIImage(image: optimizedUIImage) else {
-            throw StillWriterError.imageConversionFailed
+        // IMPORTANT: CIImage(image:) can fail to preserve pixel data. 
+        // We must create CIImage from CGImage to ensure pixels are preserved
+        let ciImage: CIImage
+        if let cgImage = optimizedUIImage.cgImage {
+            // Create CIImage directly from CGImage for reliable pixel data
+            ciImage = CIImage(cgImage: cgImage)
+        } else if let existingCIImage = optimizedUIImage.ciImage {
+            // Use existing CIImage if available
+            ciImage = existingCIImage
+        } else {
+            // Last resort: try the standard initializer
+            guard let fallbackCIImage = CIImage(image: optimizedUIImage) else {
+                throw StillWriterError.imageConversionFailed
+            }
+            ciImage = fallbackCIImage
         }
         
         // Debug: Verify CIImage extent is valid
