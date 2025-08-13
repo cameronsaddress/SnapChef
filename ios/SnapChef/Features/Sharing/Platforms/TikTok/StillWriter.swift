@@ -178,13 +178,13 @@ public final class StillWriter: @unchecked Sendable {
             
             videoInput.requestMediaDataWhenReady(on: DispatchQueue.global(qos: .userInitiated)) { [weak self] in
                 guard let self = self else { return }
-                while frameCountBox.value < totalFrames && !hasResumedBox.value {
-                    // IMPORTANT: Check readyForMoreMediaData inside the loop for each frame
-                    if !videoInput.isReadyForMoreMediaData {
-                        // Wait for the writer to be ready - this prevents the crash
-                        break
-                    }
-                    
+                
+                // Check if we're already done to avoid processing after completion
+                guard frameCountBox.value < totalFrames && !hasResumedBox.value else {
+                    return
+                }
+                
+                while frameCountBox.value < totalFrames && !hasResumedBox.value && videoInput.isReadyForMoreMediaData {
                     autoreleasepool {
                         let presentationTime = CMTime(value: Int64(frameCountBox.value), timescale: self.config.fps)
                         
@@ -331,13 +331,13 @@ public final class StillWriter: @unchecked Sendable {
             
             videoInput.requestMediaDataWhenReady(on: DispatchQueue.global(qos: .userInitiated)) { [weak self] in
                 guard let self = self else { return }
-                while frameCountBox.value < totalFrames {
-                    // IMPORTANT: Check readyForMoreMediaData inside the loop for each frame
-                    if !videoInput.isReadyForMoreMediaData {
-                        // Wait for the writer to be ready - this prevents the crash
-                        break
-                    }
-                    
+                
+                // Check if we're already done to avoid processing after completion
+                guard frameCountBox.value < totalFrames else {
+                    return
+                }
+                
+                while frameCountBox.value < totalFrames && videoInput.isReadyForMoreMediaData {
                     autoreleasepool {
                         let presentationTime = CMTime(value: Int64(frameCountBox.value), timescale: self.config.fps)
                         
