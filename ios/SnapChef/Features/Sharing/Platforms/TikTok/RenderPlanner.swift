@@ -171,7 +171,7 @@ public final class RenderPlanner: @unchecked Sendable {
         }
         
         // 3. AFTER image - final 3 seconds
-        let afterImage = applyColorPopEffect(to: media.afterFridge)
+        let afterImage = applyColorPopEffect(to: media.cookedMeal)  // Use cookedMeal for after photo
         items.append(RenderPlan.TrackItem(
             kind: .still(afterImage),
             timeRange: CMTimeRange(
@@ -239,7 +239,7 @@ public final class RenderPlanner: @unchecked Sendable {
         ))
         
         // 2. AFTER with circular wipe reveal (1.5-3s)
-        let afterImage = applyColorPopEffect(to: media.afterFridge)
+        let afterImage = applyColorPopEffect(to: media.cookedMeal)  // Use cookedMeal for after photo
         items.append(RenderPlan.TrackItem(
             kind: .still(afterImage),
             timeRange: CMTimeRange(
@@ -322,7 +322,7 @@ public final class RenderPlanner: @unchecked Sendable {
         var overlays: [RenderPlan.Overlay] = []
         
         // Background: looping motion between images
-        let backgroundImages = [media.beforeFridge, media.cookedMeal, media.afterFridge]
+        let backgroundImages = [media.beforeFridge, media.cookedMeal, media.cookedMeal]  // Use cookedMeal for after
         let segmentDuration = CMTime(seconds: 5, preferredTimescale: 600)
         
         for (index, image) in backgroundImages.enumerated() {
@@ -421,7 +421,7 @@ public final class RenderPlanner: @unchecked Sendable {
         ))
         
         // 3. AFTER with CTA (11-12s) - Only 1 second overlap as per timeline
-        let afterImage = applyEnhancedColorPopEffect(to: media.afterFridge)
+        let afterImage = applyEnhancedColorPopEffect(to: media.cookedMeal)  // Use cookedMeal for after photo
         items.append(RenderPlan.TrackItem(
             kind: .still(afterImage),
             timeRange: CMTimeRange(
@@ -515,7 +515,7 @@ public final class RenderPlanner: @unchecked Sendable {
         ))
         
         // 3. AFTER (9-15s) - 6 seconds as specified with color pop
-        let afterImage = applyEnhancedColorPopEffect(to: media.afterFridge)
+        let afterImage = applyEnhancedColorPopEffect(to: media.cookedMeal)  // Use cookedMeal for after photo
         items.append(RenderPlan.TrackItem(
             kind: .still(afterImage),
             timeRange: CMTimeRange(
