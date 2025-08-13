@@ -600,7 +600,15 @@ struct TikTokShareViewEnhanced: View {
         
         print("🎬 TikTok: Starting video generation with:")
         print("    - Before (fridge) photo: \(finalBeforePhoto != nil ? "✓ Available" : "✗ Missing")")
+        if let photo = finalBeforePhoto {
+            print("      Size: \(photo.size), Has CGImage: \(photo.cgImage != nil)")
+            print("      Photo object: \(photo)")
+        }
         print("    - After (meal) photo: \(finalAfterPhoto != nil ? "✓ Available" : "✗ Missing")")
+        if let photo = finalAfterPhoto {
+            print("      Size: \(photo.size), Has CGImage: \(photo.cgImage != nil)")
+            print("      Photo object: \(photo)")
+        }
         
         let updatedContent = ShareContent(
             type: content.type,
@@ -935,6 +943,16 @@ struct TemplateCardEnhanced: View {
                                 .background(
                                     Capsule()
                                         .fill(Color.red)
+                                )
+                        } else if template == .test {
+                            Label("TEST", systemImage: "wrench.and.screwdriver")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.orange)
                                 )
                         }
                     }

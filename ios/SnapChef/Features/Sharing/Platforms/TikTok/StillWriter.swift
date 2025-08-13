@@ -109,21 +109,40 @@ public final class StillWriter: @unchecked Sendable {
         print("✅ DEBUG StillWriter: Writing session started")
         
         // Calculate frame parameters
-        let frameDuration = CMTime(value: 1, timescale: config.fps)
+        _ = CMTime(value: 1, timescale: config.fps)  // Frame duration for reference
+        
+        // Log the input image details
+        print("📸 StillWriter: Processing image:")
+        print("    - Original size: \(image.size)")
+        print("    - Has CGImage: \(image.cgImage != nil)")
+        print("    - Has CIImage: \(image.ciImage != nil)")
+        print("    - Image object: \(image)")
         
         // Optimize image for processing to reduce memory usage
         let optimizedUIImage = memoryOptimizer.optimizeImageForProcessing(image, targetSize: config.size)
+        
+        print("📸 StillWriter: After optimization:")
+        print("    - Optimized size: \(optimizedUIImage.size)")
+        print("    - Target size: \(config.size)")
         
         // Prepare CIImage with filters applied
         guard let ciImage = CIImage(image: optimizedUIImage) else {
             throw StillWriterError.imageConversionFailed
         }
         
+        // Debug: Verify CIImage extent is valid
+        print("📝 DEBUG StillWriter: CIImage extent: \(ciImage.extent), size: \(ciImage.extent.size)")
+        
         var processedImage = try memoryOptimizer.processCIImageWithOptimization(
             ciImage,
             filters: filters,
             context: ciContext
         )
+        
+        // Debug: Check if CIImage is valid
+        if processedImage.extent.isEmpty {
+            print("❌ DEBUG StillWriter: CIImage extent is empty - image may be invalid")
+        }
         
         // Premium: Apply default vibrance and sharpen filters if premiumMode enabled
         if config.premiumMode {
@@ -448,9 +467,13 @@ public final class StillWriter: @unchecked Sendable {
         
         // Render CIImage to pixel buffer using shared context
         let renderRect = CGRect(origin: .zero, size: config.size)
-        // Fix: Use the sRGB color space directly (not via init with name)
-        // This ensures proper color space conversion and prevents white/washed out images
-        ciContext.render(ciImage, to: buffer, bounds: renderRect, colorSpace: CGColorSpaceCreateDeviceRGB())
+        // Fix: Create sRGB color space for proper color conversion
+        // This ensures photos from CloudKit/Camera render correctly without white backgrounds
+        let sRGBColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        ciContext.render(ciImage, to: buffer, bounds: renderRect, colorSpace: sRGBColorSpace)
+        
+        // Debug: Log color space being used
+        print("✅ DEBUG StillWriter: Rendering with sRGB color space")
         
         return buffer
     }
@@ -511,6 +534,21 @@ public final class StillWriter: @unchecked Sendable {
             finalImage = blendFilter.outputImage ?? currentImage.ciImage
         } else {
             finalImage = currentImage.ciImage
+        }
+        
+        // Premium: Template-specific glow for beatSyncedCarousel snaps
+        if config.premiumMode && currentImageIndex % 2 == 0 {  // Apply to alternating snaps
+            if let glowFilter = CIFilter(name: "CIGaussianBlur") {
+                glowFilter.setValue(finalImage, forKey: kCIInputImageKey)
+                glowFilter.setValue(3.0, forKey: "inputRadius")  // Subtle premium glow
+                if let glowed = glowFilter.outputImage {
+                    if let composite = CIFilter(name: "CISourceOverCompositing") {
+                        composite.setValue(glowed, forKey: kCIInputImageKey)
+                        composite.setValue(finalImage, forKey: kCIInputBackgroundImageKey)
+                        finalImage = composite.outputImage ?? finalImage
+                    }
+                }
+            }
         }
         
         // Apply transform if needed

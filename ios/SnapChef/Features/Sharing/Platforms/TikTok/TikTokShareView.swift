@@ -287,16 +287,48 @@ struct TikTokShareView: View {
             )
         }
         
-        // Create media bundle
-        let beforeImage = content.beforeImage ?? createPlaceholderImage(text: "BEFORE")
-        let afterImage = content.afterImage ?? createPlaceholderImage(text: "AFTER")
-        let cookedMeal = afterImage // Use after image as cooked meal if available
+        // Create media bundle with proper photos
+        print("📸 TikTokShareView: Creating MediaBundle:")
+        print("    - content.beforeImage (fridge): \(content.beforeImage != nil ? "✅ Available (\(content.beforeImage!.size))" : "❌ Missing")")
+        print("    - content.afterImage (meal): \(content.afterImage != nil ? "✅ Available (\(content.afterImage!.size))" : "❌ Missing")")
         
-        let mediaBundle = MediaBundle(
-            beforeFridge: beforeImage,
-            afterFridge: afterImage,
-            cookedMeal: cookedMeal
+        // Validate and prepare photos for video generation
+        let (validFridge, validMeal) = PhotoValidator.preparePhotosForVideo(
+            fridgePhoto: content.beforeImage,
+            mealPhoto: content.afterImage
         )
+        
+        // WARNING: If photos are nil or invalid, we're creating placeholders which show as black with text
+        let fridgePhoto: UIImage
+        let mealPhoto: UIImage
+        
+        if let validFridgePhoto = validFridge {
+            fridgePhoto = validFridgePhoto
+            print("📸 Using validated fridge photo: \(validFridgePhoto.size)")
+        } else {
+            print("⚠️ WARNING: No valid fridge photo available, creating placeholder")
+            fridgePhoto = createPlaceholderImage(text: "BEFORE")
+        }
+        
+        if let validMealPhoto = validMeal {
+            mealPhoto = validMealPhoto
+            print("📸 Using validated meal photo: \(validMealPhoto.size)")
+        } else {
+            print("⚠️ WARNING: No valid meal photo available, creating placeholder")
+            mealPhoto = createPlaceholderImage(text: "AFTER")
+        }
+        
+        // Create MediaBundle - using meal photo for both afterFridge and cookedMeal
+        // TODO: Refactor MediaBundle to remove afterFridge
+        let mediaBundle = MediaBundle(
+            beforeFridge: fridgePhoto,
+            afterFridge: mealPhoto,  // Using meal photo since afterFridge isn't a real concept
+            cookedMeal: mealPhoto
+        )
+        
+        print("📸 TikTokShareView: MediaBundle created:")
+        print("    - beforeFridge: \(fridgePhoto.size)")
+        print("    - cookedMeal: \(mealPhoto.size)")
         
         return (viralRecipe, mediaBundle)
     }
@@ -466,6 +498,8 @@ struct ViralTemplateCard: View {
             return [Color(hex: "#43e97b"), Color(hex: "#38f9d7")]
         case .greenScreenPIP:
             return [Color(hex: "#fa709a"), Color(hex: "#fee140")]
+        case .test:
+            return [Color.orange, Color.yellow]  // Bright orange-yellow for visibility
         }
     }
     
@@ -476,6 +510,7 @@ struct ViralTemplateCard: View {
         case .kineticTextSteps: return "text.bubble"
         case .priceTimeChallenge: return "dollarsign.circle"
         case .greenScreenPIP: return "camera.on.rectangle"
+        case .test: return "photo.on.rectangle"
         }
     }
     
@@ -486,6 +521,7 @@ struct ViralTemplateCard: View {
         case .kineticTextSteps: return "Kinetic Text"
         case .priceTimeChallenge: return "Price Challenge"
         case .greenScreenPIP: return "Green Screen"
+        case .test: return "Test (Photos Only)"
         }
     }
 }
@@ -571,6 +607,8 @@ struct TemplatePreview: View {
             TimelapsePreview(content: content)
         case .greenScreenPIP:
             Ingredients360Preview(content: content)
+        case .test:
+            TestTemplatePreview(content: content)
         }
     }
 }

@@ -29,16 +29,38 @@ struct RecipePhotoView: View {
     }
     
     // Computed properties to simplify complex conditionals
+    private var storedPhotos: PhotoStorageManager.RecipePhotos? {
+        PhotoStorageManager.shared.getPhotos(for: recipe.id)
+    }
+    
     private var savedRecipe: SavedRecipe? {
         appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id })
     }
     
     private var displayBeforePhoto: UIImage? {
-        beforePhoto ?? savedRecipe?.beforePhoto
+        // Use PhotoStorageManager as primary source
+        if let storedPhoto = storedPhotos?.fridgePhoto {
+            return storedPhoto
+        }
+        // Fall back to CloudKit photo
+        if let cloudKitPhoto = beforePhoto {
+            return cloudKitPhoto
+        }
+        // Legacy fallback to appState
+        return savedRecipe?.beforePhoto
     }
     
     private var displayAfterPhoto: UIImage? {
-        afterPhoto ?? savedRecipe?.afterPhoto
+        // Use PhotoStorageManager as primary source
+        if let storedPhoto = storedPhotos?.mealPhoto {
+            return storedPhoto
+        }
+        // Fall back to CloudKit photo
+        if let cloudKitPhoto = afterPhoto {
+            return cloudKitPhoto
+        }
+        // Legacy fallback to appState
+        return savedRecipe?.afterPhoto
     }
     
     private var halfWidth: CGFloat? {
@@ -95,7 +117,9 @@ struct RecipePhotoView: View {
             )
             .onDisappear {
                 if let photo = afterPhoto {
-                    // Save the after photo to local storage as well
+                    // Save the after photo to PhotoStorageManager (single source of truth)
+                    PhotoStorageManager.shared.storeMealPhoto(photo, for: recipe.id)
+                    // Also update appState for backwards compatibility
                     appState.updateAfterPhoto(for: recipe.id, afterPhoto: photo)
                 }
             }
@@ -248,6 +272,17 @@ struct RecipePhotoView: View {
                 await MainActor.run {
                     self.beforePhoto = photos.before
                     self.afterPhoto = photos.after
+                    
+                    // Store CloudKit photos in PhotoStorageManager (single source of truth)
+                    if photos.before != nil || photos.after != nil {
+                        PhotoStorageManager.shared.storePhotos(
+                            fridgePhoto: photos.before,
+                            mealPhoto: photos.after,
+                            for: recipe.id
+                        )
+                        print("📸 RecipePhotoView: Stored CloudKit photos in PhotoStorageManager for recipe \(recipe.id)")
+                    }
+                    
                     self.isLoadingPhotos = false
                 }
             } catch {

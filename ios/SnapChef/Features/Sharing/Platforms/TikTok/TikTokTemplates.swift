@@ -14,6 +14,7 @@ enum TikTokTemplate: String, CaseIterable {
     case ingredients360 = "360° Ingredients"
     case timelapse = "Cooking Timelapse"
     case splitScreen = "Split Screen"
+    case test = "Test (Photos Only)"  // Simple test template - no effects
     
     var name: String {
         return rawValue
@@ -31,6 +32,8 @@ enum TikTokTemplate: String, CaseIterable {
             return "Speed up cooking process with music sync"
         case .splitScreen:
             return "Side-by-side comparison of process and result"
+        case .test:
+            return "Simple test: 1 second before photo, 1 second after photo, no effects"
         }
     }
     
@@ -41,6 +44,7 @@ enum TikTokTemplate: String, CaseIterable {
         case .ingredients360: return "rotate.3d"
         case .timelapse: return "forward.fill"
         case .splitScreen: return "rectangle.split.2x1"
+        case .test: return "photo.on.rectangle"
         }
     }
     
@@ -56,6 +60,8 @@ enum TikTokTemplate: String, CaseIterable {
             return [Color(hex: "#43e97b"), Color(hex: "#38f9d7")]
         case .splitScreen:
             return [Color(hex: "#fa709a"), Color(hex: "#fee140")]
+        case .test:
+            return [Color.orange, Color.yellow]  // Bright orange-yellow for visibility
         }
     }
     
@@ -72,6 +78,8 @@ enum TikTokTemplate: String, CaseIterable {
             TimelapsePreview(content: content)
         case .splitScreen:
             SplitScreenPreview(content: content)
+        case .test:
+            TestTemplatePreview(content: content)
         }
     }
 }
@@ -264,4 +272,70 @@ struct TrendingAudio: Identifiable {
         TrendingAudio(name: "Kitchen Magic", artist: "Trending Audio", useCount: 142),
         TrendingAudio(name: "Yummy Time", artist: "Food Beats", useCount: 98)
     ]
+}
+
+// MARK: - Test Template Preview
+
+struct TestTemplatePreview: View {
+    let content: ShareContent
+    @State private var showingAfter = false
+    
+    var body: some View {
+        ZStack {
+            // Simple display - before or after
+            if !showingAfter {
+                // Before photo
+                if let beforeImage = content.beforeImage {
+                    Image(uiImage: beforeImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .overlay(
+                            Text("BEFORE")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding()
+                                .background(Color.black.opacity(0.7))
+                                .cornerRadius(8)
+                                .padding()
+                            , alignment: .top
+                        )
+                } else {
+                    Text("No Before Photo")
+                        .font(.title)
+                        .foregroundColor(.white)
+                }
+            } else {
+                // After photo
+                if let afterImage = content.afterImage {
+                    Image(uiImage: afterImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .overlay(
+                            Text("AFTER")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding()
+                                .background(Color.black.opacity(0.7))
+                                .cornerRadius(8)
+                                .padding()
+                            , alignment: .top
+                        )
+                } else {
+                    Text("No After Photo")
+                        .font(.title)
+                        .foregroundColor(.white)
+                }
+            }
+        }
+        .onAppear {
+            // Simple timer to switch between before and after
+            Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                Task { @MainActor in
+                    withAnimation {
+                        showingAfter.toggle()
+                    }
+                }
+            }
+        }
+    }
 }

@@ -39,6 +39,21 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         config: RenderConfig,
         progressCallback: @escaping @Sendable (Double) async -> Void = { _ in }
     ) async throws -> URL {
+        print("🎥 ViralVideoRenderer: Starting render with plan containing \(plan.items.count) items")
+        
+        // Log render plan items info
+        for (itemIndex, item) in plan.items.enumerated() {
+            switch item.kind {
+            case .still(let image):
+                print("  📸 Item \(itemIndex) - Still image for \(item.timeRange.duration.seconds)s:")
+                print("      - Image size: \(image.size)")
+                print("      - Has CGImage: \(image.cgImage != nil)")
+                print("      - Has CIImage: \(image.ciImage != nil)")
+            case .video(let url):
+                print("  🎬 Item \(itemIndex) - Video: \(url.lastPathComponent)")
+            }
+        }
+        
         // Render base video
         let baseVideoURL = try await renderBaseVideo(
             plan: plan,
@@ -54,6 +69,14 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         )
         
         await progressCallback(1.0) // 100%
+        
+        print("🎥 ViralVideoRenderer: Final video URL: \(compositedURL.lastPathComponent)")
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: compositedURL.path),
+           let fileSize = attributes[.size] as? Int64 {
+            let sizeInMB = Double(fileSize) / (1024 * 1024)
+            print("📏 ViralVideoRenderer: Video file size: \(String(format: "%.2f", sizeInMB)) MB")
+        }
+        
         return compositedURL
     }
     

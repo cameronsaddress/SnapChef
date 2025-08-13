@@ -97,6 +97,9 @@ struct SnapChefApp: App {
             try? await cloudKitDataManager.registerDevice()
             await cloudKitDataManager.performFullSync()
             cloudKitDataManager.trackScreenView("AppLaunch")
+            
+            // Sync CloudKit photos to PhotoStorageManager
+            await syncCloudKitPhotosToStorage()
         }
     }
     
@@ -132,6 +135,46 @@ struct SnapChefApp: App {
         if socialShareManager.handleIncomingURL(url) {
             socialShareManager.resolvePendingDeepLink()
         }
+    }
+    
+    @MainActor
+    private func syncCloudKitPhotosToStorage() async {
+        print("📸 Starting CloudKit photo sync to PhotoStorageManager...")
+        
+        // Get all CloudKit recipes
+        let cloudKitRecipes = await CloudKitRecipeCache.shared.getRecipes(forceRefresh: false)
+        
+        print("📸 Found \(cloudKitRecipes.count) CloudKit recipes to check for photos")
+        
+        // Fetch photos for recipes that don't have them in PhotoStorageManager
+        for recipe in cloudKitRecipes {
+            // Check if we already have photos in PhotoStorageManager
+            if PhotoStorageManager.shared.hasCompletePhotos(for: recipe.id) {
+                print("📸 Recipe \(recipe.name) already has complete photos in storage")
+                continue
+            }
+            
+            // Fetch photos from CloudKit
+            do {
+                let photos = try await CloudKitRecipeManager.shared.fetchRecipePhotos(for: recipe.id.uuidString)
+                
+                // Store in PhotoStorageManager if we got any photos
+                if photos.before != nil || photos.after != nil {
+                    PhotoStorageManager.shared.storePhotos(
+                        fridgePhoto: photos.before,
+                        mealPhoto: photos.after,
+                        for: recipe.id
+                    )
+                    print("✅ Synced photos for recipe: \(recipe.name)")
+                    print("    - Before: \(photos.before != nil ? "✓" : "✗")")
+                    print("    - After: \(photos.after != nil ? "✓" : "✗")")
+                }
+            } catch {
+                print("❌ Failed to sync photos for recipe \(recipe.name): \(error)")
+            }
+        }
+        
+        print("✅ CloudKit photo sync completed")
     }
 }
 

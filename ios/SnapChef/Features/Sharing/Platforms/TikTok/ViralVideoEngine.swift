@@ -249,37 +249,63 @@ public class ViralVideoEngine: ObservableObject {
             // Phase 3: Rendering Frames (20-60%)
             try await updateProgress(.renderingFrames, 0.2, progressHandler)
             print("🎬 DEBUG: Starting base video render...")
-            let baseVideoURL = try await renderer.renderBaseVideo(
-                plan: renderPlan,
-                progressCallback: { @Sendable frameProgress in
-                    _ = 0.2 + (frameProgress * 0.4) // 20% to 60%
-                    // Progress updates are handled by the renderer
-                }
-            )
+            
+            // For test template, use a special renderer with effects disabled
+            let baseVideoURL: URL
+            if template == .test {
+                print("🧪 TEST TEMPLATE: Creating renderer with effects disabled")
+                var testConfig = RenderConfig()
+                testConfig.premiumMode = false  // Disable ALL premium effects
+                let testRenderer = ViralVideoRenderer(config: testConfig)
+                baseVideoURL = try await testRenderer.renderBaseVideo(
+                    plan: renderPlan,
+                    progressCallback: { @Sendable frameProgress in
+                        _ = 0.2 + (frameProgress * 0.4) // 20% to 60%
+                        // Progress updates are handled by the renderer
+                    }
+                )
+            } else {
+                baseVideoURL = try await renderer.renderBaseVideo(
+                    plan: renderPlan,
+                    progressCallback: { @Sendable frameProgress in
+                        _ = 0.2 + (frameProgress * 0.4) // 20% to 60%
+                        // Progress updates are handled by the renderer
+                    }
+                )
+            }
             print("✅ DEBUG: Base video rendered successfully at: \(baseVideoURL.lastPathComponent)")
             
-            // Phase 4: Compositing (60-70%)
-            try await updateProgress(.compositing, 0.6, progressHandler)
-            print("🎬 DEBUG: Starting video composition...")
-            let compositedURL = try await renderer.compositeVideo(
-                baseURL: baseVideoURL,
-                plan: renderPlan
-            )
-            print("✅ DEBUG: Video composited successfully at: \(compositedURL.lastPathComponent)")
-            try await updateProgress(.compositing, 0.7, progressHandler)
-            
-            // Phase 5: Adding Overlays (70-85%)
-            try await updateProgress(.addingOverlays, 0.7, progressHandler)
-            print("🎬 DEBUG: Starting overlay application...")
-            let overlayURL = try await overlayFactory.applyOverlays(
-                videoURL: compositedURL,
-                overlays: renderPlan.overlays,
-                progressCallback: { @Sendable overlayProgress in
-                    _ = 0.7 + (overlayProgress * 0.15) // 70% to 85%
-                    // Progress updates are handled by the overlay factory
-                }
-            )
-            print("✅ DEBUG: Overlays applied successfully at: \(overlayURL.lastPathComponent)")
+            // SPECIAL HANDLING FOR TEST TEMPLATE - Skip all compositing and overlays
+            let finalVideoURL: URL
+            if template == .test {
+                print("🧪 TEST TEMPLATE: Skipping compositing and overlays - using raw base video")
+                finalVideoURL = baseVideoURL
+                try await updateProgress(.finalizing, 0.9, progressHandler)
+            } else {
+                // Phase 4: Compositing (60-70%)
+                try await updateProgress(.compositing, 0.6, progressHandler)
+                print("🎬 DEBUG: Starting video composition...")
+                let compositedURL = try await renderer.compositeVideo(
+                    baseURL: baseVideoURL,
+                    plan: renderPlan
+                )
+                print("✅ DEBUG: Video composited successfully at: \(compositedURL.lastPathComponent)")
+                try await updateProgress(.compositing, 0.7, progressHandler)
+                
+                // Phase 5: Adding Overlays (70-85%)
+                try await updateProgress(.addingOverlays, 0.7, progressHandler)
+                print("🎬 DEBUG: Starting overlay application...")
+                let overlayURL = try await overlayFactory.applyOverlays(
+                    videoURL: compositedURL,
+                    overlays: renderPlan.overlays,
+                    progressCallback: { @Sendable overlayProgress in
+                        _ = 0.7 + (overlayProgress * 0.15) // 70% to 85%
+                        // Progress updates are handled by the overlay factory
+                    }
+                )
+                print("✅ DEBUG: Overlays applied successfully at: \(overlayURL.lastPathComponent)")
+                finalVideoURL = overlayURL
+            }
             
             // Phase 6: Encoding (85-95%) - Skipped to avoid "operation stopped" error
             try await updateProgress(.encoding, 0.85, progressHandler)
@@ -291,14 +317,19 @@ public class ViralVideoEngine: ObservableObject {
             performanceMonitor.markPhaseStart(.finalizing)
             try await updateProgress(.finalizing, 0.95, progressHandler)
             print("🎬 DEBUG: Starting video finalization...")
-            let finalURL = try await finalizeVideo(overlayURL)  // Use overlayURL directly
+            let finalURL = try await finalizeVideo(finalVideoURL)  // Use finalVideoURL
             print("✅ DEBUG: Video finalized successfully at: \(finalURL.lastPathComponent)")
             performanceMonitor.markPhaseEnd(.finalizing)
             try await updateProgress(.complete, 1.0, progressHandler)
             
             // Clean up intermediate files immediately
-            let tempFilesToClean = [baseVideoURL, compositedURL]  // overlayURL is now the final URL
-            memoryOptimizer.deleteTempFiles(tempFilesToClean)
+            if template == .test {
+                // For test template, no intermediate files to clean (baseVideo is the final)
+                memoryOptimizer.deleteTempFiles([])
+            } else {
+                // For other templates, clean up intermediate files but not the final
+                memoryOptimizer.deleteTempFiles([baseVideoURL])
+            }
             
             return finalURL
             
@@ -338,6 +369,11 @@ public class ViralVideoEngine: ObservableObject {
     }
     
     private func prepareAssets(media: MediaBundle) async throws {
+        print("📸 ViralVideoEngine: Preparing assets from MediaBundle:")
+        print("    - beforeFridge: \(media.beforeFridge.size) - Has CGImage: \(media.beforeFridge.cgImage != nil)")
+        print("    - afterFridge: \(media.afterFridge.size) - Has CGImage: \(media.afterFridge.cgImage != nil)")
+        print("    - cookedMeal: \(media.cookedMeal.size) - Has CGImage: \(media.cookedMeal.cgImage != nil)")
+        
         // Validate images are in correct format and size
         _ = config.size
         

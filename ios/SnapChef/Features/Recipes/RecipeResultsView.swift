@@ -78,26 +78,75 @@ struct RecipeResultsView: View {
                                     confettiTrigger = true
                                 },
                                 onShare: {
-                                    // Use branded share popup instead
-                                    // Check if we have CloudKit photos cached
-                                    if let photos = cloudKitPhotos[recipe.id] {
-                                        shareContent = ShareContent(
-                                            type: .recipe(recipe),
-                                            beforeImage: photos.before ?? capturedImage,
-                                            afterImage: photos.after ?? getAfterPhotoForRecipe(recipe)
-                                        )
-                                        showBrandedShare = true
-                                    } else {
-                                        // Fetch from CloudKit first
-                                        fetchCloudKitPhotosForRecipe(recipe) { beforePhoto, afterPhoto in
-                                            cloudKitPhotos[recipe.id] = (beforePhoto, afterPhoto)
+                                    print("🔴 SHARE BUTTON PRESSED for recipe: \(recipe.name) (ID: \(recipe.id))")
+                                    
+                                    // Get photos from PhotoStorageManager first
+                                    let storedPhotos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+                                    
+                                    // Use stored photos, fallback to CloudKit, then capturedImage
+                                    let fridgePhoto = storedPhotos?.fridgePhoto ?? capturedImage
+                                    let mealPhoto = storedPhotos?.mealPhoto
+                                    
+                                    print("📸 RecipeResultsView: Preparing share for recipe \(recipe.id)")
+                                    print("    - storedPhotos exists: \(storedPhotos != nil)")
+                                    print("    - fridgePhoto from storage: \(storedPhotos?.fridgePhoto != nil)")
+                                    if let fp = storedPhotos?.fridgePhoto {
+                                        print("      - Storage fridge photo size: \(fp.size)")
+                                        print("      - Storage fridge photo has CGImage: \(fp.cgImage != nil)")
+                                    }
+                                    print("    - mealPhoto from storage: \(storedPhotos?.mealPhoto != nil)")
+                                    print("    - capturedImage available: \(capturedImage != nil)")
+                                    if let ci = capturedImage {
+                                        print("      - capturedImage size: \(ci.size)")
+                                        print("      - capturedImage has CGImage: \(ci.cgImage != nil)")
+                                    }
+                                    print("    - Final fridgePhoto: \(fridgePhoto != nil ? "✅" : "❌")")
+                                    print("    - Final mealPhoto: \(mealPhoto != nil ? "✅" : "❌")")
+                                    
+                                    // If we don't have a meal photo, try CloudKit
+                                    if mealPhoto == nil {
+                                        // Check CloudKit cache
+                                        if let photos = cloudKitPhotos[recipe.id] {
+                                            print("🟡 Creating ShareContent with CloudKit cached photos:")
+                                            print("    - beforeImage (fridge): \(fridgePhoto != nil ? "✅ \(fridgePhoto!.size)" : "❌")")
+                                            print("    - afterImage (meal from CloudKit): \(photos.after != nil ? "✅ \(photos.after!.size)" : "❌")")
+                                            
                                             shareContent = ShareContent(
                                                 type: .recipe(recipe),
-                                                beforeImage: beforePhoto ?? capturedImage,
-                                                afterImage: afterPhoto ?? getAfterPhotoForRecipe(recipe)
+                                                beforeImage: fridgePhoto,
+                                                afterImage: photos.after
                                             )
                                             showBrandedShare = true
+                                        } else {
+                                            // Fetch from CloudKit
+                                            fetchCloudKitPhotosForRecipe(recipe) { beforePhoto, afterPhoto in
+                                                cloudKitPhotos[recipe.id] = (beforePhoto, afterPhoto)
+                                                
+                                                // Store in PhotoStorageManager if we got photos
+                                                if let afterPhoto = afterPhoto {
+                                                    PhotoStorageManager.shared.storeMealPhoto(afterPhoto, for: recipe.id)
+                                                }
+                                                
+                                                shareContent = ShareContent(
+                                                    type: .recipe(recipe),
+                                                    beforeImage: fridgePhoto,
+                                                    afterImage: afterPhoto
+                                                )
+                                                showBrandedShare = true
+                                            }
                                         }
+                                    } else {
+                                        // We have both photos
+                                        print("🟢 Creating ShareContent with local photos:")
+                                        print("    - beforeImage (fridge): \(fridgePhoto != nil ? "✅ \(fridgePhoto!.size)" : "❌")")
+                                        print("    - afterImage (meal): \(mealPhoto != nil ? "✅ \(mealPhoto!.size)" : "❌")")
+                                        
+                                        shareContent = ShareContent(
+                                            type: .recipe(recipe),
+                                            beforeImage: fridgePhoto,
+                                            afterImage: mealPhoto
+                                        )
+                                        showBrandedShare = true
                                     }
                                 },
                                 onSave: {

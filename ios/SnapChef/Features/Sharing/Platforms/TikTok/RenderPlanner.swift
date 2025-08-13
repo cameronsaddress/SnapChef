@@ -41,6 +41,8 @@ public final class RenderPlanner: @unchecked Sendable {
             return try await createPriceTimeChallengePlan(recipe: recipe, media: media)
         case .greenScreenPIP:
             return try await createGreenScreenPIPPlan(recipe: recipe, media: media)
+        case .test:
+            return try await createTestTemplatePlan(recipe: recipe, media: media)
         }
     }
     
@@ -1032,5 +1034,53 @@ public final class RenderPlanner: @unchecked Sendable {
     
     private func createIngredientCalloutOverlay(text: String, index: Int, config: RenderConfig) -> CALayer {
         return createSalvagedIngredientCallout(text: text, index: index, config: config)
+    }
+    
+    // MARK: - Test Template Plan
+    
+    private func createTestTemplatePlan(
+        recipe: ViralRecipe,
+        media: MediaBundle
+    ) async throws -> RenderPlan {
+        
+        let totalDuration = ViralTemplate.test.duration  // 2 seconds
+        var items: [RenderPlan.TrackItem] = []
+        
+        print("🧪 TEST TEMPLATE: Creating render plan")
+        print("    - beforeFridge: \(media.beforeFridge.size)")
+        print("    - cookedMeal: \(media.cookedMeal.size)")
+        
+        // 1. BEFORE photo (0-1s) - Fridge photo, no effects
+        items.append(RenderPlan.TrackItem(
+            kind: .still(media.beforeFridge),
+            timeRange: CMTimeRange(
+                start: .zero,
+                duration: CMTime(seconds: 1, preferredTimescale: 600)
+            ),
+            transform: .identity,
+            filters: []  // No filters
+        ))
+        
+        // 2. AFTER photo (1-2s) - Cooked meal photo, no effects
+        items.append(RenderPlan.TrackItem(
+            kind: .still(media.cookedMeal),  // Use cookedMeal, not afterFridge
+            timeRange: CMTimeRange(
+                start: CMTime(seconds: 1, preferredTimescale: 600),
+                duration: CMTime(seconds: 1, preferredTimescale: 600)
+            ),
+            transform: .identity,
+            filters: []  // No filters
+        ))
+        
+        print("🧪 TEST TEMPLATE: Render plan created with \(items.count) items")
+        
+        // No overlays, no audio, no effects - just the photos
+        return RenderPlan(
+            items: items,
+            overlays: [],  // No overlays
+            audio: nil,    // No audio
+            outputDuration: totalDuration,
+            pip: nil       // No PIP
+        )
     }
 }

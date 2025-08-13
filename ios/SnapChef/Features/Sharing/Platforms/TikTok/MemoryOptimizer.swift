@@ -9,6 +9,8 @@
 import UIKit
 import AVFoundation
 import CoreImage
+import QuartzCore
+import Metal
 import os.log
 
 /// Memory management and optimization as specified in requirements
@@ -22,6 +24,9 @@ public final class MemoryOptimizer: @unchecked Sendable {
     private var memoryWarningObserver: NSObjectProtocol?
     private var isMonitoring = false
     
+    // Fix: Thread-safe lock for pixelBufferPools dictionary access
+    private let poolsLock = NSLock()
+    
     // MARK: - Optimization Techniques (Requirements)
     
     // 1. Reuse CVPixelBuffer pools
@@ -29,22 +34,27 @@ public final class MemoryOptimizer: @unchecked Sendable {
     
     // 2. Cache CIContext
     private lazy var sharedCIContext: CIContext = {
-        // Create proper color spaces for CIContext
-        let workingColorSpace = CGColorSpaceCreateDeviceRGB()
-        let outputColorSpace = CGColorSpaceCreateDeviceRGB()
+        // Create proper color spaces for CIContext - use sRGB for consistency with photos
+        let workingColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        let outputColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
         
-        let eaglContext = EAGLContext(api: .openGLES3) ?? EAGLContext(api: .openGLES2)
-        if let eaglContext = eaglContext {
-            return CIContext(eaglContext: eaglContext, options: [
+        // Fix: Use Metal for thread-safety instead of EAGL (OpenGL)
+        // Metal is thread-safe and doesn't require makeCurrentContext
+        if let device = MTLCreateSystemDefaultDevice() {
+            print("✅ DEBUG MemoryOptimizer: Using Metal CIContext (thread-safe)")
+            return CIContext(mtlDevice: device, options: [
                 .workingColorSpace: workingColorSpace,
                 .outputColorSpace: outputColorSpace,
                 .cacheIntermediates: false  // Reduce memory usage
             ])
         } else {
+            // Fallback to CPU renderer for complete thread-safety
+            print("⚠️ DEBUG MemoryOptimizer: Metal unavailable, using CPU CIContext")
             return CIContext(options: [
                 .workingColorSpace: workingColorSpace,
                 .outputColorSpace: outputColorSpace,
-                .cacheIntermediates: false
+                .cacheIntermediates: false,
+                .useSoftwareRenderer: true  // Force CPU for thread-safety
             ])
         }
     }()
@@ -116,8 +126,10 @@ public final class MemoryOptimizer: @unchecked Sendable {
     /// Force memory cleanup when needed
     public func forceMemoryCleanup() {
         autoreleasepool {
-            // Clear pixel buffer pools
+            // Clear pixel buffer pools with thread-safe lock
+            poolsLock.lock()
             pixelBufferPools.removeAll()
+            poolsLock.unlock()
             
             // Force garbage collection
             CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0, false)
@@ -131,6 +143,10 @@ public final class MemoryOptimizer: @unchecked Sendable {
     /// 1. Reuse CVPixelBuffer pools
     public func getPixelBufferPool(for config: RenderConfig) -> CVPixelBufferPool? {
         let key = "\(Int(config.size.width))x\(Int(config.size.height))"
+        
+        // Fix: Lock for thread-safe dictionary access
+        poolsLock.lock()
+        defer { poolsLock.unlock() }
         
         if let existingPool = pixelBufferPools[key] {
             return existingPool
@@ -168,6 +184,8 @@ public final class MemoryOptimizer: @unchecked Sendable {
     
     /// 2. Get cached CIContext
     public func getCIContext() -> CIContext {
+        // Debug: Log context type to verify it's not EAGL
+        print("📝 DEBUG MemoryOptimizer: Context type: \(String(describing: type(of: sharedCIContext)))")
         return sharedCIContext
     }
     
@@ -208,32 +226,86 @@ public final class MemoryOptimizer: @unchecked Sendable {
     
     // MARK: - Memory Optimization Strategies
     
-    /// Optimize image for processing
+    /// Optimize image for processing - resize with aspect fill to prevent transparency
     public func optimizeImageForProcessing(_ image: UIImage, targetSize: CGSize) -> UIImage {
-        // Only resize if necessary to save memory
-        let currentSize = image.size
-        if currentSize.width <= targetSize.width && currentSize.height <= targetSize.height {
+        // Fix: Force CGImage backing for CI-backed images to ensure drawing works on background
+        print("📝 DEBUG MemoryOptimizer: Input has CGImage: \(image.cgImage != nil)")
+        
+        guard let cgImage = image.cgImage else {
+            print("❌ DEBUG MemoryOptimizer: Input image has no CGImage - forcing CGImage creation")
+            // Try to force CGImage creation for CI-backed images
+            if let ciImage = image.ciImage {
+                let context = getCIContext()
+                let extent = ciImage.extent
+                if let generatedCGImage = context.createCGImage(ciImage, from: extent) {
+                    print("✅ DEBUG MemoryOptimizer: Successfully created CGImage from CIImage")
+                    let uiImageWithCG = UIImage(cgImage: generatedCGImage, scale: image.scale, orientation: image.imageOrientation)
+                    return optimizeImageForProcessing(uiImageWithCG, targetSize: targetSize)
+                }
+            }
+            print("❌ DEBUG MemoryOptimizer: Cannot create CGImage - returning original")
             return image
         }
         
-        // Calculate optimal size maintaining aspect ratio
-        let widthRatio = targetSize.width / currentSize.width
-        let heightRatio = targetSize.height / currentSize.height
-        let ratio = min(widthRatio, heightRatio)
+        // Create UIImage with guaranteed CGImage backing
+        let uiImageWithCG = UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
         
-        let newSize = CGSize(
-            width: currentSize.width * ratio,
-            height: currentSize.height * ratio
-        )
+        // Fix: Use thread-safe UIGraphicsImageRenderer for background queue compatibility
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = true  // Ensure no transparency
+        format.scale = 1.0    // Use 1.0 scale for consistent size
         
-        // Use autoreleasepool for memory management
-        return autoreleasepool {
-            UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
-            defer { UIGraphicsEndImageContext() }
+        let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
+        
+        let optimizedImage = renderer.image { context in
+            // Debug: Confirm renderer context is working
+            print("📝 DEBUG MemoryOptimizer: Renderer context created successfully")
             
-            image.draw(in: CGRect(origin: .zero, size: newSize))
-            return UIGraphicsGetImageFromCurrentImageContext() ?? image
+            // Fill with black background to ensure no transparent areas
+            UIColor.black.setFill()
+            context.fill(CGRect(origin: .zero, size: targetSize))
+            
+            // Calculate aspect fill to cover entire area (clip edges if needed)
+            let aspectRatio = image.size.width / image.size.height
+            let targetRatio = targetSize.width / targetSize.height
+            
+            var drawRect: CGRect
+            if aspectRatio > targetRatio {
+                // Image is wider - fit height, clip width
+                let drawWidth = targetSize.height * aspectRatio
+                drawRect = CGRect(x: (targetSize.width - drawWidth) / 2, y: 0,
+                                width: drawWidth, height: targetSize.height)
+            } else {
+                // Image is taller - fit width, clip height
+                let drawHeight = targetSize.width / aspectRatio
+                drawRect = CGRect(x: 0, y: (targetSize.height - drawHeight) / 2,
+                                width: targetSize.width, height: drawHeight)
+            }
+            
+            // Draw image with aspect fill using CG-backed version (will clip edges if needed)
+            uiImageWithCG.draw(in: drawRect)
+            
+            // Premium: Add subtle vignette for beatSyncedCarousel (edge darkening effect)
+            // Simple gradient vignette using Core Graphics for thread safety
+            let vignetteLayer = CAGradientLayer()
+            vignetteLayer.frame = CGRect(origin: .zero, size: targetSize)
+            vignetteLayer.colors = [
+                UIColor.black.withAlphaComponent(0.0).cgColor,
+                UIColor.black.withAlphaComponent(0.3).cgColor
+            ]
+            vignetteLayer.locations = [0.7, 1.0]
+            vignetteLayer.type = .radial
+            vignetteLayer.startPoint = CGPoint(x: 0.5, y: 0.5)
+            vignetteLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
+            
+            // Render vignette gradient onto the image
+            vignetteLayer.render(in: context.cgContext)
         }
+        
+        // Debug: Log the optimized image size
+        print("📝 DEBUG MemoryOptimizer: Optimized image from \(image.size) to \(optimizedImage.size)")
+        
+        return optimizedImage
     }
     
     /// Process CIImage with memory optimization
@@ -243,7 +315,7 @@ public final class MemoryOptimizer: @unchecked Sendable {
         context: CIContext? = nil
     ) throws -> CIImage {
         
-        let ciContext = context ?? getCIContext()
+        _ = context ?? getCIContext()  // Context is available but not used in current implementation
         var processedImage = image
         
         // Process filters in batches to manage memory
@@ -290,9 +362,11 @@ public final class MemoryOptimizer: @unchecked Sendable {
         
         // Emergency cleanup
         autoreleasepool {
-            // Clear pixel buffer pools
+            // Clear pixel buffer pools with thread-safe lock
+            poolsLock.lock()
             let poolCount = pixelBufferPools.count
             pixelBufferPools.removeAll()
+            poolsLock.unlock()
             
             // Force garbage collection
             CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0, false)
@@ -315,8 +389,10 @@ public final class MemoryOptimizer: @unchecked Sendable {
             
             // Clean up old pixel buffer pools if memory usage is high
             if beforeMemory > (ExportSettings.maxMemoryUsage * 7 / 10) { // 70% of limit
+                poolsLock.lock()
                 let poolCount = pixelBufferPools.count
                 pixelBufferPools.removeAll()
+                poolsLock.unlock()
                 
                 let afterMemory = getCurrentMemoryUsage()
                 let saved = beforeMemory > afterMemory ? beforeMemory - afterMemory : 0
@@ -328,7 +404,9 @@ public final class MemoryOptimizer: @unchecked Sendable {
     
     private func cleanupAllResources() {
         autoreleasepool {
+            poolsLock.lock()
             pixelBufferPools.removeAll()
+            poolsLock.unlock()
             
             // Clear any cached data in CIContext
             // Note: CIContext doesn't have a public clear method, but releasing it forces cleanup

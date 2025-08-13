@@ -2,14 +2,13 @@ import SwiftUI
 
 struct RecipesView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitRecipeCache = CloudKitRecipeCache.shared
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @State private var selectedCategory = "All"
     @State private var searchText = ""
     @State private var contentVisible = false
     @State private var showingFilters = false
-    @State private var cloudKitRecipes: [Recipe] = []
-    @State private var isLoadingCloudKit = false
+    @State private var hasInitiallyLoaded = false
     
     // Filter states
     @State private var selectedDifficulty: Recipe.Difficulty?
@@ -64,11 +63,11 @@ struct RecipesView: View {
                         }
                         
                         // Loading indicator for CloudKit
-                        if isLoadingCloudKit {
+                        if cloudKitRecipeCache.isLoading {
                             HStack {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "#667eea")))
-                                Text("Loading saved recipes...")
+                                Text(hasInitiallyLoaded ? "Checking for new recipes..." : "Loading saved recipes...")
                                     .font(.system(size: 14, weight: .medium))
                                     .foregroundColor(.white.opacity(0.8))
                             }
@@ -86,7 +85,7 @@ struct RecipesView: View {
                             .staggeredFade(index: 4, isShowing: contentVisible)
                         
                         // Empty State
-                        if filteredRecipes.isEmpty && !isLoadingCloudKit {
+                        if filteredRecipes.isEmpty && !cloudKitRecipeCache.isLoading {
                             EmptyRecipesView()
                                 .padding(.top, 50)
                                 .staggeredFade(index: 5, isShowing: contentVisible)
@@ -119,13 +118,19 @@ struct RecipesView: View {
             }
             // Load CloudKit recipes if authenticated
             if cloudKitAuth.isAuthenticated {
-                loadCloudKitRecipes()
+                loadCloudKitRecipes(forceRefresh: false)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            // Reload CloudKit recipes when app comes to foreground
+            // Only check for new recipes when app comes to foreground (don't force refresh)
+            if cloudKitAuth.isAuthenticated && hasInitiallyLoaded {
+                loadCloudKitRecipes(forceRefresh: false)
+            }
+        }
+        .refreshable {
+            // Pull to refresh - force a fresh fetch
             if cloudKitAuth.isAuthenticated {
-                loadCloudKitRecipes()
+                await loadCloudKitRecipesAsync(forceRefresh: true)
             }
         }
         .sheet(isPresented: $showingFilters) {
@@ -148,8 +153,8 @@ struct RecipesView: View {
     }
     
     var filteredRecipes: [Recipe] {
-        // Combine local and CloudKit recipes
-        let allRecipes = appState.recentRecipes + cloudKitRecipes
+        // Combine local and CloudKit cached recipes
+        let allRecipes = appState.recentRecipes + cloudKitRecipeCache.cachedRecipes
         return allRecipes.filter { recipe in
             // Search filter
             let matchesSearch = searchText.isEmpty || 
@@ -221,48 +226,36 @@ struct RecipesView: View {
     }
     
     // MARK: - CloudKit Integration
-    private func loadCloudKitRecipes() {
-        guard !isLoadingCloudKit else { return }
-        isLoadingCloudKit = true
-        
-        print("📱 Starting to load CloudKit recipes...")
-        
+    private func loadCloudKitRecipes(forceRefresh: Bool = false) {
         Task {
-            do {
-                // Load user's saved recipes from CloudKit
-                print("📱 Loading saved recipes...")
-                let savedRecipes = try await cloudKitRecipeManager.getUserSavedRecipes()
-                print("📱 Loaded \(savedRecipes.count) saved recipes")
-                
-                // Also load user's created recipes (recipes generated via LLM)
-                print("📱 Loading created recipes...")
-                let createdRecipes = try await cloudKitRecipeManager.getUserCreatedRecipes()
-                print("📱 Loaded \(createdRecipes.count) created recipes")
-                
-                // Combine and deduplicate
-                var uniqueRecipes: [Recipe] = []
-                var seenIds = Set<UUID>()
-                
-                for recipe in savedRecipes + createdRecipes {
-                    if !seenIds.contains(recipe.id) {
-                        seenIds.insert(recipe.id)
-                        uniqueRecipes.append(recipe)
-                    }
-                }
-                
-                print("📱 Total unique recipes after deduplication: \(uniqueRecipes.count)")
-                
-                await MainActor.run {
-                    self.cloudKitRecipes = uniqueRecipes
-                    self.isLoadingCloudKit = false
-                }
-                
-                print("✅ Loaded \(uniqueRecipes.count) recipes from CloudKit")
-            } catch {
-                print("❌ Failed to load CloudKit recipes: \(error)")
-                await MainActor.run {
-                    self.isLoadingCloudKit = false
-                }
+            await loadCloudKitRecipesAsync(forceRefresh: forceRefresh)
+        }
+    }
+    
+    private func loadCloudKitRecipesAsync(forceRefresh: Bool = false) async {
+        print("📱 RecipesView: Loading CloudKit recipes (forceRefresh: \(forceRefresh))")
+        
+        // Use the cache which handles intelligent loading
+        let recipes = await cloudKitRecipeCache.getRecipes(forceRefresh: forceRefresh)
+        
+        if !hasInitiallyLoaded {
+            hasInitiallyLoaded = true
+        }
+        
+        print("✅ RecipesView: Got \(recipes.count) recipes from cache")
+        
+        // Fetch photos for CloudKit recipes that don't have them in savedRecipesWithPhotos
+        if !recipes.isEmpty {
+            print("🎬 RecipesView: Fetching photos for CloudKit recipes...")
+            let recipesNeedingPhotos = recipes.filter { recipe in
+                !appState.savedRecipesWithPhotos.contains(where: { $0.recipe.id == recipe.id })
+            }
+            
+            if !recipesNeedingPhotos.isEmpty {
+                print("🎬 RecipesView: \(recipesNeedingPhotos.count) recipes need photos")
+                await CloudKitRecipeManager.shared.fetchPhotosForRecipes(recipesNeedingPhotos, appState: appState)
+            } else {
+                print("✅ RecipesView: All recipes already have photos cached")
             }
         }
     }
@@ -779,18 +772,62 @@ struct RecipeGridCard: View {
     }
     
     private func getBeforePhotoForRecipe() -> UIImage? {
-        // Check if we have a saved recipe with photos
-        if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }) {
-            return savedRecipe.beforePhoto
+        // Use PhotoStorageManager as single source of truth
+        if let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id) {
+            if let photo = photos.fridgePhoto {
+                print("📸 RecipeCard: Found before photo for \(recipe.name) in PhotoStorageManager:")
+                print("    - Size: \(photo.size)")
+                print("    - Has CGImage: \(photo.cgImage != nil)")
+                return photo
+            }
         }
+        
+        // Fallback to appState for backwards compatibility
+        if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }) {
+            if let photo = savedRecipe.beforePhoto {
+                print("📸 RecipeCard: Found before photo for \(recipe.name) in appState (legacy):")
+                print("    - Size: \(photo.size)")
+                print("    - Migrating to PhotoStorageManager...")
+                // Migrate to PhotoStorageManager
+                PhotoStorageManager.shared.storePhotos(
+                    fridgePhoto: photo,
+                    mealPhoto: savedRecipe.afterPhoto,
+                    for: recipe.id
+                )
+                return photo
+            }
+        }
+        print("⚠️ RecipeCard: No before photo found for \(recipe.name)")
         return nil
     }
     
     private func getAfterPhotoForRecipe() -> UIImage? {
-        // Check if we have a saved recipe with photos
-        if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }) {
-            return savedRecipe.afterPhoto
+        // Use PhotoStorageManager as single source of truth
+        if let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id) {
+            if let photo = photos.mealPhoto {
+                print("📸 RecipeCard: Found after photo for \(recipe.name) in PhotoStorageManager:")
+                print("    - Size: \(photo.size)")
+                print("    - Has CGImage: \(photo.cgImage != nil)")
+                return photo
+            }
         }
+        
+        // Fallback to appState for backwards compatibility
+        if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }) {
+            if let photo = savedRecipe.afterPhoto {
+                print("📸 RecipeCard: Found after photo for \(recipe.name) in appState (legacy):")
+                print("    - Size: \(photo.size)")
+                print("    - Migrating to PhotoStorageManager...")
+                // Migrate to PhotoStorageManager
+                PhotoStorageManager.shared.storePhotos(
+                    fridgePhoto: savedRecipe.beforePhoto,
+                    mealPhoto: photo,
+                    for: recipe.id
+                )
+                return photo
+            }
+        }
+        print("⚠️ RecipeCard: No after photo found for \(recipe.name)")
         return nil
     }
 }

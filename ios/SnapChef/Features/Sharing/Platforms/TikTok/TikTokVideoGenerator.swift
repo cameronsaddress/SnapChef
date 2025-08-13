@@ -45,6 +45,9 @@ class TikTokVideoGenerator: ObservableObject {
             return try await generateTimelapseVideo(content: content, outputURL: outputURL, progress: progress)
         case .splitScreen:
             return try await generateSplitScreenVideo(content: content, outputURL: outputURL, progress: progress)
+        case .test:
+            // For test template, generate a simple before/after video
+            return try await generateBeforeAfterVideo(content: content, outputURL: outputURL, progress: progress)
         }
     }
     

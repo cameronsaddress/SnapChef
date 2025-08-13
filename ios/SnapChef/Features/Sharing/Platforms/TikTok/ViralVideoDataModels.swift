@@ -134,6 +134,7 @@ public enum ViralTemplate: String, CaseIterable, Sendable {
     case kineticTextSteps = "Kinetic-Text Recipe Steps"
     case priceTimeChallenge = "Price & Time Challenge"
     case greenScreenPIP = "Green-Screen My Fridge → My Plate"
+    case test = "Test (Photos Only)"
     
     public var duration: CMTime {
         switch self {
@@ -147,6 +148,8 @@ public enum ViralTemplate: String, CaseIterable, Sendable {
             return CMTime(seconds: 12, preferredTimescale: 600)  // 12 seconds
         case .greenScreenPIP:
             return CMTime(seconds: 15, preferredTimescale: 600)  // 15 seconds
+        case .test:
+            return CMTime(seconds: 2, preferredTimescale: 600)   // 2 seconds (1 sec per photo)
         }
     }
     
@@ -162,6 +165,8 @@ public enum ViralTemplate: String, CaseIterable, Sendable {
             return "BEFORE with stickers → progress bar → AFTER with CTA"
         case .greenScreenPIP:
             return "Picture-in-picture face overlay → BEFORE → B-ROLL → AFTER"
+        case .test:
+            return "Simple test: 1 second before photo, 1 second after photo, no effects"
         }
     }
 }

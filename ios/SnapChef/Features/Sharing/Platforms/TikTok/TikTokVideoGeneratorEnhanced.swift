@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import AVFoundation
+@preconcurrency import AVFoundation
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import UIKit
@@ -37,7 +37,7 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
         content: ShareContent,
         selectedAudio: TrendingAudio? = nil,
         selectedHashtags: [String] = [],
-        progress: @escaping (Double) async -> Void
+        progress: @escaping @Sendable (Double) async -> Void
     ) async throws -> URL {
         isGenerating = true
         currentProgress = 0
@@ -83,6 +83,12 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
                 outputURL: outputURL,
                 progress: progress
             )
+        case .test:
+            result = try await generateTestTemplate(
+                content: content,
+                outputURL: outputURL,
+                progress: progress
+            )
         }
         
         // Add audio if selected
@@ -104,7 +110,7 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
     private func generateBeforeAfterReveal(
         content: ShareContent,
         outputURL: URL,
-        progress: @escaping (Double) async -> Void
+        progress: @escaping @Sendable (Double) async -> Void
     ) async throws -> URL {
         statusMessage = "Creating dramatic reveal..."
         
@@ -186,7 +192,7 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
     private func generateQuickRecipe(
         content: ShareContent,
         outputURL: URL,
-        progress: @escaping (Double) async -> Void
+        progress: @escaping @Sendable (Double) async -> Void
     ) async throws -> URL {
         statusMessage = "Creating quick recipe tutorial..."
         
@@ -258,7 +264,7 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
     private func generateIngredients360(
         content: ShareContent,
         outputURL: URL,
-        progress: @escaping (Double) async -> Void
+        progress: @escaping @Sendable (Double) async -> Void
     ) async throws -> URL {
         statusMessage = "Creating 360° ingredient showcase..."
         
@@ -307,7 +313,7 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
     private func generateTimelapse(
         content: ShareContent,
         outputURL: URL,
-        progress: @escaping (Double) async -> Void
+        progress: @escaping @Sendable (Double) async -> Void
     ) async throws -> URL {
         statusMessage = "Creating cooking timelapse..."
         
@@ -320,7 +326,7 @@ class TikTokVideoGeneratorEnhanced: ObservableObject {
     private func generateSplitScreen(
         content: ShareContent,
         outputURL: URL,
-        progress: @escaping (Double) async -> Void
+        progress: @escaping @Sendable (Double) async -> Void
     ) async throws -> URL {
         statusMessage = "Creating split screen comparison..."
         
@@ -1027,5 +1033,249 @@ extension UIColor {
         }
         
         return nil
+    }
+}
+
+// MARK: - Test Template Implementation
+
+extension TikTokVideoGeneratorEnhanced {
+    
+    /// Helper method to create pixel buffer without MainActor requirement
+    private nonisolated func createSimplePixelBuffer(from image: UIImage, size: CGSize) -> CVPixelBuffer? {
+        var pixelBuffer: CVPixelBuffer?
+        let attrs = [
+            kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue!,
+            kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue!
+        ] as CFDictionary
+        
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            Int(size.width),
+            Int(size.height),
+            kCVPixelFormatType_32BGRA,
+            attrs,
+            &pixelBuffer
+        )
+        
+        guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
+            return nil
+        }
+        
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        
+        guard let context = CGContext(
+            data: CVPixelBufferGetBaseAddress(buffer),
+            width: Int(size.width),
+            height: Int(size.height),
+            bitsPerComponent: 8,
+            bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else {
+            return nil
+        }
+        
+        // Draw the image
+        context.clear(CGRect(x: 0, y: 0, width: size.width, height: size.height))
+        
+        if let cgImage = image.cgImage {
+            let rect = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+            context.draw(cgImage, in: rect)
+        }
+        
+        return buffer
+    }
+    
+    /// Simple test template - just shows before and after photos for 1 second each, no effects
+    private func generateTestTemplate(
+        content: ShareContent,
+        outputURL: URL,
+        progress: @escaping @Sendable (Double) async -> Void
+    ) async throws -> URL {
+        
+        print("🧪 TEST TEMPLATE: Starting simple photo-only video generation")
+        statusMessage = "Creating test video (no effects)..."
+        
+        // Get the photos
+        guard let beforeImage = content.beforeImage else {
+            print("❌ TEST TEMPLATE: No before image available")
+            throw VideoGenerationError.invalidContent
+        }
+        
+        guard let afterImage = content.afterImage else {
+            print("❌ TEST TEMPLATE: No after image available")
+            throw VideoGenerationError.invalidContent
+        }
+        
+        print("🧪 TEST TEMPLATE: Before image size: \(beforeImage.size)")
+        print("🧪 TEST TEMPLATE: After image size: \(afterImage.size)")
+        
+        // Create simple 2-second video (1 second per photo)
+        let videoSize = CGSize(width: 1080, height: 1920)
+        let duration = CMTime(seconds: 2, preferredTimescale: 30)
+        
+        // Initialize video writer
+        let videoWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+        
+        // Configure video settings - simple, no compression
+        let videoSettings: [String: Any] = [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: videoSize.width,
+            AVVideoHeightKey: videoSize.height,
+        ]
+        
+        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+        videoInput.expectsMediaDataInRealTime = false
+        
+        let pixelBufferAttributes: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: videoSize.width,
+            kCVPixelBufferHeightKey as String: videoSize.height,
+        ]
+        
+        let pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: videoInput,
+            sourcePixelBufferAttributes: pixelBufferAttributes
+        )
+        
+        guard videoWriter.canAdd(videoInput) else {
+            throw VideoGenerationError.writingFailed
+        }
+        
+        videoWriter.add(videoInput)
+        
+        // Start writing
+        guard videoWriter.startWriting() else {
+            throw VideoGenerationError.writingFailed
+        }
+        
+        videoWriter.startSession(atSourceTime: .zero)
+        
+        await progress(0.2)
+        
+        // Write frames
+        let frameDuration = CMTime(value: 1, timescale: 30) // 30 FPS
+        let framesPerSecond = 30
+        let totalFrames = framesPerSecond * 2 // 2 seconds total
+        
+        print("🧪 TEST TEMPLATE: Writing \(totalFrames) frames")
+        
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            videoInput.requestMediaDataWhenReady(on: DispatchQueue.global(qos: .userInitiated)) {
+                var frameCount = 0
+                
+                while videoInput.isReadyForMoreMediaData && frameCount < totalFrames {
+                    autoreleasepool {
+                        let presentationTime = CMTime(value: Int64(frameCount), timescale: 30)
+                        
+                        // First second: show before image
+                        // Second second: show after image
+                        let imageToUse = frameCount < framesPerSecond ? beforeImage : afterImage
+                        
+                        // Create pixel buffer synchronously using a different approach
+                        if let pixelBuffer = self.createSimplePixelBuffer(from: imageToUse, size: videoSize) {
+                            pixelBufferAdaptor.append(pixelBuffer, withPresentationTime: presentationTime)
+                            
+                            if frameCount == 0 || frameCount == framesPerSecond {
+                                print("🧪 TEST TEMPLATE: Switched to \(frameCount < framesPerSecond ? "BEFORE" : "AFTER") image at frame \(frameCount)")
+                            }
+                        }
+                        
+                        frameCount += 1
+                        
+                        // Update progress
+                        let progressValue = Double(frameCount) / Double(totalFrames)
+                        Task {
+                            await progress(0.2 + progressValue * 0.6)
+                        }
+                    }
+                }
+                
+                videoInput.markAsFinished()
+                
+                Task {
+                    await videoWriter.finishWriting()
+                    continuation.resume()
+                }
+            }
+        }
+        
+        await progress(1.0)
+        
+        print("🧪 TEST TEMPLATE: Video generation complete")
+        print("🧪 TEST TEMPLATE: Output URL: \(outputURL.lastPathComponent)")
+        
+        // Check file size
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: outputURL.path),
+           let fileSize = attributes[.size] as? Int64 {
+            let sizeInMB = Double(fileSize) / (1024 * 1024)
+            print("🧪 TEST TEMPLATE: Video file size: \(String(format: "%.2f", sizeInMB)) MB")
+        }
+        
+        return outputURL
+    }
+    
+    /// Helper to create pixel buffer from UIImage
+    private func createPixelBuffer(from image: UIImage, size: CGSize) -> CVPixelBuffer? {
+        let attrs = [
+            kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue!,
+            kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue!
+        ] as CFDictionary
+        
+        var pixelBuffer: CVPixelBuffer?
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            Int(size.width),
+            Int(size.height),
+            kCVPixelFormatType_32BGRA,
+            attrs,
+            &pixelBuffer
+        )
+        
+        guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
+            return nil
+        }
+        
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        
+        let pixelData = CVPixelBufferGetBaseAddress(buffer)
+        let rgbColorSpace = CGColorSpaceCreateDeviceRGB()
+        
+        guard let context = CGContext(
+            data: pixelData,
+            width: Int(size.width),
+            height: Int(size.height),
+            bitsPerComponent: 8,
+            bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+            space: rgbColorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else {
+            return nil
+        }
+        
+        // Fill with black background
+        context.setFillColor(UIColor.black.cgColor)
+        context.fill(CGRect(origin: .zero, size: size))
+        
+        // Draw image centered with aspect fit
+        let imageSize = image.size
+        let widthRatio = size.width / imageSize.width
+        let heightRatio = size.height / imageSize.height
+        let scale = min(widthRatio, heightRatio)
+        
+        let scaledWidth = imageSize.width * scale
+        let scaledHeight = imageSize.height * scale
+        let x = (size.width - scaledWidth) / 2
+        let y = (size.height - scaledHeight) / 2
+        
+        let drawRect = CGRect(x: x, y: y, width: scaledWidth, height: scaledHeight)
+        
+        if let cgImage = image.cgImage {
+            context.draw(cgImage, in: drawRect)
+        }
+        
+        return buffer
     }
 }

@@ -403,6 +403,14 @@ struct CameraView: View {
                         self.generatedRecipes = recipes
                         self.detectedIngredients = apiResponse.data.ingredients
                         
+                        // Store the fridge photo for all generated recipes
+                        // IMPORTANT: Use 'image' parameter directly, not self.capturedImage which isn't set yet
+                        print("📸 CameraView: Storing fridge photo in PhotoStorageManager for \(recipes.count) recipes")
+                        PhotoStorageManager.shared.storeFridgePhoto(
+                            image,  // Use the image parameter passed to processImage
+                            for: recipes.map { $0.id }
+                        )
+                        
                         // Track camera session completion
                         let processingTime = Date().timeIntervalSince(startTime)
                         let completedSession = CameraSessionData(

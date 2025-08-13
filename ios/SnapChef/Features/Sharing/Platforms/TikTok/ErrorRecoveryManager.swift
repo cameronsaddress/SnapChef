@@ -370,6 +370,8 @@ public struct TemplateSimplifier {
             return .kineticTextSteps
         case .greenScreenPIP:
             return .beatSyncedCarousel
+        case .test:
+            return .beatSyncedCarousel  // Test template fallback
         }
     }
 }
