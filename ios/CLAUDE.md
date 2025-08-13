@@ -10,6 +10,59 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 13, 2025) - Part 8
+- **Fixed "Operation Stopped" Error During Video Export**
+  - Error was occurring during final AVAssetExportSession with code -11838 and -16976
+  - Root causes identified:
+    1. Empty audio tracks being created even when no audio provided
+    2. Missing explicit file type configuration in export session
+    3. Video composition not being applied for transform handling
+    4. Transforms being applied incorrectly at segment creation
+  - Fixed by:
+    - Only create audio tracks when audio is actually provided in render plan
+    - Explicitly set `AVFileType.mp4` for export session output
+    - Always apply video composition when exporting to handle transforms
+    - Removed transform application from StillWriter video input
+    - Let video composition handle all transform normalization with proper scaling
+    - Use `AVAssetExportPreset1920x1080` with video composition for compatibility
+  - Video export now completes successfully with proper transform handling
+
+### Latest Updates (Jan 12, 2025) - Part 7
+- **Fixed "Operation Stopped" Error in Video Generation**
+  - Error was occurring during StillWriter frame rendering with code -11838 and -16976
+  - Root cause 1: Incorrect pixel format - was using raw value `32` instead of proper constant
+  - Root cause 2: Invalid compression properties for H.264 codec
+  - Fixed by:
+    - Changed pixel format from `kCVPixelFormatType_32ARGB` to `kCVPixelFormatType_32BGRA` (most compatible with H.264)
+    - Removed incompatible compression properties:
+      - `AVVideoH264EntropyModeKey` - can cause compatibility issues
+      - `AVVideoAllowFrameReorderingKey` - can cause "Operation Stopped" errors  
+      - `AVVideoQualityKey` - not valid for H.264 codec
+    - Kept only essential compression properties for H.264 encoding
+  - Video generation now works correctly following iOS best practices
+
+### Latest Updates (Jan 12, 2025) - Part 6
+- **Fixed Memory Limit Exceeded Error in TikTok Video Generation**
+  - TikTok video generation was failing with "memory limit exceeded during rendering"
+  - Root cause: Memory limit set too low at 150MB in ExportSettings.maxMemoryUsage
+  - App was using ~390MB during video rendering, exceeding the 150MB limit
+  - Fixed by increasing maxMemoryUsage from 150MB to 600MB in ViralVideoDataModels.swift
+  - Updated documentation in ViralVideoPolishManager.swift to reflect new 600MB limit
+  - Video generation should now complete successfully without memory errors
+- **Fixed AVAssetWriterInput H264 Profile Level Error**
+  - App was crashing with "NSInvalidArgumentException" for invalid H264 profile level
+  - Root cause: videoProfile was set to string "kVTProfileLevel_H264_High_AutoLevel" instead of actual constant
+  - Fixed by changing to use AVVideoProfileLevelH264HighAutoLevel constant
+  - AVAssetWriterInput now accepts the correct profile level for H264 codec
+- **Fixed "Operation Stopped" Export Error**
+  - Video rendering was completing successfully but export was failing with "operation stopped"
+  - Root cause: Multiple video compositions being applied in sequence causing conflicts
+  - After base render, composite, and overlay stages, re-encoding was causing export failure
+  - Fixed by skipping the redundant `encodeWithProductionSettings` step
+  - The video is already in the correct format after overlay stage
+  - Removed unnecessary re-encoding that was causing AVAssetExportSession conflicts
+  - Video now uses the overlay output directly as the final output
+
 ### Latest Updates (Jan 12, 2025) - Part 5
 - **Fixed TikTok Video Sharing Bug**
   - TikTok was always sharing old cached videos instead of newly generated ones

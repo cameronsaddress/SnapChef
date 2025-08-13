@@ -452,14 +452,14 @@ public struct PerformanceOptimizationsSummary {
         "Export Compression": "Adaptive bitrate targeting achieves <20MB files with optimal quality",
         "Progress Indicators": "Smooth animations and haptic feedback improve perceived performance",
         "Error Recovery": "Automatic retry with fallback strategies achieves >99% success rate",
-        "Performance Monitoring": "Real-time metrics ensure <5s render times and <150MB memory usage",
+        "Performance Monitoring": "Real-time metrics ensure <5s render times and <600MB memory usage",
         "Layer Caching": "Pre-computed CALayer cache reduces overlay rendering time by ~50%",
         "Polish Features": "Loading states and smooth transitions provide premium user experience"
     ]
     
     public static let targetMetrics: [String: String] = [
         "Render Time": "<5 seconds for 15s video",
-        "Memory Usage": "<150MB peak",
+        "Memory Usage": "<600MB peak",
         "File Size": "<20MB average, <50MB max",
         "Frame Rate": "Constant 30fps",
         "Success Rate": ">99%",

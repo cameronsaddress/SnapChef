@@ -39,6 +39,10 @@ public final class OverlayFactory: @unchecked Sendable {
         progressCallback: @escaping @Sendable (Double) async -> Void
     ) async throws -> URL {
         
+        print("🎨 DEBUG OverlayFactory: Starting overlay application")
+        print("🎨 DEBUG OverlayFactory: Input video: \(videoURL.lastPathComponent)")
+        print("🎨 DEBUG OverlayFactory: Number of overlays: \(overlays.count)")
+        
         // Start performance monitoring
         memoryOptimizer.logMemoryProfile(phase: "OverlayFactory Start")
         
@@ -50,18 +54,23 @@ public final class OverlayFactory: @unchecked Sendable {
         let asset = AVAsset(url: videoURL)
         
         // Create video composition with overlays
+        print("🎨 DEBUG OverlayFactory: Creating video composition...")
         let videoComposition = try await createVideoCompositionWithOverlays(
             asset: asset,
             overlays: overlays
         )
+        print("✅ DEBUG OverlayFactory: Video composition created")
         
         // Export with overlays
+        print("🎨 DEBUG OverlayFactory: Creating export session...")
         guard let exportSession = AVAssetExportSession(
             asset: asset,
             presetName: ExportSettings.videoPreset
         ) else {
+            print("❌ DEBUG OverlayFactory: Failed to create export session")
             throw OverlayError.cannotCreateExportSession
         }
+        print("✅ DEBUG OverlayFactory: Export session created")
         
         exportSession.outputURL = outputURL
         exportSession.outputFileType = .mp4
@@ -77,19 +86,27 @@ public final class OverlayFactory: @unchecked Sendable {
                 }
             }
             
+            print("🎨 DEBUG OverlayFactory: Starting export asynchronously...")
             exportSession.exportAsynchronously {
                 progressTimer.invalidate()
                 
                 // Complete performance monitoring
                 self.memoryOptimizer.logMemoryProfile(phase: "OverlayFactory Complete")
                 
+                print("🎨 DEBUG OverlayFactory: Export completed with status: \(exportSession.status.rawValue)")
+                
                 switch exportSession.status {
                 case .completed:
+                    print("✅ DEBUG OverlayFactory: Export successful to: \(outputURL.lastPathComponent)")
                     // Clean up input file immediately
                     self.memoryOptimizer.deleteTempFile(videoURL)
                     continuation.resume(returning: outputURL)
                 case .failed:
                     let error = exportSession.error ?? OverlayError.exportFailed
+                    print("❌ DEBUG OverlayFactory: Export failed with error: \(error)")
+                    print("❌ DEBUG OverlayFactory: Error domain: \((error as NSError).domain)")
+                    print("❌ DEBUG OverlayFactory: Error code: \((error as NSError).code)")
+                    print("❌ DEBUG OverlayFactory: Error userInfo: \((error as NSError).userInfo)")
                     continuation.resume(throwing: error)
                 case .cancelled:
                     continuation.resume(throwing: OverlayError.exportCancelled)

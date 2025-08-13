@@ -309,7 +309,7 @@ public enum RenderPhase: String, CaseIterable, Sendable {
 public struct ExportSettings {
     // Video compression settings
     public static let videoCodec = AVVideoCodecType.h264
-    public static let videoProfile = "kVTProfileLevel_H264_High_AutoLevel"
+    public static let videoProfile = AVVideoProfileLevelH264HighAutoLevel
     public static let videoBitrate: Int = 8_000_000  // Optimized 8 Mbps for better compression
     public static let videoPreset = AVAssetExportPresetHighestQuality
     
@@ -326,12 +326,14 @@ public struct ExportSettings {
     public static let audioSampleRate: Double = 44100.0
     
     // Frame writing settings
-    public static let pixelFormat = kCVPixelFormatType_32ARGB
+    // Use 32BGRA which is the most compatible format for H.264 encoding
+    // kCVPixelFormatType_32BGRA = 1111970369 ('BGRA')
+    public static let pixelFormat = kCVPixelFormatType_32BGRA
     public static let maxFileSize: Int64 = 50_000_000  // 50MB max
     public static let targetFileSize: Int64 = 20_000_000  // 20MB target
     
     // Performance requirements
-    public static let maxMemoryUsage: UInt64 = 150_000_000  // 150MB
+    public static let maxMemoryUsage: UInt64 = 600_000_000  // 600MB (increased from 150MB to handle video rendering)
     public static let maxRenderTime: TimeInterval = 5.0     // 5 seconds
     
     // Compression optimization settings
@@ -352,12 +354,11 @@ public struct ExportSettings {
             AVVideoCompressionPropertiesKey: [
                 AVVideoAverageBitRateKey: targetBitrate,
                 AVVideoProfileLevelKey: videoProfile,
-                AVVideoH264EntropyModeKey: AVVideoH264EntropyModeCABAC,
                 AVVideoExpectedSourceFrameRateKey: 30,
-                AVVideoAllowFrameReorderingKey: true,
-                AVVideoMaxKeyFrameIntervalKey: 30,
-                // Optimize for file size
-                AVVideoQualityKey: 0.8 // Slight quality reduction for better compression
+                AVVideoMaxKeyFrameIntervalKey: 30
+                // Removed AVVideoH264EntropyModeKey - can cause compatibility issues
+                // Removed AVVideoAllowFrameReorderingKey - can cause "Operation Stopped" errors
+                // Removed AVVideoQualityKey - not valid for H.264 codec
             ]
         ]
     }

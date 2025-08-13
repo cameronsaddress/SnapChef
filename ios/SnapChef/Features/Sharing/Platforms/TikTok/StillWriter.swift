@@ -60,6 +60,7 @@ public final class StillWriter: @unchecked Sendable {
         memoryOptimizer.logMemoryProfile(phase: "StillWriter Start")
         
         let outputURL = createTempOutputURL()
+        print("📝 DEBUG StillWriter[createVideoFromImage]: Starting for output: \(outputURL.lastPathComponent)")
         
         // Remove existing file
         try? FileManager.default.removeItem(at: outputURL)
@@ -69,17 +70,23 @@ public final class StillWriter: @unchecked Sendable {
         
         // Configure video settings with exact specifications from requirements
         let videoSettings = createVideoSettings()
+        print("📝 DEBUG StillWriter: Video settings: \(videoSettings)")
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         videoInput.expectsMediaDataInRealTime = false
-        videoInput.transform = transform
+        // Don't apply transform here - let the video composition handle it
+        // videoInput.transform = transform
+        print("📝 DEBUG StillWriter: Transform will be handled by video composition, not applying to input")
         
         // Create pixel buffer adaptor
+        let bufferAttributes = createPixelBufferAttributes()
+        print("📝 DEBUG StillWriter: Pixel buffer attributes: \(bufferAttributes)")
         let pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(
             assetWriterInput: videoInput,
-            sourcePixelBufferAttributes: createPixelBufferAttributes()
+            sourcePixelBufferAttributes: bufferAttributes
         )
         
         guard videoWriter.canAdd(videoInput) else {
+            print("❌ DEBUG StillWriter: Cannot add video input to writer")
             throw StillWriterError.cannotAddVideoInput
         }
         
@@ -87,10 +94,19 @@ public final class StillWriter: @unchecked Sendable {
         
         // Start writing session
         guard videoWriter.startWriting() else {
+            let error = videoWriter.error
+            print("❌ DEBUG StillWriter: Failed to start writing")
+            print("❌ DEBUG StillWriter: Error: \(String(describing: error))")
+            if let error = error as NSError? {
+                print("❌ DEBUG StillWriter: Error domain: \(error.domain)")
+                print("❌ DEBUG StillWriter: Error code: \(error.code)")
+                print("❌ DEBUG StillWriter: Error userInfo: \(error.userInfo)")
+            }
             throw StillWriterError.cannotStartWriting(videoWriter.error?.localizedDescription)
         }
         
         videoWriter.startSession(atSourceTime: .zero)
+        print("✅ DEBUG StillWriter: Writing session started")
         
         // Calculate frame parameters
         let frameDuration = CMTime(value: 1, timescale: config.fps)
@@ -118,6 +134,7 @@ public final class StillWriter: @unchecked Sendable {
         }
         
         // Write frames
+        print("📝 DEBUG StillWriter: Starting to write \(totalFrames) frames")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let frameCountBox = Box(value: 0)
             // Use Box to wrap the non-Sendable array
@@ -135,11 +152,19 @@ public final class StillWriter: @unchecked Sendable {
                                 let pixelBuffer = buffersBox.value[frameCountBox.value]
                                 let success = adaptor.append(pixelBuffer, withPresentationTime: presentationTime)
                                 if !success {
+                                    print("❌ DEBUG StillWriter: Failed to append frame \(frameCountBox.value) at time \(presentationTime.seconds)s")
+                                    print("❌ DEBUG StillWriter: AVAssetWriter status: \(videoWriter.status.rawValue)")
+                                    if let error = videoWriter.error {
+                                        print("❌ DEBUG StillWriter: AVAssetWriter error: \(error)")
+                                    }
                                     continuation.resume(throwing: StillWriterError.frameWriteFailed)
                                     return
                                 } else {
                                     // Record successful frame for monitoring
                                     self.frameDropMonitor.recordFrame()
+                                    if frameCountBox.value == 0 || frameCountBox.value % 30 == 0 {
+                                        print("✅ DEBUG StillWriter: Successfully wrote frame \(frameCountBox.value)/\(totalFrames)")
+                                    }
                                 }
                             }
                         } catch {
