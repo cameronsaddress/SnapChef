@@ -4,6 +4,17 @@ All notable changes to the SnapChef iOS app will be documented in this file.
 
 ## [Unreleased]
 
+### January 12, 2025 - Part 5 - TikTok Video Sharing Fix
+
+#### Fixed
+- **TikTok Sharing Always Using Old Video**:
+  - Fixed critical bug in ViralVideoExporter.saveToPhotos() method
+  - Was fetching ALL videos and using firstObject instead of capturing new video's localIdentifier
+  - Now properly captures localIdentifier from PHAssetCreationRequest.placeholderForCreatedAsset
+  - Uses thread-safe Box pattern for capturing identifier across async boundaries
+  - TikTok now correctly shares the newly generated video instead of old cached content
+  - Added logging to confirm correct localIdentifier is captured
+
 ### January 12, 2025 - Part 4 - Swift 6 AVVideoCompositing Protocol Conformance
 
 #### Fixed

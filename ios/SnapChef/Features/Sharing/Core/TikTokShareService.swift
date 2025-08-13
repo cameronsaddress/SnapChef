@@ -211,11 +211,16 @@ enum TikTokShareService {
     @MainActor
     private static func shareWithTikTokURLScheme(completion: @escaping @Sendable (Result<Void, TikTokShareError>) -> Void) {
         // Try different TikTok URL schemes in order of preference
+        // Prioritize library/upload paths to ensure TikTok shows recent media
         let schemes = [
-            "snssdk1233://studio/publish",     // Direct to publish studio
-            "tiktok://studio/publish",          // Alternative publish studio
+            "snssdk1233://library",             // Direct to library (shows recent media first)
+            "tiktok://library",                  // Alternative library
+            "snssdk1233://studio/upload",       // Upload studio
+            "tiktok://studio/upload",            // Alternative upload
             "snssdk1233://create?media=library", // Create with library option
             "tiktok://create?media=library",    // Alternative create with library
+            "snssdk1233://studio/publish",      // Direct to publish studio
+            "tiktok://studio/publish",           // Alternative publish studio
             "snssdk1233://create",              // Create screen
             "tiktok://create",                  // Alternative create
             "snssdk1233://",                    // Main app
@@ -350,6 +355,14 @@ extension TikTokShareService {
     ) {
         print("🎬 Starting TikTok share with custom caption")
         print("📋 Custom caption: \(customCaption)")
+        print("🎥 Video URL: \(videoURL.lastPathComponent)")
+        
+        // Log video file info
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: videoURL.path),
+           let fileSize = attributes[.size] as? Int64 {
+            let sizeInMB = Double(fileSize) / (1024 * 1024)
+            print("📏 Video file size: \(String(format: "%.2f", sizeInMB)) MB")
+        }
         
         // Step 1: Save to Photos and get localIdentifier  
         saveToPhotos(videoURL: videoURL) { saveResult in
@@ -357,15 +370,18 @@ extension TikTokShareService {
             case .success(let localIdentifier):
                 print("✅ Video saved with localIdentifier: \(localIdentifier)")
                 
-                // Step 2: Share to TikTok
-                shareToTikTok(localIdentifiers: [localIdentifier], caption: customCaption) { shareResult in
-                    switch shareResult {
-                    case .success():
-                        print("✅ TikTok share with custom caption succeeded!")
-                        completion(.success(()))
-                    case .failure(let error):
-                        print("❌ TikTok share failed: \(error.localizedDescription)")
-                        completion(.failure(error))
+                // Step 2: Wait a moment for Photos to sync, then share to TikTok
+                // This helps ensure TikTok sees the new video instead of cached content
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    shareToTikTok(localIdentifiers: [localIdentifier], caption: customCaption) { shareResult in
+                        switch shareResult {
+                        case .success():
+                            print("✅ TikTok share with custom caption succeeded!")
+                            completion(.success(()))
+                        case .failure(let error):
+                            print("❌ TikTok share failed: \(error.localizedDescription)")
+                            completion(.failure(error))
+                        }
                     }
                 }
                 

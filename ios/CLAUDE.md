@@ -10,6 +10,14 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 12, 2025) - Part 5
+- **Fixed TikTok Video Sharing Bug**
+  - TikTok was always sharing old cached videos instead of newly generated ones
+  - Root cause: ViralVideoExporter.saveToPhotos() was fetching ALL videos and using firstObject
+  - Fixed by properly capturing localIdentifier from PHAssetCreationRequest.placeholderForCreatedAsset
+  - Now uses thread-safe Box pattern for capturing identifier across async boundaries
+  - TikTok sharing now correctly uses the newly generated video every time
+
 ### Latest Updates (Jan 12, 2025) - Part 4
 - **Swift 6 AVVideoCompositing Protocol Conformance Fixed**
   - Successfully implemented CIFilterCompositor with full AVVideoCompositing protocol conformance

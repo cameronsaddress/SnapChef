@@ -12,6 +12,14 @@ import CoreMedia
 import Photos
 import TikTokOpenShareSDK
 
+// Helper class for thread-safe mutable capture
+private final class Box<T>: @unchecked Sendable {
+    var value: T
+    init(value: T) {
+        self.value = value
+    }
+}
+
 // Define TikTokExportError to avoid conflicts with ShareError
 public enum TikTokExportError: Error, LocalizedError {
     case photoAccessDenied
@@ -58,20 +66,21 @@ public final class ViralVideoExporter: @unchecked Sendable {
     
     /// Save to Photos using PHPhotoLibrary.shared().performChanges as specified
     public static func saveToPhotos(videoURL: URL, completion: @escaping @Sendable (Result<String, TikTokExportError>) -> Void) {
+        // Use a thread-safe container for capturing the identifier
+        let identifierBox = Box(value: nil as String?)
+        
         PHPhotoLibrary.shared().performChanges({
             let request = PHAssetCreationRequest.forAsset()
             request.addResource(with: .video, fileURL: videoURL, options: nil)
+            // Capture the localIdentifier from the placeholder
+            identifierBox.value = request.placeholderForCreatedAsset?.localIdentifier
         }) { success, error in
             DispatchQueue.main.async {
-                if success {
-                    // Get localIdentifier from the saved asset
-                    let fetchResult = PHAsset.fetchAssets(with: .video, options: nil)
-                    if let asset = fetchResult.firstObject {
-                        completion(.success(asset.localIdentifier))
-                    } else {
-                        completion(.failure(.fetchFailed))
-                    }
+                if success, let identifier = identifierBox.value {
+                    print("✅ Video saved with localIdentifier: \(identifier)")
+                    completion(.success(identifier))
                 } else {
+                    print("❌ Failed to save video: \(error?.localizedDescription ?? "Unknown error")")
                     completion(.failure(.saveFailed))
                 }
             }
