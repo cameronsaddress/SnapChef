@@ -119,11 +119,55 @@ public final class StillWriter: @unchecked Sendable {
             throw StillWriterError.imageConversionFailed
         }
         
-        let processedImage = try memoryOptimizer.processCIImageWithOptimization(
+        var processedImage = try memoryOptimizer.processCIImageWithOptimization(
             ciImage,
             filters: filters,
             context: ciContext
         )
+        
+        // Premium: Apply default vibrance and sharpen filters if premiumMode enabled
+        if config.premiumMode {
+            // Apply vibrance filter for rich colors
+            if let vibranceFilter = CIFilter(name: "CIVibrance") {
+                vibranceFilter.setValue(processedImage, forKey: kCIInputImageKey)
+                vibranceFilter.setValue(config.vibranceAmount, forKey: "inputAmount")
+                processedImage = vibranceFilter.outputImage ?? processedImage
+            }
+            
+            // Apply sharpen filter for crisp edges
+            if let sharpenFilter = CIFilter(name: "CISharpenLuminance") {
+                sharpenFilter.setValue(processedImage, forKey: kCIInputImageKey)
+                sharpenFilter.setValue(config.sharpnessAmount, forKey: "inputSharpness")
+                sharpenFilter.setValue(0.5, forKey: "inputRadius")  // Subtle radius
+                processedImage = sharpenFilter.outputImage ?? processedImage
+            }
+            
+            // Apply color controls for contrast and saturation
+            if let colorFilter = CIFilter(name: "CIColorControls") {
+                colorFilter.setValue(processedImage, forKey: kCIInputImageKey)
+                colorFilter.setValue(config.contrastAmount, forKey: kCIInputContrastKey)
+                colorFilter.setValue(config.saturationAmount, forKey: kCIInputSaturationKey)
+                colorFilter.setValue(1.0, forKey: kCIInputBrightnessKey)  // Keep brightness neutral
+                processedImage = colorFilter.outputImage ?? processedImage
+            }
+            
+            // Premium: Carousel-specific glow and particle effects for snaps
+            // Add subtle glow effect for premium reveals
+            if let glowFilter = CIFilter(name: "CIGaussianBlur") {
+                glowFilter.setValue(processedImage, forKey: kCIInputImageKey)
+                glowFilter.setValue(config.carouselGlowIntensity * 2.0, forKey: "inputRadius")
+                
+                if let glowImage = glowFilter.outputImage {
+                    // Composite glow behind original for halo effect
+                    let composite = CIFilter(name: "CISourceOverCompositing")
+                    composite?.setValue(processedImage, forKey: kCIInputImageKey)
+                    composite?.setValue(glowImage, forKey: kCIInputBackgroundImageKey)
+                    processedImage = composite?.outputImage ?? processedImage
+                }
+            }
+            
+            // Note: Particle effects are only applied in multi-image carousel mode
+        }
         
         // Pre-render all pixel buffers to avoid capturing CIImage
         var preRenderedBuffers: [CVPixelBuffer] = []
@@ -253,7 +297,7 @@ public final class StillWriter: @unchecked Sendable {
         
         // Calculate total duration and frame parameters
         let totalDuration = images.reduce(CMTime.zero) { $0 + $1.duration }
-        let frameDuration = CMTime(value: 1, timescale: config.fps)
+        _ = CMTime(value: 1, timescale: config.fps)
         let totalFrames = Int(totalDuration.seconds * Double(config.fps))
         
         // Prepare CIImages
@@ -404,7 +448,9 @@ public final class StillWriter: @unchecked Sendable {
         
         // Render CIImage to pixel buffer using shared context
         let renderRect = CGRect(origin: .zero, size: config.size)
-        ciContext.render(ciImage, to: buffer, bounds: renderRect, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+        // Fix: Use the sRGB color space directly (not via init with name)
+        // This ensures proper color space conversion and prevents white/washed out images
+        ciContext.render(ciImage, to: buffer, bounds: renderRect, colorSpace: CGColorSpaceCreateDeviceRGB())
         
         return buffer
     }
@@ -445,15 +491,18 @@ public final class StillWriter: @unchecked Sendable {
             let nextImage = images[currentImageIndex + 1]
             let crossfadeProgress = (timeInCurrentSegment - (currentImage.duration - crossfadeDuration)).seconds / crossfadeDuration.seconds
             
+            // Premium: Use eased progress for smoother, natural fade (sine curve)
+            let easedProgress = sin(crossfadeProgress * .pi / 2)  // Ease-in-out using sine
+            
             // Create crossfade blend
             let blendFilter = CIFilter.sourceOverCompositing()
             blendFilter.inputImage = nextImage.ciImage
             blendFilter.backgroundImage = currentImage.ciImage
             
-            // Apply alpha based on crossfade progress
+            // Apply alpha based on eased crossfade progress
             let alphaFilter = CIFilter.colorMatrix()
             alphaFilter.inputImage = nextImage.ciImage
-            alphaFilter.aVector = CIVector(x: 0, y: 0, z: 0, w: CGFloat(crossfadeProgress))
+            alphaFilter.aVector = CIVector(x: 0, y: 0, z: 0, w: CGFloat(easedProgress))
             
             if let alphaOutput = alphaFilter.outputImage {
                 blendFilter.inputImage = alphaOutput
@@ -467,6 +516,23 @@ public final class StillWriter: @unchecked Sendable {
         // Apply transform if needed
         if !currentImage.transform.isIdentity {
             finalImage = finalImage.transformed(by: currentImage.transform)
+        }
+        
+        // Premium: Add particle effects for the last image (meal reveal)
+        if config.premiumMode && currentImageIndex == images.count - 1 {
+            if let particleFilter = CIFilter(name: "CIStarShineGenerator") {
+                particleFilter.setValue(CIVector(x: config.size.width / 2, y: config.size.height / 2), forKey: "inputCenter")
+                particleFilter.setValue(config.particleSpread * 2, forKey: "inputRadius")
+                particleFilter.setValue(NSNumber(value: config.carouselParticleCount), forKey: "inputCrossScale")
+                particleFilter.setValue(CIColor(red: 1.0, green: 0.85, blue: 0.0, alpha: 0.6), forKey: "inputColor")
+                
+                if let particles = particleFilter.outputImage {
+                    let composite = CIFilter(name: "CISourceOverCompositing")
+                    composite?.setValue(particles, forKey: kCIInputImageKey)
+                    composite?.setValue(finalImage, forKey: kCIInputBackgroundImageKey)
+                    finalImage = composite?.outputImage ?? finalImage
+                }
+            }
         }
         
         guard let pixelBuffer = try createPixelBuffer(from: finalImage) else {

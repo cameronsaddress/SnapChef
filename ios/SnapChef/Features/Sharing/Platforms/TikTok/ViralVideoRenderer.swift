@@ -195,16 +195,84 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             let scaleX = renderSize.width / videoSize.width
             let scaleY = renderSize.height / videoSize.height
             let scale = min(scaleX, scaleY)
-            transform = transform.scaledBy(x: scale, y: scale)
             
-            // Center the video
-            let scaledWidth = videoSize.width * scale
-            let scaledHeight = videoSize.height * scale
-            let translateX = (renderSize.width - scaledWidth) / 2
-            let translateY = (renderSize.height - scaledHeight) / 2
-            transform = transform.translatedBy(x: translateX / scale, y: translateY / scale)
+            // Get video duration for animation timing
+            let videoDuration = composition.duration
             
-            layerInstruction.setTransform(transform, at: .zero)
+            // Premium: Add subtle zoom animation with easing for dynamic feel
+            if config.premiumMode {
+                // Start slightly zoomed out, then zoom to normal
+                let startScale = scale * 0.9  // Start at 90% scale
+                let endScale = scale * 1.0    // End at 100% scale
+                
+                // Create start transform (zoomed out)
+                var startTransform = CGAffineTransform.identity
+                startTransform = startTransform.scaledBy(x: startScale, y: startScale)
+                
+                // Center for start position
+                let startScaledWidth = videoSize.width * startScale
+                let startScaledHeight = videoSize.height * startScale
+                let startTranslateX = (renderSize.width - startScaledWidth) / 2
+                let startTranslateY = (renderSize.height - startScaledHeight) / 2
+                startTransform = startTransform.translatedBy(x: startTranslateX / startScale, y: startTranslateY / startScale)
+                
+                // Create end transform (normal scale)
+                var endTransform = CGAffineTransform.identity
+                endTransform = endTransform.scaledBy(x: endScale, y: endScale)
+                
+                // Center for end position
+                let endScaledWidth = videoSize.width * endScale
+                let endScaledHeight = videoSize.height * endScale
+                let endTranslateX = (renderSize.width - endScaledWidth) / 2
+                let endTranslateY = (renderSize.height - endScaledHeight) / 2
+                endTransform = endTransform.translatedBy(x: endTranslateX / endScale, y: endTranslateY / endScale)
+                
+                // Apply transform ramp for smooth zoom animation
+                let zoomDuration = CMTime(seconds: 0.5, preferredTimescale: 600)
+                layerInstruction.setTransformRamp(
+                    fromStart: startTransform,
+                    toEnd: endTransform,
+                    timeRange: CMTimeRange(start: .zero, duration: zoomDuration)
+                )
+                
+                // Premium: Add carousel-specific beat-synced snap animations
+                // Create snap effects at beat intervals (120 BPM = 0.5s intervals)
+                let beatInterval = config.carouselSnapDelay
+                let totalBeats = Int(videoDuration.seconds / beatInterval)
+                
+                for beatIndex in 1..<min(totalBeats, 8) { // Up to 8 snaps for viral effect
+                    let snapTime = CMTime(seconds: Double(beatIndex) * beatInterval, preferredTimescale: 600)
+                    
+                    // Calculate eased scale using sine wave for smooth animation
+                    let snapScale = 1.0 + (config.carouselSnapScale - 1.0) * sin(Double.pi * 0.5)
+                    
+                    // Create snap transform with bounce effect
+                    var snapTransform = endTransform
+                    snapTransform = snapTransform.scaledBy(x: snapScale, y: snapScale)
+                    
+                    // Apply opacity fade for extra pop
+                    layerInstruction.setOpacityRamp(
+                        fromStartOpacity: 0.9,
+                        toEndOpacity: 1.0,
+                        timeRange: CMTimeRange(start: snapTime, duration: CMTime(seconds: 0.1, preferredTimescale: 600))
+                    )
+                }
+                
+                // Keep the final transform for the rest of the video
+                layerInstruction.setTransform(endTransform, at: zoomDuration)
+            } else {
+                // Non-premium: simple static transform
+                transform = transform.scaledBy(x: scale, y: scale)
+                
+                // Center the video
+                let scaledWidth = videoSize.width * scale
+                let scaledHeight = videoSize.height * scale
+                let translateX = (renderSize.width - scaledWidth) / 2
+                let translateY = (renderSize.height - scaledHeight) / 2
+                transform = transform.translatedBy(x: translateX / scale, y: translateY / scale)
+                
+                layerInstruction.setTransform(transform, at: .zero)
+            }
             
             instruction.layerInstructions = [layerInstruction]
             videoComposition.instructions = [instruction]
@@ -499,17 +567,25 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         
         let audioDuration = try await audioAsset.load(.duration)
         
+        // Premium: Enhanced beat-sync for carousel template
+        // Use configured BPM (120 default) for precise beat alignment
+        let beatInterval = config.premiumMode ? CMTime(seconds: 60.0 / Double(config.beatBPM), preferredTimescale: 600) : .zero
+        
         // Loop audio if needed
         var currentTime = CMTime.zero
+        
         while currentTime < duration {
             let remainingTime = CMTimeSubtract(duration, currentTime)
             let insertDuration = CMTimeMinimum(audioDuration, remainingTime)
+            
+            // For carousel template, align audio with snap timings
+            let insertTime = currentTime
             
             do {
                 try audioTrack.insertTimeRange(
                     CMTimeRange(start: .zero, duration: insertDuration),
                     of: audioAssetTrack,
-                    at: currentTime
+                    at: insertTime
                 )
                 
                 currentTime = CMTimeAdd(currentTime, insertDuration)

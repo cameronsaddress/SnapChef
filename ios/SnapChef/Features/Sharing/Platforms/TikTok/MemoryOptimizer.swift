@@ -29,17 +29,21 @@ public final class MemoryOptimizer: @unchecked Sendable {
     
     // 2. Cache CIContext
     private lazy var sharedCIContext: CIContext = {
+        // Create proper color spaces for CIContext
+        let workingColorSpace = CGColorSpaceCreateDeviceRGB()
+        let outputColorSpace = CGColorSpaceCreateDeviceRGB()
+        
         let eaglContext = EAGLContext(api: .openGLES3) ?? EAGLContext(api: .openGLES2)
         if let eaglContext = eaglContext {
             return CIContext(eaglContext: eaglContext, options: [
-                .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-                .outputColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
+                .workingColorSpace: workingColorSpace,
+                .outputColorSpace: outputColorSpace,
                 .cacheIntermediates: false  // Reduce memory usage
             ])
         } else {
             return CIContext(options: [
-                .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-                .outputColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
+                .workingColorSpace: workingColorSpace,
+                .outputColorSpace: outputColorSpace,
                 .cacheIntermediates: false
             ])
         }

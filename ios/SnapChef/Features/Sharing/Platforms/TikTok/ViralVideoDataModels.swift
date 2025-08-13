@@ -79,21 +79,49 @@ public struct RenderConfig: Sendable {
     public var fontNameBold: String = "SF-Pro-Display-Bold"
     public var fontNameRegular: String = "SF-Pro-Display-Regular"
     public var textStrokeEnabled: Bool = true
-    public var brandTint: UIColor = .white
+    public var brandTint: UIColor = UIColor(red: 1.0, green: 0.8, blue: 0.0, alpha: 1.0)  // Golden for premium food vibe
     public var brandShadow: UIColor = .black
     
-    // Typography hierarchy from requirements
-    public var hookFontSize: CGFloat = 64        // 60-72pt bold
-    public var stepsFontSize: CGFloat = 48       // 44-52pt bold
-    public var countersFontSize: CGFloat = 42    // 36-48pt regular
-    public var ctaFontSize: CGFloat = 40         // 40pt bold in rounded stickers
-    public var ingredientFontSize: CGFloat = 42  // 42pt bold
+    // Premium mode toggle
+    public var premiumMode: Bool = true  // Enable premium enhancements
     
-    // Animation timing from requirements
+    // Typography hierarchy - Enhanced for premium impact
+    public var hookFontSize: CGFloat = 72        // Increased for viral hook impact
+    public var stepsFontSize: CGFloat = 52       // Slightly larger for readability
+    public var countersFontSize: CGFloat = 44    // More prominent counters
+    public var ctaFontSize: CGFloat = 42         // Bigger CTA for engagement
+    public var ingredientFontSize: CGFloat = 44  // Enhanced ingredient text
+    
+    // Animation timing - More dynamic for premium
     public var fadeDuration: TimeInterval = 0.25      // 200-300ms
     public var springDamping: CGFloat = 13            // 12-14 for pop animations
-    public var scaleRange: ClosedRange<CGFloat> = 0.6...1.0  // entrance scale
+    public var scaleRange: ClosedRange<CGFloat> = 0.8...1.2  // More dramatic pop effect
     public var staggerDelay: TimeInterval = 0.15     // 150ms between elements (Template 2 requirement)
+    
+    // Premium visual enhancements
+    // Template-specific: For beatSyncedCarousel
+    public var carouselSnapDelay: TimeInterval = 0.5  // Assumed beat interval (120 BPM)
+    public var carouselSnapScale: CGFloat = 1.15      // Enhanced zoom for snap effect
+    public var carouselGlowIntensity: Float = 1.2     // Stronger glow for premium reveals
+    public var carouselParticleCount: Int = 30        // More particles for meal reveal
+    public var beatBPM: Int = 120                     // Common TikTok BPM
+    public var snapEasing: String = "cubic-bezier"    // Premium easing type
+    public var carouselBounceScale: CGFloat = 1.08   // Bounce-back scale for snap
+    public var particleSpread: Float = 100.0          // Particle spread radius
+    
+    public var vibranceAmount: Float = 1.2       // Vibrant colors
+    public var contrastAmount: Float = 1.1       // Higher contrast
+    public var saturationAmount: Float = 1.2     // Rich saturation
+    public var sharpnessAmount: Float = 0.8      // Crisp edges
+    public var glowRadius: Float = 5.0           // Glow effect for PIP
+    
+    // Premium text effects
+    public var textShadowRadius: CGFloat = 4.0   // Shadow blur
+    public var textShadowOffset: CGSize = CGSize(width: 0, height: 2)
+    public var textGradientColors: [UIColor] = [
+        UIColor(red: 1.0, green: 0.9, blue: 0.0, alpha: 1.0),  // Golden yellow
+        UIColor(red: 1.0, green: 0.7, blue: 0.0, alpha: 1.0)   // Orange gradient
+    ]
     
     public init() {}
 }
@@ -387,13 +415,13 @@ public struct ExportSettings {
 // MARK: - Caption Generation
 /// Caption generation utilities as specified in requirements
 public struct CaptionGenerator {
-    /// Generate default caption from recipe as specified in requirements
+    /// Generate default caption from recipe with premium emojis
     public static func defaultCaption(from recipe: ViralRecipe) -> String {
         let title = recipe.title
-        let mins = recipe.timeMinutes.map { "\($0) min" } ?? "quick"
-        let cost = recipe.costDollars.map { "$\($0)" } ?? ""
-        let tags = ["#FridgeGlowUp", "#BeforeAfter", "#DinnerHack", "#HomeCooking"].joined(separator: " ")
-        return "\(title) — \(mins) \(cost)\nComment \"RECIPE\" for details 👇\n\(tags)"
+        let mins = recipe.timeMinutes.map { "\($0) min ⏱️" } ?? "quick 🎯"
+        let cost = recipe.costDollars.map { "$\($0) 💰" } ?? ""
+        let tags = ["#FridgeGlowUp", "#BeforeAfter", "#DinnerHack", "#HomeCooking", "#FoodTok"].joined(separator: " ")
+        return "✨ \(title) ✨\n⏰ \(mins) \(cost)\n💬 Comment \"RECIPE\" for details 👇\n\(tags) 🔥"
     }
     
     /// CTA rotation pool as specified in requirements
@@ -410,22 +438,34 @@ public struct CaptionGenerator {
         return ctaPool.randomElement() ?? ctaPool[0]
     }
     
-    /// Generate hook text with fallback
-    public static func generateHook(from recipe: ViralRecipe) -> String {
+    /// Generate hook text with premium emojis for virality
+    public static func generateHook(from recipe: ViralRecipe, template: ViralTemplate? = nil) -> String {
+        // Premium: Carousel-specific hook for dynamic feel
+        if template == .beatSyncedCarousel {
+            let baseHook = "Fridge mess to meal magic! 🍲✨"
+            if let time = recipe.timeMinutes {
+                return "\(baseHook) in \(time) min 🔥⚡"
+            }
+            return "\(baseHook) quick & easy 🔥✨"
+        }
+        
         if let hook = recipe.hook {
-            return hook
+            // Add emojis to existing hook
+            return "\(hook) 🍳✨"
         }
         
         let time = recipe.timeMinutes ?? 15
         let cost = recipe.costDollars.map { "$\($0)" } ?? ""
-        return "Fridge chaos → dinner in \(time) min \(cost)"
+        return "Fridge chaos → dinner in \(time) min \(cost) 🍳✨"
     }
     
-    /// Process step text for display (max 5-7 words)
+    /// Process step text for display with timing icons
     public static func processStepText(_ step: ViralRecipe.Step, index: Int) -> String {
         let words = step.title.components(separatedBy: .whitespaces)
         let truncated = Array(words.prefix(7)).joined(separator: " ")
-        return "\(index + 1). \(truncated)"
+        // Add timing icon if step has duration hint
+        let timeIcon = step.secondsHint != nil ? " ⏱️" : ""
+        return "\(index + 1). \(truncated)\(timeIcon)"
     }
     
     /// Process ingredient text for display

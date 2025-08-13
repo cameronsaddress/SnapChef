@@ -20,6 +20,7 @@ struct RecipeResultsView: View {
     // New states for branded share
     @State private var showBrandedShare = false
     @State private var shareContent: ShareContent?
+    @State private var cloudKitPhotos: [UUID: (before: UIImage?, after: UIImage?)] = [:]
     
     enum ActiveSheet: Identifiable {
         case recipeDetail(Recipe)
@@ -78,12 +79,26 @@ struct RecipeResultsView: View {
                                 },
                                 onShare: {
                                     // Use branded share popup instead
-                                    shareContent = ShareContent(
-                                        type: .recipe(recipe),
-                                        beforeImage: capturedImage,
-                                        afterImage: nil
-                                    )
-                                    showBrandedShare = true
+                                    // Check if we have CloudKit photos cached
+                                    if let photos = cloudKitPhotos[recipe.id] {
+                                        shareContent = ShareContent(
+                                            type: .recipe(recipe),
+                                            beforeImage: photos.before ?? capturedImage,
+                                            afterImage: photos.after ?? getAfterPhotoForRecipe(recipe)
+                                        )
+                                        showBrandedShare = true
+                                    } else {
+                                        // Fetch from CloudKit first
+                                        fetchCloudKitPhotosForRecipe(recipe) { beforePhoto, afterPhoto in
+                                            cloudKitPhotos[recipe.id] = (beforePhoto, afterPhoto)
+                                            shareContent = ShareContent(
+                                                type: .recipe(recipe),
+                                                beforeImage: beforePhoto ?? capturedImage,
+                                                afterImage: afterPhoto ?? getAfterPhotoForRecipe(recipe)
+                                            )
+                                            showBrandedShare = true
+                                        }
+                                    }
                                 },
                                 onSave: {
                                     saveRecipe(recipe)
@@ -96,12 +111,26 @@ struct RecipeResultsView: View {
                         ViralSharePrompt(action: {
                             if let firstRecipe = recipes.first {
                                 // Use branded share for viral prompt too
-                                shareContent = ShareContent(
-                                    type: .recipe(firstRecipe),
-                                    beforeImage: capturedImage,
-                                    afterImage: nil
-                                )
-                                showBrandedShare = true
+                                // Check if we have CloudKit photos cached
+                                if let photos = cloudKitPhotos[firstRecipe.id] {
+                                    shareContent = ShareContent(
+                                        type: .recipe(firstRecipe),
+                                        beforeImage: photos.before ?? capturedImage,
+                                        afterImage: photos.after ?? getAfterPhotoForRecipe(firstRecipe)
+                                    )
+                                    showBrandedShare = true
+                                } else {
+                                    // Fetch from CloudKit first
+                                    fetchCloudKitPhotosForRecipe(firstRecipe) { beforePhoto, afterPhoto in
+                                        cloudKitPhotos[firstRecipe.id] = (beforePhoto, afterPhoto)
+                                        shareContent = ShareContent(
+                                            type: .recipe(firstRecipe),
+                                            beforeImage: beforePhoto ?? capturedImage,
+                                            afterImage: afterPhoto ?? getAfterPhotoForRecipe(firstRecipe)
+                                        )
+                                        showBrandedShare = true
+                                    }
+                                }
                             }
                         })
                         .staggeredFade(index: recipes.count + (ingredients.isEmpty ? 1 : 2), isShowing: contentVisible)
@@ -145,6 +174,10 @@ struct RecipeResultsView: View {
             withAnimation(.easeOut(duration: 0.5)) {
                 contentVisible = true
             }
+            // Pre-fetch CloudKit photos for all recipes
+            Task {
+                await fetchAllCloudKitPhotos()
+            }
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
@@ -155,7 +188,7 @@ struct RecipeResultsView: View {
                     content: ShareContent(
                         type: .recipe(recipe),
                         beforeImage: capturedImage,
-                        afterImage: nil
+                        afterImage: getAfterPhotoForRecipe(recipe)
                     )
                 )
             case .fridgeInventory:
@@ -163,7 +196,7 @@ struct RecipeResultsView: View {
                     ingredients: ingredients,
                     capturedImage: capturedImage
                 )
-            case .brandedShare(let recipe):
+            case .brandedShare(_):
                 // This case is handled by the separate sheet below
                 EmptyView()
             }
@@ -219,6 +252,57 @@ struct RecipeResultsView: View {
         // Haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
+    }
+    
+    private func getAfterPhotoForRecipe(_ recipe: Recipe) -> UIImage? {
+        // Check if we have a saved recipe with photos
+        if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }) {
+            return savedRecipe.afterPhoto
+        }
+        // If not found locally, we could fetch from CloudKit here if needed
+        // For now, return nil which will use a placeholder
+        return nil
+    }
+    
+    private func fetchCloudKitPhotosForRecipe(_ recipe: Recipe, completion: @escaping (UIImage?, UIImage?) -> Void) {
+        Task {
+            do {
+                let photos = try await CloudKitRecipeManager.shared.fetchRecipePhotos(for: recipe.id.uuidString)
+                await MainActor.run {
+                    completion(photos.before, photos.after)
+                }
+            } catch {
+                print("Failed to fetch CloudKit photos: \(error)")
+                await MainActor.run {
+                    completion(nil, nil)
+                }
+            }
+        }
+    }
+    
+    private func fetchAllCloudKitPhotos() async {
+        // Fetch photos for all recipes in parallel
+        await withTaskGroup(of: (UUID, UIImage?, UIImage?).self) { group in
+            for recipe in recipes {
+                group.addTask {
+                    do {
+                        let photos = try await CloudKitRecipeManager.shared.fetchRecipePhotos(for: recipe.id.uuidString)
+                        print("📸 Pre-fetched CloudKit photos for recipe '\(recipe.name)': before=\(photos.before != nil), after=\(photos.after != nil)")
+                        return (recipe.id, photos.before, photos.after)
+                    } catch {
+                        print("❌ Failed to fetch CloudKit photos for recipe '\(recipe.name)': \(error)")
+                        return (recipe.id, nil, nil)
+                    }
+                }
+            }
+            
+            // Collect results
+            for await (recipeId, beforePhoto, afterPhoto) in group {
+                await MainActor.run {
+                    cloudKitPhotos[recipeId] = (beforePhoto, afterPhoto)
+                }
+            }
+        }
     }
 }
 
