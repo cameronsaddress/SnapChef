@@ -397,6 +397,7 @@ public final class RenderPlanner: @unchecked Sendable {
         print("📝 KINETIC TEXT: Total duration: \(totalDuration.seconds) seconds")
         print("📝 KINETIC TEXT: Track items: \(items.count)")
         print("📝 KINETIC TEXT: Overlays: \(overlays.count)")
+        print("📝 KINETIC TEXT: Audio: \(media.musicURL != nil ? "✅ \(media.musicURL!.lastPathComponent)" : "❌ No audio")")
         
         return RenderPlan(
             items: items,

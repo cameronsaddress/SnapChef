@@ -284,17 +284,27 @@ struct TikTokShareView: View {
             mealPhoto = createPlaceholderImage(text: "AFTER")
         }
         
+        // Get the URL for Mixdown.mp3 from the app bundle
+        let musicURL = Bundle.main.url(forResource: "Mixdown", withExtension: "mp3")
+        if musicURL == nil {
+            print("⚠️ WARNING: Mixdown.mp3 not found in app bundle")
+        } else {
+            print("🎵 TikTokShareView: Found Mixdown.mp3 in app bundle")
+        }
+        
         // Create MediaBundle - using meal photo for both afterFridge and cookedMeal
         // TODO: Refactor MediaBundle to remove afterFridge
         let mediaBundle = MediaBundle(
             beforeFridge: fridgePhoto,
             afterFridge: mealPhoto,  // Using meal photo since afterFridge isn't a real concept
-            cookedMeal: mealPhoto
+            cookedMeal: mealPhoto,
+            musicURL: musicURL  // Add the background music
         )
         
         print("📸 TikTokShareView: MediaBundle created:")
         print("    - beforeFridge: \(fridgePhoto.size)")
         print("    - cookedMeal: \(mealPhoto.size)")
+        print("    - musicURL: \(musicURL != nil ? "✅ Mixdown.mp3" : "❌ No music")")
         
         return (viralRecipe, mediaBundle)
     }
