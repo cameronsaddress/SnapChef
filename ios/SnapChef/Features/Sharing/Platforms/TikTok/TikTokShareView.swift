@@ -14,12 +14,10 @@ struct TikTokShareView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var viralEngine = ViralVideoSDK()  // Use the new viral video engine
     @State private var selectedTemplate: ViralTemplate = .beatSyncedCarousel  // Use ViralTemplate
-    @StateObject private var videoGenerator = TikTokVideoGenerator()  // Keep for fallback
     @State private var isGenerating = false
     @State private var generatedVideoURL: URL?
     @State private var showingVideoPreview = false
     @State private var errorMessage: String?
-    @State private var generationProgress: Double = 0
     
     var body: some View {
         NavigationStack {
@@ -136,7 +134,7 @@ struct TikTokShareView: View {
                                     HStack(spacing: 12) {
                                         ProgressView()
                                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        Text("Generating... \(Int(generationProgress * 100))%")
+                                        Text("\(viralEngine.currentProgress.phase.rawValue)")
                                             .font(.system(size: 16, weight: .semibold))
                                             .foregroundColor(.white)
                                     }
@@ -216,32 +214,23 @@ struct TikTokShareView: View {
     
     private func generateVideo() {
         isGenerating = true
-        generationProgress = 0
         
         Task {
             do {
                 // Convert content to required format
                 let (viralRecipe, mediaBundle) = try await convertContentToViralFormat(content)
                 
-                // For now, use the old video generator as fallback
-                // TODO: Fix ViralVideoSDK integration
-                let oldTemplate = mapToOldTemplate(selectedTemplate)
-                let videoURL = try await videoGenerator.generateVideo(
-                    template: oldTemplate,
-                    content: content,
-                    progress: { progress in
-                        await MainActor.run {
-                            generationProgress = progress
-                        }
-                    }
+                // Use the ViralVideoSDK to generate video with proper template
+                let videoURL = try await viralEngine.generateVideoOnly(
+                    template: selectedTemplate,
+                    recipe: viralRecipe,
+                    media: mediaBundle
                 )
                 
                 await MainActor.run {
                     generatedVideoURL = videoURL
                     isGenerating = false
                 }
-                
-                // Progress is tracked via the callback in videoGenerator
                 
                 // Automatically save and open TikTok
                 await saveAndShareToTikTok(videoURL: videoURL)
@@ -336,21 +325,6 @@ struct TikTokShareView: View {
             )
             
             text.draw(in: textRect, withAttributes: attributes)
-        }
-    }
-    
-    private func mapToOldTemplate(_ viralTemplate: ViralTemplate) -> TikTokTemplate {
-        switch viralTemplate {
-        case .beatSyncedCarousel:
-            return .beforeAfterReveal
-        case .splitScreenSwipe:
-            return .splitScreen
-        case .kineticTextSteps:
-            return .quickRecipe
-        case .priceTimeChallenge:
-            return .timelapse
-        case .greenScreenPIP:
-            return .ingredients360
         }
     }
     
