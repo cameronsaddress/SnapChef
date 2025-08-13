@@ -223,11 +223,11 @@ public final class ErrorRecoveryManager: @unchecked Sendable {
         logger.error("Rendering failure: \(message)")
         
         // Check if we can simplify the template
-        if template == .kineticTextSteps || template == .greenScreenPIP {
+        if template == .kineticTextSteps /* || template == .greenScreenPIP */ {
             return .retryWithSimplifiedTemplate
         } else {
             // Try a simpler template
-            return .useAlternativeTemplate(.beatSyncedCarousel)
+            return .useAlternativeTemplate(.kineticTextSteps)  // was .beatSyncedCarousel
         }
     }
     
@@ -250,8 +250,8 @@ public final class ErrorRecoveryManager: @unchecked Sendable {
         
         // Try a template with different duration
         switch template {
-        case .kineticTextSteps, .greenScreenPIP:
-            return .useAlternativeTemplate(.splitScreenSwipe) // Shorter template
+        case .kineticTextSteps /* , .greenScreenPIP */:
+            return .useAlternativeTemplate(.kineticTextSteps) // was .splitScreenSwipe
         default:
             return .retryWithSimplifiedTemplate
         }
@@ -348,30 +348,32 @@ public struct TemplateSimplifier {
     public static func simplifyTemplate(_ template: ViralTemplate) -> ViralTemplate {
         switch template {
         case .kineticTextSteps:
-            return .beatSyncedCarousel // Simpler template
-        case .greenScreenPIP:
-            return .splitScreenSwipe // Remove PIP complexity
-        case .priceTimeChallenge:
-            return .beatSyncedCarousel // Remove sticker animations
+            return .kineticTextSteps // Keep same template
+        // case .greenScreenPIP:
+        //     return .splitScreenSwipe // Remove PIP complexity
+        // case .priceTimeChallenge:
+        //     return .beatSyncedCarousel // Remove sticker animations
         default:
-            return .beatSyncedCarousel // Fallback to simplest template
+            return .kineticTextSteps // Fallback to kinetic text template
         }
     }
     
     public static func getAlternativeTemplate(for template: ViralTemplate) -> ViralTemplate {
         switch template {
-        case .beatSyncedCarousel:
-            return .splitScreenSwipe
-        case .splitScreenSwipe:
-            return .beatSyncedCarousel
+        // Only supporting kinetic text template
         case .kineticTextSteps:
-            return .priceTimeChallenge
-        case .priceTimeChallenge:
-            return .kineticTextSteps
-        case .greenScreenPIP:
-            return .beatSyncedCarousel
-        case .test:
-            return .beatSyncedCarousel  // Test template fallback
+            return .kineticTextSteps  // No alternative, use same
+        // Commented out other templates
+        // case .beatSyncedCarousel:
+        //     return .splitScreenSwipe
+        // case .splitScreenSwipe:
+        //     return .beatSyncedCarousel
+        // case .priceTimeChallenge:
+        //     return .kineticTextSteps
+        // case .greenScreenPIP:
+        //     return .beatSyncedCarousel
+        // case .test:
+        //     return .beatSyncedCarousel  // Test template fallback
         }
     }
 }

@@ -31,18 +31,19 @@ public final class RenderPlanner: @unchecked Sendable {
     ) async throws -> RenderPlan {
         
         switch template {
-        case .beatSyncedCarousel:
-            return try await createBeatSyncedCarouselPlan(recipe: recipe, media: media)
-        case .splitScreenSwipe:
-            return try await createSplitScreenSwipePlan(recipe: recipe, media: media)
+        // Commented out templates - focusing on kinetic text only
+        // case .beatSyncedCarousel:
+        //     return try await createBeatSyncedCarouselPlan(recipe: recipe, media: media)
+        // case .splitScreenSwipe:
+        //     return try await createSplitScreenSwipePlan(recipe: recipe, media: media)
         case .kineticTextSteps:
             return try await createKineticTextStepsPlan(recipe: recipe, media: media)
-        case .priceTimeChallenge:
-            return try await createPriceTimeChallengePlan(recipe: recipe, media: media)
-        case .greenScreenPIP:
-            return try await createGreenScreenPIPPlan(recipe: recipe, media: media)
-        case .test:
-            return try await createTestTemplatePlan(recipe: recipe, media: media)
+        // case .priceTimeChallenge:
+        //     return try await createPriceTimeChallengePlan(recipe: recipe, media: media)
+        // case .greenScreenPIP:
+        //     return try await createGreenScreenPIPPlan(recipe: recipe, media: media)
+        // case .test:
+        //     return try await createTestTemplatePlan(recipe: recipe, media: media)
         }
     }
     
@@ -129,7 +130,7 @@ public final class RenderPlanner: @unchecked Sendable {
         media: MediaBundle
     ) async throws -> RenderPlan {
         
-        let totalDuration = ViralTemplate.beatSyncedCarousel.duration
+        let totalDuration = CMTime(seconds: 11, preferredTimescale: 600)  // ViralTemplate.beatSyncedCarousel.duration
         var items: [RenderPlan.TrackItem] = []
         var overlays: [RenderPlan.Overlay] = []
         
@@ -397,7 +398,7 @@ public final class RenderPlanner: @unchecked Sendable {
         media: MediaBundle
     ) async throws -> RenderPlan {
         
-        let totalDuration = ViralTemplate.priceTimeChallenge.duration
+        let totalDuration = CMTime(seconds: 12, preferredTimescale: 600)  // ViralTemplate.priceTimeChallenge.duration
         var items: [RenderPlan.TrackItem] = []
         var overlays: [RenderPlan.Overlay] = []
         
@@ -491,7 +492,7 @@ public final class RenderPlanner: @unchecked Sendable {
         media: MediaBundle
     ) async throws -> RenderPlan {
         
-        let totalDuration = ViralTemplate.greenScreenPIP.duration
+        let totalDuration = CMTime(seconds: 15, preferredTimescale: 600)  // ViralTemplate.greenScreenPIP.duration
         var items: [RenderPlan.TrackItem] = []
         var overlays: [RenderPlan.Overlay] = []
         
@@ -1063,7 +1064,7 @@ public final class RenderPlanner: @unchecked Sendable {
         media: MediaBundle
     ) async throws -> RenderPlan {
         
-        let totalDuration = ViralTemplate.test.duration  // 2 seconds
+        let totalDuration = CMTime(seconds: 2, preferredTimescale: 600)  // ViralTemplate.test.duration
         var items: [RenderPlan.TrackItem] = []
         
         print("🧪 TEST TEMPLATE: Creating render plan")

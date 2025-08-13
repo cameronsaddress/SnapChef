@@ -162,26 +162,16 @@ public final class StillWriter: @unchecked Sendable {
             // TODO: Add premium effects here
         }
         
-        // Pre-render all pixel buffers to avoid capturing CIImage
-        // IMPORTANT: Create a unique buffer for each frame to avoid AVAssetWriter errors
-        var preRenderedBuffers: [CVPixelBuffer] = []
-        for frameIndex in 0..<totalFrames {
-            // Create a fresh buffer for each frame to avoid reuse issues
-            if let buffer = try createOptimizedPixelBuffer(from: processedImage) {
-                preRenderedBuffers.append(buffer)
-                // Log every 30 frames to track progress
-                if frameIndex % 30 == 0 {
-                    print("📦 DEBUG StillWriter: Pre-rendered buffer \(frameIndex)/\(totalFrames)")
-                }
-            }
-        }
+        // Store the processed image for on-demand buffer creation
+        // This avoids pre-allocating all buffers which can cause memory issues
+        let finalProcessedImage = processedImage
         
         // Write frames
         print("📝 DEBUG StillWriter: Starting to write \(totalFrames) frames")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let frameCountBox = Box(value: 0)
-            // Use Box to wrap the non-Sendable array
-            let buffersBox = Box(value: preRenderedBuffers)
+            // Store the processed image in a Box for thread safety
+            let imageBox = Box(value: finalProcessedImage)
             let adaptor = pixelBufferAdaptor
             // Track if continuation has been resumed to prevent double resume
             let hasResumedBox = Box(value: false)
@@ -193,8 +183,8 @@ public final class StillWriter: @unchecked Sendable {
                         let presentationTime = CMTime(value: Int64(frameCountBox.value), timescale: self.config.fps)
                         
                         do {
-                            if frameCountBox.value < buffersBox.value.count {
-                                let pixelBuffer = buffersBox.value[frameCountBox.value]
+                            // Create a fresh buffer for each frame on-demand
+                            if let pixelBuffer = try self.createOptimizedPixelBuffer(from: imageBox.value) {
                                 let success = adaptor.append(pixelBuffer, withPresentationTime: presentationTime)
                                 if !success {
                                     print("❌ DEBUG StillWriter: Failed to append frame \(frameCountBox.value) at time \(presentationTime.seconds)s")
@@ -215,6 +205,9 @@ public final class StillWriter: @unchecked Sendable {
                                         print("✅ DEBUG StillWriter: Successfully wrote frame \(frameCountBox.value)/\(totalFrames)")
                                     }
                                 }
+                            } else {
+                                // Pixel buffer creation returned nil
+                                throw StillWriterError.pixelBufferCreationFailed
                             }
                         } catch {
                             if !hasResumedBox.value {

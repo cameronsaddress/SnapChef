@@ -137,7 +137,8 @@ public class ViralVideoEngine: ObservableObject {
                     )
                     
                     // Add PIP for green screen template if selfie provided
-                    if template == .greenScreenPIP, let selfieURL = selfieVideoURL {
+                    // Green screen PIP template commented out
+                    if false /* template == .greenScreenPIP */, let selfieURL = selfieVideoURL {
                         let pipFrame = CGRect(
                             x: config.size.width - config.safeInsets.right - 180,
                             y: config.safeInsets.top + 60,
@@ -252,7 +253,7 @@ public class ViralVideoEngine: ObservableObject {
             
             // For test template, use a special renderer with effects disabled
             let baseVideoURL: URL
-            if template == .test {
+            if false /* template == .test */ {
                 print("🧪 TEST TEMPLATE: Creating renderer with effects disabled")
                 var testConfig = RenderConfig()
                 testConfig.premiumMode = false  // Disable ALL premium effects
@@ -277,7 +278,7 @@ public class ViralVideoEngine: ObservableObject {
             
             // SPECIAL HANDLING FOR TEST TEMPLATE - Skip all compositing and overlays
             let finalVideoURL: URL
-            if template == .test {
+            if false /* template == .test */ {
                 print("🧪 TEST TEMPLATE: Skipping compositing and overlays - using raw base video")
                 finalVideoURL = baseVideoURL
                 try await updateProgress(.finalizing, 0.9, progressHandler)
@@ -323,7 +324,7 @@ public class ViralVideoEngine: ObservableObject {
             try await updateProgress(.complete, 1.0, progressHandler)
             
             // Clean up intermediate files immediately
-            if template == .test {
+            if false /* template == .test */ {
                 // For test template, no intermediate files to clean (baseVideo is the final)
                 memoryOptimizer.deleteTempFiles([])
             } else {

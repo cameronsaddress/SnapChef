@@ -129,44 +129,45 @@ public struct RenderConfig: Sendable {
 // MARK: - Viral Template Enum
 /// Five viral video templates as specified in requirements
 public enum ViralTemplate: String, CaseIterable, Sendable {
-    case beatSyncedCarousel = "Beat-Synced Photo Carousel"
-    case splitScreenSwipe = "Split-Screen Swipe Before/After"
+    // Commented out templates - focusing on kinetic text only
+    // case beatSyncedCarousel = "Beat-Synced Photo Carousel"
+    // case splitScreenSwipe = "Split-Screen Swipe Before/After"
     case kineticTextSteps = "Kinetic-Text Recipe Steps"
-    case priceTimeChallenge = "Price & Time Challenge"
-    case greenScreenPIP = "Green-Screen My Fridge → My Plate"
-    case test = "Test (Photos Only)"
+    // case priceTimeChallenge = "Price & Time Challenge"
+    // case greenScreenPIP = "Green-Screen My Fridge → My Plate"
+    // case test = "Test (Photos Only)"
     
     public var duration: CMTime {
         switch self {
-        case .beatSyncedCarousel:
-            return CMTime(seconds: 11, preferredTimescale: 600)  // 10-12 seconds
-        case .splitScreenSwipe:
-            return CMTime(seconds: 9, preferredTimescale: 600)   // 9 seconds
+        // case .beatSyncedCarousel:
+        //     return CMTime(seconds: 11, preferredTimescale: 600)  // 10-12 seconds
+        // case .splitScreenSwipe:
+        //     return CMTime(seconds: 9, preferredTimescale: 600)   // 9 seconds
         case .kineticTextSteps:
             return CMTime(seconds: 15, preferredTimescale: 600)  // 15 seconds
-        case .priceTimeChallenge:
-            return CMTime(seconds: 12, preferredTimescale: 600)  // 12 seconds
-        case .greenScreenPIP:
-            return CMTime(seconds: 15, preferredTimescale: 600)  // 15 seconds
-        case .test:
-            return CMTime(seconds: 2, preferredTimescale: 600)   // 2 seconds (1 sec per photo)
+        // case .priceTimeChallenge:
+        //     return CMTime(seconds: 12, preferredTimescale: 600)  // 12 seconds
+        // case .greenScreenPIP:
+        //     return CMTime(seconds: 15, preferredTimescale: 600)  // 15 seconds
+        // case .test:
+        //     return CMTime(seconds: 2, preferredTimescale: 600)   // 2 seconds (1 sec per photo)
         }
     }
     
     public var description: String {
         switch self {
-        case .beatSyncedCarousel:
-            return "Hook on blurred BEFORE → ingredient snaps → cooked meal → AFTER"
-        case .splitScreenSwipe:
-            return "BEFORE full screen → AFTER masked reveal → ingredient counters → CTA"
+        // case .beatSyncedCarousel:
+        //     return "Hook on blurred BEFORE → ingredient snaps → cooked meal → AFTER"
+        // case .splitScreenSwipe:
+        //     return "BEFORE full screen → AFTER masked reveal → ingredient counters → CTA"
         case .kineticTextSteps:
             return "Hook overlay → animated step text → background motion → auto-captioned"
-        case .priceTimeChallenge:
-            return "BEFORE with stickers → progress bar → AFTER with CTA"
-        case .greenScreenPIP:
-            return "Picture-in-picture face overlay → BEFORE → B-ROLL → AFTER"
-        case .test:
-            return "Simple test: 1 second before photo, 1 second after photo, no effects"
+        // case .priceTimeChallenge:
+        //     return "BEFORE with stickers → progress bar → AFTER with CTA"
+        // case .greenScreenPIP:
+        //     return "Picture-in-picture face overlay → BEFORE → B-ROLL → AFTER"
+        // case .test:
+        //     return "Simple test: 1 second before photo, 1 second after photo, no effects"
         }
     }
 }
@@ -445,14 +446,14 @@ public struct CaptionGenerator {
     
     /// Generate hook text with premium emojis for virality
     public static func generateHook(from recipe: ViralRecipe, template: ViralTemplate? = nil) -> String {
-        // Premium: Carousel-specific hook for dynamic feel
-        if template == .beatSyncedCarousel {
-            let baseHook = "Fridge mess to meal magic! 🍲✨"
-            if let time = recipe.timeMinutes {
-                return "\(baseHook) in \(time) min 🔥⚡"
-            }
-            return "\(baseHook) quick & easy 🔥✨"
-        }
+        // Premium: Carousel-specific hook for dynamic feel - commented out
+        // if template == .beatSyncedCarousel {
+        //     let baseHook = "Fridge mess to meal magic! 🍲✨"
+        //     if let time = recipe.timeMinutes {
+        //         return "\(baseHook) in \(time) min 🔥⚡"
+        //     }
+        //     return "\(baseHook) quick & easy 🔥✨"
+        // }
         
         if let hook = recipe.hook {
             // Add emojis to existing hook

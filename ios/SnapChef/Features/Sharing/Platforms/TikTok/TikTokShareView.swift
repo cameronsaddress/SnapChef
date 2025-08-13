@@ -13,7 +13,7 @@ struct TikTokShareView: View {
     let content: ShareContent
     @Environment(\.dismiss) var dismiss
     @StateObject private var viralEngine = ViralVideoSDK()  // Use the new viral video engine
-    @State private var selectedTemplate: ViralTemplate = .beatSyncedCarousel  // Use ViralTemplate
+    @State private var selectedTemplate: ViralTemplate = .kineticTextSteps  // Default to kinetic text template
     @State private var isGenerating = false
     @State private var generatedVideoURL: URL?
     @State private var showingVideoPreview = false
@@ -51,54 +51,20 @@ struct TikTokShareView: View {
                         }
                         .padding(.top, 20)
                         
-                        // Template Selection - VIRAL TEMPLATES
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Choose a viral template")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(ViralTemplate.allCases, id: \.self) { template in
-                                        ViralTemplateCard(
-                                            template: template,
-                                            isSelected: selectedTemplate == template,
-                                            action: {
-                                                selectedTemplate = template
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
+                        // Single Template - Kinetic Text Only
+                        // Template tiles removed - focusing on kinetic text template only
                         
-                        // Preview Section
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Preview")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                            
+                        // Preview Section - Kinetic Text Template
+                        VStack(spacing: 16) {
+                            // No title, just the preview
                             TemplatePreview(
-                                template: selectedTemplate,
+                                template: .kineticTextSteps,  // Always use kinetic text
                                 content: content
                             )
                         }
                         .padding(.horizontal, 20)
                         
-                        // Trending Audio Suggestions
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Trending Sounds")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                            
-                            VStack(spacing: 12) {
-                                ForEach(TrendingAudio.suggestions, id: \.id) { audio in
-                                    TrendingAudioRow(audio: audio)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
+                        // Trending sounds section removed
                         
                         // Hashtag Recommendations
                         VStack(alignment: .leading, spacing: 16) {
@@ -488,40 +454,44 @@ struct ViralTemplateCard: View {
     
     private func gradientColors(for template: ViralTemplate) -> [Color] {
         switch template {
-        case .beatSyncedCarousel:
-            return [Color(hex: "#FF0050"), Color(hex: "#00F2EA")]
-        case .splitScreenSwipe:
-            return [Color(hex: "#F77737"), Color(hex: "#F9A825")]
+        // Only supporting kinetic text
         case .kineticTextSteps:
             return [Color(hex: "#667eea"), Color(hex: "#764ba2")]
-        case .priceTimeChallenge:
-            return [Color(hex: "#43e97b"), Color(hex: "#38f9d7")]
-        case .greenScreenPIP:
-            return [Color(hex: "#fa709a"), Color(hex: "#fee140")]
-        case .test:
-            return [Color.orange, Color.yellow]  // Bright orange-yellow for visibility
+        // Commented out other templates
+        // case .beatSyncedCarousel:
+        //     return [Color(hex: "#FF0050"), Color(hex: "#00F2EA")]
+        // case .splitScreenSwipe:
+        //     return [Color(hex: "#F77737"), Color(hex: "#F9A825")]
+        // case .priceTimeChallenge:
+        //     return [Color(hex: "#43e97b"), Color(hex: "#38f9d7")]
+        // case .greenScreenPIP:
+        //     return [Color(hex: "#fa709a"), Color(hex: "#fee140")]
+        // case .test:
+        //     return [Color.orange, Color.yellow]  // Bright orange-yellow for visibility
         }
     }
     
     private func icon(for template: ViralTemplate) -> String {
         switch template {
-        case .beatSyncedCarousel: return "music.note"
-        case .splitScreenSwipe: return "arrow.left.arrow.right"
         case .kineticTextSteps: return "text.bubble"
-        case .priceTimeChallenge: return "dollarsign.circle"
-        case .greenScreenPIP: return "camera.on.rectangle"
-        case .test: return "photo.on.rectangle"
+        // Commented out other templates
+        // case .beatSyncedCarousel: return "music.note"
+        // case .splitScreenSwipe: return "arrow.left.arrow.right"
+        // case .priceTimeChallenge: return "dollarsign.circle"
+        // case .greenScreenPIP: return "camera.on.rectangle"
+        // case .test: return "photo.on.rectangle"
         }
     }
     
     private func name(for template: ViralTemplate) -> String {
         switch template {
-        case .beatSyncedCarousel: return "Beat Sync"
-        case .splitScreenSwipe: return "Split Screen"
         case .kineticTextSteps: return "Kinetic Text"
-        case .priceTimeChallenge: return "Price Challenge"
-        case .greenScreenPIP: return "Green Screen"
-        case .test: return "Test (Photos Only)"
+        // Commented out other templates
+        // case .beatSyncedCarousel: return "Beat Sync"
+        // case .splitScreenSwipe: return "Split Screen"
+        // case .priceTimeChallenge: return "Price Challenge"
+        // case .greenScreenPIP: return "Green Screen"
+        // case .test: return "Test (Photos Only)"
         }
     }
 }
@@ -597,18 +567,19 @@ struct TemplatePreview: View {
     @ViewBuilder
     private func previewContent(for template: ViralTemplate, content: ShareContent) -> some View {
         switch template {
-        case .beatSyncedCarousel:
-            BeforeAfterPreview(content: content)
-        case .splitScreenSwipe:
-            SplitScreenPreview(content: content)
+        // Only supporting kinetic text template
+        // case .beatSyncedCarousel:
+        //     BeforeAfterPreview(content: content)
+        // case .splitScreenSwipe:
+        //     SplitScreenPreview(content: content)
         case .kineticTextSteps:
             QuickRecipePreview(content: content)
-        case .priceTimeChallenge:
-            TimelapsePreview(content: content)
-        case .greenScreenPIP:
-            Ingredients360Preview(content: content)
-        case .test:
-            TestTemplatePreview(content: content)
+        // case .priceTimeChallenge:
+        //     TimelapsePreview(content: content)
+        // case .greenScreenPIP:
+        //     Ingredients360Preview(content: content)
+        // case .test:
+        //     TestTemplatePreview(content: content)
         }
     }
 }

@@ -153,7 +153,7 @@ public class ViralVideoSDK: ObservableObject {
         
         try await withCheckedThrowingContinuation { continuation in
             exporter.shareRecipeToTikTok(
-                template: .beatSyncedCarousel, // Default template for sharing
+                template: .kineticTextSteps, // Default template for sharing
                 recipe: recipe,
                 media: MediaBundle(
                     beforeFridge: UIImage(),
@@ -273,15 +273,15 @@ public class ViralVideoSDK: ObservableObject {
         
         // Template selection logic based on content
         if stepCount <= 3 && ingredientCount <= 4 {
-            return .beatSyncedCarousel
+            return .kineticTextSteps  // was .beatSyncedCarousel
         } else if stepCount >= 4 && stepCount <= 6 {
             return .kineticTextSteps
         } else if hasTime && hasCost {
-            return .priceTimeChallenge
+            return .kineticTextSteps  // was .priceTimeChallenge
         } else if ingredientCount >= 3 {
-            return .splitScreenSwipe
+            return .kineticTextSteps  // was .splitScreenSwipe
         } else {
-            return .greenScreenPIP
+            return .kineticTextSteps  // was .greenScreenPIP
         }
     }
     
@@ -396,7 +396,7 @@ public class ViralVideoSDK: ObservableObject {
 public struct ViralVideoGeneratorView: View {
     
     @StateObject private var sdk = ViralVideoSDK()
-    @State private var selectedTemplate: ViralTemplate = .beatSyncedCarousel
+    @State private var selectedTemplate: ViralTemplate = .kineticTextSteps
     @State private var showingResults = false
     
     let recipe: ViralRecipe
