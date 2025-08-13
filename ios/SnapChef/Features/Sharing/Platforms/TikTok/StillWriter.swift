@@ -191,24 +191,27 @@ public final class StillWriter: @unchecked Sendable {
                         do {
                             // Create a fresh buffer for each frame on-demand
                             if let pixelBuffer = try self.createOptimizedPixelBuffer(from: imageBox.value) {
-                                let success = adaptor.append(pixelBuffer, withPresentationTime: presentationTime)
-                                if !success {
-                                    print("❌ DEBUG StillWriter: Failed to append frame \(frameCountBox.value) at time \(presentationTime.seconds)s")
-                                    print("❌ DEBUG StillWriter: AVAssetWriter status: \(videoWriter.status.rawValue)")
-                                    if let error = videoWriter.error {
-                                        print("❌ DEBUG StillWriter: AVAssetWriter error: \(error)")
-                                    }
-                                    if !hasResumedBox.value {
-                                        hasResumedBox.value = true
-                                        videoInput.markAsFinished()
-                                        continuation.resume(throwing: StillWriterError.frameWriteFailed)
-                                    }
-                                    return
-                                } else {
-                                    // Record successful frame for monitoring
-                                    self.frameDropMonitor.recordFrame()
-                                    if frameCountBox.value == 0 || frameCountBox.value % 30 == 0 {
-                                        print("✅ DEBUG StillWriter: Successfully wrote frame \(frameCountBox.value)/\(totalFrames)")
+                                // Final check right before appending
+                                if videoInput.isReadyForMoreMediaData {
+                                    let success = adaptor.append(pixelBuffer, withPresentationTime: presentationTime)
+                                    if !success {
+                                        print("❌ DEBUG StillWriter: Failed to append frame \(frameCountBox.value) at time \(presentationTime.seconds)s")
+                                        print("❌ DEBUG StillWriter: AVAssetWriter status: \(videoWriter.status.rawValue)")
+                                        if let error = videoWriter.error {
+                                            print("❌ DEBUG StillWriter: AVAssetWriter error: \(error)")
+                                        }
+                                        if !hasResumedBox.value {
+                                            hasResumedBox.value = true
+                                            videoInput.markAsFinished()
+                                            continuation.resume(throwing: StillWriterError.frameWriteFailed)
+                                        }
+                                        return
+                                    } else {
+                                        // Record successful frame for monitoring
+                                        self.frameDropMonitor.recordFrame()
+                                        if frameCountBox.value == 0 || frameCountBox.value % 30 == 0 {
+                                            print("✅ DEBUG StillWriter: Successfully wrote frame \(frameCountBox.value)/\(totalFrames)")
+                                        }
                                     }
                                 }
                             } else {
@@ -348,10 +351,13 @@ public final class StillWriter: @unchecked Sendable {
                                 crossfadeDuration: crossfadeDuration
                             )
                             
-                            let success = adaptor.append(pixelBuffer, withPresentationTime: presentationTime)
-                            if !success {
-                                continuation.resume(throwing: StillWriterError.frameWriteFailed)
-                                return
+                            // Final check right before appending
+                            if videoInput.isReadyForMoreMediaData {
+                                let success = adaptor.append(pixelBuffer, withPresentationTime: presentationTime)
+                                if !success {
+                                    continuation.resume(throwing: StillWriterError.frameWriteFailed)
+                                    return
+                                }
                             }
                         } catch {
                             continuation.resume(throwing: error)
