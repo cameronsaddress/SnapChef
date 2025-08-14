@@ -165,6 +165,8 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         fadeAnimation.toValue = 1.0
         fadeAnimation.duration = config.fadeDuration
         fadeAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        fadeAnimation.fillMode = .forwards
+        fadeAnimation.isRemovedOnCompletion = false
         textLayer.add(fadeAnimation, forKey: "fadeIn")
         
         containerLayer.addSublayer(textLayer)
@@ -226,6 +228,8 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         scaleAnimation.damping = config.springDamping
         scaleAnimation.stiffness = 100
         scaleAnimation.mass = 1
+        scaleAnimation.fillMode = .forwards
+        scaleAnimation.isRemovedOnCompletion = false
         
         stickerLayer.add(scaleAnimation, forKey: "ctaPop")
         
@@ -257,6 +261,8 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         animation.toValue = circlePath.cgPath
         animation.duration = 1.5 // As specified in requirements
         animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        animation.fillMode = .forwards
+        animation.isRemovedOnCompletion = false
         
         maskLayer.add(animation, forKey: "circularReveal")
         
@@ -358,16 +364,22 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         slideAnimation.toValue = 0
         slideAnimation.duration = 0.35
         slideAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        slideAnimation.fillMode = .forwards
+        slideAnimation.isRemovedOnCompletion = false
         
         let fadeAnimation = CABasicAnimation(keyPath: "opacity")
         fadeAnimation.fromValue = 0.0
         fadeAnimation.toValue = 1.0
         fadeAnimation.duration = 0.35
+        fadeAnimation.fillMode = .forwards
+        fadeAnimation.isRemovedOnCompletion = false
         
         let animationGroup = CAAnimationGroup()
         animationGroup.animations = [slideAnimation, fadeAnimation]
         animationGroup.duration = 0.35
         animationGroup.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        animationGroup.fillMode = .forwards
+        animationGroup.isRemovedOnCompletion = false
         
         textLayer.add(animationGroup, forKey: "kineticSlide")
         
@@ -494,6 +506,8 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         progressAnimation.toValue = barWidth
         progressAnimation.duration = 5.0 // 5 seconds as specified
         progressAnimation.timingFunction = CAMediaTimingFunction(name: .linear)
+        progressAnimation.fillMode = .forwards
+        progressAnimation.isRemovedOnCompletion = false
         
         progressLayer.add(progressAnimation, forKey: "progressFill")
         
@@ -653,15 +667,21 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         dropAnimation.toValue = 0
         dropAnimation.duration = 0.5
         dropAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        dropAnimation.fillMode = .forwards
+        dropAnimation.isRemovedOnCompletion = false
         
         let fadeAnimation = CABasicAnimation(keyPath: "opacity")
         fadeAnimation.fromValue = 0.0
         fadeAnimation.toValue = 1.0
         fadeAnimation.duration = 0.5
+        fadeAnimation.fillMode = .forwards
+        fadeAnimation.isRemovedOnCompletion = false
         
         let animationGroup = CAAnimationGroup()
         animationGroup.animations = [dropAnimation, fadeAnimation]
         animationGroup.duration = 0.5
+        animationGroup.fillMode = .forwards
+        animationGroup.isRemovedOnCompletion = false
         
         bubbleLayer.add(animationGroup, forKey: "ingredientDrop")
         
@@ -823,17 +843,22 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         dropAnimation.toValue = 0
         dropAnimation.duration = 0.5
         dropAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        dropAnimation.fillMode = .forwards
+        dropAnimation.isRemovedOnCompletion = false
         
         let fadeAnimation = CABasicAnimation(keyPath: "opacity")
         fadeAnimation.fromValue = 0.0
         fadeAnimation.toValue = 1.0
         fadeAnimation.duration = 0.5
+        fadeAnimation.fillMode = .forwards
+        fadeAnimation.isRemovedOnCompletion = false
         
         let animationGroup = CAAnimationGroup()
         animationGroup.animations = [dropAnimation, fadeAnimation]
         animationGroup.duration = 0.5
         animationGroup.beginTime = AVCoreAnimationBeginTimeAtZero + Double(index) * 0.2
         animationGroup.fillMode = .backwards
+        animationGroup.isRemovedOnCompletion = false
         
         containerLayer.add(animationGroup, forKey: "angledCalloutDrop")
         
@@ -907,6 +932,7 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         return textLayer
     }
     
+    // MARK: - Updated Composition Creation (PREMIUM FIX: Removed immutable animation mods; set props before add)
     private func createVideoCompositionWithOverlays(
         asset: AVAsset,
         overlays: [RenderPlan.Overlay]
@@ -932,24 +958,16 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
             layer.duration = overlay.duration.seconds
             layer.isHidden = false
             
-            // PREMIUM FIX: Persist animations (e.g., pops, sparkles)
-            layer.sublayers?.forEach { sublayer in
-                sublayer.beginTime = 0.0
-                if let animationKeys = sublayer.animationKeys() {
-                    for key in animationKeys {
-                        if let animation = sublayer.animation(forKey: key) {
-                            animation.beginTime = 0.0
-                            animation.fillMode = .forwards
-                            animation.isRemovedOnCompletion = false
-                        }
-                    }
-                }
-            }
+            // PREMIUM FIX: No need to modify sublayers/animations here; handled in creation methods
+            // All animation properties are now set before adding in the creation methods
             
             overlayLayer.addSublayer(layer)
         }
         
         composition.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: videoLayer, in: parentLayer)
+        
+        // PREMIUM FIX: Force cleanup after heavy layer ops to reduce render time
+        memoryOptimizer.forceMemoryCleanup()
         
         // Instruction for passthrough with overlays
         let instruction = AVMutableVideoCompositionInstruction()
@@ -1195,6 +1213,8 @@ extension OverlayFactory {
         scrollAnimation.duration = 0.75  // Per beat
         scrollAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         scrollAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
+        scrollAnimation.fillMode = .forwards
+        scrollAnimation.isRemovedOnCompletion = false
         layer.add(scrollAnimation, forKey: "scroll")
         
         // Pop animation with bigger effect
@@ -1203,6 +1223,8 @@ extension OverlayFactory {
         popAnimation.keyTimes = [0, 0.5, 1.0]
         popAnimation.duration = 0.75
         popAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
+        popAnimation.fillMode = .forwards
+        popAnimation.isRemovedOnCompletion = false
         layer.add(popAnimation, forKey: "pop")
         
         // Add glow animation
@@ -1211,6 +1233,8 @@ extension OverlayFactory {
         glowAnim.toValue = 1.0
         glowAnim.duration = 0.75
         glowAnim.beginTime = AVCoreAnimationBeginTimeAtZero
+        glowAnim.fillMode = .forwards
+        glowAnim.isRemovedOnCompletion = false
         textLayer.add(glowAnim, forKey: "glow")
         
         return layer
@@ -1533,6 +1557,8 @@ extension OverlayFactory {
         posAnim.keyTimes = [0, 0.33, 0.66, 1.0]
         posAnim.duration = 3.0
         posAnim.beginTime = AVCoreAnimationBeginTimeAtZero
+        posAnim.fillMode = .forwards
+        posAnim.isRemovedOnCompletion = false
         emitter.add(posAnim, forKey: "move")
         
         return emitter
