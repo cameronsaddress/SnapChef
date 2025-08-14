@@ -13,7 +13,8 @@ struct TikTokShareView: View {
     let content: ShareContent
     @Environment(\.dismiss) var dismiss
     @StateObject private var viralEngine = ViralVideoEngine()  // Use the new viral video engine
-    @State private var selectedTemplate: ViralTemplate = .kineticTextSteps  // Default to kinetic text template
+    // PREMIUM FIX: Always use kineticTextSteps template for best engagement
+    private let selectedTemplate: ViralTemplate = .kineticTextSteps
     @State private var isGenerating = false
     @State private var generatedVideoURL: URL?
     @State private var showingVideoPreview = false
@@ -165,63 +166,84 @@ struct TikTokShareView: View {
     }
     
     private var recommendedHashtags: [String] {
-        var hashtags = ["FridgeChallenge", "SnapChef", "CookingHack", "RecipeOfTheDay"]
+        // PREMIUM FIX: Premium hashtags for maximum viral reach
+        var hashtags = [
+            "SnapChef",
+            "ViralRecipe",
+            "FoodTok",
+            "QuickDinner",
+            "FridgeHack",
+            "RecipeOfTheDay",
+            "CookingHack"
+        ]
         
         switch content.type {
         case .recipe(let recipe):
+            // Add recipe-specific premium tags
             hashtags.append(contentsOf: [
-                "HomeCooking",
-                "\(recipe.difficulty.rawValue.capitalized)Recipe",
-                "FoodTok",
-                "CookingVideo",
-                "QuickRecipe"
+                "EasyRecipe",
+                "\(recipe.difficulty.rawValue.capitalized)Cooking",
+                "FoodContent",
+                "Cooking\(Calendar.current.component(.year, from: Date()))",
+                "MealPrep",
+                "HomeChef"
             ])
+            
+            // Add time-based hashtags
+            if recipe.prepTime + recipe.cookTime <= 30 {
+                hashtags.append(contentsOf: ["30MinuteMeals", "QuickRecipe"])
+            }
+            
         case .challenge:
             hashtags.append(contentsOf: [
                 "CookingChallenge",
-                "ChefChallenge",
-                "FoodChallenge"
+                "FoodChallenge",
+                "ChefLife",
+                "Viral"
             ])
+            
         default:
-            hashtags.append("FoodLover")
+            hashtags.append(contentsOf: ["FoodLover", "Foodie", "InstaFood"])
         }
         
-        return hashtags
+        // Limit to top 10 most relevant hashtags
+        return Array(hashtags.prefix(10))
     }
     
     private func generateVideo() {
-        // Check photo library permission first
+        // PREMIUM FIX: Simplified video generation with kinetic template
+        isGenerating = true
         Task {
-            let photoStatus = await checkPhotoLibraryPermission()
-            
-            guard photoStatus else {
-                await MainActor.run {
-                    errorMessage = "Photo library access is required to save videos. Please grant permission in Settings."
-                }
-                return
-            }
-            
-            await MainActor.run {
-                isGenerating = true
-            }
-            
             do {
+                // Check photo library permission first
+                let photoStatus = await checkPhotoLibraryPermission()
+                guard photoStatus else {
+                    await MainActor.run {
+                        errorMessage = "Photo library access is required to save videos. Please grant permission in Settings."
+                        isGenerating = false
+                    }
+                    return
+                }
+                
                 // Convert content to required format
                 let (viralRecipe, mediaBundle) = try await convertContentToViralFormat(content)
                 
-                // Use the ViralVideoEngine to generate video with proper template
+                // PREMIUM FIX: Always use kineticTextSteps for best engagement
                 let videoURL = try await viralEngine.render(
-                    template: selectedTemplate,
+                    template: .kineticTextSteps,
                     recipe: viralRecipe,
                     media: mediaBundle,
                     progressHandler: { progress in
-                        // Progress updates are already handled by the engine
+                        await MainActor.run {
+                            // Update UI with progress
+                            // viralEngine.currentProgress is already updated
+                        }
                     }
                 )
                 
                 await MainActor.run {
                     generatedVideoURL = videoURL
-                    isGenerating = false
+                    showingVideoPreview = true
                 }
                 
                 // Automatically save and open TikTok
@@ -230,8 +252,11 @@ struct TikTokShareView: View {
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
-                    isGenerating = false
                 }
+            }
+            
+            await MainActor.run {
+                isGenerating = false
             }
         }
     }
