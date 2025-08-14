@@ -148,8 +148,16 @@ public final class MemoryOptimizer: @unchecked Sendable {
     
     // MARK: - Image Optimization
     public func optimizeImageForProcessing(_ image: UIImage, targetSize: CGSize) -> UIImage {
-        UIGraphicsBeginImageContextWithOptions(targetSize, false, 0.0)
-        image.draw(in: CGRect(origin: .zero, size: targetSize))
+        // Calculate aspect ratio to fit width while maintaining aspect ratio
+        let aspectRatio = image.size.height / image.size.width
+        let fitWidth = targetSize.width
+        let fitHeight = fitWidth * aspectRatio
+        
+        // Create context with the actual image size (not forcing to target size)
+        // This preserves the full image without cropping
+        let drawSize = CGSize(width: fitWidth, height: fitHeight)
+        UIGraphicsBeginImageContextWithOptions(drawSize, false, 0.0)
+        image.draw(in: CGRect(origin: .zero, size: drawSize))
         let optimizedImage = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
         return optimizedImage ?? image

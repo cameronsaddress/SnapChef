@@ -578,17 +578,29 @@ public final class StillWriter: @unchecked Sendable {
         // Apply easing for smooth motion
         let easedProgress = easeInOut(t: clampedProgress)
         
-        // FIXED: Start at 1.0, end at 1.05 (EXACTLY 5% total zoom)
-        // No additional pulse to avoid exceeding 5%
-        let finalScale = 1.0 + 0.05 * easedProgress
+        // First apply fit-width transform
+        let imageSize = image.extent.size
+        let videoSize = config.size
         
-        // NO PAN to keep image centered
-        let transform = CGAffineTransform(scaleX: finalScale, y: finalScale)
+        // Calculate scale to fit width (so entire width of photo is visible)
+        let fitWidthScale = videoSize.width / imageSize.width
         
-        // Apply transform and ensure result is within bounds
+        // FIXED: Start at fitWidthScale, add up to 5% zoom on top
+        let zoomFactor = 1.0 + 0.05 * easedProgress
+        let finalScale = fitWidthScale * zoomFactor
+        
+        // Calculate centering offsets
+        let scaledHeight = imageSize.height * finalScale
+        let yOffset = (videoSize.height - scaledHeight) / 2.0
+        
+        // Create transform that fits width and centers vertically
+        let transform = CGAffineTransform(translationX: 0, y: yOffset)
+            .scaledBy(x: finalScale, y: finalScale)
+        
+        // Apply transform
         let transformedImage = image.transformed(by: transform)
         
-        // Crop to output size to prevent oversized images
+        // Crop to output size to prevent oversized frames
         let outputRect = CGRect(origin: .zero, size: config.size)
         return transformedImage.cropped(to: outputRect)
     }

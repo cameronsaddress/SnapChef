@@ -632,24 +632,19 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
     // Implementing all effects from TIKTOK_VIRAL_COMPLETE_REQUIREMENTS.md
     
     /// Enhanced Ken Burns Effect with minimal zoom and beat pulse
-    /// Base Scale: 1.05x (5% zoom as requested), Beat pulse: +0.02x
-    /// Direction: Alternating (index % 2), Translation: minimal
+    /// Base Scale: Identity - Ken Burns effect in StillWriter handles all scaling
+    /// This prevents double scaling that was causing excessive zoom
     private func createEnhancedKenBurnsTransform(index: Int) -> CGAffineTransform {
-        // FIXED: EXACTLY 5% zoom max, no additional scaling
-        let baseScale: CGFloat = 1.05 // 5% zoom as requested
-        // NO translation to avoid shifting the image
-        
-        return CGAffineTransform(scaleX: baseScale, y: baseScale)
+        // Return identity transform - all scaling is handled in StillWriter.applyKenBurns
+        // This ensures we don't have multiple transforms stacking
+        return CGAffineTransform.identity
     }
     
     /// Create beat-pulsing transform for photos
     private func createBeatPulseTransform(beatIndex: Int) -> CGAffineTransform {
-        // FIXED: Max 5% zoom total, with subtle pulse
-        // 80 BPM = pulse every 0.75 seconds
-        // Scale between 1.03 and 1.05 (3%-5% zoom) for subtle pulse effect
-        let pulseScale: CGFloat = beatIndex % 2 == 0 ? 1.05 : 1.03 // Alternate between 3% and 5%
-        
-        return CGAffineTransform(scaleX: pulseScale, y: pulseScale)
+        // Return identity - beat pulsing is handled in renderer's clampedScaleTransform
+        // This prevents stacking transforms that would exceed 5% zoom limit
+        return CGAffineTransform.identity
     }
     
     /// Legacy Ken Burns for backward compatibility
