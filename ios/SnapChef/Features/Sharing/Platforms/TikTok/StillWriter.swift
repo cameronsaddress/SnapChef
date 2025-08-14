@@ -578,31 +578,38 @@ public final class StillWriter: @unchecked Sendable {
         // Apply easing for smooth motion
         let easedProgress = easeInOut(t: clampedProgress)
         
-        // First apply fit-width transform
+        // First apply fit-height transform (changed from fit-width)
         let imageSize = image.extent.size
         let videoSize = config.size
         
-        // Calculate scale to fit width (so entire width of photo is visible)
-        let fitWidthScale = videoSize.width / imageSize.width
+        // Calculate scale to fit height (so entire height of photo fills the frame)
+        let fitHeightScale = videoSize.height / imageSize.height
         
-        // FIXED: Start at fitWidthScale, add up to 5% zoom on top
+        // FIXED: Start at fitHeightScale, add up to 5% zoom on top
         let zoomFactor = 1.0 + 0.05 * easedProgress
-        let finalScale = fitWidthScale * zoomFactor
+        let finalScale = fitHeightScale * zoomFactor
         
-        // Calculate centering offsets
-        let scaledHeight = imageSize.height * finalScale
-        let yOffset = (videoSize.height - scaledHeight) / 2.0
+        // Calculate centering offsets (center horizontally if needed)
+        let scaledWidth = imageSize.width * finalScale
+        let xOffset = (videoSize.width - scaledWidth) / 2.0
         
-        // Create transform that fits width and centers vertically
-        let transform = CGAffineTransform(translationX: 0, y: yOffset)
-            .scaledBy(x: finalScale, y: finalScale)
+        // Create transform that fits height and centers horizontally
+        // Note: No translation, let the transform handle positioning naturally
+        let transform = CGAffineTransform(scaleX: finalScale, y: finalScale)
         
         // Apply transform
         let transformedImage = image.transformed(by: transform)
         
-        // Crop to output size to prevent oversized frames
+        // Center the image properly within the output rect
         let outputRect = CGRect(origin: .zero, size: config.size)
-        return transformedImage.cropped(to: outputRect)
+        
+        // Calculate the actual crop rect to center the scaled image
+        let scaledExtent = transformedImage.extent
+        let cropX = max(0, (scaledExtent.width - videoSize.width) / 2.0)
+        let cropY = max(0, (scaledExtent.height - videoSize.height) / 2.0)
+        let cropRect = CGRect(x: cropX, y: cropY, width: videoSize.width, height: videoSize.height)
+        
+        return transformedImage.cropped(to: cropRect)
     }
     
     /// Add particle effects for meal reveal

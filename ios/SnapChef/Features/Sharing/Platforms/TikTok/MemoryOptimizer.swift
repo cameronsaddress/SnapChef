@@ -148,10 +148,10 @@ public final class MemoryOptimizer: @unchecked Sendable {
     
     // MARK: - Image Optimization
     public func optimizeImageForProcessing(_ image: UIImage, targetSize: CGSize) -> UIImage {
-        // Calculate aspect ratio to fit width while maintaining aspect ratio
-        let aspectRatio = image.size.height / image.size.width
-        let fitWidth = targetSize.width
-        let fitHeight = fitWidth * aspectRatio
+        // Calculate aspect ratio to fit height while maintaining aspect ratio
+        let aspectRatio = image.size.width / image.size.height
+        let fitHeight = targetSize.height
+        let fitWidth = fitHeight * aspectRatio
         
         // Create context with the actual image size (not forcing to target size)
         // This preserves the full image without cropping
