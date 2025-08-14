@@ -86,11 +86,11 @@ public struct RenderConfig: Sendable {
     public var premiumMode: Bool = true  // Enable premium enhancements
     
     // Typography hierarchy - Enhanced for premium impact
-    public var hookFontSize: CGFloat = 72        // Increased for viral hook impact
-    public var stepsFontSize: CGFloat = 52       // Slightly larger for readability
-    public var countersFontSize: CGFloat = 44    // More prominent counters
-    public var ctaFontSize: CGFloat = 42         // Bigger CTA for engagement
-    public var ingredientFontSize: CGFloat = 44  // Enhanced ingredient text
+    public var hookFontSize: CGFloat = 144       // DOUBLED: Increased for viral hook impact
+    public var stepsFontSize: CGFloat = 104      // DOUBLED: Slightly larger for readability
+    public var countersFontSize: CGFloat = 88    // DOUBLED: More prominent counters
+    public var ctaFontSize: CGFloat = 84         // DOUBLED: Bigger CTA for engagement
+    public var ingredientFontSize: CGFloat = 88  // DOUBLED: Enhanced ingredient text
     
     // Animation timing - More dynamic for premium
     public var fadeDuration: TimeInterval = 0.25      // 200-300ms
@@ -467,20 +467,36 @@ public struct CaptionGenerator {
     }
     
     /// Process step text for display with timing icons and chef emoji
-    // PREMIUM FIX: Added 📝 emoji for premium visual pop
+    // PREMIUM FIX: Removed step numbers, just show instructions
     public static func processStepText(_ step: ViralRecipe.Step, index: Int) -> String {
-        let words = step.title.components(separatedBy: .whitespaces)
-        let truncated = Array(words.prefix(7)).joined(separator: " ")
-        // Add chef emoji and timing icon if step has duration hint
+        // Remove any leading step numbers from the text itself
+        var cleanedTitle = step.title
+        // Remove patterns like "Step 1:" or "1." or "1:" from the beginning
+        let patterns = ["Step \\d+[:.]", "\\d+[:.]", "Step \\d+"]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: "^\(pattern)\\s*", options: .caseInsensitive) {
+                let range = NSRange(location: 0, length: cleanedTitle.count)
+                cleanedTitle = regex.stringByReplacingMatches(in: cleanedTitle, options: [], range: range, withTemplate: "")
+            }
+        }
+        // Add timing icon if step has duration hint
         let timeIcon = step.secondsHint != nil ? " ⏱️" : ""
-        return "📝👨‍🍳 \(index + 1). \(truncated)\(timeIcon)"
+        return "\(cleanedTitle)\(timeIcon)"
     }
     
-    /// Overloaded method for string steps with emoji
+    /// Overloaded method for string steps
     public static func processStepText(_ step: String, index: Int) -> String {
-        let words = step.components(separatedBy: .whitespaces)
-        let truncated = Array(words.prefix(7)).joined(separator: " ")
-        return "📝 \(truncated)"
+        // Remove any leading step numbers from the text itself
+        var cleanedStep = step
+        // Remove patterns like "Step 1:" or "1." or "1:" from the beginning
+        let patterns = ["Step \\d+[:.]", "\\d+[:.]", "Step \\d+"]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: "^\(pattern)\\s*", options: .caseInsensitive) {
+                let range = NSRange(location: 0, length: cleanedStep.count)
+                cleanedStep = regex.stringByReplacingMatches(in: cleanedStep, options: [], range: range, withTemplate: "")
+            }
+        }
+        return cleanedStep
     }
     
     /// Process ingredient text for display with shopping cart emoji

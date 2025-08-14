@@ -888,11 +888,26 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
     ) -> CATextLayer {
         
         let textLayer = CATextLayer()
-        textLayer.string = text
+        
+        // Create attributed string for better text wrapping control
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = alignment == .center ? .center : (alignment == .left ? .left : .right)
+        paragraphStyle.lineBreakMode = .byWordWrapping
+        paragraphStyle.lineSpacing = fontSize * 0.2  // Add line spacing for readability
+        
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: fontSize, weight: fontWeight),
+            .foregroundColor: color,
+            .paragraphStyle: paragraphStyle
+        ]
+        
+        let attributedString = NSAttributedString(string: text, attributes: attributes)
+        textLayer.string = attributedString
         textLayer.fontSize = fontSize
         textLayer.alignmentMode = alignment
         textLayer.isWrapped = true
-        textLayer.truncationMode = .end
+        textLayer.truncationMode = .none  // Don't truncate, wrap instead
+        textLayer.contentsScale = 2.0  // Retina display
         
         // Font setup with fallback as specified in requirements
         if let font = UIFont(name: config.fontNameBold, size: fontSize) {
@@ -1415,20 +1430,23 @@ extension OverlayFactory {
         let containerLayer = CALayer()
         containerLayer.frame = CGRect(origin: .zero, size: config.size)
         
+        // Use "Free With SNAPCHEF!" text
+        let ctaText = "Free With SNAPCHEF!"
+        
         // Translucent rounded sticker background - position at bottom with safe area
         let stickerLayer = CALayer()
-        let stickerWidth: CGFloat = 300  // Fixed width for hashtags
-        let stickerHeight: CGFloat = 100  // Smaller height, larger font
+        let stickerWidth: CGFloat = 800  // Wider for larger text
+        let stickerHeight: CGFloat = 200  // Taller for larger text with padding
         stickerLayer.frame = CGRect(
-            x: config.size.width / 2 - 150,  // Centered
-            y: config.size.height - 250,  // Lower to avoid clip
+            x: (config.size.width - stickerWidth) / 2,  // Centered
+            y: config.size.height - 400,  // Higher to avoid cutoff
             width: stickerWidth,
             height: stickerHeight
         )
-        stickerLayer.backgroundColor = UIColor.black.withAlphaComponent(0.8).cgColor
-        stickerLayer.cornerRadius = 25
+        stickerLayer.backgroundColor = UIColor.black.withAlphaComponent(0.9).cgColor
+        stickerLayer.cornerRadius = 40
         stickerLayer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
-        stickerLayer.borderWidth = 2
+        stickerLayer.borderWidth = 3
         
         // Add sparkle particles to sticker
         for _ in 0..<8 {
@@ -1436,33 +1454,52 @@ extension OverlayFactory {
             stickerLayer.addSublayer(sparkle)
         }
         
-        // Text layer with attributed string for better hashtag formatting
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .center
-        paragraphStyle.lineBreakMode = .byWordWrapping
+        // Create two text layers - one for "Free With" and one for gradient "SNAPCHEF!"
+        let padding: CGFloat = 40
         
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.boldSystemFont(ofSize: fontSize),
-            .foregroundColor: UIColor.white,
-            .paragraphStyle: paragraphStyle
-        ]
-        
-        let attributedString = NSAttributedString(string: text, attributes: attributes)
-        
-        let textLayer = CATextLayer()
-        textLayer.string = attributedString
-        textLayer.fontSize = fontSize
-        textLayer.font = UIFont.boldSystemFont(ofSize: fontSize)
-        textLayer.foregroundColor = UIColor.white.cgColor
-        textLayer.alignmentMode = .center
-        textLayer.isWrapped = true
-        textLayer.contentsScale = 2.0 // Use fixed scale instead of UIScreen
-        textLayer.frame = CGRect(
-            x: 20,
-            y: 20,
-            width: stickerWidth - 40,
-            height: stickerHeight - 40
+        // "Free With" text layer (white)
+        let freeWithLayer = CATextLayer()
+        freeWithLayer.string = "Free With"
+        freeWithLayer.fontSize = config.ctaFontSize  // Using doubled font size from config
+        freeWithLayer.font = UIFont.boldSystemFont(ofSize: config.ctaFontSize)
+        freeWithLayer.foregroundColor = UIColor.white.cgColor
+        freeWithLayer.alignmentMode = .center
+        freeWithLayer.contentsScale = 2.0
+        freeWithLayer.frame = CGRect(
+            x: padding,
+            y: padding,
+            width: stickerWidth - (padding * 2),
+            height: stickerHeight / 2 - padding
         )
+        
+        // "SNAPCHEF!" gradient layer
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.frame = CGRect(
+            x: padding,
+            y: stickerHeight / 2,
+            width: stickerWidth - (padding * 2),
+            height: stickerHeight / 2 - padding
+        )
+        gradientLayer.colors = [
+            UIColor(red: 1.0, green: 0.4, blue: 0.2, alpha: 1.0).cgColor,  // Orange
+            UIColor(red: 1.0, green: 0.6, blue: 0.1, alpha: 1.0).cgColor,  // Orange-Yellow  
+            UIColor(red: 1.0, green: 0.8, blue: 0.0, alpha: 1.0).cgColor   // Yellow
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0.5)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 0.5)
+        
+        // Text mask for gradient
+        let snapchefLayer = CATextLayer()
+        snapchefLayer.string = "SNAPCHEF!"
+        snapchefLayer.fontSize = config.ctaFontSize * 1.2  // 20% larger than "Free With"
+        snapchefLayer.font = UIFont.boldSystemFont(ofSize: config.ctaFontSize * 1.2)
+        snapchefLayer.foregroundColor = UIColor.white.cgColor
+        snapchefLayer.alignmentMode = .center
+        snapchefLayer.contentsScale = 2.0
+        snapchefLayer.frame = gradientLayer.bounds
+        
+        // Apply mask
+        gradientLayer.mask = snapchefLayer
         
         // Set initial opacity
         stickerLayer.opacity = 0
@@ -1496,7 +1533,8 @@ extension OverlayFactory {
         stickerLayer.add(pulseAnimation, forKey: "ctaPulse")
         stickerLayer.add(fadeInAnimation, forKey: "ctaFade")
         
-        stickerLayer.addSublayer(textLayer)
+        stickerLayer.addSublayer(freeWithLayer)
+        stickerLayer.addSublayer(gradientLayer)
         containerLayer.addSublayer(stickerLayer)
         
         return containerLayer
