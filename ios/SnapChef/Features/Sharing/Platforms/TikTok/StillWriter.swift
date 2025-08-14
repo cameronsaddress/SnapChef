@@ -148,7 +148,7 @@ public final class StillWriter: @unchecked Sendable {
         
         var processedImage = try memoryOptimizer.processCIImageWithOptimization(
             ciImage,
-            filters: filters,
+            filters: filters,  // Note: filters are already CIFilter type, not FilterSpec
             context: ciContext
         )
         
@@ -720,11 +720,6 @@ public final class StillWriter: @unchecked Sendable {
             finalImage = finalImage.transformed(by: currentImage.transform)
         }
         
-        // Premium: Particle effects for meal reveal - to be implemented
-        if config.premiumMode && currentImageIndex == images.count - 1 {
-            // TODO: Add particle effects here
-        }
-        
         guard let pixelBuffer = try createPixelBuffer(from: finalImage) else {
             throw StillWriterError.pixelBufferCreationFailed
         }
@@ -736,6 +731,16 @@ public final class StillWriter: @unchecked Sendable {
         let tempDir = FileManager.default.temporaryDirectory
         let filename = "still_video_\(Date().timeIntervalSince1970).mp4"
         return tempDir.appendingPathComponent(filename)
+    }
+    
+    private func convertFilterSpecsToCIFilters(_ specs: [FilterSpec]) -> [CIFilter] {
+        return specs.compactMap { spec in
+            guard let filter = CIFilter(name: spec.name) else { return nil }
+            for (key, value) in spec.params {
+                filter.setValue(value.value, forKey: key)
+            }
+            return filter
+        }
     }
 }
 
