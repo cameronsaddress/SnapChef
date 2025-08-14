@@ -1146,7 +1146,7 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         textLayer.alignmentMode = .center
         textLayer.contentsScale = 2.0  // Use standard retina scale
         
-        // PREMIUM FIX: Beat-synced animations
+        // PREMIUM FIX: Beat-synced animations with props set before add
         if beatTime > 0 {
             // Slide in from side
             let slideAnimation = CABasicAnimation(keyPath: "transform.translation.x")
@@ -1155,6 +1155,8 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
             slideAnimation.duration = 0.3
             slideAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
             slideAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            slideAnimation.fillMode = .forwards  // PREMIUM FIX: Set before add
+            slideAnimation.isRemovedOnCompletion = false  // PREMIUM FIX: Set before add
             bgLayer.add(slideAnimation, forKey: "slideIn")
             
             // Scale pop
@@ -1164,6 +1166,8 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
             scaleAnimation.damping = 10
             scaleAnimation.duration = 0.4
             scaleAnimation.beginTime = AVCoreAnimationBeginTimeAtZero + 0.1
+            scaleAnimation.fillMode = .forwards  // PREMIUM FIX: Set before add
+            scaleAnimation.isRemovedOnCompletion = false  // PREMIUM FIX: Set before add
             bgLayer.add(scaleAnimation, forKey: "scalePop")
             
             // Pulse for CTA
@@ -1175,6 +1179,8 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
                 pulseAnimation.autoreverses = true
                 pulseAnimation.repeatCount = .infinity
                 pulseAnimation.beginTime = AVCoreAnimationBeginTimeAtZero + 0.5
+                pulseAnimation.fillMode = .forwards  // PREMIUM FIX: Set before add
+                pulseAnimation.isRemovedOnCompletion = false  // PREMIUM FIX: Set before add
                 bgLayer.add(pulseAnimation, forKey: "pulse")
             }
         }
@@ -1197,6 +1203,47 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
     
     private func createPIPFaceOverlay(config: RenderConfig) -> CALayer {
         return createPIPFaceOverlay340x340(config: config)
+    }
+    
+    // PREMIUM FIX: New method with beat times array for multiple pops
+    private func createKineticStepOverlay(text: String, config: RenderConfig, fontSize: CGFloat, beatTimes: [Double]) -> CALayer {
+        let layer = CALayer()
+        layer.frame = CGRect(x: 0, y: 0, width: config.size.width, height: config.size.height)
+        
+        let textLayer = CATextLayer()
+        textLayer.string = text
+        textLayer.fontSize = fontSize
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = .center
+        textLayer.frame = layer.bounds.inset(by: config.safeInsets)
+        textLayer.contentsScale = 2.0  // Use standard retina scale
+        
+        // Beat-synced pop group
+        let group = CAAnimationGroup()
+        group.duration = config.fadeDuration
+        group.beginTime = AVCoreAnimationBeginTimeAtZero  // PREMIUM FIX: Set before add
+        group.fillMode = .forwards  // PREMIUM FIX: Set before add
+        group.isRemovedOnCompletion = false  // PREMIUM FIX: Set before add
+        
+        var pops: [CAAnimation] = []
+        for beat in beatTimes {
+            let pop = CASpringAnimation(keyPath: "transform.scale")
+            pop.fromValue = 1.0
+            pop.toValue = 1.2
+            pop.stiffness = 100
+            pop.damping = 10
+            pop.duration = 0.2
+            pop.beginTime = beat  // Relative to group
+            pop.fillMode = .forwards  // PREMIUM FIX: Set before add
+            pop.isRemovedOnCompletion = false  // PREMIUM FIX: Set before add
+            pops.append(pop)
+        }
+        group.animations = pops
+        
+        textLayer.add(group, forKey: "kineticPop")  // Add after setting all props
+        layer.addSublayer(textLayer)
+        
+        return layer
     }
     
     private func createIngredientCalloutOverlay(text: String, index: Int, config: RenderConfig) -> CALayer {
