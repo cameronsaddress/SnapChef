@@ -128,14 +128,7 @@ final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionPro
             
             var image = CIImage(cvPixelBuffer: sourceBuffer)
             
-            // PREMIUM FIX: Add premium filters to enhance visuals
-            // Apply vignette for cinematic look
-            if let vignette = CIFilter(name: "CIVignette") {
-                vignette.setValue(image, forKey: kCIInputImageKey)
-                vignette.setValue(1.5, forKey: "inputIntensity")
-                vignette.setValue(2.0, forKey: "inputRadius")
-                image = vignette.outputImage ?? image
-            }
+            // REMOVED: Vignette filter that was darkening images
             
             // Apply transform
             if !videoInstruction.transform.isIdentity {
@@ -371,20 +364,8 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
                 at: item.timeRange.start
             )
             
-            // PREMIUM FIX: Add premium filters to instruction
-            var enhancedFilters = item.filters
-            enhancedFilters += [
-                FilterSpec(name: "CIBloom", params: [
-                    "inputRadius": AnyCodable(10.0),
-                    "inputIntensity": AnyCodable(0.5)
-                ]),
-                FilterSpec(name: "CIVibrance", params: [
-                    "inputAmount": AnyCodable(1.2)
-                ]),
-                FilterSpec(name: "CISharpenLuminance", params: [
-                    "inputSharpness": AnyCodable(0.8)
-                ])
-            ]
+            // REMOVED: Premium filters that were darkening images
+            let enhancedFilters = item.filters  // Use original filters only
             
             // Create instruction with enhanced filters
             let instruction = VideoInstruction(

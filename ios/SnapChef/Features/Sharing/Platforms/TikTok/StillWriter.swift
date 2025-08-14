@@ -500,33 +500,7 @@ public final class StillWriter: @unchecked Sendable {
             processedImage = output.clampedToExtent()
         }
         
-        // Add default bloom and vibrance if not already included
-        if config.premiumMode {
-            // Check if bloom not already applied
-            let hasBloom = filters.contains { $0.name == "CIBloom" }
-            if !hasBloom {
-                if let bloomFilter = CIFilter(name: "CIBloom") {
-                    bloomFilter.setValue(processedImage, forKey: kCIInputImageKey)
-                    bloomFilter.setValue(5.0, forKey: "inputRadius")
-                    bloomFilter.setValue(0.3, forKey: "inputIntensity")
-                    if let output = bloomFilter.outputImage {
-                        processedImage = output
-                    }
-                }
-            }
-            
-            // Check if vibrance not already applied
-            let hasVibrance = filters.contains { $0.name == "CIVibrance" }
-            if !hasVibrance {
-                if let vibranceFilter = CIFilter(name: "CIVibrance") {
-                    vibranceFilter.setValue(processedImage, forKey: kCIInputImageKey)
-                    vibranceFilter.setValue(0.8, forKey: "inputAmount")
-                    if let output = vibranceFilter.outputImage {
-                        processedImage = output
-                    }
-                }
-            }
-        }
+        // REMOVED: Premium filters that were darkening images
         
         return processedImage
     }

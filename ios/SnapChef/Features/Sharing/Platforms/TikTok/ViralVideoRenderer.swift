@@ -117,41 +117,10 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         }
         print("✅ DEBUG ViralVideoRenderer: Created video track")
         
-        // PREMIUM FIX: Apply premium filters to all items
+        // REMOVED: Premium filters that were darkening images
         performanceMonitor.markPhaseStart(.preparingAssets)
-        let enhancedItems: [RenderPlan.TrackItem]
-        if config.premiumMode {
-            // Create new items with enhanced filters
-            enhancedItems = plan.items.map { item in
-                let premiumFilters = [
-                    FilterSpec(name: "CIVignette", params: [
-                        "inputIntensity": AnyCodable(1.5),
-                        "inputRadius": AnyCodable(2.0)
-                    ]),
-                    FilterSpec(name: "CIBloom", params: [
-                        "inputRadius": AnyCodable(10.0),
-                        "inputIntensity": AnyCodable(0.5)
-                    ]),
-                    FilterSpec(name: "CIVibrance", params: [
-                        "inputAmount": AnyCodable(config.vibranceAmount)
-                    ]),
-                    FilterSpec(name: "CISharpenLuminance", params: [
-                        "inputSharpness": AnyCodable(config.sharpnessAmount)
-                    ])
-                ]
-                
-                // Create new item with combined filters
-                return RenderPlan.TrackItem(
-                    kind: item.kind,
-                    timeRange: item.timeRange,
-                    transform: item.transform,
-                    filters: item.filters + premiumFilters
-                )
-            }
-            print("✅ PREMIUM FIX: Added vignette/bloom/vibrance/sharpen to \(enhancedItems.count) items")
-        } else {
-            enhancedItems = plan.items
-        }
+        let enhancedItems = plan.items  // Use items as-is for clear visibility
+        print("✅ Using original items without darkening filters")
         performanceMonitor.markPhaseEnd(.preparingAssets)
         
         // Process track items

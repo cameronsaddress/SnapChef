@@ -202,8 +202,8 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         )
         
         let textSize = textLayer.preferredFrameSize()
-        let stickerWidth = textSize.width + 40 // 20px padding each side
-        let stickerHeight = textSize.height + 20 // 10px padding top/bottom
+        let stickerWidth = max(textSize.width + 80, 400) // 40px padding each side, min width
+        let stickerHeight = max(textSize.height + 80, 160) // 40px padding top/bottom, min height
         
         // Position sticker in bottom safe area
         stickerLayer.frame = CGRect(
@@ -641,7 +641,7 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         )
         
         let textSize = textLayer.preferredFrameSize()
-        let bubbleSize = CGSize(width: textSize.width + 24, height: textSize.height + 16)
+        let bubbleSize = CGSize(width: textSize.width + 80, height: max(textSize.height + 80, 140))  // More padding for larger text
         
         // Position callouts on left side, staggered
         let xPosition = config.safeInsets.left + 20
@@ -729,7 +729,7 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         )
         
         let textSize = textLayer.preferredFrameSize()
-        let chipSize = CGSize(width: textSize.width + 24, height: textSize.height + 16)
+        let chipSize = CGSize(width: textSize.width + 80, height: max(textSize.height + 80, 140))  // More padding for larger text
         
         // Position chips in staggered formation within safe zones
         let xPosition = config.safeInsets.left + 20 + (CGFloat(index) * 10)

@@ -1006,9 +1006,9 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
             .font: UIFont.systemFont(ofSize: config.ctaFontSize, weight: .bold)
         ])
         
-        let padding: CGFloat = 20
+        let padding: CGFloat = 40  // More padding for larger text
         let stickerWidth = textSize.width + (padding * 2)
-        let stickerHeight: CGFloat = 60
+        let stickerHeight: CGFloat = 140  // DOUBLED: Was 60, now tall enough for text
         
         let stickerLayer = CALayer()
         stickerLayer.frame = CGRect(
@@ -1034,7 +1034,7 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
             textLayer.font = CTFontCreateWithName(font.fontName as CFString, config.ctaFontSize, nil)
         }
         textLayer.foregroundColor = UIColor.white.cgColor
-        textLayer.frame = CGRect(x: padding, y: 15, width: textSize.width, height: 30)
+        textLayer.frame = CGRect(x: padding, y: padding / 2, width: stickerWidth - padding * 2, height: stickerHeight - padding)
         textLayer.alignmentMode = .center
         
         // CTA pop animation
@@ -1087,9 +1087,9 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
             .font: UIFont.systemFont(ofSize: config.stepsFontSize, weight: .bold)
         ])
         
-        let padding: CGFloat = 30
-        let bgWidth = min(config.size.width - 60, textSize.width + padding * 2)
-        let bgHeight: CGFloat = 80
+        let padding: CGFloat = 40  // More padding for larger text
+        let bgWidth = min(config.size.width - 100, textSize.width + padding * 2)
+        let bgHeight: CGFloat = 180  // DOUBLED: Was 80, now tall enough for text
         
         // Center horizontally, position vertically based on index
         let yPosition = config.safeInsets.top + 100 + CGFloat(index % 3) * 100
@@ -1139,9 +1139,9 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         textLayer.foregroundColor = UIColor.white.cgColor
         textLayer.frame = CGRect(
             x: padding,
-            y: (bgHeight - config.stepsFontSize) / 2 - 5,
+            y: padding / 2,  // Top padding
             width: bgWidth - padding * 2,
-            height: config.stepsFontSize + 10
+            height: bgHeight - padding  // Full height minus padding
         )
         textLayer.alignmentMode = .center
         textLayer.contentsScale = 2.0  // Use standard retina scale
@@ -1323,14 +1323,7 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
             params: ["inputRadius": AnyCodable(5.0)]
         ))
         
-        // Dim brightness for dramatic start
-        filters.append(FilterSpec(
-            name: "CIColorControls",
-            params: [
-                "inputBrightness": AnyCodable(-0.2),
-                "inputContrast": AnyCodable(1.1)
-            ]
-        ))
+        // REMOVED: Brightness dimming that was darkening images
         
         return filters
     }
@@ -1338,35 +1331,13 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
     private func createCinematicFilterSpecs() -> [FilterSpec] {
         var filters: [FilterSpec] = []
         
-        // Bloom for glow effect
-        filters.append(FilterSpec(
-            name: "CIBloom",
-            params: [
-                "inputRadius": AnyCodable(10.0),
-                "inputIntensity": AnyCodable(0.5)
-            ]
-        ))
+        // REMOVED: Bloom filter that was affecting visibility
         
-        // Vibrance for color pop
-        filters.append(FilterSpec(
-            name: "CIVibrance",
-            params: ["inputAmount": AnyCodable(1.2)]
-        ))
+        // REMOVED: Vibrance filter
         
-        // Sharpen for crisp details
-        filters.append(FilterSpec(
-            name: "CISharpenLuminance",
-            params: ["inputSharpness": AnyCodable(0.8)]
-        ))
+        // REMOVED: Sharpen filter
         
-        // Vignette for premium framing
-        filters.append(FilterSpec(
-            name: "CIVignette",
-            params: [
-                "inputIntensity": AnyCodable(1.5),
-                "inputRadius": AnyCodable(2.0)
-            ]
-        ))
+        // REMOVED: Vignette filter that was darkening edges
         
         return filters
     }
