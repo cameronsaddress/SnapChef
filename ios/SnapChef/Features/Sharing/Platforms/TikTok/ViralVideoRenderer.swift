@@ -86,7 +86,8 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         progressCallback: @escaping @Sendable (Double) async -> Void
     ) async throws -> URL {
         
-        // Start performance monitoring
+        // PREMIUM FIX: Start comprehensive performance monitoring
+        performanceMonitor.startRenderMonitoring()
         performanceMonitor.markPhaseStart(.renderingFrames)
         memoryOptimizer.logMemoryProfile(phase: "Renderer Start")
         
@@ -116,13 +117,51 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         }
         print("✅ DEBUG ViralVideoRenderer: Created video track")
         
+        // PREMIUM FIX: Apply premium filters to all items
+        performanceMonitor.markPhaseStart(.preparingAssets)
+        let enhancedItems: [RenderPlan.TrackItem]
+        if config.premiumMode {
+            // Create new items with enhanced filters
+            enhancedItems = plan.items.map { item in
+                let premiumFilters = [
+                    FilterSpec(name: "CIVignette", params: [
+                        "inputIntensity": AnyCodable(1.5),
+                        "inputRadius": AnyCodable(2.0)
+                    ]),
+                    FilterSpec(name: "CIBloom", params: [
+                        "inputRadius": AnyCodable(10.0),
+                        "inputIntensity": AnyCodable(0.5)
+                    ]),
+                    FilterSpec(name: "CIVibrance", params: [
+                        "inputAmount": AnyCodable(config.vibranceAmount)
+                    ]),
+                    FilterSpec(name: "CISharpenLuminance", params: [
+                        "inputSharpness": AnyCodable(config.sharpnessAmount)
+                    ])
+                ]
+                
+                // Create new item with combined filters
+                return RenderPlan.TrackItem(
+                    kind: item.kind,
+                    timeRange: item.timeRange,
+                    transform: item.transform,
+                    filters: item.filters + premiumFilters
+                )
+            }
+            print("✅ PREMIUM FIX: Added vignette/bloom/vibrance/sharpen to \(enhancedItems.count) items")
+        } else {
+            enhancedItems = plan.items
+        }
+        performanceMonitor.markPhaseEnd(.preparingAssets)
+        
         // Process track items
         var currentTime = CMTime.zero
         var segmentURLs: [URL] = []
         
-        print("🎬 DEBUG ViralVideoRenderer: Processing \(plan.items.count) track items")
+        print("🎬 DEBUG ViralVideoRenderer: Processing \(enhancedItems.count) track items")
         
-        for (index, item) in plan.items.enumerated() {
+        performanceMonitor.markPhaseStart(.compositing)
+        for (index, item) in enhancedItems.enumerated() {
             let segmentURL = try await createSegmentForTrackItem(
                 item,
                 progressCallback: { segmentProgress in
@@ -320,7 +359,17 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         memoryOptimizer.deleteTempFiles(segmentURLs)
         
         // Complete performance monitoring
+        performanceMonitor.markPhaseEnd(.compositing)
         performanceMonitor.markPhaseEnd(.renderingFrames)
+        
+        // PREMIUM FIX: Check render time and log results
+        let totalRenderTime = performanceMonitor.completeRenderMonitoring()
+        if totalRenderTime > ExportSettings.maxRenderTime {
+            print("⚠️ PREMIUM FIX: Render exceeded 5s limit: \(String(format: "%.2f", totalRenderTime))s")
+        } else {
+            print("✅ PREMIUM FIX: Render completed in \(String(format: "%.2f", totalRenderTime))s (<5s requirement met)")
+        }
+        
         memoryOptimizer.logMemoryProfile(phase: "Renderer Complete")
         
         return exportedURL
@@ -541,16 +590,38 @@ public final class ViralVideoRenderer: @unchecked Sendable {
                 let itemTransform = trackTransform.concatenating(item.transform)
                 layerInstruction.setTransform(itemTransform, at: currentTime)
                 
-                // Add crossfade between segments (except for first item)
-                if index > 0 {
-                    let fadeDuration = CMTime(seconds: 0.5, preferredTimescale: 600)
+                // PREMIUM FIX: Add crossfade with glow between segments
+                if index > 0 && config.premiumMode {
+                    let fadeDuration = CMTime(seconds: 0.3, preferredTimescale: 600)
                     let fadeStartTime = currentTime - fadeDuration
                     
-                    // Create fade transition
+                    // Create fade transition with glow effect
                     if fadeStartTime >= .zero {
                         let fadeRange = CMTimeRange(start: fadeStartTime, duration: fadeDuration)
                         
-                        // Fade in current segment
+                        // Fade in current segment with ease-in-out
+                        layerInstruction.setOpacityRamp(
+                            fromStartOpacity: 0.0,
+                            toEndOpacity: 1.0,
+                            timeRange: fadeRange
+                        )
+                        
+                        // Add subtle scale for glow effect
+                        let glowStartTransform = itemTransform.scaledBy(x: 1.05, y: 1.05)
+                        let glowEndTransform = itemTransform
+                        layerInstruction.setTransformRamp(
+                            fromStart: glowStartTransform,
+                            toEnd: glowEndTransform,
+                            timeRange: fadeRange
+                        )
+                    }
+                } else if index > 0 {
+                    // Non-premium: simple fade without glow
+                    let fadeDuration = CMTime(seconds: 0.5, preferredTimescale: 600)
+                    let fadeStartTime = currentTime - fadeDuration
+                    
+                    if fadeStartTime >= .zero {
+                        let fadeRange = CMTimeRange(start: fadeStartTime, duration: fadeDuration)
                         layerInstruction.setOpacityRamp(
                             fromStartOpacity: 0.0,
                             toEndOpacity: 1.0,
