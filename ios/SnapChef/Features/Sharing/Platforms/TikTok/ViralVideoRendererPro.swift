@@ -121,21 +121,57 @@ final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionPro
             $0.timeRange.containsTime(compositionTime) && $0.pip == nil 
         }
         
-        for videoInstruction in activeInstructions {
+        for (index, videoInstruction) in activeInstructions.enumerated() {
             guard let sourceBuffer = request.sourceFrame(byTrackID: videoInstruction.trackID) else { 
                 continue 
             }
             
             var image = CIImage(cvPixelBuffer: sourceBuffer)
             
+            // PREMIUM FIX: Add premium filters to enhance visuals
+            // Apply vignette for cinematic look
+            if let vignette = CIFilter(name: "CIVignette") {
+                vignette.setValue(image, forKey: kCIInputImageKey)
+                vignette.setValue(1.5, forKey: "inputIntensity")
+                vignette.setValue(2.0, forKey: "inputRadius")
+                image = vignette.outputImage ?? image
+            }
+            
             // Apply transform
             if !videoInstruction.transform.isIdentity {
                 image = image.transformed(by: videoInstruction.transform)
             }
             
-            // Apply filters
+            // Apply custom filters
             for filterSpec in videoInstruction.filters {
                 image = applyFilter(filterSpec, to: image)
+            }
+            
+            // PREMIUM FIX: Add crossfade with glow between segments
+            if index > 0 {
+                // Calculate crossfade alpha based on time position
+                let timeInRange = compositionTime.seconds - videoInstruction.timeRange.start.seconds
+                let crossfadeDuration = 0.3 // 300ms crossfade
+                
+                if timeInRange < crossfadeDuration {
+                    let alpha = timeInRange / crossfadeDuration
+                    
+                    // Add glow during crossfade
+                    if let bloom = CIFilter(name: "CIBloom") {
+                        bloom.setValue(image, forKey: kCIInputImageKey)
+                        bloom.setValue(15.0, forKey: "inputRadius")
+                        bloom.setValue(0.8 * (1.0 - alpha), forKey: "inputIntensity") // Fade out glow
+                        image = bloom.outputImage ?? image
+                    }
+                    
+                    // Apply alpha fade
+                    if let colorMatrix = CIFilter(name: "CIColorMatrix") {
+                        colorMatrix.setValue(image, forKey: kCIInputImageKey)
+                        let alphaVector = CIVector(x: 0, y: 0, z: 0, w: CGFloat(alpha))
+                        colorMatrix.setValue(alphaVector, forKey: "inputAVector")
+                        image = colorMatrix.outputImage ?? image
+                    }
+                }
             }
             
             // Composite over background
@@ -184,6 +220,13 @@ final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionPro
                               canvasSize: CGSize) -> CIImage {
         var pipImage = CIImage(cvPixelBuffer: pipBuffer)
         
+        // PREMIUM FIX: Add glow to PIP for enhanced visual effect
+        let bloom = CIFilter(name: "CIBloom")!
+        bloom.setValue(pipImage, forKey: kCIInputImageKey)
+        bloom.setValue(10.0, forKey: "inputRadius")
+        bloom.setValue(0.5, forKey: "inputIntensity")
+        pipImage = bloom.outputImage ?? pipImage
+        
         // Scale PIP to target frame size
         let pipExtent = pipImage.extent
         let scaleX = pip.frame.width / pipExtent.width
@@ -192,16 +235,39 @@ final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionPro
         pipImage = pipImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
         pipImage = pipImage.transformed(by: CGAffineTransform(translationX: pip.frame.minX, y: pip.frame.minY))
         
-        // Create circular mask
+        // Create circular mask with shadow effect
         let maskImage = createCircularMask(
             size: canvasSize,
             rect: pip.frame,
             cornerRadius: pip.cornerRadius
         )
         
-        // Apply mask and composite
+        // Apply mask
         pipImage = applyMask(pipImage, mask: maskImage)
-        return pipImage.composited(over: background)
+        
+        // PREMIUM FIX: Add drop shadow for depth
+        var finalBackground = background
+        if let shadowFilter = CIFilter(name: "CIGaussianBlur") {
+            var shadowImage = pipImage
+            shadowFilter.setValue(shadowImage, forKey: kCIInputImageKey)
+            shadowFilter.setValue(8.0, forKey: "inputRadius")
+            shadowImage = shadowFilter.outputImage ?? shadowImage
+            
+            // Offset shadow
+            shadowImage = shadowImage.transformed(by: CGAffineTransform(translationX: 2, y: -2))
+            
+            // Darken shadow
+            if let colorMatrix = CIFilter(name: "CIColorMatrix") {
+                colorMatrix.setValue(shadowImage, forKey: kCIInputImageKey)
+                colorMatrix.setValue(CIVector(x: 0, y: 0, z: 0, w: 0.5), forKey: "inputAVector")
+                shadowImage = colorMatrix.outputImage ?? shadowImage
+                
+                // Composite shadow first, then PIP
+                finalBackground = shadowImage.composited(over: finalBackground)
+            }
+        }
+        
+        return pipImage.composited(over: finalBackground)
     }
     
     nonisolated private func createCircularMask(size: CGSize, rect: CGRect, cornerRadius: CGFloat) -> CIImage {
@@ -305,12 +371,27 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
                 at: item.timeRange.start
             )
             
-            // Create instruction
+            // PREMIUM FIX: Add premium filters to instruction
+            var enhancedFilters = item.filters
+            enhancedFilters += [
+                FilterSpec(name: "CIBloom", params: [
+                    "inputRadius": AnyCodable(10.0),
+                    "inputIntensity": AnyCodable(0.5)
+                ]),
+                FilterSpec(name: "CIVibrance", params: [
+                    "inputAmount": AnyCodable(1.2)
+                ]),
+                FilterSpec(name: "CISharpenLuminance", params: [
+                    "inputSharpness": AnyCodable(0.8)
+                ])
+            ]
+            
+            // Create instruction with enhanced filters
             let instruction = VideoInstruction(
                 timeRange: item.timeRange,
                 trackID: destinationTrack.trackID,
                 transform: item.transform,
-                filters: item.filters,
+                filters: enhancedFilters,
                 pip: nil
             )
             instructions.append(instruction)
