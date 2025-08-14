@@ -228,8 +228,8 @@ public final class StillWriter: @unchecked Sendable {
                             if self.config.premiumMode {
                                 let progress = Double(frameCountBox.value) / Double(totalFrames)
                                 
-                                // Apply Ken Burns effect for zoom/pan
-                                frameImage = self.applyKenBurns(to: frameImage, at: progress)
+                                // COMMENTED OUT: Ken Burns effect - causing text visibility issues
+                                // frameImage = self.applyKenBurns(to: frameImage, at: progress)
                                 
                                 // Apply particle effects for meal reveal (last 30% of duration)
                                 if progress > 0.7 {
@@ -700,10 +700,10 @@ public final class StillWriter: @unchecked Sendable {
             finalImage = currentImage.ciImage
         }
         
-        // Apply Ken Burns effect for dynamic movement
+        // COMMENTED OUT: Ken Burns effect - causing text visibility issues
         let totalDuration = images.reduce(CMTime.zero) { $0 + $1.duration }
         let frameProgress = time.seconds / totalDuration.seconds
-        finalImage = applyKenBurns(to: finalImage, at: frameProgress)
+        // finalImage = applyKenBurns(to: finalImage, at: frameProgress)
         
         // Add particles for meal reveal (last segment)
         if config.premiumMode && currentImageIndex == images.count - 1 && frameProgress > 0.7 {
