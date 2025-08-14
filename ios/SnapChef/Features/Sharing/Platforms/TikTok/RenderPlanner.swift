@@ -341,8 +341,12 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         var items: [RenderPlan.TrackItem] = []
         var overlays: [RenderPlan.Overlay] = []
         
+        // PREMIUM FIX: Generate beat times for synced animations at 80 BPM
+        let bpm: Double = 80.0
+        let beatInterval = 60.0 / bpm  // 0.75 seconds per beat
+        let beatTimes = stride(from: 0.0, to: 15.0, by: beatInterval).map { $0 }
+        
         // Background segments with effects + transforms for movement
-        let backgroundImages = [media.beforeFridge, media.cookedMeal]
         let segments = [
             (image: media.beforeFridge, duration: CMTime(seconds: 3.5, preferredTimescale: 600), transform: createDimGlowTransform(), filters: createDimFilterSpecs()),
             (image: media.cookedMeal, duration: CMTime(seconds: 11.5, preferredTimescale: 600), transform: createCinematicZoomTransform(), filters: createCinematicFilterSpecs())
@@ -353,55 +357,66 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
                 kind: .still(segment.image),
                 timeRange: CMTimeRange(start: currentTime, duration: segment.duration),
                 transform: segment.transform,
-                filters: segment.filters  // Already FilterSpec array
+                filters: segment.filters
             ))
             currentTime = currentTime + segment.duration
         }
         
-        // Hook overlay (0-3.5s) with bounce animation
+        // Hook overlay (0-3.5s) with beat-synced bounce
         let hookText = CaptionGenerator.generateHook(from: recipe)
         overlays.append(RenderPlan.Overlay(
             start: .zero,
             duration: CMTime(seconds: 3.5, preferredTimescale: 600),
             layerBuilder: { config in
-                return self.createPremiumHookOverlay(text: hookText, config: config, fontSize: config.hookFontSize)
+                return self.createKineticStepOverlay(
+                    text: "✨ \(hookText) ✨",
+                    index: 0,
+                    beatTime: 0.0,
+                    config: config
+                )
             }
         ))
         
-        // Carousel: Ingredients + Steps, beat-synced (3.5-12s)
-        // Use real BPM if music available
-        let bpm = media.musicURL != nil ? await detectBPM(from: media.musicURL!) : 80.0
-        let beatTimes = getBeatTimes(duration: 8.5, bpm: bpm)  // From 3.5s, 8.5s duration for carousel
+        // PREMIUM FIX: Process steps with emoji formatting
+        let processedSteps = recipe.steps.enumerated().map { index, step in
+            CaptionGenerator.processStepText(step, index: index)
+        }
         
-        // Add emojis for premium viral feel
-        let ingredients = CaptionGenerator.processIngredientText(recipe.ingredients)
-            .prefix(3)
-            .map { "🛒 \($0)" }  // Shopping cart emoji for ingredients
-        let steps = recipe.steps.enumerated()
-            .map { CaptionGenerator.processStepText($1, index: $0) }
-            .map { "👨‍🍳 \($0)" }  // Chef emoji for steps
-        let carouselItems = Array(ingredients) + steps  // Combine ingredients first, then steps
-        for (index, text) in carouselItems.enumerated() {
-            if index < beatTimes.count {
-                let startTime = CMTime(seconds: 3.5 + beatTimes[index], preferredTimescale: 600)
-                let duration = CMTime(seconds: 0.75, preferredTimescale: 600)  // Per beat
+        // Create beat-synced overlays for each step (3.5-12s)
+        let stepsStartTime = 3.5
+        for (index, stepText) in processedSteps.prefix(6).enumerated() {  // Max 6 steps
+            let beatIndex = index + 4  // Start after hook (4th beat)
+            if beatIndex < beatTimes.count {
+                let startTime = CMTime(seconds: stepsStartTime + Double(index) * beatInterval, preferredTimescale: 600)
+                let duration = CMTime(seconds: beatInterval, preferredTimescale: 600)
+                
                 overlays.append(RenderPlan.Overlay(
                     start: startTime,
                     duration: duration,
                     layerBuilder: { config in
-                        return self.createCarouselItemOverlay(text: text, index: index, config: config, fontSize: config.stepsFontSize)
+                        return self.createKineticStepOverlay(
+                            text: stepText,
+                            index: index + 1,
+                            beatTime: beatTimes[beatIndex],
+                            config: config
+                        )
                     }
                 ))
             }
         }
         
-        // CTA overlay (12-15s) with pulse + sparkles
+        // CTA overlay (12-15s) with pulse animation
         let ctaText = CaptionGenerator.randomCTA()
         overlays.append(RenderPlan.Overlay(
             start: CMTime(seconds: 12, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { config in
-                return self.createPremiumCTAOverlay(text: ctaText, config: config, fontSize: config.ctaFontSize)
+                return self.createKineticStepOverlay(
+                    text: "🔥 \(ctaText) 🔥",
+                    index: 99,  // Special index for CTA
+                    beatTime: 12.0,
+                    config: config
+                )
             }
         ))
         
@@ -1057,10 +1072,117 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
     }
     
     private func createKineticStepOverlay(text: String, index: Int, config: RenderConfig) -> CALayer {
-        // Stub implementation - will be moved to OverlayFactory
-        let layer = CATextLayer()
-        layer.string = text
-        return layer
+        // Forward to beat-synced version with default beat time
+        return createKineticStepOverlay(text: text, index: index, beatTime: 0.0, config: config)
+    }
+    
+    // PREMIUM FIX: New beat-synced overlay creator
+    private func createKineticStepOverlay(text: String, index: Int, beatTime: Double, config: RenderConfig) -> CALayer {
+        let containerLayer = CALayer()
+        containerLayer.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Background with gradient
+        let bgLayer = CAGradientLayer()
+        let textSize = text.size(withAttributes: [
+            .font: UIFont.systemFont(ofSize: config.stepsFontSize, weight: .bold)
+        ])
+        
+        let padding: CGFloat = 30
+        let bgWidth = min(config.size.width - 60, textSize.width + padding * 2)
+        let bgHeight: CGFloat = 80
+        
+        // Center horizontally, position vertically based on index
+        let yPosition = config.safeInsets.top + 100 + CGFloat(index % 3) * 100
+        
+        bgLayer.frame = CGRect(
+            x: (config.size.width - bgWidth) / 2,
+            y: yPosition,
+            width: bgWidth,
+            height: bgHeight
+        )
+        
+        // Premium gradient colors
+        if index == 99 {  // CTA special styling
+            bgLayer.colors = [
+                UIColor.systemOrange.cgColor,
+                UIColor.systemRed.cgColor
+            ]
+        } else if index == 0 {  // Hook special styling
+            bgLayer.colors = [
+                UIColor.systemPurple.cgColor,
+                UIColor.systemIndigo.cgColor
+            ]
+        } else {  // Step styling
+            bgLayer.colors = [
+                UIColor.systemBlue.cgColor,
+                UIColor.systemTeal.cgColor
+            ]
+        }
+        
+        bgLayer.startPoint = CGPoint(x: 0, y: 0.5)
+        bgLayer.endPoint = CGPoint(x: 1, y: 0.5)
+        bgLayer.cornerRadius = bgHeight / 2
+        
+        // Shadow
+        bgLayer.shadowColor = UIColor.black.cgColor
+        bgLayer.shadowOffset = CGSize(width: 0, height: 4)
+        bgLayer.shadowOpacity = 0.3
+        bgLayer.shadowRadius = 8
+        
+        // Text layer
+        let textLayer = CATextLayer()
+        textLayer.string = text
+        textLayer.fontSize = config.stepsFontSize
+        if let font = UIFont(name: config.fontNameBold, size: config.stepsFontSize) {
+            textLayer.font = CTFontCreateWithName(font.fontName as CFString, config.stepsFontSize, nil)
+        }
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.frame = CGRect(
+            x: padding,
+            y: (bgHeight - config.stepsFontSize) / 2 - 5,
+            width: bgWidth - padding * 2,
+            height: config.stepsFontSize + 10
+        )
+        textLayer.alignmentMode = .center
+        textLayer.contentsScale = 2.0  // Use standard retina scale
+        
+        // PREMIUM FIX: Beat-synced animations
+        if beatTime > 0 {
+            // Slide in from side
+            let slideAnimation = CABasicAnimation(keyPath: "transform.translation.x")
+            slideAnimation.fromValue = index % 2 == 0 ? -config.size.width : config.size.width
+            slideAnimation.toValue = 0
+            slideAnimation.duration = 0.3
+            slideAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
+            slideAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            bgLayer.add(slideAnimation, forKey: "slideIn")
+            
+            // Scale pop
+            let scaleAnimation = CASpringAnimation(keyPath: "transform.scale")
+            scaleAnimation.fromValue = 0.8
+            scaleAnimation.toValue = 1.0
+            scaleAnimation.damping = 10
+            scaleAnimation.duration = 0.4
+            scaleAnimation.beginTime = AVCoreAnimationBeginTimeAtZero + 0.1
+            bgLayer.add(scaleAnimation, forKey: "scalePop")
+            
+            // Pulse for CTA
+            if index == 99 {
+                let pulseAnimation = CABasicAnimation(keyPath: "transform.scale")
+                pulseAnimation.fromValue = 1.0
+                pulseAnimation.toValue = 1.05
+                pulseAnimation.duration = 0.75  // Match beat interval
+                pulseAnimation.autoreverses = true
+                pulseAnimation.repeatCount = .infinity
+                pulseAnimation.beginTime = AVCoreAnimationBeginTimeAtZero + 0.5
+                bgLayer.add(pulseAnimation, forKey: "pulse")
+            }
+        }
+        
+        bgLayer.addSublayer(textLayer)
+        containerLayer.addSublayer(bgLayer)
+        
+        return containerLayer
     }
     
     private func createStickerOverlay(stickerData: (text: String, color: UIColor), index: Int, config: RenderConfig) -> CALayer {
