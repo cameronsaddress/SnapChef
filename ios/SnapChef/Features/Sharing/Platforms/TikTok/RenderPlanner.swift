@@ -1411,15 +1411,15 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
     
     // MARK: - Cinematic Transform Functions
     
+    // Subtle pan, no baseline zoom (lets pulses do the work)
     private func createDimGlowTransform() -> CGAffineTransform {
-        // Subtle scale and pan for dramatic effect on fridge photo
-        return CGAffineTransform(scaleX: 1.05, y: 1.05)
+        return CGAffineTransform.identity
             .translatedBy(x: -10, y: -10)
     }
     
+    // Light baseline zoom (≈2%) + tiny pan for the reveal
     private func createCinematicZoomTransform() -> CGAffineTransform {
-        // FIXED: Limited to 5% zoom max for meal reveal
-        return CGAffineTransform(scaleX: 1.05, y: 1.05)
+        return CGAffineTransform(scaleX: 1.02, y: 1.02)
             .translatedBy(x: 20, y: 15)
     }
     

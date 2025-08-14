@@ -527,19 +527,20 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         }
     }
     
-    // FIXED: Helper to cap transform scale to prevent over-zooming
+    // Clamp the effective scale of a transform so stacked effects never exceed maxScale
+    private func clampedScaleTransform(_ t: CGAffineTransform, maxScale: CGFloat = 1.05) -> CGAffineTransform {
+        // Approximate scale from matrix columns
+        let sx = sqrt(t.a*t.a + t.c*t.c)
+        let sy = sqrt(t.b*t.b + t.d*t.d)
+        let s  = max(sx, sy)
+        guard s > maxScale, s > 0 else { return t }
+        let k = maxScale / s
+        return t.scaledBy(x: k, y: k)
+    }
+    
+    // FIXED: Helper to cap transform scale to prevent over-zooming (legacy)
     private func cappedTransform(_ transform: CGAffineTransform, maxScale: CGFloat = 1.05) -> CGAffineTransform {
-        // Calculate current scale from transform matrix
-        let currentScaleX = sqrt(transform.a * transform.a + transform.c * transform.c)
-        let currentScaleY = sqrt(transform.b * transform.b + transform.d * transform.d)
-        let currentScale = max(currentScaleX, currentScaleY)
-        
-        // If over the limit, scale it back down
-        if currentScale > maxScale {
-            let clampFactor = maxScale / currentScale
-            return transform.scaledBy(x: clampFactor, y: clampFactor)
-        }
-        return transform
+        return clampedScaleTransform(transform, maxScale: maxScale)
     }
     
     private func createVideoComposition(
@@ -574,13 +575,44 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             for (index, item) in plan.items.enumerated() {
                 // FIXED: Apply item transform but cap scale to prevent over-zooming
                 let itemTransform = trackTransform.concatenating(item.transform)
+                let clamped = clampedScaleTransform(itemTransform, maxScale: 1.05)
+                layerInstruction.setTransform(clamped, at: currentTime)
                 
-                // Cap the scale to 1.05x max to prevent excessive zoom
-                let capped = cappedTransform(itemTransform, maxScale: 1.05)
-                layerInstruction.setTransform(capped, at: currentTime)
-                
-                // REMOVED: Beat pulse transforms - they were stacking with planner transforms
-                // The planner already provides all necessary scaling (5% max)
+                // Add beat pulse (scale + opacity) for premium mode
+                if config.premiumMode {
+                    // Beat parameters
+                    let beatInterval = 0.75   // 80 BPM
+                    let itemDuration = item.timeRange.duration.seconds
+                    let beatCount    = Int(itemDuration / beatInterval)
+                    
+                    for b in 0..<beatCount {
+                        let beatStart = currentTime + CMTime(seconds: Double(b) * beatInterval, preferredTimescale: 600)
+                        let beatDur   = CMTime(seconds: 0.20, preferredTimescale: 600)
+                        
+                        // Alternate slightly for organic feel (1.00→1.03 and 1.00→1.025)
+                        let peak: CGFloat = (b % 2 == 0) ? 1.03 : 1.025
+                        
+                        // Build pulse transforms from the already-clamped base
+                        let base      = clampedScaleTransform(trackTransform.concatenating(item.transform), maxScale: 1.05)
+                        let pulseUp   = clampedScaleTransform(base.scaledBy(x: peak, y: peak), maxScale: 1.05)
+                        
+                        // Smooth scale ramp (up then down)
+                        layerInstruction.setTransformRamp(fromStart: base, toEnd: pulseUp,
+                                                          timeRange: CMTimeRange(start: beatStart,
+                                                                                 duration: CMTime(seconds: 0.10, preferredTimescale: 600)))
+                        layerInstruction.setTransformRamp(fromStart: pulseUp, toEnd: base,
+                                                          timeRange: CMTimeRange(start: beatStart + CMTime(seconds: 0.10, preferredTimescale: 600),
+                                                                                 duration: CMTime(seconds: 0.10, preferredTimescale: 600)))
+                        
+                        // Matching opacity micro-pulse (prevents the perceived "zoom" from feeling heavy)
+                        layerInstruction.setOpacityRamp(fromStartOpacity: 0.97, toEndOpacity: 1.0,
+                                                        timeRange: CMTimeRange(start: beatStart,
+                                                                               duration: CMTime(seconds: 0.10, preferredTimescale: 600)))
+                        layerInstruction.setOpacityRamp(fromStartOpacity: 1.0, toEndOpacity: 0.97,
+                                                        timeRange: CMTimeRange(start: beatStart + CMTime(seconds: 0.10, preferredTimescale: 600),
+                                                                               duration: CMTime(seconds: 0.10, preferredTimescale: 600)))
+                    }
+                }
                 
                 // PREMIUM FIX: Add crossfade with glow between segments
                 if index > 0 && config.premiumMode {
