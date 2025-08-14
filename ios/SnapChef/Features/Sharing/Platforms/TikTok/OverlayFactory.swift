@@ -173,7 +173,7 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         fadeAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
         textLayer.add(fadeAnimation, forKey: "fadeIn")
         
-        // Add beat pulse animations for labels
+        // Add beat pulse animations for labels (SCALE ONLY - no opacity conflict)
         // Keyframe scale pulse: 1.0 → 1.06 → 1.0 (labels can be a touch stronger than bg)
         let scalePulse = CAKeyframeAnimation(keyPath: "transform.scale")
         scalePulse.values = [1.0, 1.06, 1.0]
@@ -184,18 +184,8 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         scalePulse.fillMode = .both
         scalePulse.beginTime = AVCoreAnimationBeginTimeAtZero + config.fadeDuration // Start after fade
         
-        // Opacity shimmer with the pulse: 1.0 ↔ 0.96
-        let alphaPulse = CAKeyframeAnimation(keyPath: "opacity")
-        alphaPulse.values = [1.0, 0.96, 1.0]
-        alphaPulse.keyTimes = [0, 0.5, 1]
-        alphaPulse.duration = 0.75
-        alphaPulse.repeatCount = .greatestFiniteMagnitude
-        alphaPulse.isRemovedOnCompletion = false
-        alphaPulse.fillMode = .both
-        alphaPulse.beginTime = scalePulse.beginTime
-        
         textLayer.add(scalePulse, forKey: "labelBeatScale")
-        textLayer.add(alphaPulse, forKey: "labelBeatAlpha")
+        // REMOVED: Opacity pulse - it was conflicting with fade animation
         
         containerLayer.addSublayer(textLayer)
         
@@ -420,7 +410,7 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         fadeAnimation.fillMode = .backwards
         textLayer.add(fadeAnimation, forKey: "staggeredFade")
         
-        // Add beat pulse for step text
+        // Add beat pulse for step text (SCALE ONLY)
         let scalePulse = CAKeyframeAnimation(keyPath: "transform.scale")
         scalePulse.values = [1.0, 1.06, 1.0]
         scalePulse.keyTimes = [0, 0.5, 1]
@@ -430,17 +420,8 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         scalePulse.fillMode = .both
         scalePulse.beginTime = AVCoreAnimationBeginTimeAtZero + delay + config.fadeDuration
         
-        let alphaPulse = CAKeyframeAnimation(keyPath: "opacity")
-        alphaPulse.values = [1.0, 0.96, 1.0]
-        alphaPulse.keyTimes = [0, 0.5, 1]
-        alphaPulse.duration = 0.75
-        alphaPulse.repeatCount = .greatestFiniteMagnitude
-        alphaPulse.isRemovedOnCompletion = false
-        alphaPulse.fillMode = .both
-        alphaPulse.beginTime = scalePulse.beginTime
-        
         textLayer.add(scalePulse, forKey: "stepBeatScale")
-        textLayer.add(alphaPulse, forKey: "stepBeatAlpha")
+        // REMOVED: Opacity pulse - conflicting with fade
         
         containerLayer.addSublayer(textLayer)
         return containerLayer
