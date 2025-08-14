@@ -315,7 +315,7 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         fadeAnimation.fromValue = 0.0
         fadeAnimation.toValue = 1.0
         fadeAnimation.duration = config.fadeDuration
-        fadeAnimation.beginTime = CACurrentMediaTime() + delay
+        fadeAnimation.beginTime = AVCoreAnimationBeginTimeAtZero + delay
         fadeAnimation.fillMode = .backwards
         textLayer.add(fadeAnimation, forKey: "staggeredFade")
         
@@ -442,7 +442,7 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         scaleAnimation.toValue = 1.0
         scaleAnimation.duration = 0.5
         scaleAnimation.damping = config.springDamping
-        scaleAnimation.beginTime = CACurrentMediaTime() + delay
+        scaleAnimation.beginTime = AVCoreAnimationBeginTimeAtZero + delay
         scaleAnimation.fillMode = .backwards
         
         stickerLayer.add(scaleAnimation, forKey: "stickerPop")
@@ -714,20 +714,20 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         scaleAnimation.fromValue = 0.6
         scaleAnimation.toValue = 1.0
         scaleAnimation.duration = config.fadeDuration
-        scaleAnimation.beginTime = CACurrentMediaTime() + delay
+        scaleAnimation.beginTime = AVCoreAnimationBeginTimeAtZero + delay
         scaleAnimation.fillMode = .backwards
         
         let fadeAnimation = CABasicAnimation(keyPath: "opacity")
         fadeAnimation.fromValue = 0.0
         fadeAnimation.toValue = 1.0
         fadeAnimation.duration = config.fadeDuration
-        fadeAnimation.beginTime = CACurrentMediaTime() + delay
+        fadeAnimation.beginTime = AVCoreAnimationBeginTimeAtZero + delay
         fadeAnimation.fillMode = .backwards
         
         let animationGroup = CAAnimationGroup()
         animationGroup.animations = [scaleAnimation, fadeAnimation]
         animationGroup.duration = config.fadeDuration
-        animationGroup.beginTime = CACurrentMediaTime() + delay
+        animationGroup.beginTime = AVCoreAnimationBeginTimeAtZero + delay
         animationGroup.fillMode = .backwards
         
         chipLayer.add(animationGroup, forKey: "chipAppear")
@@ -810,7 +810,7 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         let animationGroup = CAAnimationGroup()
         animationGroup.animations = [dropAnimation, fadeAnimation]
         animationGroup.duration = 0.5
-        animationGroup.beginTime = CACurrentMediaTime() + Double(index) * 0.2
+        animationGroup.beginTime = AVCoreAnimationBeginTimeAtZero + Double(index) * 0.2
         animationGroup.fillMode = .backwards
         
         containerLayer.add(animationGroup, forKey: "angledCalloutDrop")
@@ -901,14 +901,9 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         
         for overlay in overlays {
             let layer = overlay.layerBuilder(config)
-            layer.beginTime = AVCoreAnimationBeginTimeAtZero  // Critical for animations
+            layer.beginTime = AVCoreAnimationBeginTimeAtZero + overlay.start.seconds  // Set correct timing
             
-            // Propagate beginTime to all sublayers including emitters
-            layer.sublayers?.forEach { sublayer in
-                sublayer.beginTime = AVCoreAnimationBeginTimeAtZero
-            }
-            
-            // Set initial opacity and animation timing
+            // Set initial opacity for fade animations
             layer.opacity = 0
             
             // Fade in at start time
@@ -1158,7 +1153,7 @@ extension OverlayFactory {
     // Update createCarouselItemOverlay for beat pop + scrolling
     public func createCarouselItemOverlay(text: String, index: Int, config: RenderConfig, fontSize: CGFloat = 52) -> CALayer {
         let layer = CALayer()
-        layer.frame = CGRect(x: config.size.width + CGFloat(index * 300), y: config.size.height / 2 - 100, width: config.size.width - 100, height: 200)  // Wider frame for text
+        layer.frame = CGRect(x: config.size.width, y: config.size.height / 2 - 100, width: config.size.width - 200, height: 200)  // Start right edge, wider for wrapping
         
         let textLayer = CATextLayer()
         let paragraphStyle = NSMutableParagraphStyle()
@@ -1170,34 +1165,44 @@ extension OverlayFactory {
             .paragraphStyle: paragraphStyle
         ])
         textLayer.string = attributedString
-        textLayer.frame = CGRect(x: 0, y: 0, width: config.size.width - 100, height: 200)  // Full width for text
+        textLayer.frame = layer.bounds.insetBy(dx: 20, dy: 20)  // Padding
         textLayer.contentsScale = 2.0  // Use fixed scale instead of UIScreen.main
         textLayer.isWrapped = true  // Enable multiline
         textLayer.alignmentMode = .center
+        textLayer.truncationMode = .end  // If still long
         
-        // Add golden glow for premium effect
-        textLayer.shadowColor = UIColor(red: 1.0, green: 0.8, blue: 0.0, alpha: 1.0).cgColor
-        textLayer.shadowOpacity = 0.8
-        textLayer.shadowRadius = 8
+        // Add white glow for premium effect
+        textLayer.shadowColor = UIColor.white.cgColor
+        textLayer.shadowOpacity = 1.0
+        textLayer.shadowRadius = 10
         textLayer.shadowOffset = .zero
         
         layer.addSublayer(textLayer)
         
-        // Scrolling animation (leftward)
+        // Scrolling animation (full screen left)
         let scrollAnimation = CABasicAnimation(keyPath: "position.x")
-        scrollAnimation.fromValue = layer.position.x
-        scrollAnimation.toValue = -300  // Scroll off-screen
-        scrollAnimation.duration = 8.5  // Full carousel duration
+        scrollAnimation.fromValue = config.size.width
+        scrollAnimation.toValue = -layer.frame.width
+        scrollAnimation.duration = 0.75  // Per beat
+        scrollAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         scrollAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
         layer.add(scrollAnimation, forKey: "scroll")
         
-        // Pop animation (beat-synced, but timed in planner)
+        // Pop animation with bigger effect
         let popAnimation = CAKeyframeAnimation(keyPath: "transform.scale")
-        popAnimation.values = [0.8, 1.1, 1.0]
+        popAnimation.values = [0.8, 1.2, 1.0]  // Bigger pop for awesome
         popAnimation.keyTimes = [0, 0.5, 1.0]
         popAnimation.duration = 0.75
         popAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
         layer.add(popAnimation, forKey: "pop")
+        
+        // Add glow animation
+        let glowAnim = CABasicAnimation(keyPath: "shadowOpacity")
+        glowAnim.fromValue = 0.0
+        glowAnim.toValue = 1.0
+        glowAnim.duration = 0.75
+        glowAnim.beginTime = AVCoreAnimationBeginTimeAtZero
+        textLayer.add(glowAnim, forKey: "glow")
         
         return layer
     }
@@ -1477,12 +1482,12 @@ extension OverlayFactory {
         // Create sparkle cell
         let sparkleCell = CAEmitterCell()
         sparkleCell.name = "sparkle"
-        sparkleCell.birthRate = 0  // Start with 0, will animate
+        sparkleCell.birthRate = 5.0  // Base rate for visibility
         sparkleCell.lifetime = 2.0
         sparkleCell.lifetimeRange = 0.5
         sparkleCell.velocity = 50
         sparkleCell.velocityRange = 20
-        sparkleCell.emissionRange = .pi * 2
+        sparkleCell.emissionRange = .pi  // Narrower for focused bursts
         sparkleCell.scale = 0.8  // Larger for premium effect
         sparkleCell.scaleRange = 0.3
         sparkleCell.scaleSpeed = -0.3
@@ -1498,7 +1503,7 @@ extension OverlayFactory {
         
         // Keyframe birthRate for dynamic sparkles over time
         let birthAnimation = CAKeyframeAnimation(keyPath: "emitterCells.sparkle.birthRate")
-        birthAnimation.values = [0, 20, 10, 20, 0]  // Off, burst, low, burst, off
+        birthAnimation.values = [0, 50, 20, 50, 0]  // Stronger bursts for awesome
         birthAnimation.keyTimes = [0, 0.2, 0.5, 0.8, 1.0]
         birthAnimation.duration = 3.0  // CTA duration
         birthAnimation.repeatCount = 1
@@ -1507,6 +1512,19 @@ extension OverlayFactory {
         birthAnimation.isRemovedOnCompletion = false
         
         emitter.add(birthAnimation, forKey: "sparkleBirth")
+        
+        // Add position animation for moving sparkles
+        let posAnim = CAKeyframeAnimation(keyPath: "position")
+        posAnim.values = [
+            CGPoint(x: bounds.midX, y: bounds.midY),
+            CGPoint(x: bounds.midX + 100, y: bounds.midY - 100),
+            CGPoint(x: bounds.midX - 100, y: bounds.midY + 100),
+            CGPoint(x: bounds.midX, y: bounds.midY)
+        ]
+        posAnim.keyTimes = [0, 0.33, 0.66, 1.0]
+        posAnim.duration = 3.0
+        posAnim.beginTime = AVCoreAnimationBeginTimeAtZero
+        emitter.add(posAnim, forKey: "move")
         
         return emitter
     }

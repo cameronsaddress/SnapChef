@@ -12,7 +12,7 @@ import Photos
 struct TikTokShareView: View {
     let content: ShareContent
     @Environment(\.dismiss) var dismiss
-    @StateObject private var viralEngine = ViralVideoSDK()  // Use the new viral video engine
+    @StateObject private var viralEngine = ViralVideoEngine()  // Use the new viral video engine
     @State private var selectedTemplate: ViralTemplate = .kineticTextSteps  // Default to kinetic text template
     @State private var isGenerating = false
     @State private var generatedVideoURL: URL?
@@ -55,15 +55,15 @@ struct TikTokShareView: View {
                         // Single Template - Kinetic Text Only
                         // Template tiles removed - focusing on kinetic text template only
                         
-                        // Preview Section - Kinetic Text Template
-                        VStack(spacing: 16) {
-                            // No title, just the preview
-                            TemplatePreview(
-                                template: .kineticTextSteps,  // Always use kinetic text
-                                content: content
-                            )
-                        }
-                        .padding(.horizontal, 20)
+                        // Preview Section - Removed (not needed for current implementation)
+                        // VStack(spacing: 16) {
+                        //     // No title, just the preview
+                        //     TemplatePreview(
+                        //         template: .kineticTextSteps,  // Always use kinetic text
+                        //         content: content
+                        //     )
+                        // }
+                        // .padding(.horizontal, 20)
                         
                         // Trending sounds section removed
                         
@@ -209,11 +209,14 @@ struct TikTokShareView: View {
                 // Convert content to required format
                 let (viralRecipe, mediaBundle) = try await convertContentToViralFormat(content)
                 
-                // Use the ViralVideoSDK to generate video with proper template
-                let videoURL = try await viralEngine.generateVideoOnly(
+                // Use the ViralVideoEngine to generate video with proper template
+                let videoURL = try await viralEngine.render(
                     template: selectedTemplate,
                     recipe: viralRecipe,
-                    media: mediaBundle
+                    media: mediaBundle,
+                    progressHandler: { progress in
+                        // Progress updates are already handled by the engine
+                    }
                 )
                 
                 await MainActor.run {
@@ -552,129 +555,11 @@ struct ViralTemplateCard: View {
     }
 }
 
-// MARK: - Template Card (Old - Keep for compatibility)
-struct TemplateCard: View {
-    let template: TikTokTemplate
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                // Template preview thumbnail
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(
-                        LinearGradient(
-                            colors: template.gradientColors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 100, height: 150)
-                    .overlay(
-                        Image(systemName: template.icon)
-                            .font(.system(size: 32))
-                            .foregroundColor(.white)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(
-                                isSelected ? Color(hex: "#FF0050") : Color.clear,
-                                lineWidth: 3
-                            )
-                    )
-                
-                Text(template.name)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .gray)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .frame(width: 100)
-            }
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
+// Template Card struct removed - using ViralTemplate enum instead
 
-// MARK: - Template Preview
-struct TemplatePreview: View {
-    let template: ViralTemplate
-    let content: ShareContent
-    
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black)
-                .frame(height: 400)
-            
-            VStack {
-                Text(template.description)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .padding()
-                
-                // Mock preview based on template
-                previewContent(for: template, content: content)
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func previewContent(for template: ViralTemplate, content: ShareContent) -> some View {
-        switch template {
-        // Only supporting kinetic text template
-        // case .beatSyncedCarousel:
-        //     BeforeAfterPreview(content: content)
-        // case .splitScreenSwipe:
-        //     SplitScreenPreview(content: content)
-        case .kineticTextSteps:
-            QuickRecipePreview(content: content)
-        // case .priceTimeChallenge:
-        //     TimelapsePreview(content: content)
-        // case .greenScreenPIP:
-        //     Ingredients360Preview(content: content)
-        // case .test:
-        //     TestTemplatePreview(content: content)
-        }
-    }
-}
+// Template Preview struct removed - not needed for current implementation
 
-// MARK: - Trending Audio Row
-struct TrendingAudioRow: View {
-    let audio: TrendingAudio
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "music.note")
-                .font(.system(size: 20))
-                .foregroundColor(Color(hex: "#FF0050"))
-                .frame(width: 40, height: 40)
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(8)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(audio.name)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-                
-                Text(audio.artist)
-                    .font(.system(size: 12))
-                    .foregroundColor(.gray)
-            }
-            
-            Spacer()
-            
-            Text("\(audio.useCount)K")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.gray)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(8)
-    }
-}
+// TrendingAudioRow struct removed - not used in current implementation
 
 // MARK: - Hashtag Chip
 struct HashtagChip: View {

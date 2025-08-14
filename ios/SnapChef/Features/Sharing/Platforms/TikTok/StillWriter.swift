@@ -572,14 +572,22 @@ public final class StillWriter: @unchecked Sendable {
     
     // MARK: - Premium Effects
     
-    /// Add Ken Burns effect for dynamic movement
+    /// Easing function for smooth animations
+    private func easeInOut(t: Double) -> Double {
+        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+    }
+    
+    /// Add Ken Burns effect for dynamic movement with easing
     private func applyKenBurns(to image: CIImage, at progress: Double) -> CIImage {
         // Clamp progress to 0-1 range for safety
         let clampedProgress = max(0, min(1, progress))
         
-        let scale = 1.0 + 0.08 * clampedProgress  // Zoom from 1.0 to 1.08
-        let tx = -10 * clampedProgress  // Subtle horizontal pan
-        let ty = -5 * clampedProgress   // Subtle vertical pan
+        // Apply easing for smooth motion
+        let easedProgress = easeInOut(t: clampedProgress)
+        
+        let scale = 1.0 + 0.1 * easedProgress  // Zoom from 1.0 to 1.1 with easing
+        let tx = -20 * easedProgress  // More pronounced horizontal pan
+        let ty = -15 * easedProgress   // More pronounced vertical pan
         
         let transform = CGAffineTransform(scaleX: scale, y: scale)
             .translatedBy(x: tx, y: ty)
@@ -596,15 +604,16 @@ public final class StillWriter: @unchecked Sendable {
     private func addMealRevealParticles(to image: CIImage, progress: Double) -> CIImage {
         guard config.premiumMode else { return image }
         
-        // Create star shine effect
+        // Create star shine effect that grows with progress
         if let starShine = CIFilter(name: "CIStarShineGenerator") {
-            starShine.setValue(CIVector(x: config.size.width / 2, y: config.size.height / 2), forKey: "inputCenter")
-            starShine.setValue(100.0, forKey: "inputRadius")
+            let extent = image.extent
+            starShine.setValue(CIVector(x: extent.midX, y: extent.midY), forKey: "inputCenter")
+            starShine.setValue(5 + progress * 20, forKey: "inputRadius")  // Grow with progress
             starShine.setValue(progress * 2.0, forKey: "inputCrossScale")
             starShine.setValue(50.0, forKey: "inputCrossAngle")
-            starShine.setValue(CIColor(red: 1.0, green: 0.8, blue: 0.0), forKey: "inputColor")
+            starShine.setValue(CIColor(red: 1.0, green: 0.8, blue: 0.0), forKey: "inputColor")  // Golden color
             
-            if let particleImage = starShine.outputImage {
+            if let particleImage = starShine.outputImage?.cropped(to: extent) {
                 // Composite over image
                 if let compositeFilter = CIFilter(name: "CISourceOverCompositing") {
                     compositeFilter.setValue(particleImage, forKey: kCIInputImageKey)
@@ -652,17 +661,17 @@ public final class StillWriter: @unchecked Sendable {
             let easedProgress = sin(crossfadeProgress * .pi / 2)  // Ease-in-out using sine
             
             // Create crossfade blend
-            let blendFilter = CIFilter.sourceOverCompositing()
-            blendFilter.inputImage = nextImage.ciImage
-            blendFilter.backgroundImage = currentImage.ciImage
+            let blendFilter = CIFilter(name: "CISourceOverCompositing")!
+            blendFilter.setValue(nextImage.ciImage, forKey: kCIInputImageKey)
+            blendFilter.setValue(currentImage.ciImage, forKey: kCIInputBackgroundImageKey)
             
             // Apply alpha based on eased crossfade progress
-            let alphaFilter = CIFilter.colorMatrix()
-            alphaFilter.inputImage = nextImage.ciImage
-            alphaFilter.aVector = CIVector(x: 0, y: 0, z: 0, w: CGFloat(easedProgress))
+            let alphaFilter = CIFilter(name: "CIColorMatrix")!
+            alphaFilter.setValue(nextImage.ciImage, forKey: kCIInputImageKey)
+            alphaFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: CGFloat(easedProgress)), forKey: "inputAVector")
             
             if let alphaOutput = alphaFilter.outputImage {
-                blendFilter.inputImage = alphaOutput
+                blendFilter.setValue(alphaOutput, forKey: kCIInputImageKey)
             }
             
             // Add bloom effect to the crossfade for glow transition

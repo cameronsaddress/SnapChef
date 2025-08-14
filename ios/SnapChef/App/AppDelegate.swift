@@ -39,14 +39,14 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         // Handle TikTok callbacks through URL schemes
         // The TikTok SDK handles callbacks internally when sharing
         
-        // Handle TikTok callbacks through our wrapper as fallback
-        if url.absoluteString.contains("tiktok") || url.absoluteString.contains("sbawj0946ft24i4wjv") {
-            let handled = TikTokOpenSDKWrapper.shared.handleOpenURL(url)
-            if handled {
-                print("✅ TikTok callback handled by wrapper: \(url)")
-                return true
-            }
-        }
+        // TikTok callback handling removed - using direct URL scheme
+        // if url.absoluteString.contains("tiktok") || url.absoluteString.contains("sbawj0946ft24i4wjv") {
+        //     let handled = TikTokOpenSDKWrapper.shared.handleOpenURL(url)
+        //     if handled {
+        //         print("✅ TikTok callback handled by wrapper: \(url)")
+        //         return true
+        //     }
+        // }
         
         // Let the app handle other URLs
         return false

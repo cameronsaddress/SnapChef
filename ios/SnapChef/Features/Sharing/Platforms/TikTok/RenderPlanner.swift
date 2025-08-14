@@ -627,10 +627,10 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         
         let ciImage = CIImage(cgImage: cgImage)
         
-        let colorFilter = CIFilter.colorControls()
-        colorFilter.inputImage = ciImage
-        colorFilter.contrast = 1.1    // +0.1 contrast as specified
-        colorFilter.saturation = 1.08 // +0.08 saturation as specified
+        let colorFilter = CIFilter(name: "CIColorControls")!
+        colorFilter.setValue(ciImage, forKey: kCIInputImageKey)
+        colorFilter.setValue(1.1, forKey: "inputContrast")    // +0.1 contrast as specified
+        colorFilter.setValue(1.08, forKey: "inputSaturation") // +0.08 saturation as specified
         
         guard let outputImage = colorFilter.outputImage,
               let outputCGImage = CIContext().createCGImage(outputImage, from: outputImage.extent) else {
@@ -659,9 +659,9 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         
         let ciImage = CIImage(cgImage: cgImage)
         
-        let blurFilter = CIFilter.gaussianBlur()
-        blurFilter.inputImage = ciImage
-        blurFilter.radius = 3 // Reduced from 10 - more subtle blur
+        let blurFilter = CIFilter(name: "CIGaussianBlur")!
+        blurFilter.setValue(ciImage, forKey: kCIInputImageKey)
+        blurFilter.setValue(3, forKey: "inputRadius") // Reduced from 10 - more subtle blur
         
         // Need to crop the output to original extent since blur expands the image
         let originalExtent = ciImage.extent
@@ -770,7 +770,7 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         scaleAnimation.toValue = 1.0   // To config.scaleRange
         scaleAnimation.damping = config.springDamping // 12-14 for pop animations
         scaleAnimation.duration = 0.6
-        scaleAnimation.beginTime = CACurrentMediaTime() + Double(index) * 0.12 // 120ms stagger
+        scaleAnimation.beginTime = AVCoreAnimationBeginTimeAtZero + Double(index) * 0.12 // 120ms stagger
         stickerLayer.add(scaleAnimation, forKey: "stickerPop")
         
         containerLayer.addSublayer(stickerLayer)

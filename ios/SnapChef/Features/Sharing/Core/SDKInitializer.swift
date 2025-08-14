@@ -14,10 +14,10 @@ final class SDKInitializer {
     static func initializeSDKs() {
         print("🚀 Initializing social media SDKs...")
         
-        // Register TikTok SDK
-        let tiktokSDK = TikTokSDKManager()
-        SocialSDKManager.shared.register(platform: .tiktok, sdk: tiktokSDK)
-        print("✅ TikTok SDK registered - Available: \(tiktokSDK.isAvailable())")
+        // TikTok SDK registration removed - using direct URL scheme approach
+        // let tiktokSDK = TikTokSDKManager()
+        // SocialSDKManager.shared.register(platform: .tiktok, sdk: tiktokSDK)
+        // print("✅ TikTok SDK registered - Available: \(tiktokSDK.isAvailable())")
         
         // Register other SDKs as they are implemented
         // TODO: Register Instagram SDK
@@ -36,10 +36,10 @@ final class SDKInitializer {
         
         // Check if it's a TikTok callback
         if url.absoluteString.contains("tiktok") || url.absoluteString.contains("sbawj0946ft24i4wjv") {
-            // Handle TikTok SDK callback with proper wrapper
-            let handled = TikTokOpenSDKWrapper.shared.handleOpenURL(url)
-            print("✅ TikTok callback handled: \(handled)")
-            return handled
+            // TikTok SDK callback handling removed - using direct URL scheme
+            // let handled = TikTokOpenSDKWrapper.shared.handleOpenURL(url)
+            // print("✅ TikTok callback handled: \(handled)")
+            return false
         }
         
         // Check for other platform callbacks
