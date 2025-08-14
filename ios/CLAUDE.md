@@ -10,6 +10,33 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 14, 2025) - Part 19
+- **Major Codebase Cleanup - Removed Unused Features**
+  - Conducted comprehensive audit of entire codebase
+  - Removed 17% of code (~2,600 lines) that was unused or deprecated
+  - **Files Deleted (6 total):**
+    - `SnapChefApp_old.swift` - Old backup of app entry point
+    - `CameraTabView.swift` - Alternative camera implementation never used
+    - `FakeUserDataService.swift` - Fake user generation for development
+    - `TeamChallengeManager.swift` - Team challenge management (feature removed)
+    - `CreateTeamView.swift` - Team creation UI (feature removed)
+    - `TeamChallengeView.swift` - Team challenge UI (feature removed)
+  - **Empty Directories Removed:**
+    - `Features/Fridge/` - Never implemented
+    - `Features/Subscription/` - Logic exists in Core/Services
+  - **Team Feature Completely Removed:**
+    - All Team-related CloudKit methods removed
+    - TeamStreak struct and references eliminated
+    - Team achievement sharing removed from ChallengeSharingManager
+    - CloudKit schema cleaned of Team/TeamMessage types
+  - **Results:**
+    - 83% of codebase is actively used
+    - Build succeeds with zero errors
+    - No broken dependencies
+    - Cleaner, more maintainable codebase
+  - Created comprehensive audit report (APP_AUDIT_REPORT.md)
+  - Created cleanup summary (CLEANUP_SUMMARY.md)
+
 ### Latest Updates (Jan 14, 2025) - Part 18
 - **Changed Default AI Provider to Gemini**
   - Updated default LLM provider from Grok to Gemini across the app
