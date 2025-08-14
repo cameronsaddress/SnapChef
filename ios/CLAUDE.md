@@ -10,6 +10,27 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 14, 2025) - Part 20
+- **TikTok Video Generation Improvements**
+  - **Text Font Size Reduced**: All text sizes cut in half for better screen fit
+    - Hook font: 72pt (was 144pt)
+    - Steps font: 52pt (was 104pt)  
+    - Counters font: 44pt (was 88pt)
+    - CTA font: 42pt (was 84pt)
+    - Ingredients font: 44pt (was 88pt)
+  - **Container Animations Fixed**: 
+    - Text now properly displays inside animated containers
+    - Created wrapper layer to ensure text and background animate together
+    - Fixed text vertical centering within containers
+  - **Photo Zoom Corrected**:
+    - Reduced Ken Burns zoom to exactly 5% as requested (was excessive)
+    - Photos start at 1.0x and zoom to 1.05x over duration
+    - Added subtle 2% pulse effect synchronized to 80 BPM beat
+    - Minimal pan movement for professional look
+  - **Beat Synchronization**: All elements pulse to 80 BPM (0.75s intervals)
+  - **Recipe Instructions**: Added ingredients carousel overlay (2-3.5s) showing ingredients
+  - Build succeeds with all improvements operational
+
 ### Latest Updates (Jan 14, 2025) - Part 19
 - **Major Codebase Cleanup - Removed Unused Features**
   - Conducted comprehensive audit of entire codebase
