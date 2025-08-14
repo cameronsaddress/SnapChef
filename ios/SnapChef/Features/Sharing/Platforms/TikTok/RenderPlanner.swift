@@ -630,13 +630,13 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
     // MARK: - Enhanced Visual Effects System
     // Implementing all effects from TIKTOK_VIRAL_COMPLETE_REQUIREMENTS.md
     
-    /// Enhanced Ken Burns Effect with reduced zoom and beat pulse
-    /// Base Scale: 1.02x (reduced from 1.08x), Beat pulse: +0.03x
-    /// Direction: Alternating (index % 2), Translation: ±1% of size
+    /// Enhanced Ken Burns Effect with minimal zoom and beat pulse
+    /// Base Scale: 1.05x (5% zoom as requested), Beat pulse: +0.02x
+    /// Direction: Alternating (index % 2), Translation: minimal
     private func createEnhancedKenBurnsTransform(index: Int) -> CGAffineTransform {
-        let baseScale: CGFloat = 1.02 // REDUCED: Much less zoom for photos
+        let baseScale: CGFloat = 1.05 // 5% zoom as requested
         let direction: CGFloat = index % 2 == 0 ? 1.0 : -1.0 // Alternating direction
-        let translation = config.size.width * 0.01 * direction // ±1% translation (reduced)
+        let translation = config.size.width * 0.005 * direction // Very minimal translation
         
         return CGAffineTransform(scaleX: baseScale, y: baseScale)
             .translatedBy(x: translation, y: 0)
@@ -1197,16 +1197,18 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         )
         
         textLayer.string = attributedString
+        // Position text layer relative to background layer bounds
         textLayer.frame = CGRect(
             x: padding / 2,
-            y: padding / 2,
+            y: (bgHeight - textSize.height) / 2,  // Center vertically
             width: bgWidth - padding,
-            height: bgHeight - padding
+            height: textSize.height + 10  // Give a bit of extra height
         )
         textLayer.alignmentMode = .center
         textLayer.isWrapped = true
         textLayer.truncationMode = .none  // Don't truncate
         textLayer.contentsScale = 2.0  // Use standard retina scale
+        textLayer.backgroundColor = UIColor.clear.cgColor  // Ensure transparent background
         
         // PREMIUM FIX: Beat-synced animations with props set before add
         if beatTime > 0 {
@@ -1276,11 +1278,22 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
             }
             
             animationGroup.animations = animations
-            bgLayer.add(animationGroup, forKey: "containerAnimations")
+            
+            // Create a wrapper layer for the background + text so they animate together
+            let wrapperLayer = CALayer()
+            wrapperLayer.frame = bgLayer.frame
+            wrapperLayer.addSublayer(bgLayer)
+            bgLayer.frame = CGRect(origin: .zero, size: bgLayer.frame.size)
+            bgLayer.addSublayer(textLayer)
+            
+            // Apply animations to wrapper so background and text move together
+            wrapperLayer.add(animationGroup, forKey: "containerAnimations")
+            containerLayer.addSublayer(wrapperLayer)
+        } else {
+            // No animations, just add layers normally
+            bgLayer.addSublayer(textLayer)
+            containerLayer.addSublayer(bgLayer)
         }
-        
-        bgLayer.addSublayer(textLayer)
-        containerLayer.addSublayer(bgLayer)
         
         return containerLayer
     }

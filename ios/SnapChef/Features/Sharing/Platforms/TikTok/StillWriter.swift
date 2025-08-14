@@ -567,7 +567,7 @@ public final class StillWriter: @unchecked Sendable {
         return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
     }
     
-    /// Add Ken Burns effect with reduced zoom and beat pulsing (80 BPM)
+    /// Add Ken Burns effect with 5% zoom and beat pulsing (80 BPM)
     private func applyKenBurns(to image: CIImage, at progress: Double) -> CIImage {
         // Clamp progress to 0-1 range for safety
         let clampedProgress = max(0, min(1, progress))
@@ -575,20 +575,20 @@ public final class StillWriter: @unchecked Sendable {
         // Apply easing for smooth motion
         let easedProgress = easeInOut(t: clampedProgress)
         
-        // REDUCED ZOOM: Only 1.0 to 1.02 base scale (was 1.1)
-        let baseScale = 1.0 + 0.02 * easedProgress
+        // 5% ZOOM: Start at 1.0, end at 1.05 (5% total zoom)
+        let baseScale = 1.0 + 0.05 * easedProgress
         
         // Add beat pulse (80 BPM = 0.75s per beat)
         let beatDuration = 0.75
         let currentBeat = floor(clampedProgress * 15.0 / beatDuration)  // 15 second video
         let beatProgress = (clampedProgress * 15.0).truncatingRemainder(dividingBy: beatDuration) / beatDuration
         
-        // Pulse effect: quick scale up and down on the beat
+        // Pulse effect: subtle scale up and down on the beat
         let pulseScale: CGFloat
         if beatProgress < 0.2 {  // First 20% of beat - scale up
-            pulseScale = 1.0 + 0.03 * (beatProgress / 0.2)
+            pulseScale = 1.0 + 0.02 * (beatProgress / 0.2)  // Max 2% additional
         } else if beatProgress < 0.4 {  // Next 20% - scale down
-            pulseScale = 1.03 - 0.03 * ((beatProgress - 0.2) / 0.2)
+            pulseScale = 1.02 - 0.02 * ((beatProgress - 0.2) / 0.2)
         } else {  // Rest of beat - normal
             pulseScale = 1.0
         }
@@ -596,9 +596,9 @@ public final class StillWriter: @unchecked Sendable {
         // Combine base scale with pulse
         let finalScale = baseScale * pulseScale
         
-        // REDUCED PAN: Much smaller movement
-        let tx = -5 * easedProgress  // Reduced from -20
-        let ty = -3 * easedProgress   // Reduced from -15
+        // MINIMAL PAN: Very subtle movement
+        let tx = -2 * easedProgress  // Very minimal horizontal pan
+        let ty = -1 * easedProgress   // Very minimal vertical pan
         
         let transform = CGAffineTransform(scaleX: finalScale, y: finalScale)
             .translatedBy(x: tx, y: ty)
