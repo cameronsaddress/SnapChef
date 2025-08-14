@@ -470,14 +470,46 @@ public final class StillWriter: @unchecked Sendable {
     private func applyFiltersToImage(_ image: CIImage, filters: [CIFilter]) throws -> CIImage {
         var processedImage = image
         
+        // Chain multiple filters properly
         for filter in filters {
             filter.setValue(processedImage, forKey: kCIInputImageKey)
             
             guard let output = filter.outputImage else {
+                // Log which filter failed for debugging
+                print("⚠️ StillWriter: Filter \(filter.name) failed to produce output")
                 throw StillWriterError.filterApplicationFailed
             }
             
-            processedImage = output
+            // Critical: Clamp to prevent blank frames
+            processedImage = output.clampedToExtent()
+        }
+        
+        // Add default bloom and vibrance if not already included
+        if config.premiumMode {
+            // Check if bloom not already applied
+            let hasBloom = filters.contains { $0.name == "CIBloom" }
+            if !hasBloom {
+                if let bloomFilter = CIFilter(name: "CIBloom") {
+                    bloomFilter.setValue(processedImage, forKey: kCIInputImageKey)
+                    bloomFilter.setValue(5.0, forKey: "inputRadius")
+                    bloomFilter.setValue(0.3, forKey: "inputIntensity")
+                    if let output = bloomFilter.outputImage {
+                        processedImage = output
+                    }
+                }
+            }
+            
+            // Check if vibrance not already applied
+            let hasVibrance = filters.contains { $0.name == "CIVibrance" }
+            if !hasVibrance {
+                if let vibranceFilter = CIFilter(name: "CIVibrance") {
+                    vibranceFilter.setValue(processedImage, forKey: kCIInputImageKey)
+                    vibranceFilter.setValue(0.8, forKey: "inputAmount")
+                    if let output = vibranceFilter.outputImage {
+                        processedImage = output
+                    }
+                }
+            }
         }
         
         return processedImage
@@ -526,6 +558,45 @@ public final class StillWriter: @unchecked Sendable {
     /// Legacy method for backward compatibility
     private func createPixelBuffer(from ciImage: CIImage) throws -> CVPixelBuffer? {
         return try createOptimizedPixelBuffer(from: ciImage)
+    }
+    
+    // MARK: - Premium Effects
+    
+    /// Add Ken Burns effect for dynamic movement
+    private func applyKenBurns(to image: CIImage, at progress: Double) -> CIImage {
+        let scale = 1.0 + 0.08 * progress  // Zoom from 1.0 to 1.08
+        let tx = -10 * progress  // Subtle horizontal pan
+        let ty = -5 * progress   // Subtle vertical pan
+        
+        let transform = CGAffineTransform(scaleX: scale, y: scale)
+            .translatedBy(x: tx, y: ty)
+        
+        return image.transformed(by: transform)
+    }
+    
+    /// Add particle effects for meal reveal
+    private func addMealRevealParticles(to image: CIImage, progress: Double) -> CIImage {
+        guard config.premiumMode else { return image }
+        
+        // Create star shine effect
+        if let starShine = CIFilter(name: "CIStarShineGenerator") {
+            starShine.setValue(CIVector(x: config.size.width / 2, y: config.size.height / 2), forKey: "inputCenter")
+            starShine.setValue(100.0, forKey: "inputRadius")
+            starShine.setValue(progress * 2.0, forKey: "inputCrossScale")
+            starShine.setValue(50.0, forKey: "inputCrossAngle")
+            starShine.setValue(CIColor(red: 1.0, green: 0.8, blue: 0.0), forKey: "inputColor")
+            
+            if let particleImage = starShine.outputImage {
+                // Composite over image
+                if let compositeFilter = CIFilter(name: "CISourceOverCompositing") {
+                    compositeFilter.setValue(particleImage, forKey: kCIInputImageKey)
+                    compositeFilter.setValue(image, forKey: kCIInputBackgroundImageKey)
+                    return compositeFilter.outputImage ?? image
+                }
+            }
+        }
+        
+        return image
     }
     
     private func createCrossfadeFrame(
@@ -590,9 +661,15 @@ public final class StillWriter: @unchecked Sendable {
             finalImage = currentImage.ciImage
         }
         
-        // Premium: Template-specific effects - to be implemented
-        if config.premiumMode && currentImageIndex % 2 == 0 {
-            // TODO: Add template-specific effects here
+        // Apply Ken Burns effect for dynamic movement
+        let totalDuration = images.reduce(CMTime.zero) { $0 + $1.duration }
+        let frameProgress = time.seconds / totalDuration.seconds
+        finalImage = applyKenBurns(to: finalImage, at: frameProgress)
+        
+        // Add particles for meal reveal (last segment)
+        if config.premiumMode && currentImageIndex == images.count - 1 && frameProgress > 0.7 {
+            let particleProgress = (frameProgress - 0.7) / 0.3  // 0-1 for last 30%
+            finalImage = addMealRevealParticles(to: finalImage, progress: particleProgress)
         }
         
         // Apply transform if needed

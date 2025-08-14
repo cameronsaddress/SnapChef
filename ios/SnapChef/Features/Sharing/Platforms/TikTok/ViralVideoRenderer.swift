@@ -136,6 +136,9 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             print("🎬 DEBUG ViralVideoRenderer: Created segment \(index+1)/\(plan.items.count) at: \(segmentURL.lastPathComponent)")
             print("🎬 DEBUG ViralVideoRenderer: Segment duration: \(item.timeRange.duration.seconds) seconds")
             
+            // Memory optimization: Force cleanup after each segment
+            memoryOptimizer.forceMemoryCleanup()
+            
             // Add segment to composition
             let asset = AVAsset(url: segmentURL)
             print("🎬 DEBUG ViralVideoRenderer: Loading video track from segment...")
@@ -510,9 +513,9 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         plan: RenderPlan
     ) async throws -> AVVideoComposition {
         
-        let composition = AVMutableVideoComposition()
-        composition.renderSize = config.size
-        composition.frameDuration = CMTime(value: 1, timescale: config.fps)
+        let videoComposition = AVMutableVideoComposition()
+        videoComposition.renderSize = config.size
+        videoComposition.frameDuration = CMTime(value: 1, timescale: config.fps)
         
         // Get video tracks
         let videoTracks = try await asset.loadTracks(withMediaType: .video)
@@ -520,21 +523,52 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             throw RendererError.cannotLoadVideoTrack
         }
         
-        // Create instruction for the entire duration
         let instruction = AVMutableVideoCompositionInstruction()
         instruction.timeRange = CMTimeRange(start: .zero, duration: plan.outputDuration)
         
-        // Create layer instruction
-        let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
+        // Apply per-item transforms and crossfades from the render plan
+        var layerInstructions: [AVVideoCompositionLayerInstruction] = []
         
-        // Apply any transforms or effects here
-        let trackTransform = try await videoTrack.load(.preferredTransform)
-        layerInstruction.setTransform(trackTransform, at: .zero)
+        if !plan.items.isEmpty {
+            let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
+            
+            // Get the base track transform
+            let trackTransform = try await videoTrack.load(.preferredTransform)
+            
+            // Apply transforms and crossfades for each item
+            var currentTime = CMTime.zero
+            for (index, item) in plan.items.enumerated() {
+                let itemTransform = trackTransform.concatenating(item.transform)
+                layerInstruction.setTransform(itemTransform, at: currentTime)
+                
+                // Add crossfade between segments (except for first item)
+                if index > 0 {
+                    let fadeDuration = CMTime(seconds: 0.5, preferredTimescale: 600)
+                    let fadeStartTime = currentTime - fadeDuration
+                    
+                    // Create fade transition
+                    if fadeStartTime >= .zero {
+                        let fadeRange = CMTimeRange(start: fadeStartTime, duration: fadeDuration)
+                        
+                        // Fade in current segment
+                        layerInstruction.setOpacityRamp(
+                            fromStartOpacity: 0.0,
+                            toEndOpacity: 1.0,
+                            timeRange: fadeRange
+                        )
+                    }
+                }
+                
+                currentTime = CMTimeAdd(currentTime, item.timeRange.duration)
+            }
+            
+            layerInstructions = [layerInstruction]
+        }
         
-        instruction.layerInstructions = [layerInstruction]
-        composition.instructions = [instruction]
+        instruction.layerInstructions = layerInstructions
         
-        return composition
+        videoComposition.instructions = [instruction]
+        return videoComposition
     }
     
     private func createVideoCompositionForSegment(

@@ -889,48 +889,26 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         asset: AVAsset,
         overlays: [RenderPlan.Overlay]
     ) async throws -> AVVideoComposition {
-        
         let composition = AVMutableVideoComposition()
         composition.renderSize = config.size
         composition.frameDuration = CMTime(value: 1, timescale: config.fps)
         
-        // Get video tracks
-        let videoTracks = try await asset.loadTracks(withMediaType: .video)
-        guard let videoTrack = videoTracks.first else {
-            throw OverlayError.cannotLoadVideoTrack
-        }
+        // Create animation layer with all overlays
+        let animationLayer = CALayer()
+        animationLayer.frame = CGRect(origin: .zero, size: config.size)
+        animationLayer.masksToBounds = true
+        animationLayer.beginTime = AVCoreAnimationBeginTimeAtZero  // Critical: Set animation layer begin time
         
-        let duration = try await asset.load(.duration)
-        
-        // Create instruction
-        let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = CMTimeRange(start: .zero, duration: duration)
-        
-        // Create layer instruction
-        let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
-        
-        instruction.layerInstructions = [layerInstruction]
-        composition.instructions = [instruction]
-        
-        // Add animation layer for overlays
-        let parentLayer = CALayer()
-        parentLayer.frame = CGRect(origin: .zero, size: config.size)
-        
-        let videoLayer = CALayer()
-        videoLayer.frame = CGRect(origin: .zero, size: config.size)
-        
-        let overlayLayer = CALayer()
-        overlayLayer.frame = CGRect(origin: .zero, size: config.size)
-        
-        // Add all overlay layers with proper timing
         for overlay in overlays {
             let layer = overlay.layerBuilder(config)
+            layer.beginTime = AVCoreAnimationBeginTimeAtZero  // Critical for animations
             
-            // Critical: Set up proper timing for AVVideoCompositionCoreAnimationTool
-            // We need to use AVCoreAnimationBeginTimeAtZero as the base time
-            layer.beginTime = AVCoreAnimationBeginTimeAtZero + overlay.start.seconds
+            // Propagate beginTime to all sublayers including emitters
+            layer.sublayers?.forEach { sublayer in
+                sublayer.beginTime = AVCoreAnimationBeginTimeAtZero
+            }
             
-            // Set opacity to 0 initially, then animate it during its time range
+            // Set initial opacity and animation timing
             layer.opacity = 0
             
             // Fade in at start time
@@ -953,16 +931,30 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
             fadeOut.isRemovedOnCompletion = false
             layer.add(fadeOut, forKey: "fadeOut")
             
-            overlayLayer.addSublayer(layer)
+            animationLayer.addSublayer(layer)
         }
         
+        // Use CoreAnimationTool for rendering animations
+        let parentLayer = CALayer()
+        let videoLayer = CALayer()
+        parentLayer.frame = CGRect(origin: .zero, size: config.size)
+        videoLayer.frame = CGRect(origin: .zero, size: config.size)
         parentLayer.addSublayer(videoLayer)
-        parentLayer.addSublayer(overlayLayer)
+        parentLayer.addSublayer(animationLayer)
         
         composition.animationTool = AVVideoCompositionCoreAnimationTool(
             postProcessingAsVideoLayer: videoLayer,
             in: parentLayer
         )
+        
+        // Instruction for passthrough with overlays
+        let instruction = AVMutableVideoCompositionInstruction()
+        instruction.timeRange = CMTimeRange(start: .zero, duration: try await asset.load(.duration))
+        if let videoTrack = try await asset.loadTracks(withMediaType: .video).first {
+            let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
+            instruction.layerInstructions = [layerInstruction]
+        }
+        composition.instructions = [instruction]
         
         return composition
     }
@@ -1163,7 +1155,55 @@ extension OverlayFactory {
     }
     
     /// Create carousel item with beat-synced pop animation (3-10s)
+    // Update createCarouselItemOverlay for beat pop + scrolling
     public func createCarouselItemOverlay(text: String, index: Int, config: RenderConfig, fontSize: CGFloat = 52) -> CALayer {
+        let layer = CALayer()
+        layer.frame = CGRect(x: config.size.width + CGFloat(index * 300), y: config.size.height / 2 - 100, width: config.size.width - 100, height: 200)  // Wider frame for text
+        
+        let textLayer = CATextLayer()
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+        paragraphStyle.lineBreakMode = .byWordWrapping  // Fix wrapping
+        let attributedString = NSAttributedString(string: text, attributes: [
+            .font: UIFont(name: config.fontNameBold, size: fontSize) ?? UIFont.boldSystemFont(ofSize: fontSize),
+            .foregroundColor: UIColor.white,
+            .paragraphStyle: paragraphStyle
+        ])
+        textLayer.string = attributedString
+        textLayer.frame = CGRect(x: 0, y: 0, width: config.size.width - 100, height: 200)  // Full width for text
+        textLayer.contentsScale = 2.0  // Use fixed scale instead of UIScreen.main
+        textLayer.isWrapped = true  // Enable multiline
+        textLayer.alignmentMode = .center
+        
+        // Add golden glow for premium effect
+        textLayer.shadowColor = UIColor(red: 1.0, green: 0.8, blue: 0.0, alpha: 1.0).cgColor
+        textLayer.shadowOpacity = 0.8
+        textLayer.shadowRadius = 8
+        textLayer.shadowOffset = .zero
+        
+        layer.addSublayer(textLayer)
+        
+        // Scrolling animation (leftward)
+        let scrollAnimation = CABasicAnimation(keyPath: "position.x")
+        scrollAnimation.fromValue = layer.position.x
+        scrollAnimation.toValue = -300  // Scroll off-screen
+        scrollAnimation.duration = 8.5  // Full carousel duration
+        scrollAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
+        layer.add(scrollAnimation, forKey: "scroll")
+        
+        // Pop animation (beat-synced, but timed in planner)
+        let popAnimation = CAKeyframeAnimation(keyPath: "transform.scale")
+        popAnimation.values = [0.8, 1.1, 1.0]
+        popAnimation.keyTimes = [0, 0.5, 1.0]
+        popAnimation.duration = 0.75
+        popAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
+        layer.add(popAnimation, forKey: "pop")
+        
+        return layer
+    }
+    
+    // Original version for compatibility (can be called from other places)
+    public func createCarouselItemOverlay_OLD(text: String, index: Int, config: RenderConfig, fontSize: CGFloat = 52) -> CALayer {
         let containerLayer = CALayer()
         containerLayer.frame = CGRect(origin: .zero, size: config.size)
         
@@ -1425,6 +1465,7 @@ extension OverlayFactory {
     }
     
     /// Helper function to create sparkle emitter layer with keyframed birthRate
+    // Update createPremiumCTAOverlay for keyframed sparkles
     private func createSparkleLayer(in bounds: CGRect) -> CALayer {
         let emitter = CAEmitterLayer()
         emitter.frame = bounds
@@ -1442,11 +1483,12 @@ extension OverlayFactory {
         sparkleCell.velocity = 50
         sparkleCell.velocityRange = 20
         sparkleCell.emissionRange = .pi * 2
-        sparkleCell.scale = 0.5
+        sparkleCell.scale = 0.8  // Larger for premium effect
         sparkleCell.scaleRange = 0.3
         sparkleCell.scaleSpeed = -0.3
         sparkleCell.alphaRange = 0.8
         sparkleCell.alphaSpeed = -0.5
+        sparkleCell.color = UIColor(red: 1.0, green: 0.8, blue: 0.0, alpha: 1.0).cgColor  // Premium gold sparkles
         
         // Sparkle image (white circle)
         let sparkleImage = UIImage.circle(diameter: 8, color: .white)
@@ -1454,12 +1496,12 @@ extension OverlayFactory {
         
         emitter.emitterCells = [sparkleCell]
         
-        // Keyframe birthRate animation for video export
+        // Keyframe birthRate for dynamic sparkles over time
         let birthAnimation = CAKeyframeAnimation(keyPath: "emitterCells.sparkle.birthRate")
-        birthAnimation.values = [0, 20, 0]  // Off, on, off
-        birthAnimation.keyTimes = [0, 0.2, 1.0]
-        birthAnimation.duration = 1.0
-        birthAnimation.repeatCount = .infinity
+        birthAnimation.values = [0, 20, 10, 20, 0]  // Off, burst, low, burst, off
+        birthAnimation.keyTimes = [0, 0.2, 0.5, 0.8, 1.0]
+        birthAnimation.duration = 3.0  // CTA duration
+        birthAnimation.repeatCount = 1
         birthAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
         birthAnimation.fillMode = .forwards
         birthAnimation.isRemovedOnCompletion = false

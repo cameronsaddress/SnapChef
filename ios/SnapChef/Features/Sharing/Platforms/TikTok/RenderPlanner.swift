@@ -24,10 +24,17 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
     // MARK: - Beat Sync Support
     
     /// Get beat times for a given duration at 80 BPM
-    private func getBeatTimes(duration: Double) -> [Double] {
-        let bpm = 80.0
-        let beatInterval = 60.0 / bpm  // 0.75s
+    private func getBeatTimes(duration: Double, bpm: Double = 80.0) -> [Double] {
+        let beatInterval = 60.0 / bpm  // seconds per beat
         return stride(from: 0.0, to: duration, by: beatInterval).map { $0 }
+    }
+    
+    /// Detect BPM from audio file (placeholder for real implementation)
+    private func detectBPM(from url: URL) async -> Double {
+        // TODO: Implement real BPM detection using AVAudioEngine
+        // For now, return default 80 BPM
+        // Real implementation would analyze audio onset detection
+        return 80.0
     }
     
     // MARK: - Public Interface
@@ -330,130 +337,73 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         recipe: ViralRecipe,
         media: MediaBundle
     ) async throws -> RenderPlan {
-        
-        print("📝 KINETIC TEXT: Starting plan creation - Redesigned template")
-        print("📝 KINETIC TEXT: Recipe has \(recipe.steps.count) steps, \(recipe.ingredients.count) ingredients")
-        
         let totalDuration = CMTime(seconds: 15, preferredTimescale: 600)
         var items: [RenderPlan.TrackItem] = []
         var overlays: [RenderPlan.Overlay] = []
         
-        // PHASE 1: Dramatic "before" fridge reveal with dim lighting (0-3.5s with overlap)
-        // PHASE 2-4: Cinematic "after" meal with zoom and sparkles (3-15s)
-        let overlap = CMTime(seconds: 0.5, preferredTimescale: 600)
-        let firstDuration = CMTime(seconds: 3.5, preferredTimescale: 600)  // Overlap for crossfade
-        let secondDuration = CMTime(seconds: 11.5, preferredTimescale: 600)  // Adjusted for overlap
-        
+        // Background segments with effects + transforms for movement
+        let backgroundImages = [media.beforeFridge, media.cookedMeal]
         let segments = [
-            (image: media.beforeFridge, 
-             duration: firstDuration, 
-             transform: createDimGlowTransform(),
-             filters: createDimFilterSpecs()),
-            (image: media.cookedMeal, 
-             duration: secondDuration, 
-             transform: createCinematicZoomTransform(),
-             filters: createCinematicFilterSpecs())
+            (image: media.beforeFridge, duration: CMTime(seconds: 3.5, preferredTimescale: 600), transform: createDimGlowTransform(), filters: createDimFilterSpecs()),
+            (image: media.cookedMeal, duration: CMTime(seconds: 11.5, preferredTimescale: 600), transform: createCinematicZoomTransform(), filters: createCinematicFilterSpecs())
         ]
-        
-        print("📝 KINETIC TEXT: Creating 2 premium background segments with effects")
-        
         var currentTime = CMTime.zero
-        for (index, segment) in segments.enumerated() {
-            print("📝 KINETIC TEXT: Segment \(index): \(currentTime.seconds)s - \((currentTime + segment.duration).seconds)s")
-            
+        for segment in segments {
             items.append(RenderPlan.TrackItem(
                 kind: .still(segment.image),
-                timeRange: CMTimeRange(
-                    start: currentTime,
-                    duration: segment.duration
-                ),
+                timeRange: CMTimeRange(start: currentTime, duration: segment.duration),
                 transform: segment.transform,
-                filters: segment.filters
+                filters: segment.filters  // Already FilterSpec array
             ))
             currentTime = currentTime + segment.duration
         }
         
-        // PHASE 1 OVERLAY: Hook with golden glow and bounce animation (0-3s)
+        // Hook overlay (0-3.5s) with bounce animation
+        let hookText = CaptionGenerator.generateHook(from: recipe)
         overlays.append(RenderPlan.Overlay(
             start: .zero,
-            duration: CMTime(seconds: 3, preferredTimescale: 600),
+            duration: CMTime(seconds: 3.5, preferredTimescale: 600),
             layerBuilder: { config in
-                return self.createPremiumHookOverlay(
-                    text: (recipe.hook?.isEmpty ?? true) ? CaptionGenerator.generateHook(from: recipe) : (recipe.hook ?? CaptionGenerator.generateHook(from: recipe)),
-                    config: config,
-                    fontSize: 72  // Increased from default
-                )
+                return self.createPremiumHookOverlay(text: hookText, config: config, fontSize: config.hookFontSize)
             }
         ))
         
-        // PHASE 2 OVERLAY: Ingredient/Step Carousel with beat-synced pops (3-10s)
-        // Use beat sync for perfect timing
-        let beatTimes = getBeatTimes(duration: 7.0)  // 3-10s window
+        // Carousel: Ingredients + Steps, beat-synced (3.5-12s)
+        // Use real BPM if music available
+        let bpm = media.musicURL != nil ? await detectBPM(from: media.musicURL!) : 80.0
+        let beatTimes = getBeatTimes(duration: 8.5, bpm: bpm)  // From 3.5s, 8.5s duration for carousel
         
-        // Combine ingredients and steps for carousel
-        let carouselTexts = recipe.ingredients.prefix(3).map { "🥘 \($0)" } + 
-                           recipe.steps.prefix(6).enumerated().map { (index, step) in
-                               "\(index + 1). \(step.title.prefix(20))..."
-                           }
-        
-        print("📝 KINETIC TEXT: Creating beat-synced carousel with \(carouselTexts.count) items")
-        print("📝 KINETIC TEXT: Beat times: \(beatTimes)")
-        
-        // Create carousel overlays synced to beats
-        for (index, text) in carouselTexts.enumerated() where index < beatTimes.count {
-            let startTime = CMTime(seconds: 3 + beatTimes[index], preferredTimescale: 600)
-            let itemDuration = CMTime(seconds: 0.75, preferredTimescale: 600)
-            
-            // Only show items that fit within the 3-10s window
-            if startTime.seconds < 10 {
+        // Add emojis for premium viral feel
+        let ingredients = CaptionGenerator.processIngredientText(recipe.ingredients)
+            .prefix(3)
+            .map { "🛒 \($0)" }  // Shopping cart emoji for ingredients
+        let steps = recipe.steps.enumerated()
+            .map { CaptionGenerator.processStepText($1, index: $0) }
+            .map { "👨‍🍳 \($0)" }  // Chef emoji for steps
+        let carouselItems = Array(ingredients) + steps  // Combine ingredients first, then steps
+        for (index, text) in carouselItems.enumerated() {
+            if index < beatTimes.count {
+                let startTime = CMTime(seconds: 3.5 + beatTimes[index], preferredTimescale: 600)
+                let duration = CMTime(seconds: 0.75, preferredTimescale: 600)  // Per beat
                 overlays.append(RenderPlan.Overlay(
                     start: startTime,
-                    duration: itemDuration,
+                    duration: duration,
                     layerBuilder: { config in
-                        return self.createCarouselItemOverlay(
-                            text: text,
-                            index: index,
-                            config: config,
-                            fontSize: 52  // Increased from default
-                        )
+                        return self.createCarouselItemOverlay(text: text, index: index, config: config, fontSize: config.stepsFontSize)
                     }
                 ))
             }
         }
         
-        // PHASE 3: Cinematic achievement text (10-13s)
+        // CTA overlay (12-15s) with pulse + sparkles
+        let ctaText = CaptionGenerator.randomCTA()
         overlays.append(RenderPlan.Overlay(
-            start: CMTime(seconds: 10, preferredTimescale: 600),
+            start: CMTime(seconds: 12, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { config in
-                return self.createCinematicRevealOverlay(
-                    text: "✨ \(recipe.title) ✨",
-                    config: config
-                )
+                return self.createPremiumCTAOverlay(text: ctaText, config: config, fontSize: config.ctaFontSize)
             }
         ))
-        
-        // PHASE 4: CTA with hashtags and pulse animation (13-15s)
-        let hashtags = ["#FridgeChallenge", "#SnapChef", "#\(recipe.title.replacingOccurrences(of: " ", with: ""))"]
-        let ctaText = "Try this recipe!\n\(hashtags.joined(separator: " "))"
-        
-        overlays.append(RenderPlan.Overlay(
-            start: CMTime(seconds: 13, preferredTimescale: 600),
-            duration: CMTime(seconds: 2, preferredTimescale: 600),
-            layerBuilder: { config in
-                return self.createPremiumCTAOverlay(
-                    text: ctaText,
-                    config: config,
-                    fontSize: 44  // Increased from default
-                )
-            }
-        ))
-        
-        print("📝 KINETIC TEXT: Plan complete - Redesigned")
-        print("📝 KINETIC TEXT: Total duration: \(totalDuration.seconds) seconds")
-        print("📝 KINETIC TEXT: Track items: \(items.count)")
-        print("📝 KINETIC TEXT: Overlays: \(overlays.count)")
-        print("📝 KINETIC TEXT: Audio: \(media.musicURL != nil ? "✅ \(media.musicURL!.lastPathComponent)" : "❌ No audio")")
         
         return RenderPlan(
             items: items,

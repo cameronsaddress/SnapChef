@@ -486,12 +486,25 @@ public class ViralVideoEngine: ObservableObject {
             throw ViralVideoError.invalidDuration
         }
         
-        // Check file size
+        // Check file size and downsample if needed
         let fileSize = try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64 ?? 0
-        guard fileSize <= ExportSettings.maxFileSize else {
-            throw ViralVideoError.fileSizeExceeded
+        
+        if fileSize > ExportSettings.maxFileSize {
+            print("⚠️ File size exceeded: \(fileSize/(1024*1024))MB, downsampling...")
+            let exporter = ViralVideoExporter(config: config)
+            let downsampledURL = try await exporter.downsampleVideo(at: url)
+            
+            // Delete original oversized file
+            try? FileManager.default.removeItem(at: url)
+            
+            // Verify downsampled size
+            let newSize = try FileManager.default.attributesOfItem(atPath: downsampledURL.path)[.size] as? Int64 ?? 0
+            print("✅ Downsampled to: \(newSize/(1024*1024))MB")
+            
+            return downsampledURL
         }
         
+        print("✅ File size OK: \(fileSize/(1024*1024))MB")
         return url
     }
     

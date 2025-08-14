@@ -280,6 +280,53 @@ public final class ViralVideoExporter: @unchecked Sendable {
         }
     }
     
+    // MARK: - Size Optimization
+    
+    /// Downsample video to reduce file size
+    public func downsampleVideo(at url: URL) async throws -> URL {
+        let asset = AVAsset(url: url)
+        
+        guard let exportSession = AVAssetExportSession(
+            asset: asset,
+            presetName: AVAssetExportPresetMediumQuality
+        ) else {
+            throw ExportError.cannotCreateExportSession
+        }
+        
+        let outputURL = createTempOutputURL()
+        try? FileManager.default.removeItem(at: outputURL)
+        
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mp4
+        exportSession.shouldOptimizeForNetworkUse = true
+        
+        // Configure lower bitrate for smaller size
+        await exportSession.export()
+        
+        if exportSession.status != .completed {
+            throw ExportError.exportFailed
+        }
+        
+        // Check if downsampled version is actually smaller
+        let originalSize = try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64 ?? 0
+        let downsampledSize = try FileManager.default.attributesOfItem(atPath: outputURL.path)[.size] as? Int64 ?? 0
+        
+        if downsampledSize < originalSize {
+            print("✅ Downsampled video from \(originalSize/(1024*1024))MB to \(downsampledSize/(1024*1024))MB")
+            return outputURL
+        } else {
+            // Keep original if downsampling didn't help
+            try FileManager.default.removeItem(at: outputURL)
+            return url
+        }
+    }
+    
+    private func createTempOutputURL() -> URL {
+        let tempDir = FileManager.default.temporaryDirectory
+        let filename = "tiktok_export_\(Date().timeIntervalSince1970).mp4"
+        return tempDir.appendingPathComponent(filename)
+    }
+    
     // MARK: - Private Implementation
     
     private func createProductionVideoComposition(for asset: AVAsset) -> AVVideoComposition {
