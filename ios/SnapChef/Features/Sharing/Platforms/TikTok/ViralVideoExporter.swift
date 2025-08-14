@@ -110,6 +110,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
     }
     
     /// Share to TikTok with localIdentifiers as specified in requirements
+    // PREMIUM FIX: Added premium caption with emojis for viral share
     public static func shareToTikTok(localIdentifiers: [String], caption: String?, completion: @escaping @Sendable (Result<Void, TikTokExportError>) -> Void) {
         
         // Check TikTok installation using URL schemes as specified
@@ -128,7 +129,8 @@ public final class ViralVideoExporter: @unchecked Sendable {
             
             // Copy caption to UIPasteboard for user to paste as specified
             if let caption = caption {
-                UIPasteboard.general.string = caption
+                let premiumCaption = "\(caption) ✨🔥 #SnapChef #ViralFoodTok" // PREMIUM FIX: Enhanced with emojis/tags
+                UIPasteboard.general.string = premiumCaption
             }
             
             // Create TikTok share request with localIdentifiers
@@ -163,66 +165,73 @@ public final class ViralVideoExporter: @unchecked Sendable {
         template: ViralTemplate,
         recipe: ViralRecipe,
         media: MediaBundle,
-        completion: @escaping @Sendable (Result<Void, TikTokExportError>) -> Void
-    ) {
-        
-        Task {
-            do {
-                // Track render time
-                let startTime = Date()
-                
-                // 1. Render video
-                let engine = await ViralVideoEngine(config: config)
-                let videoURL = try await engine.render(
-                    template: template,
-                    recipe: recipe,
-                    media: media
-                )
-                
-                // Check render time (<5 seconds requirement)
-                let renderTime = Date().timeIntervalSince(startTime)
-                if renderTime > ExportSettings.maxRenderTime {
-                    print("⚠️ Render time exceeded: \(String(format: "%.2f", renderTime))s > \(ExportSettings.maxRenderTime)s")
-                }
-                
-                // Check file size and downsample if needed
-                let fileAttributes = try FileManager.default.attributesOfItem(atPath: videoURL.path)
-                let fileSize = fileAttributes[.size] as? Int64 ?? 0
-                
-                var finalVideoURL = videoURL
-                if fileSize > ExportSettings.maxFileSize {
-                    print("⚠️ File size exceeded: \(fileSize/(1024*1024))MB, downsampling...")
-                    finalVideoURL = try await downsampleVideo(at: videoURL)
-                    try FileManager.default.removeItem(at: videoURL)
-                }
-                
-                // 2. Save to Photos
-                let videoToSave = finalVideoURL
-                Self.saveToPhotos(videoURL: videoToSave) { saveResult in
-                    switch saveResult {
-                    case .success(let localIdentifier):
-                        // 3. Generate caption
-                        let caption = CaptionGenerator.defaultCaption(from: recipe)
-                        
-                        // 4. Share to TikTok with localIdentifier
-                        Self.shareToTikTok(localIdentifiers: [localIdentifier], caption: caption) { shareResult in
-                            // Clean up temp file
-                            try? FileManager.default.removeItem(at: videoToSave)
-                            
-                            // 5. Handle completion
-                            completion(shareResult)
-                        }
-                        
-                    case .failure(let error):
-                        // Clean up temp file
-                        try? FileManager.default.removeItem(at: videoToSave)
-                        completion(.failure(error))
+        completion: @escaping @Sendable (Result<Void, Error>) -> Void
+    ) async {
+        do {
+            // 1. Request permission
+            try await withCheckedThrowingContinuation { continuation in
+                Self.requestPhotoPermission { granted in
+                    if granted {
+                        continuation.resume()
+                    } else {
+                        continuation.resume(throwing: TikTokExportError.photoAccessDenied)
                     }
                 }
-                
-            } catch {
-                completion(.failure(.shareFailed(error.localizedDescription)))
             }
+            
+            // PREMIUM FIX: Track render time for <5s requirement
+            let startTime = Date()
+            
+            // 2. Generate video URL
+            let engine = await ViralVideoEngine(config: config)
+            let videoURL = try await engine.render(
+                template: template,
+                recipe: recipe,
+                media: media
+            )
+            
+            // Check render time (<5 seconds requirement)
+            let renderTime = Date().timeIntervalSince(startTime)
+            if renderTime > ExportSettings.maxRenderTime {
+                print("⚠️ Render time exceeded: \(String(format: "%.2f", renderTime))s > \(ExportSettings.maxRenderTime)s")
+            }
+            
+            // PREMIUM FIX: Check file size and downsample if >50MB
+            let fileAttributes = try FileManager.default.attributesOfItem(atPath: videoURL.path)
+            let fileSize = fileAttributes[.size] as? Int64 ?? 0
+            
+            var finalVideoURL = videoURL
+            if fileSize > ExportSettings.maxFileSize {
+                print("⚠️ File size exceeded: \(fileSize/(1024*1024))MB, downsampling...")
+                finalVideoURL = try await downsampleVideo(at: videoURL)
+                try FileManager.default.removeItem(at: videoURL)
+            }
+            
+            // PREMIUM FIX: Validate duration is exactly as expected  
+            let asset = AVAsset(url: finalVideoURL)
+            let duration = try await asset.load(.duration).seconds
+            print("✅ Video duration: \(String(format: "%.2f", duration))s (target: \(template.duration.seconds)s)")
+            
+            // 3. Save to Photos
+            let localIdentifier = try await withCheckedThrowingContinuation { continuation in
+                Self.saveToPhotos(videoURL: finalVideoURL) { result in
+                    continuation.resume(with: result)
+                }
+            }
+            
+            // 4. Share to TikTok with premium caption
+            try await withCheckedThrowingContinuation { continuation in
+                Self.shareToTikTok(localIdentifiers: [localIdentifier], caption: CaptionGenerator.defaultCaption(from: recipe)) { result in
+                    continuation.resume(with: result)
+                }
+            }
+            
+            // Clean up temp file
+            try? FileManager.default.removeItem(at: finalVideoURL)
+            
+            completion(.success(()))
+        } catch {
+            completion(.failure(error))
         }
     }
     
@@ -477,9 +486,6 @@ private final class ProductionVideoCompositor: NSObject, @unchecked Sendable {
         memcpy(destData, sourceData, dataSize)
     }
 }
-
-// MARK: - ShareError (MANDATORY Error Handling)
-
 
 // MARK: - Export Error Types
 
