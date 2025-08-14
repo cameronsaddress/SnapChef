@@ -210,8 +210,16 @@ public class ViralVideoEngine: ObservableObject {
         progressHandler: @escaping @Sendable (RenderProgress) async -> Void
     ) async throws -> URL {
         
+        // PREMIUM FIX: Start comprehensive performance monitoring
+        performanceMonitor.startRenderMonitoring()
+        
         isRendering = true
         errorMessage = nil
+        
+        // PREMIUM FIX: Initialize frame drop monitoring
+        let totalFrames = Int(config.maxDuration.seconds * Double(config.fps))
+        let frameDropMonitor = FrameDropMonitor.shared
+        frameDropMonitor.startMonitoring(expectedFrames: totalFrames)
         
         // Music beat sync assumption for animations
         if let musicURL = media.musicURL {
@@ -223,32 +231,43 @@ public class ViralVideoEngine: ObservableObject {
             // Note: Beat sync timing is used in RenderPlanner.getBeatTimes()
         }
         
-        // Start comprehensive performance monitoring
-        performanceMonitor.startRenderMonitoring()
         memoryOptimizer.logMemoryProfile(phase: "Render Start")
         
         defer {
             isRendering = false
+            
+            // PREMIUM FIX: Complete monitoring and get results
             let totalTime = performanceMonitor.completeRenderMonitoring()
+            let frameResults = frameDropMonitor.completeMonitoring()
             memoryOptimizer.logMemoryProfile(phase: "Render Complete")
             
-            // Log performance summary
-            print("📊 Render Performance Summary:")
+            // Log comprehensive performance summary
+            print("📊 PREMIUM Render Performance Summary:")
             print("   Total time: \(String(format: "%.3f", totalTime))s")
+            print("   Target: <5s requirement \(totalTime <= 5.0 ? "✅ MET" : "❌ EXCEEDED")")
             print("   Memory usage: \(memoryOptimizer.getCurrentMemoryUsage() / 1024 / 1024) MB")
+            print("   Frame performance: \(frameResults.actual)/\(frameResults.expected) frames")
+            print("   Dropped frames: \(frameResults.dropped)")
+            
+            if totalTime > ExportSettings.maxRenderTime {
+                print("⚠️ PREMIUM FIX: Render time exceeded 5s limit!")
+            }
         }
         
         do {
             // Phase 1: Planning (0-10%)
             performanceMonitor.markPhaseStart(.planning)
-            try await updateProgress(.planning, 0.0, progressHandler)
+            await progressHandler(RenderProgress(phase: .planning, progress: 0.0))
+            
+            // PREMIUM FIX: Use premium planner methods for kinetic template
             let renderPlan = try await planner.createRenderPlan(
                 template: template,
                 recipe: recipe,
                 media: media
             )
+            
             performanceMonitor.markPhaseEnd(.planning)
-            try await updateProgress(.planning, 0.1, progressHandler)
+            await progressHandler(RenderProgress(phase: .planning, progress: 0.1))
             
             // Phase 2: Preparing Assets (10-20%)
             performanceMonitor.markPhaseStart(.preparingAssets)
@@ -258,12 +277,24 @@ public class ViralVideoEngine: ObservableObject {
             try await updateProgress(.preparingAssets, 0.2, progressHandler)
             
             // Phase 3: Rendering Frames (20-60%)
-            try await updateProgress(.renderingFrames, 0.2, progressHandler)
+            performanceMonitor.markPhaseStart(.renderingFrames)
+            await progressHandler(RenderProgress(phase: .renderingFrames, progress: 0.2))
             print("🎬 DEBUG: Starting base video render...")
             
-            // For test template, use a special renderer with effects disabled
+            // PREMIUM FIX: Use premium render flow with effects
             let baseVideoURL: URL
-            if false /* template == .test */ {
+            if config.premiumMode && template == .kineticTextSteps {
+                print("✨ PREMIUM: Rendering with kinetic text effects")
+                // Use premium renderer with enhanced effects
+                baseVideoURL = try await renderer.render(
+                    plan: renderPlan,
+                    config: config,
+                    progressCallback: { @Sendable frameProgress in
+                        let progress = 0.2 + (frameProgress * 0.4) // 20% to 60%
+                        await progressHandler(RenderProgress(phase: .renderingFrames, progress: progress))
+                    }
+                )
+            } else if false /* template == .test */ {
                 print("🧪 TEST TEMPLATE: Creating renderer with effects disabled")
                 var testConfig = RenderConfig()
                 testConfig.premiumMode = false  // Disable ALL premium effects
@@ -271,19 +302,21 @@ public class ViralVideoEngine: ObservableObject {
                 baseVideoURL = try await testRenderer.renderBaseVideo(
                     plan: renderPlan,
                     progressCallback: { @Sendable frameProgress in
-                        _ = 0.2 + (frameProgress * 0.4) // 20% to 60%
-                        // Progress updates are handled by the renderer
+                        let progress = 0.2 + (frameProgress * 0.4) // 20% to 60%
+                        await progressHandler(RenderProgress(phase: .renderingFrames, progress: progress))
                     }
                 )
             } else {
                 baseVideoURL = try await renderer.renderBaseVideo(
                     plan: renderPlan,
                     progressCallback: { @Sendable frameProgress in
-                        _ = 0.2 + (frameProgress * 0.4) // 20% to 60%
-                        // Progress updates are handled by the renderer
+                        let progress = 0.2 + (frameProgress * 0.4) // 20% to 60%
+                        await progressHandler(RenderProgress(phase: .renderingFrames, progress: progress))
                     }
                 )
             }
+            
+            performanceMonitor.markPhaseEnd(.renderingFrames)
             print("✅ DEBUG: Base video rendered successfully at: \(baseVideoURL.lastPathComponent)")
             
             // SPECIAL HANDLING FOR TEST TEMPLATE - Skip all compositing and overlays
@@ -304,16 +337,18 @@ public class ViralVideoEngine: ObservableObject {
                 try await updateProgress(.compositing, 0.7, progressHandler)
                 
                 // Phase 5: Adding Overlays (70-85%)
-                try await updateProgress(.addingOverlays, 0.7, progressHandler)
+                performanceMonitor.markPhaseStart(.addingOverlays)
+                await progressHandler(RenderProgress(phase: .addingOverlays, progress: 0.7))
                 print("🎬 DEBUG: Starting overlay application...")
                 let overlayURL = try await overlayFactory.applyOverlays(
                     videoURL: compositedURL,
                     overlays: renderPlan.overlays,
                     progressCallback: { @Sendable overlayProgress in
-                        _ = 0.7 + (overlayProgress * 0.15) // 70% to 85%
-                        // Progress updates are handled by the overlay factory
+                        let progress = 0.7 + (overlayProgress * 0.15) // 70% to 85%
+                        await progressHandler(RenderProgress(phase: .addingOverlays, progress: progress))
                     }
                 )
+                performanceMonitor.markPhaseEnd(.addingOverlays)
                 print("✅ DEBUG: Overlays applied successfully at: \(overlayURL.lastPathComponent)")
                 finalVideoURL = overlayURL
             }
@@ -326,12 +361,16 @@ public class ViralVideoEngine: ObservableObject {
             
             // Phase 7: Finalizing (95-100%)
             performanceMonitor.markPhaseStart(.finalizing)
-            try await updateProgress(.finalizing, 0.95, progressHandler)
+            await progressHandler(RenderProgress(phase: .finalizing, progress: 0.95))
             print("🎬 DEBUG: Starting video finalization...")
             let finalURL = try await finalizeVideo(finalVideoURL)  // Use finalVideoURL
             print("✅ DEBUG: Video finalized successfully at: \(finalURL.lastPathComponent)")
+            
+            // PREMIUM FIX: Record final frame count
+            frameDropMonitor.recordFrame() // Record final frame
+            
             performanceMonitor.markPhaseEnd(.finalizing)
-            try await updateProgress(.complete, 1.0, progressHandler)
+            await progressHandler(RenderProgress(phase: .complete, progress: 1.0))
             
             // Clean up intermediate files immediately
             if false /* template == .test */ {
