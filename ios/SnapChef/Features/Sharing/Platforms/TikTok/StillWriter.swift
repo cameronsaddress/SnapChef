@@ -228,8 +228,8 @@ public final class StillWriter: @unchecked Sendable {
                             if self.config.premiumMode {
                                 let progress = Double(frameCountBox.value) / Double(totalFrames)
                                 
-                                // COMMENTED OUT: Ken Burns effect - causing text visibility issues
-                                // frameImage = self.applyKenBurns(to: frameImage, at: progress)
+                                // Apply Ken Burns effect for zoom/pan
+                                frameImage = self.applyKenBurns(to: frameImage, at: progress)
                                 
                                 // Apply particle effects for meal reveal (last 30% of duration)
                                 if progress > 0.7 {
@@ -569,8 +569,7 @@ public final class StillWriter: @unchecked Sendable {
     
     /// Add Ken Burns effect with EXACTLY 5% max zoom (no additional pulsing)
     private func applyKenBurns(to image: CIImage, at progress: Double) -> CIImage {
-        // FIXED: EXACTLY 5% max zoom, no pulsing that would exceed this
-        // Photos should appear nearly full-frame with minimal zoom
+        // Photos should fill the entire height of the frame with 5% zoom
         
         // Clamp progress to 0-1 range for safety
         let clampedProgress = max(0, min(1, progress))
@@ -578,36 +577,31 @@ public final class StillWriter: @unchecked Sendable {
         // Apply easing for smooth motion
         let easedProgress = easeInOut(t: clampedProgress)
         
-        // First apply fit-height transform (changed from fit-width)
+        // Get sizes
         let imageSize = image.extent.size
         let videoSize = config.size
         
-        // Calculate scale to fit height (so entire height of photo fills the frame)
+        // Calculate scale to fit height (entire height of photo fills the frame)
         let fitHeightScale = videoSize.height / imageSize.height
         
-        // FIXED: Start at fitHeightScale, add up to 5% zoom on top
+        // Apply 5% zoom on top
         let zoomFactor = 1.0 + 0.05 * easedProgress
         let finalScale = fitHeightScale * zoomFactor
         
-        // Calculate centering offsets (center horizontally if needed)
+        // Calculate how much of the scaled image extends beyond the frame
         let scaledWidth = imageSize.width * finalScale
-        let xOffset = (videoSize.width - scaledWidth) / 2.0
+        let scaledHeight = imageSize.height * finalScale
         
-        // Create transform that fits height and centers horizontally
-        // Note: No translation, let the transform handle positioning naturally
+        // Center the image horizontally
+        let xOffset = (scaledWidth - videoSize.width) / 2.0
+        let yOffset = (scaledHeight - videoSize.height) / 2.0
+        
+        // Apply the scale transform
         let transform = CGAffineTransform(scaleX: finalScale, y: finalScale)
-        
-        // Apply transform
         let transformedImage = image.transformed(by: transform)
         
-        // Center the image properly within the output rect
-        let outputRect = CGRect(origin: .zero, size: config.size)
-        
-        // Calculate the actual crop rect to center the scaled image
-        let scaledExtent = transformedImage.extent
-        let cropX = max(0, (scaledExtent.width - videoSize.width) / 2.0)
-        let cropY = max(0, (scaledExtent.height - videoSize.height) / 2.0)
-        let cropRect = CGRect(x: cropX, y: cropY, width: videoSize.width, height: videoSize.height)
+        // Crop to the video frame, centered
+        let cropRect = CGRect(x: xOffset, y: yOffset, width: videoSize.width, height: videoSize.height)
         
         return transformedImage.cropped(to: cropRect)
     }
@@ -700,10 +694,10 @@ public final class StillWriter: @unchecked Sendable {
             finalImage = currentImage.ciImage
         }
         
-        // COMMENTED OUT: Ken Burns effect - causing text visibility issues
+        // Apply Ken Burns effect for dynamic movement
         let totalDuration = images.reduce(CMTime.zero) { $0 + $1.duration }
         let frameProgress = time.seconds / totalDuration.seconds
-        // finalImage = applyKenBurns(to: finalImage, at: frameProgress)
+        finalImage = applyKenBurns(to: finalImage, at: frameProgress)
         
         // Add particles for meal reveal (last segment)
         if config.premiumMode && currentImageIndex == images.count - 1 && frameProgress > 0.7 {
