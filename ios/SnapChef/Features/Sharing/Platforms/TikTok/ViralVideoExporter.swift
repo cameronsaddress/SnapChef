@@ -168,6 +168,9 @@ public final class ViralVideoExporter: @unchecked Sendable {
         
         Task {
             do {
+                // Track render time
+                let startTime = Date()
+                
                 // 1. Render video
                 let engine = await ViralVideoEngine(config: config)
                 let videoURL = try await engine.render(
@@ -176,8 +179,26 @@ public final class ViralVideoExporter: @unchecked Sendable {
                     media: media
                 )
                 
+                // Check render time (<5 seconds requirement)
+                let renderTime = Date().timeIntervalSince(startTime)
+                if renderTime > ExportSettings.maxRenderTime {
+                    print("⚠️ Render time exceeded: \(String(format: "%.2f", renderTime))s > \(ExportSettings.maxRenderTime)s")
+                }
+                
+                // Check file size and downsample if needed
+                let fileAttributes = try FileManager.default.attributesOfItem(atPath: videoURL.path)
+                let fileSize = fileAttributes[.size] as? Int64 ?? 0
+                
+                var finalVideoURL = videoURL
+                if fileSize > ExportSettings.maxFileSize {
+                    print("⚠️ File size exceeded: \(fileSize/(1024*1024))MB, downsampling...")
+                    finalVideoURL = try await downsampleVideo(at: videoURL)
+                    try FileManager.default.removeItem(at: videoURL)
+                }
+                
                 // 2. Save to Photos
-                Self.saveToPhotos(videoURL: videoURL) { saveResult in
+                let videoToSave = finalVideoURL
+                Self.saveToPhotos(videoURL: videoToSave) { saveResult in
                     switch saveResult {
                     case .success(let localIdentifier):
                         // 3. Generate caption
@@ -186,7 +207,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
                         // 4. Share to TikTok with localIdentifier
                         Self.shareToTikTok(localIdentifiers: [localIdentifier], caption: caption) { shareResult in
                             // Clean up temp file
-                            try? FileManager.default.removeItem(at: videoURL)
+                            try? FileManager.default.removeItem(at: videoToSave)
                             
                             // 5. Handle completion
                             completion(shareResult)
@@ -194,7 +215,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
                         
                     case .failure(let error):
                         // Clean up temp file
-                        try? FileManager.default.removeItem(at: videoURL)
+                        try? FileManager.default.removeItem(at: videoToSave)
                         completion(.failure(error))
                     }
                 }
@@ -238,9 +259,12 @@ public final class ViralVideoExporter: @unchecked Sendable {
         let startTime = Date()
         
         return try await withCheckedThrowingContinuation { continuation in
-            let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak exportSession] _ in
+                guard let exportSession = exportSession else { return }
                 let currentProgress = Double(exportSession.progress)
-                progressCallback(currentProgress)
+                Task { @MainActor in
+                    progressCallback(currentProgress)
+                }
                 
                 // Check render time limit as specified in requirements (<5 seconds)
                 let elapsedTime = Date().timeIntervalSince(startTime)
@@ -251,8 +275,13 @@ public final class ViralVideoExporter: @unchecked Sendable {
                 }
             }
             
-            exportSession.exportAsynchronously {
+            exportSession.exportAsynchronously { [weak exportSession] in
                 progressTimer.invalidate()
+                
+                guard let exportSession = exportSession else {
+                    continuation.resume(throwing: ExportError.exportFailed)
+                    return
+                }
                 
                 switch exportSession.status {
                 case .completed:

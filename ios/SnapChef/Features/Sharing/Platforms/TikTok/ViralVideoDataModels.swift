@@ -465,20 +465,28 @@ public struct CaptionGenerator {
         return "Fridge chaos → dinner in \(time) min \(cost) 🍳✨"
     }
     
-    /// Process step text for display with timing icons
+    /// Process step text for display with timing icons and chef emoji
     public static func processStepText(_ step: ViralRecipe.Step, index: Int) -> String {
         let words = step.title.components(separatedBy: .whitespaces)
         let truncated = Array(words.prefix(7)).joined(separator: " ")
-        // Add timing icon if step has duration hint
+        // Add chef emoji and timing icon if step has duration hint
         let timeIcon = step.secondsHint != nil ? " ⏱️" : ""
-        return "\(index + 1). \(truncated)\(timeIcon)"
+        return "👨‍🍳 \(index + 1). \(truncated)\(timeIcon)"
     }
     
-    /// Process ingredient text for display
+    /// Overloaded method for string steps with emoji
+    public static func processStepText(_ step: String, index: Int) -> String {
+        let words = step.components(separatedBy: .whitespaces)
+        let truncated = Array(words.prefix(7)).joined(separator: " ")
+        return "📝 \(truncated)"
+    }
+    
+    /// Process ingredient text for display with shopping cart emoji
     public static func processIngredientText(_ ingredients: [String]) -> [String] {
         return ingredients.prefix(3).map { ingredient in
             let capitalized = ingredient.prefix(1).capitalized + ingredient.dropFirst()
-            return String(capitalized.prefix(20)) + (capitalized.count > 20 ? "..." : "")
+            let truncated = String(capitalized.prefix(20)) + (capitalized.count > 20 ? "..." : "")
+            return "🛒 \(truncated)"
         }
     }
 }

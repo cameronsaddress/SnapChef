@@ -157,9 +157,10 @@ public final class StillWriter: @unchecked Sendable {
             print("❌ DEBUG StillWriter: CIImage extent is empty - image may be invalid")
         }
         
-        // Premium effects - to be implemented
+        // Premium effects - apply Ken Burns and particles per frame
         if config.premiumMode {
-            // TODO: Add premium effects here
+            // Note: Ken Burns and particles will be applied per frame during rendering
+            // This is handled in the frame writing loop below
         }
         
         // Store the processed image for on-demand buffer creation
@@ -222,8 +223,23 @@ public final class StillWriter: @unchecked Sendable {
                                 }
                             }
                             
+                            // Apply per-frame effects if premium mode
+                            var frameImage = imageBox.value
+                            if self.config.premiumMode {
+                                let progress = Double(frameCountBox.value) / Double(totalFrames)
+                                
+                                // Apply Ken Burns effect for zoom/pan
+                                frameImage = self.applyKenBurns(to: frameImage, at: progress)
+                                
+                                // Apply particle effects for meal reveal (last 30% of duration)
+                                if progress > 0.7 {
+                                    let particleProgress = (progress - 0.7) / 0.3
+                                    frameImage = self.addMealRevealParticles(to: frameImage, progress: particleProgress)
+                                }
+                            }
+                            
                             // Create a fresh buffer for each frame on-demand
-                            if let pixelBuffer = try self.createOptimizedPixelBuffer(from: imageBox.value) {
+                            if let pixelBuffer = try self.createOptimizedPixelBuffer(from: frameImage) {
                                 
                                 // Final check right before appending
                                 if videoInput.isReadyForMoreMediaData {

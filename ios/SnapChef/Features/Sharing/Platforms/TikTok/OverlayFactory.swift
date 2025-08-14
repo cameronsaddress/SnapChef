@@ -671,6 +671,27 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
     
     // MARK: - Private Helper Methods
     
+    /// Helper method to recursively propagate beginTime to all sublayers
+    private func propagateBeginTimeToSublayers(layer: CALayer, beginTime: CFTimeInterval) {
+        layer.beginTime = beginTime
+        
+        // Recursively set beginTime for all sublayers
+        if let sublayers = layer.sublayers {
+            for sublayer in sublayers {
+                propagateBeginTimeToSublayers(layer: sublayer, beginTime: beginTime)
+            }
+        }
+        
+        // Special handling for CAEmitterLayer
+        if let emitterLayer = layer as? CAEmitterLayer {
+            emitterLayer.beginTime = beginTime
+            // Also set birthRate animation beginTime if exists
+            if let animation = emitterLayer.animation(forKey: "birthRate") {
+                animation.beginTime = beginTime
+            }
+        }
+    }
+    
     /// Create ingredient chip for counters overlay
     private func createIngredientChip(text: String, index: Int, config: RenderConfig) -> CALayer {
         let chipLayer = CALayer()
@@ -902,6 +923,9 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         for overlay in overlays {
             let layer = overlay.layerBuilder(config)
             layer.beginTime = AVCoreAnimationBeginTimeAtZero + overlay.start.seconds  // Set correct timing
+            
+            // CRITICAL: Propagate beginTime to all sublayers including emitters
+            propagateBeginTimeToSublayers(layer: layer, beginTime: AVCoreAnimationBeginTimeAtZero + overlay.start.seconds)
             
             // Set initial opacity for fade animations
             layer.opacity = 0
