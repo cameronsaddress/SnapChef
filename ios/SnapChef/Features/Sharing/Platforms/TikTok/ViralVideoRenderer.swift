@@ -233,8 +233,9 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             // Get video duration for animation timing
             let videoDuration = composition.duration
             
-            // Premium: Add subtle zoom animation with easing for dynamic feel
-            if config.premiumMode {
+            // FIXED: Remove renderer's global zoom ramp - let planner control all scaling
+            // Only apply fit + center transform, no additional zoom animations
+            if false {  // Disabled premium zoom to prevent double-scaling
                 // Start slightly zoomed out, then zoom to normal
                 let startScale = scale * 0.9  // Start at 90% scale
                 let endScale = scale * 1.0    // End at 100% scale
@@ -558,6 +559,36 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             for (index, item) in plan.items.enumerated() {
                 let itemTransform = trackTransform.concatenating(item.transform)
                 layerInstruction.setTransform(itemTransform, at: currentTime)
+                
+                // FIXED: Add beat pulse transforms (80 BPM = 0.75s intervals)
+                // Pulse between 1.03x and 1.05x on the beat
+                if config.premiumMode {
+                    let beatInterval = 0.75  // 80 BPM
+                    let itemDuration = item.timeRange.duration.seconds
+                    let numBeats = Int(itemDuration / beatInterval)
+                    
+                    for beatIndex in 0..<numBeats {
+                        let beatTime = currentTime + CMTime(seconds: Double(beatIndex) * beatInterval, preferredTimescale: 600)
+                        let beatDuration = CMTime(seconds: 0.2, preferredTimescale: 600)  // Quick pulse
+                        
+                        // Alternate between 1.03x and 1.05x
+                        let scale1: CGFloat = (beatIndex % 2 == 0) ? 1.03 : 1.05
+                        let scale2: CGFloat = (beatIndex % 2 == 0) ? 1.05 : 1.03
+                        
+                        // Create pulse transforms
+                        let pulseStart = itemTransform.scaledBy(x: scale1, y: scale1)
+                        let pulseEnd = itemTransform.scaledBy(x: scale2, y: scale2)
+                        
+                        // Apply pulse ramp
+                        if beatTime + beatDuration <= currentTime + item.timeRange.duration {
+                            layerInstruction.setTransformRamp(
+                                fromStart: pulseStart,
+                                toEnd: pulseEnd,
+                                timeRange: CMTimeRange(start: beatTime, duration: beatDuration)
+                            )
+                        }
+                    }
+                }
                 
                 // PREMIUM FIX: Add crossfade with glow between segments
                 if index > 0 && config.premiumMode {

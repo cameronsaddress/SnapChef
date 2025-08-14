@@ -346,10 +346,11 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         let beatInterval = 60.0 / bpm  // 0.75 seconds per beat
         let beatTimes = stride(from: 0.0, to: 15.0, by: beatInterval).map { $0 }
         
-        // Background segments with effects + transforms for movement
+        // FIXED: Use 5% transform helpers instead of cinematic zoom
+        // Background segments with effects + transforms for movement (max 5% zoom)
         let segments = [
-            (image: media.beforeFridge, duration: CMTime(seconds: 3.5, preferredTimescale: 600), transform: createDimGlowTransform(), filters: createDimFilterSpecs()),
-            (image: media.cookedMeal, duration: CMTime(seconds: 11.5, preferredTimescale: 600), transform: createCinematicZoomTransform(), filters: createCinematicFilterSpecs())
+            (image: media.beforeFridge, duration: CMTime(seconds: 3.5, preferredTimescale: 600), transform: createEnhancedKenBurnsTransform(index: 0), filters: createDimFilterSpecs()),
+            (image: media.cookedMeal, duration: CMTime(seconds: 11.5, preferredTimescale: 600), transform: createEnhancedKenBurnsTransform(index: 1), filters: createCinematicFilterSpecs())
         ]
         var currentTime = CMTime.zero
         for segment in segments {
@@ -1417,8 +1418,8 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
     }
     
     private func createCinematicZoomTransform() -> CGAffineTransform {
-        // Dramatic zoom in for meal reveal
-        return CGAffineTransform(scaleX: 1.2, y: 1.2)
+        // FIXED: Limited to 5% zoom max for meal reveal
+        return CGAffineTransform(scaleX: 1.05, y: 1.05)
             .translatedBy(x: 20, y: 15)
     }
     
