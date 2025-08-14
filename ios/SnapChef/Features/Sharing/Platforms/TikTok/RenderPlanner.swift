@@ -802,6 +802,7 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         textLayer.foregroundColor = UIColor.white.cgColor
         textLayer.frame = CGRect(x: 40, y: 20, width: 70, height: 20)
         textLayer.alignmentMode = .center
+        textLayer.opacity = 1.0  // FIXED: Ensure text is visible
         stickerLayer.addSublayer(textLayer)
         
         // Pop animation - Spring with scale 0.6→1.0 as specified
@@ -964,6 +965,7 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         textLayer.foregroundColor = UIColor.white.cgColor
         textLayer.frame = CGRect(x: 15, y: 8, width: calloutWidth - 30, height: 24)
         textLayer.alignmentMode = .left
+        textLayer.opacity = 1.0  // FIXED: Ensure text is visible
         
         // Drop animation as specified (0.5s with Y+50 offset)
         let dropAnimation = CABasicAnimation(keyPath: "transform.translation.y")
@@ -1061,6 +1063,7 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         textLayer.foregroundColor = UIColor.white.cgColor
         textLayer.frame = CGRect(x: padding, y: padding / 2, width: stickerWidth - padding * 2, height: stickerHeight - padding)
         textLayer.alignmentMode = .center
+        textLayer.opacity = 1.0  // FIXED: Ensure text is visible
         
         // CTA pop animation
         let scaleAnimation = CASpringAnimation(keyPath: "transform.scale")
@@ -1323,6 +1326,7 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         textLayer.alignmentMode = .center
         textLayer.frame = layer.bounds.inset(by: config.safeInsets)
         textLayer.contentsScale = 2.0  // Use standard retina scale
+        textLayer.opacity = 1.0  // FIXED: Ensure text is visible
         
         // Beat-synced pop group
         let group = CAAnimationGroup()

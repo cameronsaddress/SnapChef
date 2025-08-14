@@ -159,6 +159,9 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
             height: textSize.height
         )
         
+        // FIXED: Set model layer opacity to 1.0 for visibility in render
+        textLayer.opacity = 1.0
+        
         // Add hero hook animation - fade in 0.3s
         let fadeAnimation = CABasicAnimation(keyPath: "opacity")
         fadeAnimation.fromValue = 0.0
@@ -167,6 +170,7 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         fadeAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         fadeAnimation.fillMode = .forwards
         fadeAnimation.isRemovedOnCompletion = false
+        fadeAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
         textLayer.add(fadeAnimation, forKey: "fadeIn")
         
         containerLayer.addSublayer(textLayer)
@@ -380,6 +384,9 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         
         // Staggered appearance with delay
         let delay = Double(index) * config.staggerDelay
+        
+        // FIXED: Set model layer opacity
+        textLayer.opacity = 1.0
         
         let fadeAnimation = CABasicAnimation(keyPath: "opacity")
         fadeAnimation.fromValue = 0.0
