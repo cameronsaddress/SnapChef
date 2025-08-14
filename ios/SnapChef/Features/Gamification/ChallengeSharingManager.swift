@@ -21,7 +21,6 @@ class ChallengeSharingManager: ObservableObject {
     @Published var shareProgress: Double = 0
     
     private lazy var gamificationManager = GamificationManager.shared
-    private lazy var teamManager = TeamChallengeManager.shared
     
     // Social Platform Types
     enum SocialPlatform: String, CaseIterable {
@@ -78,7 +77,6 @@ class ChallengeSharingManager: ObservableObject {
         case levelUp(Int)
         case streakMilestone(Int)
         case leaderboardRank(Int, LeaderboardScope)
-        case teamAchievement(Team, TeamAchievement)
         case badgeUnlocked(GameBadge)
         case weeklyStats
         
@@ -144,9 +142,6 @@ class ChallengeSharingManager: ObservableObject {
             case .leaderboardRank(let rank, let scope):
                 LeaderboardRankShareView(rank: rank, scope: scope, platform: platform)
                 
-            case .teamAchievement(let team, let achievement):
-                TeamAchievementShareView(team: team, achievement: achievement, platform: platform)
-                
             case .badgeUnlocked(let badge):
                 BadgeUnlockedShareView(badge: badge, platform: platform)
                 
@@ -185,9 +180,6 @@ class ChallengeSharingManager: ObservableObject {
         case .leaderboardRank(let rank, let scope):
             let scopeText = scope == .weekly ? "this week" : scope == .monthly ? "this month" : "all-time"
             text += "🏆 Ranked #\(rank) \(scopeText) on SnapChef! Think you can beat me? 😎\n\n"
-            
-        case .teamAchievement(let team, let achievement):
-            text += "🎯 Team Achievement Unlocked! My team \"\(team.name)\" just earned \"\(achievement.name)\"! 👥\n\n"
             
         case .badgeUnlocked(let badge):
             text += "🏅 New Badge Unlocked: \(badge.name)! \(badge.description) ✨\n\n"
@@ -465,9 +457,6 @@ class ChallengeSharingManager: ObservableObject {
         case .leaderboardRank(let rank, _):
             eventParams["type"] = "leaderboard_rank"
             eventParams["rank"] = rank
-        case .teamAchievement(let team, _):
-            eventParams["type"] = "team_achievement"
-            eventParams["team_name"] = team.name
         case .badgeUnlocked(let badge):
             eventParams["type"] = "badge_unlocked"
             eventParams["badge_name"] = badge.name
@@ -731,55 +720,7 @@ struct LeaderboardRankShareView: View {
     }
 }
 
-struct TeamAchievementShareView: View {
-    let team: Team
-    let achievement: TeamAchievement
-    let platform: ChallengeSharingManager.SocialPlatform
-    
-    var body: some View {
-        VStack(spacing: 40) {
-            Spacer()
-            
-            // Team icon
-            Text(team.imageIcon)
-                .font(.system(size: 120))
-            
-            // Team name
-            Text(team.name)
-                .font(.system(size: 48, weight: .black, design: .rounded))
-                .foregroundColor(.white)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-            
-            // Achievement
-            VStack(spacing: 16) {
-                Image(systemName: achievement.icon)
-                    .font(.system(size: 80))
-                    .foregroundColor(.yellow)
-                
-                Text(achievement.name)
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            
-            Spacer()
-            
-            // App branding
-            VStack(spacing: 16) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 40))
-                    .foregroundColor(.white)
-                
-                Text("SnapChef")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-            }
-            .padding(.bottom, 80)
-        }
-    }
-}
+
 
 struct BadgeUnlockedShareView: View {
     let badge: GameBadge

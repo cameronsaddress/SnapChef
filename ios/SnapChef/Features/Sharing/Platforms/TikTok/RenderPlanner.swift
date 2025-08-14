@@ -1081,15 +1081,31 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         let containerLayer = CALayer()
         containerLayer.frame = CGRect(origin: .zero, size: config.size)
         
+        // Calculate wrapped text dimensions
+        let maxTextWidth = config.size.width - 200  // Allow for margins
+        let font = UIFont.systemFont(ofSize: config.stepsFontSize, weight: .bold)
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byWordWrapping
+        paragraphStyle.alignment = .center
+        
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .paragraphStyle: paragraphStyle
+        ]
+        
+        // Calculate the actual size needed for wrapped text
+        let textSize = text.boundingRect(
+            with: CGSize(width: maxTextWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes,
+            context: nil
+        ).size
+        
         // Background with gradient
         let bgLayer = CAGradientLayer()
-        let textSize = text.size(withAttributes: [
-            .font: UIFont.systemFont(ofSize: config.stepsFontSize, weight: .bold)
-        ])
-        
-        let padding: CGFloat = 40  // More padding for larger text
+        let padding: CGFloat = 40  // Padding on all sides
         let bgWidth = min(config.size.width - 100, textSize.width + padding * 2)
-        let bgHeight: CGFloat = 180  // DOUBLED: Was 80, now tall enough for text
+        let bgHeight = max(180, textSize.height + padding * 2)  // Dynamic height, minimum 180
         
         // Center horizontally, position vertically based on index
         let yPosition = config.safeInsets.top + 100 + CGFloat(index % 3) * 100
@@ -1129,21 +1145,33 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         bgLayer.shadowOpacity = 0.3
         bgLayer.shadowRadius = 8
         
-        // Text layer
+        // Text layer with proper wrapping using NSAttributedString
         let textLayer = CATextLayer()
-        textLayer.string = text
-        textLayer.fontSize = config.stepsFontSize
-        if let font = UIFont(name: config.fontNameBold, size: config.stepsFontSize) {
-            textLayer.font = CTFontCreateWithName(font.fontName as CFString, config.stepsFontSize, nil)
-        }
-        textLayer.foregroundColor = UIColor.white.cgColor
+        
+        // Create attributed string for proper text wrapping
+        let textParagraphStyle = NSMutableParagraphStyle()
+        textParagraphStyle.lineBreakMode = .byWordWrapping
+        textParagraphStyle.alignment = .center
+        
+        let attributedString = NSAttributedString(
+            string: text,
+            attributes: [
+                .font: UIFont.systemFont(ofSize: config.stepsFontSize, weight: .bold),
+                .foregroundColor: UIColor.white,
+                .paragraphStyle: textParagraphStyle
+            ]
+        )
+        
+        textLayer.string = attributedString
         textLayer.frame = CGRect(
-            x: padding,
-            y: padding / 2,  // Top padding
-            width: bgWidth - padding * 2,
-            height: bgHeight - padding  // Full height minus padding
+            x: padding / 2,
+            y: padding / 2,
+            width: bgWidth - padding,
+            height: bgHeight - padding
         )
         textLayer.alignmentMode = .center
+        textLayer.isWrapped = true
+        textLayer.truncationMode = .none  // Don't truncate
         textLayer.contentsScale = 2.0  // Use standard retina scale
         
         // PREMIUM FIX: Beat-synced animations with props set before add

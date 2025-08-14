@@ -307,39 +307,7 @@ struct StreakInsurance: Codable {
     }
 }
 
-// MARK: - Team Streak
-struct TeamStreak: Codable, Identifiable {
-    let id: UUID
-    let teamId: String
-    let type: StreakType
-    var currentStreak: Int
-    var memberContributions: [String: Bool] // userId: contributed today
-    var lastActivityDate: Date
-    var gracePeriodUntil: Date?
-    
-    init(teamId: String, type: StreakType) {
-        self.id = UUID()
-        self.teamId = teamId
-        self.type = type
-        self.currentStreak = 0
-        self.memberContributions = [:]
-        self.lastActivityDate = Date()
-        self.gracePeriodUntil = nil
-    }
-    
-    var isInGracePeriod: Bool {
-        if let gracePeriod = gracePeriodUntil {
-            return Date() < gracePeriod
-        }
-        return false
-    }
-    
-    var contributionPercentage: Double {
-        guard !memberContributions.isEmpty else { return 0 }
-        let contributors = memberContributions.values.filter { $0 }.count
-        return Double(contributors) / Double(memberContributions.count)
-    }
-}
+// MARK: - Team Streak (Removed)
 
 // MARK: - Streak Power-Up
 struct StreakPowerUp: Identifiable {

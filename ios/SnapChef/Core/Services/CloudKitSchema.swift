@@ -306,29 +306,9 @@ struct CKField {
     }
     
     // Team Fields
-    struct Team {
-        static let id = "id"
-        static let name = "name"
-        static let description = "description"
-        static let captainID = "captainID"
-        static let memberIDs = "memberIDs"
-        static let challengeID = "challengeID"
-        static let totalPoints = "totalPoints"
-        static let createdAt = "createdAt"
-        static let inviteCode = "inviteCode"
-        static let isPublic = "isPublic"
-        static let maxMembers = "maxMembers"
-    }
     
-    // TeamMessage Fields
-    struct TeamMessage {
-        static let teamID = "teamID"
-        static let senderID = "senderID"
-        static let senderName = "senderName"
-        static let message = "message"
-        static let timestamp = "timestamp"
-        static let type = "type"
-    }
+    
+    
     
     // Leaderboard Fields
     struct Leaderboard {

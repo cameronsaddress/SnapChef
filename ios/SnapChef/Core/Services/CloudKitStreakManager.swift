@@ -123,59 +123,7 @@ class CloudKitStreakManager: ObservableObject {
         }
     }
     
-    /// Get team streak data
-    func getTeamStreak(teamID: String, type: StreakType) async -> TeamStreak? {
-        let recordID = CKRecord.ID(recordName: "team_streak_\(teamID)_\(type.rawValue)")
-        
-        do {
-            let record = try await publicDB.record(for: recordID)
-            
-            var teamStreak = TeamStreak(teamId: teamID, type: type)
-            teamStreak.currentStreak = Int(record["currentStreak"] as? Int64 ?? 0)
-            teamStreak.lastActivityDate = record["lastActivityDate"] as? Date ?? Date()
-            teamStreak.gracePeriodUntil = record["gracePeriodUntil"] as? Date
-            
-            if let contributionsData = record["memberContributions"] as? String,
-               let data = contributionsData.data(using: .utf8),
-               let contributions = try? JSONDecoder().decode([String: Bool].self, from: data) {
-                teamStreak.memberContributions = contributions
-            }
-            
-            return teamStreak
-        } catch {
-            print("❌ Failed to get team streak: \(error)")
-            return nil
-        }
-    }
-    
-    /// Update team streak
-    func updateTeamStreak(_ teamStreak: TeamStreak) async {
-        let recordID = CKRecord.ID(recordName: "team_streak_\(teamStreak.teamId)_\(teamStreak.type.rawValue)")
-        
-        let record: CKRecord
-        do {
-            record = try await publicDB.record(for: recordID)
-        } catch {
-            record = CKRecord(recordType: "TeamStreak", recordID: recordID)
-        }
-        
-        record["teamID"] = teamStreak.teamId
-        record["streakType"] = teamStreak.type.rawValue
-        record["currentStreak"] = Int64(teamStreak.currentStreak)
-        record["lastActivityDate"] = teamStreak.lastActivityDate
-        record["gracePeriodUntil"] = teamStreak.gracePeriodUntil
-        
-        if let contributionsData = try? JSONEncoder().encode(teamStreak.memberContributions) {
-            record["memberContributions"] = String(data: contributionsData, encoding: .utf8)
-        }
-        
-        do {
-            _ = try await publicDB.save(record)
-            print("✅ Team streak updated")
-        } catch {
-            print("❌ Failed to update team streak: \(error)")
-        }
-    }
+    // Team streak functionality has been removed
     
     /// Get streak leaderboard
     func getStreakLeaderboard(type: StreakType, limit: Int = 100) async -> [(userID: String, streak: Int, username: String)] {

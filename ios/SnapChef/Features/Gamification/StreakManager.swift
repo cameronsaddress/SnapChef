@@ -13,7 +13,6 @@ class StreakManager: ObservableObject {
     @Published var unclaimedAchievements: [StreakAchievement] = []
     @Published var activeInsurance: [StreakType: StreakInsurance] = [:]
     @Published var activeFreezes: [StreakType: StreakFreeze] = [:]
-    @Published var teamStreaks: [TeamStreak] = []
     @Published var globalMultiplier: Double = 1.0
     @Published var isLoading = false
     

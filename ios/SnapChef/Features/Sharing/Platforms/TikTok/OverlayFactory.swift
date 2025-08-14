@@ -186,24 +186,29 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         // Validate safe zones (MANDATORY)
         validateSafeZones(config: config)
         
+        // Text should be "Share Your SNAPCHEF!"
+        let ctaText = "Share Your SNAPCHEF!"
+        
         // Create rounded sticker background
         let stickerLayer = CALayer()
-        stickerLayer.backgroundColor = UIColor.black.withAlphaComponent(0.8).cgColor
-        stickerLayer.cornerRadius = 25
+        stickerLayer.backgroundColor = UIColor.black.withAlphaComponent(0.9).cgColor
+        stickerLayer.cornerRadius = 40
         
-        // CTA text
-        let textLayer = createTextLayer(
-            text: text,
-            fontSize: config.ctaFontSize,
-            fontWeight: .bold,
-            color: config.brandTint,
-            maxWidth: config.size.width - (config.safeInsets.left + config.safeInsets.right) - 40, // Padding for sticker
-            alignment: .center
-        )
+        // Calculate size needed for the text with proper wrapping
+        let padding: CGFloat = 60
+        let maxTextWidth = config.size.width - (config.safeInsets.left + config.safeInsets.right) - 100
         
-        let textSize = textLayer.preferredFrameSize()
-        let stickerWidth = max(textSize.width + 80, 400) // 40px padding each side, min width
-        let stickerHeight = max(textSize.height + 80, 160) // 40px padding top/bottom, min height
+        // Measure text size with wrapping
+        let font = UIFont.boldSystemFont(ofSize: config.ctaFontSize)
+        let textSize = (ctaText as NSString).boundingRect(
+            with: CGSize(width: maxTextWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font],
+            context: nil
+        ).size
+        
+        let stickerWidth = min(textSize.width + padding * 2, config.size.width - 100)
+        let stickerHeight = textSize.height + padding * 2
         
         // Position sticker in bottom safe area
         stickerLayer.frame = CGRect(
@@ -213,12 +218,71 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
             height: stickerHeight
         )
         
-        textLayer.frame = CGRect(
-            x: 20,
-            y: 10,
-            width: textSize.width,
-            height: textSize.height
-        )
+        // Create gradient layer for SNAPCHEF!
+        if text.contains("SNAPCHEF") {
+            // Split text into "Share Your " and "SNAPCHEF!"
+            let shareYourLayer = CATextLayer()
+            shareYourLayer.string = "Share Your"
+            shareYourLayer.fontSize = config.ctaFontSize
+            shareYourLayer.font = UIFont.boldSystemFont(ofSize: config.ctaFontSize)
+            shareYourLayer.foregroundColor = UIColor.white.cgColor
+            shareYourLayer.alignmentMode = .center
+            shareYourLayer.contentsScale = 2.0
+            shareYourLayer.frame = CGRect(
+                x: padding,
+                y: padding / 2,
+                width: stickerWidth - padding * 2,
+                height: stickerHeight / 2
+            )
+            
+            // Gradient layer for SNAPCHEF!
+            let gradientLayer = CAGradientLayer()
+            gradientLayer.frame = CGRect(
+                x: padding,
+                y: stickerHeight / 2,
+                width: stickerWidth - padding * 2,
+                height: stickerHeight / 2 - padding / 2
+            )
+            gradientLayer.colors = [
+                UIColor(red: 1.0, green: 0.4, blue: 0.2, alpha: 1.0).cgColor,  // Orange
+                UIColor(red: 1.0, green: 0.6, blue: 0.1, alpha: 1.0).cgColor,  // Orange-Yellow
+                UIColor(red: 1.0, green: 0.8, blue: 0.0, alpha: 1.0).cgColor   // Yellow
+            ]
+            gradientLayer.startPoint = CGPoint(x: 0, y: 0.5)
+            gradientLayer.endPoint = CGPoint(x: 1, y: 0.5)
+            
+            // Text mask for gradient
+            let snapchefLayer = CATextLayer()
+            snapchefLayer.string = "SNAPCHEF!"
+            snapchefLayer.fontSize = config.ctaFontSize * 1.3  // 30% larger
+            snapchefLayer.font = UIFont.boldSystemFont(ofSize: config.ctaFontSize * 1.3)
+            snapchefLayer.foregroundColor = UIColor.white.cgColor
+            snapchefLayer.alignmentMode = .center
+            snapchefLayer.contentsScale = 2.0
+            snapchefLayer.frame = gradientLayer.bounds
+            
+            gradientLayer.mask = snapchefLayer
+            
+            stickerLayer.addSublayer(shareYourLayer)
+            stickerLayer.addSublayer(gradientLayer)
+        } else {
+            // Fallback for other text
+            let textLayer = createTextLayer(
+                text: text,
+                fontSize: config.ctaFontSize,
+                fontWeight: .bold,
+                color: config.brandTint,
+                maxWidth: stickerWidth - padding * 2,
+                alignment: .center
+            )
+            textLayer.frame = CGRect(
+                x: padding,
+                y: padding,
+                width: stickerWidth - padding * 2,
+                height: stickerHeight - padding * 2
+            )
+            stickerLayer.addSublayer(textLayer)
+        }
         
         // CTA Pop animation - Spring 0.6s with scale 0.6→1.0
         let scaleAnimation = CASpringAnimation(keyPath: "transform.scale")
@@ -233,7 +297,6 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         
         stickerLayer.add(scaleAnimation, forKey: "ctaPop")
         
-        stickerLayer.addSublayer(textLayer)
         containerLayer.addSublayer(stickerLayer)
         return containerLayer
     }
@@ -411,6 +474,25 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         // Validate safe zones (MANDATORY)
         validateSafeZones(config: config)
         
+        // Calculate wrapped text dimensions
+        let maxTextWidth: CGFloat = 200  // Allow wider stickers
+        let font = UIFont.boldSystemFont(ofSize: 32)
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byWordWrapping
+        paragraphStyle.alignment = .center
+        
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .paragraphStyle: paragraphStyle
+        ]
+        
+        let wrappedTextSize = stickerData.text.boundingRect(
+            with: CGSize(width: maxTextWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes,
+            context: nil
+        ).size
+        
         // Create sticker background
         let stickerLayer = CALayer()
         stickerLayer.backgroundColor = stickerData.color.withAlphaComponent(0.9).cgColor
@@ -422,12 +504,15 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
             fontSize: 32,
             fontWeight: .bold,
             color: .white,
-            maxWidth: 120,
+            maxWidth: maxTextWidth,
             alignment: .center
         )
         
-        let textSize = textLayer.preferredFrameSize()
-        let stickerSize = CGSize(width: max(80, textSize.width + 20), height: max(40, textSize.height + 16))
+        let padding: CGFloat = 20
+        let stickerSize = CGSize(
+            width: wrappedTextSize.width + padding * 2,
+            height: wrappedTextSize.height + padding * 2
+        )
         
         // Position stickers in stack formation
         let xPosition = config.safeInsets.left + 20 + (CGFloat(index) * 15)
@@ -441,10 +526,10 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         )
         
         textLayer.frame = CGRect(
-            x: (stickerSize.width - textSize.width) / 2,
-            y: (stickerSize.height - textSize.height) / 2,
-            width: textSize.width,
-            height: textSize.height
+            x: padding,
+            y: padding,
+            width: stickerSize.width - padding * 2,
+            height: stickerSize.height - padding * 2
         )
         
         // Sticker Stack animation - staggered pop with 120ms delay per item (exact spec)
@@ -719,17 +804,39 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         chipLayer.backgroundColor = UIColor.black.withAlphaComponent(0.7).cgColor
         chipLayer.cornerRadius = 20
         
+        // Calculate wrapped text dimensions first
+        let maxTextWidth: CGFloat = 300  // Allow wider chips for ingredients
+        let font = UIFont.systemFont(ofSize: config.countersFontSize, weight: .regular)
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byWordWrapping
+        paragraphStyle.alignment = .center
+        
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .paragraphStyle: paragraphStyle
+        ]
+        
+        let wrappedTextSize = text.boundingRect(
+            with: CGSize(width: maxTextWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes,
+            context: nil
+        ).size
+        
         let textLayer = createTextLayer(
             text: text,
             fontSize: config.countersFontSize,
             fontWeight: .regular,
             color: config.brandTint,
-            maxWidth: 200,
+            maxWidth: maxTextWidth,
             alignment: .center
         )
         
-        let textSize = textLayer.preferredFrameSize()
-        let chipSize = CGSize(width: textSize.width + 80, height: max(textSize.height + 80, 140))  // More padding for larger text
+        let padding: CGFloat = 40  // Padding on all sides
+        let chipSize = CGSize(
+            width: wrappedTextSize.width + padding * 2,
+            height: wrappedTextSize.height + padding * 2
+        )  // Dynamic sizing based on wrapped text
         
         // Position chips in staggered formation within safe zones
         let xPosition = config.safeInsets.left + 20 + (CGFloat(index) * 10)
@@ -743,10 +850,10 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         )
         
         textLayer.frame = CGRect(
-            x: 12,
-            y: 8,
-            width: textSize.width,
-            height: textSize.height
+            x: padding / 2,
+            y: padding / 2,
+            width: chipSize.width - padding,
+            height: chipSize.height - padding
         )
         
         // Staggered appearance animation (120-150ms between items)

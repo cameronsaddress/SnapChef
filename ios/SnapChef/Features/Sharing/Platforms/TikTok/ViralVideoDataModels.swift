@@ -439,9 +439,9 @@ public struct CaptionGenerator {
         "From fridge → plate 😎"
     ]
     
-    /// Get random CTA from pool
+    /// Get CTA text - always returns "Share Your SNAPCHEF!"
     public static func randomCTA() -> String {
-        return ctaPool.randomElement() ?? ctaPool[0]
+        return "Share Your SNAPCHEF!"
     }
     
     /// Generate hook text with premium emojis for virality

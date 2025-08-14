@@ -582,28 +582,9 @@ final class CloudKitSyncService: ObservableObject {
         try await CloudKitManager.shared.saveUserChallenge(userChallenge)
     }
     
-    func joinTeam(teamID: String, userID: String) async throws {
-        // Fetch team record
-        let recordID = CKRecord.ID(recordName: teamID)
-        let teamRecord = try await publicDatabase.record(for: recordID)
-        
-        // Add user to team members
-        var memberIDs = (teamRecord[CKField.Team.memberIDs] as? [String]) ?? []
-        if !memberIDs.contains(userID) {
-            memberIDs.append(userID)
-            teamRecord[CKField.Team.memberIDs] = memberIDs
-            
-            _ = try await publicDatabase.save(teamRecord)
-            print("✅ Joined team successfully")
-        }
-    }
+    // Team functionality removed
     
-    func createTeam(_ team: Team) async throws -> Team {
-        // Moved to CloudKitManager
-        try await CloudKitManager.shared.saveTeam(team)
-        print("✅ Created team: \(team.name)")
-        return team
-    }
+    
     
     // MARK: - Challenge Proof Submission
     

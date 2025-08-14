@@ -250,38 +250,7 @@ struct CloudKitLeaderboardEntry {
     }
 }
 
-// MARK: - Team CloudKit Extension
-struct CloudKitTeamWrapper {
-    let team: Team
-    var recordID: CKRecord.ID?
-    
-    func toCKRecord() -> CKRecord {
-        let record = recordID != nil ? CKRecord(recordType: CloudKitConfig.teamRecordType, recordID: recordID!) 
-                                     : CKRecord(recordType: CloudKitConfig.teamRecordType)
-        
-        record[CKField.Team.id] = team.id.uuidString
-        record[CKField.Team.name] = team.name
-        record[CKField.Team.description] = team.description
-        record[CKField.Team.captainID] = team.captain
-        record[CKField.Team.memberIDs] = team.members
-        
-        // Store active challenges
-        if !team.activeChallenges.isEmpty {
-            // For now, just store the first challenge ID
-            if let firstChallenge = team.activeChallenges.first {
-                record[CKField.Team.challengeID] = CKRecord.Reference(recordID: CKRecord.ID(recordName: firstChallenge), action: .none)
-            }
-        }
-        
-        record[CKField.Team.totalPoints] = team.totalPoints
-        record[CKField.Team.createdAt] = team.createdAt
-        record[CKField.Team.inviteCode] = UUID().uuidString // Generate invite code
-        record[CKField.Team.isPublic] = team.isPublic ? 1 : 0
-        record[CKField.Team.maxMembers] = team.maxMembers
-        
-        return record
-    }
-}
+// MARK: - Team CloudKit Extension (Removed)
 
 // MARK: - Model Extensions for CloudKit
 extension Challenge {

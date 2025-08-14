@@ -429,27 +429,8 @@ class DiscoverUsersViewModel: ObservableObject {
     }
     
     private func loadFakeUsers() {
-        let fakeUserData = FakeUserDataService.shared.generateFakeUsers()
-        fakeUsers = fakeUserData.map { userData in
-            UserProfile(
-                id: userData.id,
-                username: userData.username,
-                displayName: userData.displayName,
-                profileImageURL: userData.profileImageURL,
-                profileImage: userData.profileImage,
-                followerCount: userData.followerCount,
-                followingCount: userData.followingCount,
-                recipesShared: userData.recipesShared,
-                isVerified: userData.isVerified,
-                isFollowing: userData.isFollowing,
-                bio: userData.bio,
-                isLocal: userData.isLocal,
-                joinedDate: userData.joinedDate,
-                lastActive: userData.lastActive,
-                cuisineSpecialty: userData.cuisineSpecialty,
-                cookingLevel: userData.cookingLevel
-            )
-        }
+        // Removed fake user generation - now only uses real CloudKit users
+        fakeUsers = []
     }
     
     func loadUsers(for category: DiscoverUsersView.DiscoverCategory) async {
