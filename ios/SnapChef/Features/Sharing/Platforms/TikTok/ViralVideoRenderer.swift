@@ -575,8 +575,8 @@ public final class ViralVideoRenderer: @unchecked Sendable {
                             timeRange: fadeRange
                         )
                         
-                        // Add subtle scale for glow effect
-                        let glowStartTransform = itemTransform.scaledBy(x: 1.05, y: 1.05)
+                        // FIXED: No additional scaling for glow - photos already have 5% zoom max
+                        let glowStartTransform = itemTransform
                         let glowEndTransform = itemTransform
                         layerInstruction.setTransformRamp(
                             fromStart: glowStartTransform,

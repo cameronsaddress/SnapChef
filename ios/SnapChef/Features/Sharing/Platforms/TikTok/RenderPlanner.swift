@@ -634,25 +634,21 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
     /// Base Scale: 1.05x (5% zoom as requested), Beat pulse: +0.02x
     /// Direction: Alternating (index % 2), Translation: minimal
     private func createEnhancedKenBurnsTransform(index: Int) -> CGAffineTransform {
+        // FIXED: EXACTLY 5% zoom max, no additional scaling
         let baseScale: CGFloat = 1.05 // 5% zoom as requested
-        let direction: CGFloat = index % 2 == 0 ? 1.0 : -1.0 // Alternating direction
-        let translation = config.size.width * 0.005 * direction // Very minimal translation
+        // NO translation to avoid shifting the image
         
         return CGAffineTransform(scaleX: baseScale, y: baseScale)
-            .translatedBy(x: translation, y: 0)
     }
     
     /// Create beat-pulsing transform for photos
     private func createBeatPulseTransform(beatIndex: Int) -> CGAffineTransform {
+        // FIXED: Max 5% zoom total, with subtle pulse
         // 80 BPM = pulse every 0.75 seconds
-        // Add small scale pulse on the beat
-        let baseScale: CGFloat = 1.02
-        let pulseScale: CGFloat = beatIndex % 2 == 0 ? 1.05 : 1.03 // Alternate pulse intensity
-        let direction: CGFloat = beatIndex % 2 == 0 ? 1.0 : -1.0
-        let translation = config.size.width * 0.01 * direction
+        // Scale between 1.03 and 1.05 (3%-5% zoom) for subtle pulse effect
+        let pulseScale: CGFloat = beatIndex % 2 == 0 ? 1.05 : 1.03 // Alternate between 3% and 5%
         
         return CGAffineTransform(scaleX: pulseScale, y: pulseScale)
-            .translatedBy(x: translation, y: 0)
     }
     
     /// Legacy Ken Burns for backward compatibility
@@ -1197,7 +1193,8 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         )
         
         textLayer.string = attributedString
-        // Position text layer relative to background layer bounds
+        // FIXED: Position text layer relative to bgLayer's NEW bounds (after frame reset)
+        // When bgLayer frame is reset to origin zero, text must be positioned within those bounds
         textLayer.frame = CGRect(
             x: padding / 2,
             y: (bgHeight - textSize.height) / 2,  // Center vertically
@@ -1209,6 +1206,8 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         textLayer.truncationMode = .none  // Don't truncate
         textLayer.contentsScale = 2.0  // Use standard retina scale
         textLayer.backgroundColor = UIColor.clear.cgColor  // Ensure transparent background
+        // Set explicit z-position to ensure text is on top
+        textLayer.zPosition = 10
         
         // PREMIUM FIX: Beat-synced animations with props set before add
         if beatTime > 0 {

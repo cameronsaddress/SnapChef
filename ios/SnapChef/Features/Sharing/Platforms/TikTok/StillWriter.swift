@@ -567,41 +567,23 @@ public final class StillWriter: @unchecked Sendable {
         return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
     }
     
-    /// Add Ken Burns effect with 5% zoom and beat pulsing (80 BPM)
+    /// Add Ken Burns effect with EXACTLY 5% max zoom (no additional pulsing)
     private func applyKenBurns(to image: CIImage, at progress: Double) -> CIImage {
+        // FIXED: EXACTLY 5% max zoom, no pulsing that would exceed this
+        // Photos should appear nearly full-frame with minimal zoom
+        
         // Clamp progress to 0-1 range for safety
         let clampedProgress = max(0, min(1, progress))
         
         // Apply easing for smooth motion
         let easedProgress = easeInOut(t: clampedProgress)
         
-        // 5% ZOOM: Start at 1.0, end at 1.05 (5% total zoom)
-        let baseScale = 1.0 + 0.05 * easedProgress
+        // FIXED: Start at 1.0, end at 1.05 (EXACTLY 5% total zoom)
+        // No additional pulse to avoid exceeding 5%
+        let finalScale = 1.0 + 0.05 * easedProgress
         
-        // Add beat pulse (80 BPM = 0.75s per beat)
-        let beatDuration = 0.75
-        let currentBeat = floor(clampedProgress * 15.0 / beatDuration)  // 15 second video
-        let beatProgress = (clampedProgress * 15.0).truncatingRemainder(dividingBy: beatDuration) / beatDuration
-        
-        // Pulse effect: subtle scale up and down on the beat
-        let pulseScale: CGFloat
-        if beatProgress < 0.2 {  // First 20% of beat - scale up
-            pulseScale = 1.0 + 0.02 * (beatProgress / 0.2)  // Max 2% additional
-        } else if beatProgress < 0.4 {  // Next 20% - scale down
-            pulseScale = 1.02 - 0.02 * ((beatProgress - 0.2) / 0.2)
-        } else {  // Rest of beat - normal
-            pulseScale = 1.0
-        }
-        
-        // Combine base scale with pulse
-        let finalScale = baseScale * pulseScale
-        
-        // MINIMAL PAN: Very subtle movement
-        let tx = -2 * easedProgress  // Very minimal horizontal pan
-        let ty = -1 * easedProgress   // Very minimal vertical pan
-        
+        // NO PAN to keep image centered
         let transform = CGAffineTransform(scaleX: finalScale, y: finalScale)
-            .translatedBy(x: tx, y: ty)
         
         // Apply transform and ensure result is within bounds
         let transformedImage = image.transformed(by: transform)
