@@ -567,7 +567,7 @@ public final class StillWriter: @unchecked Sendable {
         return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
     }
     
-    /// Add Ken Burns effect for dynamic movement with easing
+    /// Add Ken Burns effect with reduced zoom and beat pulsing (80 BPM)
     private func applyKenBurns(to image: CIImage, at progress: Double) -> CIImage {
         // Clamp progress to 0-1 range for safety
         let clampedProgress = max(0, min(1, progress))
@@ -575,11 +575,32 @@ public final class StillWriter: @unchecked Sendable {
         // Apply easing for smooth motion
         let easedProgress = easeInOut(t: clampedProgress)
         
-        let scale = 1.0 + 0.1 * easedProgress  // Zoom from 1.0 to 1.1 with easing
-        let tx = -20 * easedProgress  // More pronounced horizontal pan
-        let ty = -15 * easedProgress   // More pronounced vertical pan
+        // REDUCED ZOOM: Only 1.0 to 1.02 base scale (was 1.1)
+        let baseScale = 1.0 + 0.02 * easedProgress
         
-        let transform = CGAffineTransform(scaleX: scale, y: scale)
+        // Add beat pulse (80 BPM = 0.75s per beat)
+        let beatDuration = 0.75
+        let currentBeat = floor(clampedProgress * 15.0 / beatDuration)  // 15 second video
+        let beatProgress = (clampedProgress * 15.0).truncatingRemainder(dividingBy: beatDuration) / beatDuration
+        
+        // Pulse effect: quick scale up and down on the beat
+        let pulseScale: CGFloat
+        if beatProgress < 0.2 {  // First 20% of beat - scale up
+            pulseScale = 1.0 + 0.03 * (beatProgress / 0.2)
+        } else if beatProgress < 0.4 {  // Next 20% - scale down
+            pulseScale = 1.03 - 0.03 * ((beatProgress - 0.2) / 0.2)
+        } else {  // Rest of beat - normal
+            pulseScale = 1.0
+        }
+        
+        // Combine base scale with pulse
+        let finalScale = baseScale * pulseScale
+        
+        // REDUCED PAN: Much smaller movement
+        let tx = -5 * easedProgress  // Reduced from -20
+        let ty = -3 * easedProgress   // Reduced from -15
+        
+        let transform = CGAffineTransform(scaleX: finalScale, y: finalScale)
             .translatedBy(x: tx, y: ty)
         
         // Apply transform and ensure result is within bounds

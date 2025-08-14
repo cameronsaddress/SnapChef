@@ -85,12 +85,13 @@ public struct RenderConfig: Sendable {
     // Premium mode toggle
     public var premiumMode: Bool = true  // Enable premium enhancements
     
-    // Typography hierarchy - Enhanced for premium impact
-    public var hookFontSize: CGFloat = 144       // DOUBLED: Increased for viral hook impact
-    public var stepsFontSize: CGFloat = 104      // DOUBLED: Slightly larger for readability
-    public var countersFontSize: CGFloat = 88    // DOUBLED: More prominent counters
-    public var ctaFontSize: CGFloat = 84         // DOUBLED: Bigger CTA for engagement
-    public var ingredientFontSize: CGFloat = 88  // DOUBLED: Enhanced ingredient text
+    // Typography hierarchy - Optimized for readability
+    public var hookFontSize: CGFloat = 72        // HALVED: Better fit on screen
+    public var stepsFontSize: CGFloat = 52       // HALVED: Clear and readable
+    public var countersFontSize: CGFloat = 44    // HALVED: Visible but not overwhelming
+    public var ctaFontSize: CGFloat = 42         // HALVED: Reasonable CTA size
+    public var ingredientFontSize: CGFloat = 44  // HALVED: Good ingredient text size
+    public var headingFontSize: CGFloat = 44     // For section headers
     
     // Animation timing - More dynamic for premium
     public var fadeDuration: TimeInterval = 0.25      // 200-300ms

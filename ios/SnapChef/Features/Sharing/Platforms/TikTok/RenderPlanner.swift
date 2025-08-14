@@ -362,16 +362,31 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
             currentTime = currentTime + segment.duration
         }
         
-        // Hook overlay (0-3.5s) with beat-synced bounce
+        // Hook overlay (0-2s) with beat-synced bounce
         let hookText = CaptionGenerator.generateHook(from: recipe)
         overlays.append(RenderPlan.Overlay(
             start: .zero,
-            duration: CMTime(seconds: 3.5, preferredTimescale: 600),
+            duration: CMTime(seconds: 2, preferredTimescale: 600),
             layerBuilder: { config in
                 return self.createKineticStepOverlay(
                     text: "✨ \(hookText) ✨",
                     index: 0,
                     beatTime: 0.0,
+                    config: config
+                )
+            }
+        ))
+        
+        // Ingredients carousel (2-3.5s) - Show what we're using
+        let ingredientText = "🛒 Ingredients: " + recipe.ingredients.prefix(5).joined(separator: ", ")
+        overlays.append(RenderPlan.Overlay(
+            start: CMTime(seconds: 2, preferredTimescale: 600),
+            duration: CMTime(seconds: 1.5, preferredTimescale: 600),
+            layerBuilder: { config in
+                return self.createKineticStepOverlay(
+                    text: ingredientText,
+                    index: -1,  // Special index for ingredients
+                    beatTime: beatTimes[2],  // 3rd beat
                     config: config
                 )
             }
@@ -615,14 +630,28 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
     // MARK: - Enhanced Visual Effects System
     // Implementing all effects from TIKTOK_VIRAL_COMPLETE_REQUIREMENTS.md
     
-    /// Enhanced Ken Burns Effect with EXACT specifications
-    /// Scale: 1.08x, Direction: Alternating (index % 2), Translation: ±2% of size
+    /// Enhanced Ken Burns Effect with reduced zoom and beat pulse
+    /// Base Scale: 1.02x (reduced from 1.08x), Beat pulse: +0.03x
+    /// Direction: Alternating (index % 2), Translation: ±1% of size
     private func createEnhancedKenBurnsTransform(index: Int) -> CGAffineTransform {
-        let scale: CGFloat = 1.08 // EXACT specification from requirements
+        let baseScale: CGFloat = 1.02 // REDUCED: Much less zoom for photos
         let direction: CGFloat = index % 2 == 0 ? 1.0 : -1.0 // Alternating direction
-        let translation = config.size.width * 0.02 * direction // ±2% translation
+        let translation = config.size.width * 0.01 * direction // ±1% translation (reduced)
         
-        return CGAffineTransform(scaleX: scale, y: scale)
+        return CGAffineTransform(scaleX: baseScale, y: baseScale)
+            .translatedBy(x: translation, y: 0)
+    }
+    
+    /// Create beat-pulsing transform for photos
+    private func createBeatPulseTransform(beatIndex: Int) -> CGAffineTransform {
+        // 80 BPM = pulse every 0.75 seconds
+        // Add small scale pulse on the beat
+        let baseScale: CGFloat = 1.02
+        let pulseScale: CGFloat = beatIndex % 2 == 0 ? 1.05 : 1.03 // Alternate pulse intensity
+        let direction: CGFloat = beatIndex % 2 == 0 ? 1.0 : -1.0
+        let translation = config.size.width * 0.01 * direction
+        
+        return CGAffineTransform(scaleX: pulseScale, y: pulseScale)
             .translatedBy(x: translation, y: 0)
     }
     
@@ -1076,12 +1105,12 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         return createKineticStepOverlay(text: text, index: index, beatTime: 0.0, config: config)
     }
     
-    // PREMIUM FIX: New beat-synced overlay creator
+    // PREMIUM FIX: New beat-synced overlay creator with animations
     private func createKineticStepOverlay(text: String, index: Int, beatTime: Double, config: RenderConfig) -> CALayer {
         let containerLayer = CALayer()
         containerLayer.frame = CGRect(origin: .zero, size: config.size)
         
-        // Calculate wrapped text dimensions
+        // Calculate wrapped text dimensions with smaller font
         let maxTextWidth = config.size.width - 200  // Allow for margins
         let font = UIFont.systemFont(ofSize: config.stepsFontSize, weight: .bold)
         let paragraphStyle = NSMutableParagraphStyle()
@@ -1103,12 +1132,12 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         
         // Background with gradient
         let bgLayer = CAGradientLayer()
-        let padding: CGFloat = 40  // Padding on all sides
+        let padding: CGFloat = 30  // Reduced padding for smaller text
         let bgWidth = min(config.size.width - 100, textSize.width + padding * 2)
-        let bgHeight = max(180, textSize.height + padding * 2)  // Dynamic height, minimum 180
+        let bgHeight = textSize.height + padding * 2  // Dynamic height based on text
         
         // Center horizontally, position vertically based on index
-        let yPosition = config.safeInsets.top + 100 + CGFloat(index % 3) * 100
+        let yPosition = config.safeInsets.top + 100 + CGFloat(index % 3) * 120
         
         bgLayer.frame = CGRect(
             x: (config.size.width - bgWidth) / 2,
@@ -1127,6 +1156,11 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
             bgLayer.colors = [
                 UIColor.systemPurple.cgColor,
                 UIColor.systemIndigo.cgColor
+            ]
+        } else if index == -1 {  // Ingredients special styling
+            bgLayer.colors = [
+                UIColor.systemGreen.cgColor,
+                UIColor.systemMint.cgColor
             ]
         } else {  // Step styling
             bgLayer.colors = [
@@ -1176,41 +1210,73 @@ public actor RenderPlanner {  // Swift 6: Actor for isolated state
         
         // PREMIUM FIX: Beat-synced animations with props set before add
         if beatTime > 0 {
+            // Animation group for container
+            let animationGroup = CAAnimationGroup()
+            animationGroup.duration = 0.75  // Duration of overlay display (80 BPM = 0.75s per beat)
+            animationGroup.beginTime = AVCoreAnimationBeginTimeAtZero
+            animationGroup.fillMode = .forwards
+            animationGroup.isRemovedOnCompletion = false
+            
+            var animations: [CAAnimation] = []
+            
             // Slide in from side
-            let slideAnimation = CABasicAnimation(keyPath: "transform.translation.x")
-            slideAnimation.fromValue = index % 2 == 0 ? -config.size.width : config.size.width
-            slideAnimation.toValue = 0
-            slideAnimation.duration = 0.3
-            slideAnimation.beginTime = AVCoreAnimationBeginTimeAtZero
-            slideAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            slideAnimation.fillMode = .forwards  // PREMIUM FIX: Set before add
-            slideAnimation.isRemovedOnCompletion = false  // PREMIUM FIX: Set before add
-            bgLayer.add(slideAnimation, forKey: "slideIn")
+            let slideInAnimation = CABasicAnimation(keyPath: "transform.translation.x")
+            slideInAnimation.fromValue = index % 2 == 0 ? -config.size.width : config.size.width
+            slideInAnimation.toValue = 0
+            slideInAnimation.duration = 0.3
+            slideInAnimation.beginTime = 0
+            slideInAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            animations.append(slideInAnimation)
             
-            // Scale pop
-            let scaleAnimation = CASpringAnimation(keyPath: "transform.scale")
-            scaleAnimation.fromValue = 0.8
-            scaleAnimation.toValue = 1.0
-            scaleAnimation.damping = 10
-            scaleAnimation.duration = 0.4
-            scaleAnimation.beginTime = AVCoreAnimationBeginTimeAtZero + 0.1
-            scaleAnimation.fillMode = .forwards  // PREMIUM FIX: Set before add
-            scaleAnimation.isRemovedOnCompletion = false  // PREMIUM FIX: Set before add
-            bgLayer.add(scaleAnimation, forKey: "scalePop")
+            // Scale pop in
+            let scaleInAnimation = CASpringAnimation(keyPath: "transform.scale")
+            scaleInAnimation.fromValue = 0.6
+            scaleInAnimation.toValue = 1.0
+            scaleInAnimation.damping = 10
+            scaleInAnimation.duration = 0.3
+            scaleInAnimation.beginTime = 0
+            animations.append(scaleInAnimation)
             
-            // Pulse for CTA
-            if index == 99 {
-                let pulseAnimation = CABasicAnimation(keyPath: "transform.scale")
-                pulseAnimation.fromValue = 1.0
-                pulseAnimation.toValue = 1.05
-                pulseAnimation.duration = 0.75  // Match beat interval
-                pulseAnimation.autoreverses = true
-                pulseAnimation.repeatCount = .infinity
-                pulseAnimation.beginTime = AVCoreAnimationBeginTimeAtZero + 0.5
-                pulseAnimation.fillMode = .forwards  // PREMIUM FIX: Set before add
-                pulseAnimation.isRemovedOnCompletion = false  // PREMIUM FIX: Set before add
-                bgLayer.add(pulseAnimation, forKey: "pulse")
+            // Beat pulse (80 BPM = 0.75s per beat)
+            let pulseAnimation = CABasicAnimation(keyPath: "transform.scale")
+            pulseAnimation.fromValue = 1.0
+            pulseAnimation.toValue = 1.08  // Small pulse
+            pulseAnimation.duration = 0.15
+            pulseAnimation.beginTime = 0.3  // After slide in
+            pulseAnimation.autoreverses = true
+            animations.append(pulseAnimation)
+            
+            // Slide out (except for CTA which stays)
+            if index != 99 {
+                let slideOutAnimation = CABasicAnimation(keyPath: "transform.translation.x")
+                slideOutAnimation.fromValue = 0
+                slideOutAnimation.toValue = index % 2 == 0 ? config.size.width : -config.size.width
+                slideOutAnimation.duration = 0.2
+                slideOutAnimation.beginTime = 0.55  // Near end of beat
+                slideOutAnimation.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                animations.append(slideOutAnimation)
+                
+                // Fade out
+                let fadeOutAnimation = CABasicAnimation(keyPath: "opacity")
+                fadeOutAnimation.fromValue = 1.0
+                fadeOutAnimation.toValue = 0.0
+                fadeOutAnimation.duration = 0.2
+                fadeOutAnimation.beginTime = 0.55
+                animations.append(fadeOutAnimation)
+            } else {
+                // CTA stays and pulses continuously
+                let continuousPulse = CABasicAnimation(keyPath: "transform.scale")
+                continuousPulse.fromValue = 1.0
+                continuousPulse.toValue = 1.05
+                continuousPulse.duration = 0.75  // Match beat interval
+                continuousPulse.autoreverses = true
+                continuousPulse.repeatCount = .infinity
+                continuousPulse.beginTime = 0.5
+                animations.append(continuousPulse)
             }
+            
+            animationGroup.animations = animations
+            bgLayer.add(animationGroup, forKey: "containerAnimations")
         }
         
         bgLayer.addSublayer(textLayer)
