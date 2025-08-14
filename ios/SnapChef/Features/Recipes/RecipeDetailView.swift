@@ -6,6 +6,7 @@ struct RecipeDetailView: View {
     let recipe: Recipe
     var cloudKitRecipe: CloudKitRecipe?
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var appState: AppState
     @State private var showingPrintView = false
     @State private var showingComments = false
     @State private var isLiked = false
@@ -18,8 +19,10 @@ struct RecipeDetailView: View {
     @State private var showingAllComments = false
     @State private var selectedUserID = ""
     @State private var selectedUserName = ""
+    @State private var showingDeleteAlert = false
     @StateObject private var cloudKitSync = CloudKitSyncService.shared
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @StateObject private var commentsViewModel = RecipeCommentsViewModel()
     
     // New states for branded share
@@ -171,6 +174,28 @@ struct RecipeDetailView: View {
                         }
                     }
                     
+                    // Delete Recipe Button
+                    Button(action: {
+                        showingDeleteAlert = true
+                    }) {
+                        HStack {
+                            Image(systemName: "trash")
+                                .font(.system(size: 18, weight: .medium))
+                            Text("Delete Recipe")
+                                .font(.system(size: 18, weight: .medium))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red)
+                        .cornerRadius(12)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    
+                    Divider()
+                        .padding(.horizontal, 20)
+                    
                     // Comments Section
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
@@ -273,11 +298,50 @@ struct RecipeDetailView: View {
                     BrandedSharePopup(content: content)
                 }
             }
+            .alert("Delete Recipe?", isPresented: $showingDeleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    deleteRecipe()
+                }
+            } message: {
+                Text("Are you sure you want to delete \"\(recipe.name)\"? This action cannot be undone.")
+            }
             .task {
                 await loadLikeStatus()
                 await loadAuthorInfo()
                 await commentsViewModel.loadComments(for: recipe.id.uuidString)
             }
+        }
+    }
+    
+    // MARK: - Delete Recipe
+    private func deleteRecipe() {
+        withAnimation(.spring()) {
+            appState.deleteRecipe(recipe)
+            
+            // Also remove from CloudKit if it's a CloudKit recipe
+            if cloudKitAuth.isAuthenticated {
+                Task {
+                    do {
+                        // Remove from saved recipes in CloudKit
+                        try await cloudKitRecipeManager.removeRecipeFromUserProfile(
+                            recipe.id.uuidString,
+                            type: .saved
+                        )
+                        // Also remove from created if it was created by user
+                        try await cloudKitRecipeManager.removeRecipeFromUserProfile(
+                            recipe.id.uuidString,
+                            type: .created
+                        )
+                        print("✅ Removed recipe from CloudKit")
+                    } catch {
+                        print("❌ Failed to remove recipe from CloudKit: \(error)")
+                    }
+                }
+            }
+            
+            // Dismiss the detail view after deletion
+            dismiss()
         }
     }
     

@@ -10,6 +10,30 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 14, 2025) - Part 18
+- **Changed Default AI Provider to Gemini**
+  - Updated default LLM provider from Grok to Gemini across the app
+  - Modified CameraView.swift to use Gemini as fallback
+  - Updated ProfileView.swift AI settings to default to Gemini
+  - Added initialization in SnapChefApp.swift to set Gemini for new users
+  - Preserves existing user selections (no forced migration)
+  - Users can still switch between Grok and Gemini in Profile → AI Settings
+
+- **Fixed Recipe Tiles Scrolling Issues**
+  - Removed conflicting swipe-to-delete gesture from recipe tiles
+  - Eliminated tile shrinking animation on swipe
+  - Moved delete functionality to inside RecipeDetailView
+  - Replaced all Button elements with onTapGesture for better scroll compatibility
+  - Used allowsHitTesting(false) on non-interactive elements
+  - Applied BorderlessButtonStyle to preserve button functionality
+  - Result: Entire tile surface is now scrollable while maintaining all tap actions
+
+- **Created Implementation Plans for Future Work**
+  - Added Premium Strategy Implementation Plan (PREMIUM_STRATEGY_IMPLEMENTATION_PLAN.md)
+  - Added Progressive Authentication Implementation Plan (PROGRESSIVE_AUTH_IMPLEMENTATION_PLAN.md)
+  - Both plans documented in CLAUDE.md for future reference
+  - Designed to work together for maximum conversion
+
 ### Latest Updates (Jan 14, 2025) - Part 17
 - **Completed Premium TikTok Video Generation Pipeline Review**
   - Comprehensive verification of all 9 core TikTok video generation files
@@ -818,4 +842,47 @@ If returning to challenge system work:
 2. Check current phase status
 3. Continue from next pending task
 4. Update progress file after each completion
+
+## Future Implementation Work
+
+### 1. Premium Strategy Implementation
+**Plan**: `PREMIUM_STRATEGY_IMPLEMENTATION_PLAN.md`
+**Timeline**: 2-3 days
+**Description**: Transform SnapChef from a rigid paywall system to a progressive freemium model with "Hook, Habit, Monetize" approach.
+
+**Key Features**:
+- User Lifecycle System (honeymoon/trial/standard phases)
+- Progressive limits (unlimited → 10 → 5 → 3 recipes/day)
+- Smart paywall triggers based on engagement
+- Three-tier pricing (Starter/Premium/Pro)
+- Social proof and FOMO mechanics
+- A/B testing framework
+
+**Success Metrics**:
+- Target 5-8% conversion rate (up from ~2%)
+- 40% trial-to-paid conversion
+- $1.20 ARPU
+
+### 2. Progressive Authentication Implementation
+**Plan**: `PROGRESSIVE_AUTH_IMPLEMENTATION_PLAN.md`
+**Timeline**: 3-4 days
+**Description**: Implement strategic, context-aware authentication prompts that appear at moments of peak engagement.
+
+**Key Features**:
+- Anonymous user tracking (Keychain persistence)
+- Smart authentication prompts at optimal moments
+- Non-intrusive slide-up UI components
+- Seamless data migration when user authenticates
+- A/B testing for prompt optimization
+
+**Success Metrics**:
+- 40-60% authentication rate within first week
+- 3-5 days average time to auth
+- >15% conversion per prompt
+- >95% successful data migration
+
+### Implementation Priority
+1. **Start with Progressive Authentication** - Foundation for user tracking
+2. **Then Premium Strategy** - Builds on top of user lifecycle data
+3. Both plans are designed to work together for maximum conversion
 

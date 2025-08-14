@@ -531,39 +531,33 @@ struct RecipeGridView: View {
 // MARK: - Recipe Grid Card
 struct RecipeGridCard: View {
     let recipe: Recipe
-    @State private var isPressed = false
     @State private var showDetail = false
     @State private var showSharePopup = false
-    @State private var showDeleteAlert = false
-    @State private var deleteOffset: CGFloat = 0
     @State private var showingUserProfile = false
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     
     var body: some View {
+        // Base card with tap gesture for viewing details
         GlassmorphicCard {
             VStack(alignment: .leading, spacing: 8) {
                 // Recipe before/after photos
                 ZStack {
-                    Button(action: {
-                        showDetail = true
-                    }) {
-                        RecipePhotoView(
-                            recipe: recipe,
-                            width: UIScreen.main.bounds.width / 2 - 44, // Account for padding
-                            height: 120,
-                            showLabels: true
-                        )
-                        .frame(height: 120) // Ensure consistent height
-                        .clipped()
-                    }
-                    .buttonStyle(PlainButtonStyle())
+                    RecipePhotoView(
+                        recipe: recipe,
+                        width: UIScreen.main.bounds.width / 2 - 44, // Account for padding
+                        height: 120,
+                        showLabels: true
+                    )
+                    .frame(height: 120) // Ensure consistent height
+                    .clipped()
+                    .allowsHitTesting(false) // Allow scroll to pass through
                     
                     // Difficulty badge and favorite button overlay
                     VStack {
                         HStack {
-                            // Favorite button
+                            // Favorite button - as overlay button that captures its own taps
                             Button(action: {
                                 appState.toggleFavorite(recipe.id)
                                 let generator = UIImpactFeedbackGenerator(style: .light)
@@ -578,10 +572,10 @@ struct RecipeGridCard: View {
                                             .fill(Color.black.opacity(0.3))
                                     )
                             }
-                            .buttonStyle(PlainButtonStyle())
                             
                             Spacer()
                             DifficultyBadge(difficulty: recipe.difficulty)
+                                .allowsHitTesting(false) // Let scroll pass through badge
                         }
                         .padding(8)
                         Spacer()
@@ -596,6 +590,7 @@ struct RecipeGridCard: View {
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                             .frame(minHeight: 40, alignment: .topLeading)
+                            .allowsHitTesting(false) // Allow scroll to pass through
                         
                         // Author row
                         Button(action: {
@@ -613,18 +608,20 @@ struct RecipeGridCard: View {
                                     .lineLimit(1)
                             }
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(BorderlessButtonStyle()) // Use BorderlessButtonStyle to not block scroll
                         
                         HStack {
                             Label("\(recipe.cookTime)m", systemImage: "clock")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
+                                .allowsHitTesting(false) // Allow scroll to pass through
                             
                             Spacer()
                             
                             Label("\(recipe.nutrition.calories)", systemImage: "flame")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
+                                .allowsHitTesting(false) // Allow scroll to pass through
                         }
                         
                         // Share button
@@ -651,7 +648,7 @@ struct RecipeGridCard: View {
                                         )
                                 )
                             }
-                            .buttonStyle(PlainButtonStyle())
+                            .buttonStyle(BorderlessButtonStyle()) // Use BorderlessButtonStyle to not block scroll
                         }
                     }
             }
@@ -659,56 +656,11 @@ struct RecipeGridCard: View {
         }
         .frame(height: 280) // Ensure consistent card height
         .clipped() // Prevent content overflow
-        .scaleEffect(isPressed ? 0.95 : 1)
-        .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isPressed = pressing
-            }
-        }, perform: {})
-        .contextMenu {
-            Button(action: {
-                showDetail = true
-            }) {
-                Label("View Details", systemImage: "eye")
-            }
-            
-            Button(action: {
-                showSharePopup = true
-            }) {
-                Label("Share Recipe", systemImage: "square.and.arrow.up")
-            }
-            
-            Divider()
-            
-            Button(role: .destructive, action: {
-                showDeleteAlert = true
-            }) {
-                Label("Delete Recipe", systemImage: "trash")
-            }
+        .contentShape(Rectangle()) // Define hit testing area for the entire card
+        .onTapGesture {
+            // This tap gesture will only fire if no button was tapped
+            showDetail = true
         }
-        .offset(x: deleteOffset)
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    if value.translation.width < -50 {
-                        withAnimation(.spring()) {
-                            deleteOffset = -60
-                        }
-                    } else if value.translation.width > 50 {
-                        withAnimation(.spring()) {
-                            deleteOffset = 0
-                        }
-                    }
-                }
-                .onEnded { value in
-                    if value.translation.width < -100 {
-                        showDeleteAlert = true
-                    }
-                    withAnimation(.spring()) {
-                        deleteOffset = 0
-                    }
-                }
-        )
         .sheet(isPresented: $showDetail) {
             RecipeDetailView(recipe: recipe)
         }
@@ -720,36 +672,6 @@ struct RecipeGridCard: View {
                     afterImage: getAfterPhotoForRecipe()
                 )
             )
-        }
-        .alert("Delete Recipe?", isPresented: $showDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                withAnimation(.spring()) {
-                    appState.deleteRecipe(recipe)
-                    // Also remove from CloudKit if it's a CloudKit recipe
-                    if cloudKitAuth.isAuthenticated {
-                        Task {
-                            do {
-                                // Remove from saved recipes in CloudKit
-                                try await cloudKitRecipeManager.removeRecipeFromUserProfile(
-                                    recipe.id.uuidString, 
-                                    type: .saved
-                                )
-                                // Also remove from created if it was created by user
-                                try await cloudKitRecipeManager.removeRecipeFromUserProfile(
-                                    recipe.id.uuidString, 
-                                    type: .created
-                                )
-                                print("✅ Removed recipe from CloudKit")
-                            } catch {
-                                print("❌ Failed to remove recipe from CloudKit: \(error)")
-                            }
-                        }
-                    }
-                }
-            }
-        } message: {
-            Text("Are you sure you want to delete \"\(recipe.name)\"? This action cannot be undone.")
         }
         .sheet(isPresented: $showingUserProfile) {
             if let currentUser = cloudKitAuth.currentUser {

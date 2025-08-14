@@ -78,6 +78,11 @@ struct SnapChefApp: App {
         configureTableView()
         configureWindow()
         
+        // Set default LLM provider to Gemini if not already set
+        if UserDefaults.standard.object(forKey: "SelectedLLMProvider") == nil {
+            UserDefaults.standard.set("gemini", forKey: "SelectedLLMProvider")
+        }
+        
         // Initialize social media SDKs
         SDKInitializer.initializeSDKs()
         SDKInitializer.verifyURLSchemes()

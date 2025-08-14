@@ -1385,7 +1385,7 @@ struct FoodPreferencesCard: View {
 
 // MARK: - AI Settings View
 struct AISettingsView: View {
-    @State private var selectedProvider: String = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "grok"
+    @State private var selectedProvider: String = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini"
     @Environment(\.dismiss) var dismiss
     
     var body: some View {

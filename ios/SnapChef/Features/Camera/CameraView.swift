@@ -373,8 +373,8 @@ struct CameraView: View {
                 selectedFoodType
             }
             
-            // Get selected LLM provider from UserDefaults
-            let llmProvider = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "grok"
+            // Get selected LLM provider from UserDefaults (default to Gemini)
+            let llmProvider = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini"
             
             // Call the API
             SnapChefAPIManager.shared.sendImageForRecipeGeneration(
