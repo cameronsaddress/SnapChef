@@ -430,11 +430,11 @@ public struct CaptionGenerator {
         return "✨ \(title) ✨\n⏰ \(mins) \(cost)\n💬 Comment \"RECIPE\" for details 👇\n\(tags) 🔥"
     }
     
-    /// CTA rotation pool as specified in requirements
+    /// CTA rotation pool as specified in requirements with premium emojis
     public static let ctaPool = [
         "Comment 'RECIPE' for details",
         "Save for grocery day 🛒",
-        "Try this tonight? 👇",
+        "Try this tonight? 👨‍🍳",
         "Save & try this tonight ✨",
         "From fridge → plate 😎"
     ]
@@ -445,6 +445,7 @@ public struct CaptionGenerator {
     }
     
     /// Generate hook text with premium emojis for virality
+    // PREMIUM FIX: Enhanced with more emojis and dynamic text for viral appeal
     public static func generateHook(from recipe: ViralRecipe, template: ViralTemplate? = nil) -> String {
         // Premium: Carousel-specific hook for dynamic feel - commented out
         // if template == .beatSyncedCarousel {
@@ -457,21 +458,22 @@ public struct CaptionGenerator {
         
         if let hook = recipe.hook {
             // Add emojis to existing hook
-            return "\(hook) 🍳✨"
+            return "\(hook) 🍳✨🔥"
         }
         
         let time = recipe.timeMinutes ?? 15
         let cost = recipe.costDollars.map { "$\($0)" } ?? ""
-        return "Fridge chaos → dinner in \(time) min \(cost) 🍳✨"
+        return "Fridge chaos → dinner in \(time) min \(cost) 🍳✨⚡"
     }
     
     /// Process step text for display with timing icons and chef emoji
+    // PREMIUM FIX: Added 📝 emoji for premium visual pop
     public static func processStepText(_ step: ViralRecipe.Step, index: Int) -> String {
         let words = step.title.components(separatedBy: .whitespaces)
         let truncated = Array(words.prefix(7)).joined(separator: " ")
         // Add chef emoji and timing icon if step has duration hint
         let timeIcon = step.secondsHint != nil ? " ⏱️" : ""
-        return "👨‍🍳 \(index + 1). \(truncated)\(timeIcon)"
+        return "📝👨‍🍳 \(index + 1). \(truncated)\(timeIcon)"
     }
     
     /// Overloaded method for string steps with emoji
@@ -482,6 +484,7 @@ public struct CaptionGenerator {
     }
     
     /// Process ingredient text for display with shopping cart emoji
+    // PREMIUM FIX: Added 🛒 emoji and capitalization for better readability
     public static func processIngredientText(_ ingredients: [String]) -> [String] {
         return ingredients.prefix(3).map { ingredient in
             let capitalized = ingredient.prefix(1).capitalized + ingredient.dropFirst()
