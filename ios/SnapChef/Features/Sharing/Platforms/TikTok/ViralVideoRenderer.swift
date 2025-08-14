@@ -527,6 +527,21 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         }
     }
     
+    // FIXED: Helper to cap transform scale to prevent over-zooming
+    private func cappedTransform(_ transform: CGAffineTransform, maxScale: CGFloat = 1.05) -> CGAffineTransform {
+        // Calculate current scale from transform matrix
+        let currentScaleX = sqrt(transform.a * transform.a + transform.c * transform.c)
+        let currentScaleY = sqrt(transform.b * transform.b + transform.d * transform.d)
+        let currentScale = max(currentScaleX, currentScaleY)
+        
+        // If over the limit, scale it back down
+        if currentScale > maxScale {
+            let clampFactor = maxScale / currentScale
+            return transform.scaledBy(x: clampFactor, y: clampFactor)
+        }
+        return transform
+    }
+    
     private func createVideoComposition(
         for asset: AVAsset,
         plan: RenderPlan
@@ -557,38 +572,15 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             // Apply transforms and crossfades for each item
             var currentTime = CMTime.zero
             for (index, item) in plan.items.enumerated() {
+                // FIXED: Apply item transform but cap scale to prevent over-zooming
                 let itemTransform = trackTransform.concatenating(item.transform)
-                layerInstruction.setTransform(itemTransform, at: currentTime)
                 
-                // FIXED: Add beat pulse transforms (80 BPM = 0.75s intervals)
-                // Pulse between 1.03x and 1.05x on the beat
-                if config.premiumMode {
-                    let beatInterval = 0.75  // 80 BPM
-                    let itemDuration = item.timeRange.duration.seconds
-                    let numBeats = Int(itemDuration / beatInterval)
-                    
-                    for beatIndex in 0..<numBeats {
-                        let beatTime = currentTime + CMTime(seconds: Double(beatIndex) * beatInterval, preferredTimescale: 600)
-                        let beatDuration = CMTime(seconds: 0.2, preferredTimescale: 600)  // Quick pulse
-                        
-                        // Alternate between 1.03x and 1.05x
-                        let scale1: CGFloat = (beatIndex % 2 == 0) ? 1.03 : 1.05
-                        let scale2: CGFloat = (beatIndex % 2 == 0) ? 1.05 : 1.03
-                        
-                        // Create pulse transforms
-                        let pulseStart = itemTransform.scaledBy(x: scale1, y: scale1)
-                        let pulseEnd = itemTransform.scaledBy(x: scale2, y: scale2)
-                        
-                        // Apply pulse ramp
-                        if beatTime + beatDuration <= currentTime + item.timeRange.duration {
-                            layerInstruction.setTransformRamp(
-                                fromStart: pulseStart,
-                                toEnd: pulseEnd,
-                                timeRange: CMTimeRange(start: beatTime, duration: beatDuration)
-                            )
-                        }
-                    }
-                }
+                // Cap the scale to 1.05x max to prevent excessive zoom
+                let capped = cappedTransform(itemTransform, maxScale: 1.05)
+                layerInstruction.setTransform(capped, at: currentTime)
+                
+                // REMOVED: Beat pulse transforms - they were stacking with planner transforms
+                // The planner already provides all necessary scaling (5% max)
                 
                 // PREMIUM FIX: Add crossfade with glow between segments
                 if index > 0 && config.premiumMode {

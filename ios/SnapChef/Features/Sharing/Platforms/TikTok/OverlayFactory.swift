@@ -1005,7 +1005,14 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         
         // Create attributed string for better text wrapping control
         let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = alignment == .center ? .center : (alignment == .left ? .left : .right)
+        // FIXED: Proper alignment mapping without identifier issues
+        if alignment == .center {
+            paragraphStyle.alignment = .center
+        } else if alignment == .left {
+            paragraphStyle.alignment = .left
+        } else {
+            paragraphStyle.alignment = .right
+        }
         paragraphStyle.lineBreakMode = .byWordWrapping
         paragraphStyle.lineSpacing = fontSize * 0.2  // Add line spacing for readability
         
@@ -1047,16 +1054,17 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
             }
         }
         
-        // Calculate frame size respecting max width and line limits
+        // FIXED: Calculate frame size using THE SAME attributes we render with
         let maxSize = CGSize(width: maxWidth, height: .greatestFiniteMagnitude)
         let textSize = text.boundingRect(
             with: maxSize,
             options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: textLayer.font as Any],
+            attributes: attributes,  // FIXED: Use same attributes for measurement
             context: nil
         ).size
         
         textLayer.bounds = CGRect(origin: .zero, size: textSize)
+        textLayer.opacity = 1.0  // FIXED: Set model layer to final state
         
         return textLayer
     }
@@ -1251,9 +1259,9 @@ extension OverlayFactory {
         // Use AVCoreAnimationBeginTimeAtZero for proper video composition timing
         let startTime = AVCoreAnimationBeginTimeAtZero
         
-        // Initial state
-        textLayer.opacity = 0
-        textLayer.transform = CATransform3DMakeScale(0.95, 0.95, 1.0)
+        // Initial state - FIXED: Model layer at final values
+        textLayer.opacity = 1.0  // Model = final state
+        textLayer.transform = CATransform3DIdentity  // Final scale
         
         // Fade in with scale bounce animation (0.95 → 1.05 → 1.0)
         let scaleAnimation = CAKeyframeAnimation(keyPath: "transform.scale")
@@ -1410,9 +1418,9 @@ extension OverlayFactory {
         let beatTime = 0.75 // Each beat is 0.75 seconds
         let itemStartTime = AVCoreAnimationBeginTimeAtZero + 3.0 + (Double(index) * beatTime)
         
-        // Initial state: invisible and scaled down
-        textLayer.opacity = 0
-        textLayer.transform = CATransform3DMakeScale(0.8, 0.8, 1.0)
+        // Initial state - FIXED: Model layer at final values
+        textLayer.opacity = 1.0  // Model = final state
+        textLayer.transform = CATransform3DIdentity  // Final scale
         
         // Pop in animation synced to beat
         let popIn = CAKeyframeAnimation(keyPath: "transform.scale")
