@@ -33,6 +33,7 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
     // MARK: - Public Interface
     
     /// Apply overlays to video with progress tracking
+    // PREMIUM FIX: Fixed layer order and animation persistence per AVFoundation best practices
     public func applyOverlays(
         videoURL: URL,
         overlays: [RenderPlan.Overlay],
@@ -914,57 +915,41 @@ public final class OverlayFactory: @unchecked Sendable {  // Swift 6: Sendable f
         composition.renderSize = config.size
         composition.frameDuration = CMTime(value: 1, timescale: config.fps)
         
-        // Create animation layer with all overlays
-        let animationLayer = CALayer()
-        animationLayer.frame = CGRect(origin: .zero, size: config.size)
-        animationLayer.masksToBounds = true
-        animationLayer.beginTime = AVCoreAnimationBeginTimeAtZero  // Critical: Set animation layer begin time
+        let parentLayer = CALayer()
+        parentLayer.frame = CGRect(origin: .zero, size: config.size)
+        
+        let videoLayer = CALayer()
+        videoLayer.frame = parentLayer.frame
+        parentLayer.addSublayer(videoLayer)
+        
+        let overlayLayer = CALayer()
+        overlayLayer.frame = parentLayer.frame
+        parentLayer.addSublayer(overlayLayer)  // PREMIUM FIX: Overlay on top for text/particles
         
         for overlay in overlays {
             let layer = overlay.layerBuilder(config)
-            layer.beginTime = AVCoreAnimationBeginTimeAtZero + overlay.start.seconds  // Set correct timing
+            layer.beginTime = overlay.start.seconds
+            layer.duration = overlay.duration.seconds
+            layer.isHidden = false
             
-            // CRITICAL: Propagate beginTime to all sublayers including emitters
-            propagateBeginTimeToSublayers(layer: layer, beginTime: AVCoreAnimationBeginTimeAtZero + overlay.start.seconds)
+            // PREMIUM FIX: Persist animations (e.g., pops, sparkles)
+            layer.sublayers?.forEach { sublayer in
+                sublayer.beginTime = 0.0
+                if let animationKeys = sublayer.animationKeys() {
+                    for key in animationKeys {
+                        if let animation = sublayer.animation(forKey: key) {
+                            animation.beginTime = 0.0
+                            animation.fillMode = .forwards
+                            animation.isRemovedOnCompletion = false
+                        }
+                    }
+                }
+            }
             
-            // Set initial opacity for fade animations
-            layer.opacity = 0
-            
-            // Fade in at start time
-            let fadeIn = CABasicAnimation(keyPath: "opacity")
-            fadeIn.fromValue = 0
-            fadeIn.toValue = 1
-            fadeIn.beginTime = AVCoreAnimationBeginTimeAtZero + overlay.start.seconds
-            fadeIn.duration = 0.2
-            fadeIn.fillMode = .forwards
-            fadeIn.isRemovedOnCompletion = false
-            layer.add(fadeIn, forKey: "fadeIn")
-            
-            // Fade out at end time
-            let fadeOut = CABasicAnimation(keyPath: "opacity")
-            fadeOut.fromValue = 1
-            fadeOut.toValue = 0
-            fadeOut.beginTime = AVCoreAnimationBeginTimeAtZero + overlay.start.seconds + overlay.duration.seconds - 0.2
-            fadeOut.duration = 0.2
-            fadeOut.fillMode = .forwards
-            fadeOut.isRemovedOnCompletion = false
-            layer.add(fadeOut, forKey: "fadeOut")
-            
-            animationLayer.addSublayer(layer)
+            overlayLayer.addSublayer(layer)
         }
         
-        // Use CoreAnimationTool for rendering animations
-        let parentLayer = CALayer()
-        let videoLayer = CALayer()
-        parentLayer.frame = CGRect(origin: .zero, size: config.size)
-        videoLayer.frame = CGRect(origin: .zero, size: config.size)
-        parentLayer.addSublayer(videoLayer)
-        parentLayer.addSublayer(animationLayer)
-        
-        composition.animationTool = AVVideoCompositionCoreAnimationTool(
-            postProcessingAsVideoLayer: videoLayer,
-            in: parentLayer
-        )
+        composition.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: videoLayer, in: parentLayer)
         
         // Instruction for passthrough with overlays
         let instruction = AVMutableVideoCompositionInstruction()
