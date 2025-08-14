@@ -542,12 +542,22 @@ public final class StillWriter: @unchecked Sendable {
             throw StillWriterError.pixelBufferCreationFailed
         }
         
-        // Render CIImage to pixel buffer using shared context
+        // Lock the pixel buffer before rendering
+        CVPixelBufferLockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0))
+        defer {
+            CVPixelBufferUnlockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0))
+        }
+        
+        // Ensure the CIImage is within bounds
         let renderRect = CGRect(origin: .zero, size: config.size)
-        // Fix: Create sRGB color space for proper color conversion
+        let boundedImage = ciImage.clampedToExtent().cropped(to: renderRect)
+        
+        // Create sRGB color space for proper color conversion
         // This ensures photos from CloudKit/Camera render correctly without white backgrounds
-        let sRGBColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
-        ciContext.render(ciImage, to: buffer, bounds: renderRect, colorSpace: sRGBColorSpace)
+        let sRGBColorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        
+        // Render CIImage to pixel buffer using shared context
+        ciContext.render(boundedImage, to: buffer, bounds: renderRect, colorSpace: sRGBColorSpace)
         
         // Debug: Log color space being used
         print("✅ DEBUG StillWriter: Rendering with sRGB color space")
@@ -564,14 +574,22 @@ public final class StillWriter: @unchecked Sendable {
     
     /// Add Ken Burns effect for dynamic movement
     private func applyKenBurns(to image: CIImage, at progress: Double) -> CIImage {
-        let scale = 1.0 + 0.08 * progress  // Zoom from 1.0 to 1.08
-        let tx = -10 * progress  // Subtle horizontal pan
-        let ty = -5 * progress   // Subtle vertical pan
+        // Clamp progress to 0-1 range for safety
+        let clampedProgress = max(0, min(1, progress))
+        
+        let scale = 1.0 + 0.08 * clampedProgress  // Zoom from 1.0 to 1.08
+        let tx = -10 * clampedProgress  // Subtle horizontal pan
+        let ty = -5 * clampedProgress   // Subtle vertical pan
         
         let transform = CGAffineTransform(scaleX: scale, y: scale)
             .translatedBy(x: tx, y: ty)
         
-        return image.transformed(by: transform)
+        // Apply transform and ensure result is within bounds
+        let transformedImage = image.transformed(by: transform)
+        
+        // Crop to output size to prevent oversized images
+        let outputRect = CGRect(origin: .zero, size: config.size)
+        return transformedImage.cropped(to: outputRect)
     }
     
     /// Add particle effects for meal reveal
