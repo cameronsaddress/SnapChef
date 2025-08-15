@@ -60,8 +60,9 @@ public final class ViralVideoExporter: @unchecked Sendable {
     
     /// Request photo permission as specified in requirements
     public static func requestPhotoPermission(_ completion: @escaping @Sendable (Bool) -> Void) {
-        PHPhotoLibrary.requestAuthorization { status in
-            DispatchQueue.main.async {
+        Task {
+            let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            await MainActor.run {
                 completion(status == .authorized || status == .limited)
             }
         }
@@ -69,35 +70,34 @@ public final class ViralVideoExporter: @unchecked Sendable {
     
     /// Save to Photos using PHPhotoLibrary.shared().performChanges as specified
     public static func saveToPhotos(videoURL: URL, completion: @escaping @Sendable (Result<String, TikTokExportError>) -> Void) {
-        // CRITICAL FIX: Ensure all PhotoKit operations run on main thread
-        DispatchQueue.main.async {
+        // CRITICAL FIX: Use async/await for Swift 6 concurrency compliance
+        Task {
             // Request fresh permission to ensure valid PhotoKit session
-            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-                DispatchQueue.main.async {
-                    guard status == .authorized || status == .limited else {
-                        print("❌ Photo library permission denied. Status: \(status.rawValue)")
-                        completion(.failure(.permissionDenied))
-                        return
-                    }
-                    
-                    // Validate video file exists and is readable
-                    guard FileManager.default.fileExists(atPath: videoURL.path) else {
-                        print("❌ Video file does not exist at path: \(videoURL.path)")
-                        completion(.failure(.saveFailed))
-                        return
-                    }
-                    
-                    // Use a thread-safe container for capturing the identifier
-                    let identifierBox = Box(value: nil as String?)
-                    
-                    // CRITICAL FIX: Perform save with retry mechanism
-                    self.performSaveWithRetry(
-                        videoURL: videoURL, 
-                        identifierBox: identifierBox, 
-                        retryCount: 0,
-                        completion: completion
-                    )
+            let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            await MainActor.run {
+                guard status == .authorized || status == .limited else {
+                    print("❌ Photo library permission denied. Status: \(status.rawValue)")
+                    completion(.failure(.permissionDenied))
+                    return
                 }
+                
+                // Validate video file exists and is readable
+                guard FileManager.default.fileExists(atPath: videoURL.path) else {
+                    print("❌ Video file does not exist at path: \(videoURL.path)")
+                    completion(.failure(.saveFailed))
+                    return
+                }
+                
+                // Use a thread-safe container for capturing the identifier
+                let identifierBox = Box(value: nil as String?)
+                
+                // CRITICAL FIX: Perform save with retry mechanism
+                self.performSaveWithRetry(
+                    videoURL: videoURL, 
+                    identifierBox: identifierBox, 
+                    retryCount: 0,
+                    completion: completion
+                )
             }
         }
     }
@@ -111,60 +111,71 @@ public final class ViralVideoExporter: @unchecked Sendable {
     ) {
         let maxRetries = 3
         
-        // CRITICAL FIX: Perform PhotoKit operations with proper error handling
-        PHPhotoLibrary.shared().performChanges({
-            // CRITICAL FIX: Remove potential force unwraps and add validation
-            let request = PHAssetCreationRequest.forAsset()
-            
-            // Validate video file before adding resource
-            guard FileManager.default.fileExists(atPath: videoURL.path) else {
-                print("❌ Video file missing during save operation")
-                return
-            }
-            
-            // Add resource with proper error handling
-            request.addResource(with: .video, fileURL: videoURL, options: nil)
-            
-            // Safely capture the localIdentifier from the placeholder
-            if let placeholder = request.placeholderForCreatedAsset {
-                identifierBox.value = placeholder.localIdentifier
-            } else {
-                print("⚠️ No placeholder created for asset")
-            }
-        }) { success, error in
-                DispatchQueue.main.async {
-                    if success, let identifier = identifierBox.value, !identifier.isEmpty {
+        // CRITICAL FIX: Use async/await for Swift 6 concurrency compliance
+        Task {
+            do {
+                try await PHPhotoLibrary.shared().performChanges { @Sendable in
+                    // CRITICAL FIX: Remove potential force unwraps and add validation
+                    let request = PHAssetCreationRequest.forAsset()
+                    
+                    // Validate video file before adding resource
+                    guard FileManager.default.fileExists(atPath: videoURL.path) else {
+                        print("❌ Video file missing during save operation")
+                        return
+                    }
+                    
+                    // Add resource with proper error handling
+                    request.addResource(with: .video, fileURL: videoURL, options: nil)
+                    
+                    // Safely capture the localIdentifier from the placeholder
+                    if let placeholder = request.placeholderForCreatedAsset {
+                        identifierBox.value = placeholder.localIdentifier
+                    } else {
+                        print("⚠️ No placeholder created for asset")
+                    }
+                }
+                
+                // Success - now safe to access main actor isolated values
+                await MainActor.run {
+                    if let identifier = identifierBox.value, !identifier.isEmpty {
                         print("✅ Video saved with localIdentifier: \(identifier)")
                         completion(.success(identifier))
                     } else {
-                        let errorMessage = error?.localizedDescription ?? "Unknown error"
-                        print("❌ Failed to save video (attempt \(retryCount + 1)): \(errorMessage)")
-                        
-                        // Check if it's a PhotoKit XPC proxy error and retry
-                        if errorMessage.contains("PhotoKit XPC proxy") || errorMessage.contains("connection to service") || errorMessage.contains("XPC") {
-                            if retryCount < maxRetries {
-                                print("🔄 Retrying PhotoKit save (attempt \(retryCount + 2)/\(maxRetries + 1))...")
+                        print("❌ No identifier captured during save")
+                        completion(.failure(.saveFailed))
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    let errorMessage = error.localizedDescription
+                    print("❌ Failed to save video (attempt \(retryCount + 1)): \(errorMessage)")
+                    
+                    // Check if it's a PhotoKit XPC proxy error and retry
+                    if errorMessage.contains("PhotoKit XPC proxy") || errorMessage.contains("connection to service") || errorMessage.contains("XPC") {
+                        if retryCount < maxRetries {
+                            print("🔄 Retrying PhotoKit save (attempt \(retryCount + 2)/\(maxRetries + 1))...")
+                            Task {
                                 // Wait a moment for PhotoKit to recover
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                    self.performSaveWithRetry(
-                                        videoURL: videoURL,
-                                        identifierBox: identifierBox,
-                                        retryCount: retryCount + 1,
-                                        completion: completion
-                                    )
-                                }
-                                return
+                                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                                self.performSaveWithRetry(
+                                    videoURL: videoURL,
+                                    identifierBox: identifierBox,
+                                    retryCount: retryCount + 1,
+                                    completion: completion
+                                )
                             }
-                            
-                            // If all retries failed, try fallback save method
-                            print("🔄 PhotoKit retries exhausted, trying fallback save...")
-                            self.performFallbackSave(videoURL: videoURL, completion: completion)
-                        } else {
-                            completion(.failure(.saveFailed))
+                            return
                         }
+                        
+                        // If all retries failed, try fallback save method
+                        print("🔄 PhotoKit retries exhausted, trying fallback save...")
+                        self.performFallbackSave(videoURL: videoURL, completion: completion)
+                    } else {
+                        completion(.failure(.saveFailed))
                     }
                 }
             }
+        }
     }
     
     /// Fallback save method - copy to Documents and open TikTok
@@ -191,28 +202,41 @@ public final class ViralVideoExporter: @unchecked Sendable {
             print("✅ Video saved to Documents: \(backupURL.path)")
             
             // Try one more simple save attempt using PHPhotoLibrary directly
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 let tempIdentifierBox = Box(value: nil as String?)
                 
-                // CRITICAL FIX: Clean PhotoKit operations without unnecessary do-catch
-                PHPhotoLibrary.shared().performChanges({
-                    guard FileManager.default.fileExists(atPath: videoURL.path) else {
-                        print("❌ Video file missing during fallback save")
-                        return
-                    }
-                    
-                    let request = PHAssetCreationRequest.forAsset()
-                    request.addResource(with: .video, fileURL: videoURL, options: nil)
-                    
-                    if let placeholder = request.placeholderForCreatedAsset {
-                        tempIdentifierBox.value = placeholder.localIdentifier
-                    }
-                }) { success, error in
-                    DispatchQueue.main.async {
-                        if success, let identifier = tempIdentifierBox.value, !identifier.isEmpty {
-                            print("✅ Fallback save succeeded with identifier: \(identifier)")
-                            completion(.success(identifier))
-                        } else {
+                // CRITICAL FIX: Use async/await for Swift 6 concurrency compliance
+                Task {
+                    do {
+                        try await PHPhotoLibrary.shared().performChanges { @Sendable in
+                            guard FileManager.default.fileExists(atPath: videoURL.path) else {
+                                print("❌ Video file missing during fallback save")
+                                return
+                            }
+                            
+                            let request = PHAssetCreationRequest.forAsset()
+                            request.addResource(with: .video, fileURL: videoURL, options: nil)
+                            
+                            if let placeholder = request.placeholderForCreatedAsset {
+                                tempIdentifierBox.value = placeholder.localIdentifier
+                            }
+                        }
+                        
+                        // Success - now safe to access main actor isolated values
+                        await MainActor.run {
+                            if let identifier = tempIdentifierBox.value, !identifier.isEmpty {
+                                print("✅ Fallback save succeeded with identifier: \(identifier)")
+                                completion(.success(identifier))
+                            } else {
+                                print("⚠️ Fallback save also failed. Opening TikTok with notification to user...")
+                                // Open TikTok and provide guidance to user
+                                self.openTikTokWithGuidance(backupURL)
+                                // Return a dummy identifier since video is saved to Documents
+                                completion(.success("documents_backup"))
+                            }
+                        }
+                    } catch {
+                        await MainActor.run {
                             print("⚠️ Fallback save also failed. Opening TikTok with notification to user...")
                             // Open TikTok and provide guidance to user
                             self.openTikTokWithGuidance(backupURL)
@@ -245,7 +269,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
     
     /// Open TikTok with guidance for user
     private static func openTikTokWithGuidance(_ fileURL: URL) {
-        DispatchQueue.main.async {
+        Task { @MainActor in
             // CRITICAL FIX: Add safety checks for UI operations
             guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                   let window = windowScene.windows.first(where: { $0.isKeyWindow }),
@@ -333,7 +357,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
             
             // Perform share request
             shareRequest.send { response in
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     if let shareResponse = response as? TikTokShareResponse {
                         if shareResponse.errorCode == .noError {
                             completion(.success(()))
@@ -433,7 +457,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
     public func exportVideo(
         inputURL: URL,
         outputURL: URL,
-        progressCallback: @escaping (Double) -> Void = { _ in }
+        progressCallback: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> URL {
         
         // Remove existing output file
@@ -463,9 +487,14 @@ public final class ViralVideoExporter: @unchecked Sendable {
             // Box to hold timer reference for proper cleanup
             let timerBox = Box(value: nil as Timer?)
             
+            // Capture export session progress in a thread-safe way
+            let progressBox = Box(value: 0.0)
+            
             let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                // Capture export session and callback safely
+                // Safely read progress from export session
                 let currentProgress = Double(exportSession.progress)
+                progressBox.value = currentProgress
+                
                 Task { @MainActor in
                     progressCallback(currentProgress)
                 }
@@ -482,7 +511,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
             
             timerBox.value = progressTimer
             
-            exportSession.exportAsynchronously {
+            exportSession.exportAsynchronously { @Sendable in
                 timerBox.value?.invalidate()
                 
                 switch exportSession.status {
