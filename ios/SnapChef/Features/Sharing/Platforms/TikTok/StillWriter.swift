@@ -57,7 +57,13 @@ public final class StillWriter: @unchecked Sendable {
                                      filters: [CIFilter] = [],
                                      specs: [FilterSpec] = [], // Add filter specs for motion effects
                                      progressCallback: @escaping @Sendable (Double) async -> Void = { _ in }) async throws -> URL {
+        let startTime = Date()
+        print("[StillWriter] \(startTime): Starting createVideoFromImage, duration: \(duration.seconds)s")
+        
         let out = createTempOutputURL(); try? FileManager.default.removeItem(at: out)
+        print("[StillWriter] \(Date()): Output URL: \(out)")
+        
+        print("[StillWriter] \(Date()): Creating AVAssetWriter")
         let writer = try AVAssetWriter(outputURL: out, fileType: .mp4)
         
         // Enhanced video settings for TikTok format with proper compression
@@ -96,13 +102,18 @@ public final class StillWriter: @unchecked Sendable {
         }
         
         writer.add(input)
+        print("[StillWriter] \(Date()): Added input to writer")
         
+        print("[StillWriter] \(Date()): Starting writer")
         guard writer.startWriting() else {
             let errorDesc = writer.error?.localizedDescription ?? "Unknown writer error"
+            print("[StillWriter] \(Date()): ERROR - Cannot start writing: \(errorDesc)")
             throw StillWriterError.cannotStartWriting(errorDesc)
         }
         
+        print("[StillWriter] \(Date()): Writer started, beginning session")
         writer.startSession(atSourceTime: .zero)
+        print("[StillWriter] \(Date()): Session started")
 
         // Preprocess: aspect-fit into a 1080×1920 canvas (fit width requirement)
         let canvas = CGRect(origin: .zero, size: config.size)

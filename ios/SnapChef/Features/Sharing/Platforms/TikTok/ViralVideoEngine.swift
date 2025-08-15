@@ -28,16 +28,29 @@ public final class ViralVideoEngine: ObservableObject {
 
     public func render(template: ViralTemplate, recipe: ViralRecipe, media: MediaBundle,
                        progressHandler: @escaping @Sendable (RenderProgress) async -> Void = { _ in }) async throws -> URL {
+        let startTime = Date()
+        print("[ViralVideoEngine] \(startTime): Starting render process")
+        
         isRendering = true
-        defer { isRendering = false }
+        defer { 
+            isRendering = false
+            let endTime = Date()
+            print("[ViralVideoEngine] \(endTime): Render process completed in \(endTime.timeIntervalSince(startTime))s")
+        }
+        
+        print("[ViralVideoEngine] \(Date()): Starting planning phase")
         try await update(.planning, 0.05, handler: progressHandler)
 
+        print("[ViralVideoEngine] \(Date()): Creating render plan")
         let plan = try await planner.createRenderPlan(template: template, recipe: recipe, media: media)
+        print("[ViralVideoEngine] \(Date()): Render plan created with \(plan.items.count) items")
         try await update(.renderingFrames, 0.1, handler: progressHandler)
 
+        print("[ViralVideoEngine] \(Date()): Starting renderer.render()")
         let url = try await renderer.render(plan: plan, config: config) { p in
             Task { try? await self.update(.renderingFrames, p, handler: progressHandler) }
         }
+        print("[ViralVideoEngine] \(Date()): Renderer.render() completed, output URL: \(url)")
         try await update(.finalizing, 1.0, handler: progressHandler)
         return url
     }

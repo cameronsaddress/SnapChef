@@ -312,53 +312,79 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
         config: RenderConfig,
         progressCallback: @escaping @Sendable (Double) async -> Void = { _ in }
     ) async throws -> URL {
+        let startTime = Date()
+        print("[ViralVideoRendererPro] \(startTime): Starting render with \(plan.items.count) items")
         
         memoryOptimizer.logMemoryProfile(phase: "RendererPro Start")
         
+        print("[ViralVideoRendererPro] \(Date()): Creating composition and video tracks")
         let composition = AVMutableComposition()
         var videoTracks: [AVMutableCompositionTrack] = []
         
         // Create video tracks
         let trackCount = max(2, plan.items.count)
-        for _ in 0..<trackCount {
+        print("[ViralVideoRendererPro] \(Date()): Creating \(trackCount) video tracks")
+        for i in 0..<trackCount {
             if let track = composition.addMutableTrack(
                 withMediaType: .video,
                 preferredTrackID: kCMPersistentTrackID_Invalid
             ) {
                 videoTracks.append(track)
+                print("[ViralVideoRendererPro] \(Date()): Created video track \(i+1) with ID: \(track.trackID)")
             }
         }
+        print("[ViralVideoRendererPro] \(Date()): Created \(videoTracks.count) video tracks total")
         
         // Process items and create instructions
+        print("[ViralVideoRendererPro] \(Date()): Starting to process items and create instructions")
         var instructions: [VideoInstruction] = []
+        
+        print("[ViralVideoRendererPro] \(Date()): Preloading still images")
+        let preloadStartTime = Date()
         let stillURLs = try await preloadStills(plan: plan, config: config)
+        let preloadEndTime = Date()
+        print("[ViralVideoRendererPro] \(preloadEndTime): Preloaded \(stillURLs.count) stills in \(preloadEndTime.timeIntervalSince(preloadStartTime))s")
+        
         var trackIndex = 0
         
+        print("[ViralVideoRendererPro] \(Date()): Processing \(plan.items.count) items")
         for (index, item) in plan.items.enumerated() {
+            let itemStartTime = Date()
+            print("[ViralVideoRendererPro] \(itemStartTime): Processing item \(index+1)/\(plan.items.count): \(item.kind)")
+            
             let assetURL: URL
             
             switch item.kind {
             case .video(let url):
+                print("[ViralVideoRendererPro] \(Date()): Using video URL: \(url)")
                 assetURL = url
             case .still:
-                guard let url = stillURLs[index] else { continue }
+                guard let url = stillURLs[index] else { 
+                    print("[ViralVideoRendererPro] \(Date()): ERROR - No preloaded still URL for index \(index)")
+                    continue 
+                }
+                print("[ViralVideoRendererPro] \(Date()): Using preloaded still URL: \(url)")
                 assetURL = url
             }
             
+            print("[ViralVideoRendererPro] \(Date()): Loading asset from \(assetURL)")
             let asset = AVAsset(url: assetURL)
             guard let sourceTrack = try await asset.loadTracks(withMediaType: .video).first else {
+                print("[ViralVideoRendererPro] \(Date()): ERROR - No video track found in asset \(assetURL)")
                 continue
             }
             
             let destinationTrack = videoTracks[trackIndex % videoTracks.count]
             trackIndex += 1
             
+            print("[ViralVideoRendererPro] \(Date()): Inserting time range into track \(destinationTrack.trackID)")
             // Insert time range
             try destinationTrack.insertTimeRange(
                 CMTimeRange(start: .zero, duration: item.timeRange.duration),
                 of: sourceTrack,
                 at: item.timeRange.start
             )
+            print("[ViralVideoRendererPro] \(Date()): Inserted range: start=\(item.timeRange.start.seconds)s, duration=\(item.timeRange.duration.seconds)s")
             
             // REMOVED: Premium filters that were darkening images
             let enhancedFilters = item.filters  // Use original filters only
@@ -375,11 +401,14 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
             
             // Update progress
             let progress = Double(index + 1) / Double(plan.items.count) * 0.5
+            let itemEndTime = Date()
+            print("[ViralVideoRendererPro] \(itemEndTime): Item \(index+1) completed in \(itemEndTime.timeIntervalSince(itemStartTime))s, progress: \(progress*100)%")
             await progressCallback(progress)
         }
+        print("[ViralVideoRendererPro] \(Date()): All items processed, created \(instructions.count) instructions")
         
         // Handle PIP track if present - NOT IMPLEMENTED YET
-        var pipTrackID: CMPersistentTrackID?
+        let pipTrackID: CMPersistentTrackID? = nil
         /*
         if let pip = plan.pip {
             let pipAsset = AVAsset(url: pip.url)
@@ -411,16 +440,25 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
         
         // Add audio if present
         if let audioURL = plan.audio {
+            print("[ViralVideoRendererPro] \(Date()): Adding audio track from: \(audioURL)")
+            let audioStartTime = Date()
             try await addAudioTrack(to: composition, audioURL: audioURL, duration: plan.outputDuration)
+            let audioEndTime = Date()
+            print("[ViralVideoRendererPro] \(audioEndTime): Audio track added in \(audioEndTime.timeIntervalSince(audioStartTime))s")
+        } else {
+            print("[ViralVideoRendererPro] \(Date()): No audio track to add")
         }
         
         // Create video composition
+        print("[ViralVideoRendererPro] \(Date()): Creating video composition")
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = config.size
         videoComposition.frameDuration = CMTime(value: 1, timescale: config.fps)
         videoComposition.customVideoCompositorClass = CIFilterCompositor.self
+        print("[ViralVideoRendererPro] \(Date()): Video composition configured - size: \(config.size), fps: \(config.fps)")
         
         // Build AV instructions
+        print("[ViralVideoRendererPro] \(Date()): Building AV instructions")
         let fullTimeRange = CMTimeRange(start: .zero, duration: plan.outputDuration)
         let metaInstruction = MetaContainerInstruction(
             timeRange: fullTimeRange,
@@ -429,15 +467,19 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
             pipTrackID: pipTrackID
         )
         videoComposition.instructions = [metaInstruction]
+        print("[ViralVideoRendererPro] \(Date()): Meta instruction created with \(instructions.count) video instructions")
         
         // Export
+        print("[ViralVideoRendererPro] \(Date()): Starting export process")
         let outputURL = createTempOutputURL()
+        print("[ViralVideoRendererPro] \(Date()): Export output URL: \(outputURL)")
         await progressCallback(0.7)
         
         guard let exportSession = AVAssetExportSession(
             asset: composition,
             presetName: AVAssetExportPresetHighestQuality
         ) else {
+            print("[ViralVideoRendererPro] \(Date()): ERROR - Failed to create export session")
             throw ViralVideoError.exportFailed
         }
         
@@ -447,52 +489,104 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
         exportSession.shouldOptimizeForNetworkUse = true
         
         // Configure export settings
+        print("[ViralVideoRendererPro] \(Date()): Configuring audio mix")
         exportSession.audioMix = createAudioMix(for: composition)
         
+        print("[ViralVideoRendererPro] \(Date()): Starting export session...")
+        let exportStartTime = Date()
+        
+        // Add progress monitoring
+        let progressTask = Task { @MainActor in
+            while exportSession.status == .exporting {
+                let progress = exportSession.progress
+                let elapsed = Date().timeIntervalSince(exportStartTime)
+                print("[ViralVideoRendererPro] \(Date()): Export progress: \(progress * 100)% (\(elapsed)s elapsed)")
+                
+                if elapsed > 120 { // 2 minute timeout
+                    print("[ViralVideoRendererPro] \(Date()): ERROR - Export timeout after \(elapsed)s")
+                    exportSession.cancelExport()
+                    break
+                }
+                
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            }
+        }
+        
         await exportSession.export()
+        progressTask.cancel()
+        
+        let exportEndTime = Date()
+        let exportDuration = exportEndTime.timeIntervalSince(exportStartTime)
+        print("[ViralVideoRendererPro] \(exportEndTime): Export completed in \(exportDuration)s with status: \(exportSession.status.rawValue)")
+        
         await progressCallback(1.0)
         
         guard exportSession.status == .completed else {
+            print("[ViralVideoRendererPro] \(Date()): ERROR - Export failed with error: \(exportSession.error?.localizedDescription ?? "Unknown")")
             throw ViralVideoError.exportFailed
         }
         
+        print("[ViralVideoRendererPro] \(Date()): Export SUCCESS - Final output: \(outputURL)")
         memoryOptimizer.logMemoryProfile(phase: "RendererPro Complete")
+        
+        let totalTime = Date().timeIntervalSince(startTime)
+        print("[ViralVideoRendererPro] \(Date()): Total render time: \(totalTime)s")
         return outputURL
     }
     
     private func preloadStills(plan: RenderPlan, config: RenderConfig) async throws -> [Int: URL] {
+        print("[ViralVideoRendererPro] \(Date()): Starting preloadStills")
         var urlMap: [Int: URL] = [:]
+        var stillCount = 0
         
         for (index, item) in plan.items.enumerated() {
             if case .still(let image) = item.kind {
+                stillCount += 1
+                let stillStartTime = Date()
+                print("[ViralVideoRendererPro] \(stillStartTime): Processing still \(stillCount) at index \(index) with \(item.filters.count) filters")
+                
                 // Apply filters to still image
                 var processedImage = image
                 
                 if !item.filters.isEmpty {
-                    guard var ciImage = CIImage(image: image) else { continue }
+                    print("[ViralVideoRendererPro] \(Date()): Applying \(item.filters.count) filters to still image")
+                    guard var ciImage = CIImage(image: image) else { 
+                        print("[ViralVideoRendererPro] \(Date()): ERROR - Cannot create CIImage from UIImage")
+                        continue 
+                    }
                     
                     let ciFilters = FilterSpecBridge.toCIFilters(item.filters)
-                    for filter in ciFilters {
+                    for (filterIndex, filter) in ciFilters.enumerated() {
+                        print("[ViralVideoRendererPro] \(Date()): Applying filter \(filterIndex+1)/\(ciFilters.count)")
                         filter.setValue(ciImage, forKey: kCIInputImageKey)
                         ciImage = filter.outputImage ?? ciImage
                     }
                     
+                    print("[ViralVideoRendererPro] \(Date()): Rendering filtered image to CGImage")
                     let context = CIContext()
                     if let cgImage = context.createCGImage(ciImage, from: ciImage.extent) {
                         processedImage = UIImage(cgImage: cgImage)
+                        print("[ViralVideoRendererPro] \(Date()): Filtered image rendered successfully")
+                    } else {
+                        print("[ViralVideoRendererPro] \(Date()): WARNING - Failed to render filtered image, using original")
                     }
                 }
                 
                 // Create video from still
+                print("[ViralVideoRendererPro] \(Date()): Creating video from still image")
                 let stillWriter = StillWriter(config: config)
                 let url = try await stillWriter.createVideoFromImage(
                     processedImage,
                     duration: item.timeRange.duration
                 )
                 urlMap[index] = url
+                
+                let stillEndTime = Date()
+                print("[ViralVideoRendererPro] \(stillEndTime): Still \(stillCount) processed in \(stillEndTime.timeIntervalSince(stillStartTime))s, URL: \(url)")
             }
         }
         
+        print("[ViralVideoRendererPro] \(Date()): Preloaded \(stillCount) stills, returning \(urlMap.count) URLs")
         return urlMap
     }
     

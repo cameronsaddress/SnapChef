@@ -19,36 +19,24 @@ public final class OverlayFactory: @unchecked Sendable {
     }
 
     public func createHookOverlay(text: String, config: RenderConfig) -> CALayer {
-        let L = CALayer(); L.frame = CGRect(origin: .zero, size: config.size)
+        let L = CALayer()
+        L.frame = CGRect(origin: .zero, size: config.size)
         
-        // Add professional sparkles behind text
-        let sparkles = createParticleSystem(type: .professionalSparkles, intensity: 0.6)
-        sparkles.position = CGPoint(x: config.size.width / 2, y: -50)
-        sparkles.zPosition = -200
-        L.addSublayer(sparkles)
-        
-        // Create gradient container for hook text
-        let gradientContainer = createSnapChefGradientContainer(
+        // Simplified gradient container for hook text - NO PARTICLES
+        let gradientContainer = createSimplifiedGradientContainer(
             text: text,
             fontSize: config.hookFontSize,
             config: config,
             centered: true
         )
         gradientContainer.position = CGPoint(x: config.size.width / 2, y: config.size.height * 0.3)
-        gradientContainer.zPosition = 0 // Text in middle layer
         
-        // Add particle system for dramatic moment (foreground)
-        let particles = createParticleSystem(type: .sparkle, intensity: 0.8)
-        particles.position = CGPoint(x: config.size.width / 2, y: config.size.height / 2)
-        particles.zPosition = 100
-        L.addSublayer(particles)
-        
-        // Slide in animation from top
-        let slideIn = createSlideInAnimation(from: .top, duration: 0.8)
+        // Simple slide in animation from top
+        let slideIn = createSimpleSlideInAnimation(from: .top, duration: 0.8)
         gradientContainer.add(slideIn, forKey: "slideIn")
         
-        // Beat-synced pulse animation
-        let beatPulse = createBeatSyncPulse(bpm: config.fallbackBPM)
+        // Simple pulse animation with finite duration
+        let beatPulse = createSimpleBeatSyncPulse(bpm: config.fallbackBPM, duration: 3.0)
         gradientContainer.add(beatPulse, forKey: "beatPulse")
         
         L.addSublayer(gradientContainer)
@@ -56,16 +44,11 @@ public final class OverlayFactory: @unchecked Sendable {
     }
 
     public func createKineticStepOverlay(text: String, index: Int, beatBPM: Double, config: RenderConfig) -> CALayer {
-        let L = CALayer(); L.frame = CGRect(origin: .zero, size: config.size)
+        let L = CALayer()
+        L.frame = CGRect(origin: .zero, size: config.size)
         
-        // Add subtle professional sparkles behind step text
-        let sparkles = createParticleSystem(type: .professionalSparkles, intensity: 0.3)
-        sparkles.position = CGPoint(x: config.size.width / 2, y: -50)
-        sparkles.zPosition = -200
-        L.addSublayer(sparkles)
-        
-        // Create gradient container for step text (no step numbers)
-        let gradientContainer = createSnapChefGradientContainer(
+        // Create simplified gradient container for step text - NO PARTICLES
+        let gradientContainer = createSimplifiedGradientContainer(
             text: text,
             fontSize: config.stepsFontSize,
             config: config,
@@ -78,36 +61,29 @@ public final class OverlayFactory: @unchecked Sendable {
             x: config.safeInsets.left + gradientContainer.frame.width / 2,
             y: yPosition
         )
-        gradientContainer.zPosition = 0 // Text in middle layer
         
-        // Slide in animation from left with staggered delay
-        let slideIn = createSlideInAnimation(from: .left, duration: 0.6, delay: Double(index) * 0.2)
+        // Simple slide in animation from left with staggered delay
+        let slideIn = createSimpleSlideInAnimation(from: .left, duration: 0.6, delay: Double(index) * 0.2)
         gradientContainer.add(slideIn, forKey: "slideIn")
         
-        // Beat-synchronized pulse
-        let beatPulse = createBeatSyncPulse(bpm: beatBPM, intensity: 0.05)
+        // Simple beat-synchronized pulse with finite duration
+        let beatPulse = createSimpleBeatSyncPulse(bpm: beatBPM, duration: 1.5, intensity: 0.05)
         gradientContainer.add(beatPulse, forKey: "beatPulse")
-        
-        // Add subtle particle trail for movement
-        if index % 2 == 0 {
-            let trail = createParticleSystem(type: .trail, intensity: 0.4)
-            trail.position = CGPoint(x: config.safeInsets.left + 50, y: yPosition)
-            L.addSublayer(trail)
-        }
         
         L.addSublayer(gradientContainer)
         return L
     }
 
     public func createCTAOverlay(text: String, config: RenderConfig) -> CALayer {
-        let L = CALayer(); L.frame = CGRect(origin: .zero, size: config.size)
+        let L = CALayer()
+        L.frame = CGRect(origin: .zero, size: config.size)
         
-        // Create SnapChef logo with gradient
-        let logoContainer = createSnapChefLogoContainer(config: config)
+        // Create simplified SnapChef logo
+        let logoContainer = createSimplifiedLogoContainer(config: config)
         logoContainer.position = CGPoint(x: config.size.width / 2, y: config.size.height - config.safeInsets.bottom - 150)
         
-        // Create gradient container for CTA text
-        let ctaContainer = createSnapChefGradientContainer(
+        // Create simplified gradient container for CTA text
+        let ctaContainer = createSimplifiedGradientContainer(
             text: text,
             fontSize: config.ctaFontSize,
             config: config,
@@ -115,13 +91,13 @@ public final class OverlayFactory: @unchecked Sendable {
         )
         ctaContainer.position = CGPoint(x: config.size.width / 2, y: config.size.height - config.safeInsets.bottom - 80)
         
-        // Slide in animation from bottom
-        let slideIn = createSlideInAnimation(from: .bottom, duration: 0.8)
+        // Simple slide in animation from bottom
+        let slideIn = createSimpleSlideInAnimation(from: .bottom, duration: 0.8)
         logoContainer.add(slideIn, forKey: "logoSlideIn")
         ctaContainer.add(slideIn, forKey: "ctaSlideIn")
         
-        // Pulsing attention effect
-        let pulseAttention = createAttentionPulse()
+        // Simple pulsing attention effect with finite duration
+        let pulseAttention = createSimpleAttentionPulse(duration: 2.0)
         logoContainer.add(pulseAttention, forKey: "logoPulse")
         ctaContainer.add(pulseAttention, forKey: "ctaPulse")
         
@@ -259,38 +235,25 @@ public final class OverlayFactory: @unchecked Sendable {
         return container
     }
     
-    /// Creates a professional sparkle overlay that renders behind text layers
+    /// Creates a professional sparkle overlay that renders behind text layers (DISABLED FOR VIDEO COMPOSITION)
     public func createProfessionalSparkleOverlay(intensity: CGFloat = 0.5, config: RenderConfig) -> CALayer {
         let container = CALayer()
         container.frame = CGRect(origin: .zero, size: config.size)
         
-        // Create the professional sparkle particle system
-        let sparkleSystem = createParticleSystem(type: .professionalSparkles, intensity: intensity)
-        sparkleSystem.position = CGPoint(x: config.size.width / 2, y: -50)
+        // DISABLED: Particle systems cause issues with video composition
+        // Return empty container for video compatibility
         
-        // Ensure particles are behind text by setting low z-position
-        sparkleSystem.zPosition = -200
-        
-        container.addSublayer(sparkleSystem)
         return container
     }
     
-    /// Creates a localized sparkle system behind specific text area
+    /// Creates a localized sparkle system behind specific text area (DISABLED FOR VIDEO COMPOSITION)
     public func createLocalizedSparkleOverlay(textPosition: CGPoint, textSize: CGSize, intensity: CGFloat = 0.4, config: RenderConfig) -> CALayer {
         let container = CALayer()
         container.frame = CGRect(origin: .zero, size: config.size)
         
-        // Create sparkles that emanate from above the text area
-        let sparkleSystem = createParticleSystem(type: .professionalSparkles, intensity: intensity)
-        sparkleSystem.position = CGPoint(x: textPosition.x, y: textPosition.y - textSize.height - 50)
+        // DISABLED: Particle systems cause issues with video composition
+        // Return empty container for video compatibility
         
-        // Modify emitter size to match text width
-        if let emitterSystem = sparkleSystem as? CAEmitterLayer {
-            emitterSystem.emitterSize = CGSize(width: textSize.width * 1.2, height: 10)
-        }
-        
-        sparkleSystem.zPosition = -150
-        container.addSublayer(sparkleSystem)
         return container
     }
 
@@ -299,7 +262,154 @@ public final class OverlayFactory: @unchecked Sendable {
         return createPremiumTextLayer(text: text, size: size, style: .glow(color: .white, intensity: 0.3), center: center)
     }
 
-    // MARK: - SNAPCHEF GRADIENT CONTAINER FACTORY
+    // MARK: - SIMPLIFIED OVERLAY FACTORY FOR VIDEO COMPOSITION
+    
+    /// Creates a simplified gradient container compatible with video composition
+    private func createSimplifiedGradientContainer(text: String, fontSize: CGFloat, config: RenderConfig, centered: Bool) -> CALayer {
+        let container = CALayer()
+        
+        // Create gradient background with SnapChef colors - SIMPLIFIED
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor(red: 1.0, green: 0.42, blue: 0.21, alpha: 0.9).cgColor, // Orange #FF6B35
+            UIColor(red: 1.0, green: 0.08, blue: 0.58, alpha: 0.9).cgColor  // Pink #FF1493
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.cornerRadius = 12
+        
+        // Create white text layer
+        let textLayer = CATextLayer()
+        textLayer.string = text
+        textLayer.font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, fontSize, nil)
+        textLayer.fontSize = fontSize
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = centered ? .center : .left
+        textLayer.contentsScale = config.contentsScale
+        textLayer.isWrapped = true
+        
+        // Calculate text size and add padding
+        let textSize = textLayer.preferredFrameSize()
+        let padding: CGFloat = 16 // Reduced padding
+        let containerSize = CGSize(
+            width: min(textSize.width + padding * 2, config.size.width - 40),
+            height: textSize.height + padding * 2
+        )
+        
+        // Set frames
+        container.frame = CGRect(origin: .zero, size: containerSize)
+        gradientLayer.frame = container.bounds
+        textLayer.frame = container.bounds.insetBy(dx: padding, dy: padding)
+        
+        // Simplified shadow
+        gradientLayer.shadowColor = UIColor.black.cgColor
+        gradientLayer.shadowOffset = CGSize(width: 0, height: 2)
+        gradientLayer.shadowRadius = 4
+        gradientLayer.shadowOpacity = 0.3
+        
+        container.addSublayer(gradientLayer)
+        container.addSublayer(textLayer)
+        
+        return container
+    }
+    
+    /// Creates simple animations that are compatible with video composition
+    private func createSimpleSlideInAnimation(from direction: SlideDirection, duration: Double, delay: Double = 0) -> CABasicAnimation {
+        let animation = CABasicAnimation(keyPath: "position")
+        animation.duration = duration
+        animation.beginTime = AVCoreAnimationBeginTimeAtZero + delay
+        animation.fillMode = .forwards
+        animation.isRemovedOnCompletion = false
+        animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        
+        // Simplified slide values
+        switch direction {
+        case .top:
+            animation.fromValue = NSValue(cgPoint: CGPoint(x: 0, y: -100))
+        case .bottom:
+            animation.fromValue = NSValue(cgPoint: CGPoint(x: 0, y: 100))
+        case .left:
+            animation.fromValue = NSValue(cgPoint: CGPoint(x: -100, y: 0))
+        case .right:
+            animation.fromValue = NSValue(cgPoint: CGPoint(x: 100, y: 0))
+        }
+        animation.toValue = NSValue(cgPoint: CGPoint.zero)
+        
+        return animation
+    }
+    
+    /// Creates simple beat sync pulse with finite duration
+    private func createSimpleBeatSyncPulse(bpm: Double, duration: Double, intensity: CGFloat = 0.03) -> CABasicAnimation {
+        let pulse = CABasicAnimation(keyPath: "transform.scale")
+        pulse.fromValue = 1.0
+        pulse.toValue = 1.0 + intensity
+        pulse.duration = 60.0 / bpm
+        pulse.repeatCount = Float(duration / (60.0 / bpm)) // Finite repeat count based on duration
+        pulse.autoreverses = true
+        pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        pulse.beginTime = AVCoreAnimationBeginTimeAtZero
+        pulse.fillMode = .forwards
+        pulse.isRemovedOnCompletion = false
+        
+        return pulse
+    }
+    
+    /// Creates simplified logo container compatible with video composition
+    private func createSimplifiedLogoContainer(config: RenderConfig) -> CALayer {
+        let container = CALayer()
+        let logoSize = CGSize(width: 160, height: 50)
+        container.frame = CGRect(origin: .zero, size: logoSize)
+        
+        // Simple gradient background
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.frame = container.bounds
+        gradientLayer.colors = [
+            UIColor(red: 1.0, green: 0.42, blue: 0.21, alpha: 0.9).cgColor,
+            UIColor(red: 1.0, green: 0.08, blue: 0.58, alpha: 0.9).cgColor
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.cornerRadius = 25
+        
+        // Simple text
+        let textLayer = CATextLayer()
+        textLayer.string = "SnapChef"
+        textLayer.font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, 24, nil)
+        textLayer.fontSize = 24
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = .center
+        textLayer.contentsScale = config.contentsScale
+        textLayer.frame = container.bounds
+        
+        // Simple shadow
+        gradientLayer.shadowColor = UIColor.black.cgColor
+        gradientLayer.shadowOffset = CGSize(width: 0, height: 2)
+        gradientLayer.shadowRadius = 4
+        gradientLayer.shadowOpacity = 0.3
+        
+        container.addSublayer(gradientLayer)
+        container.addSublayer(textLayer)
+        
+        return container
+    }
+    
+    /// Creates simple attention pulse with finite duration
+    private func createSimpleAttentionPulse(duration: Double) -> CABasicAnimation {
+        let pulse = CABasicAnimation(keyPath: "transform.scale")
+        pulse.fromValue = 1.0
+        pulse.toValue = 1.05
+        pulse.duration = 1.2
+        pulse.autoreverses = true
+        pulse.repeatCount = Float(duration / 2.4) // Finite repeat count
+        pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        pulse.beginTime = AVCoreAnimationBeginTimeAtZero
+        pulse.fillMode = .forwards
+        pulse.isRemovedOnCompletion = false
+        
+        return pulse
+    }
+    
+    // MARK: - SNAPCHEF GRADIENT CONTAINER FACTORY (LEGACY - KEEPING FOR REFERENCE)
     
     private func createSnapChefGradientContainer(text: String, fontSize: CGFloat, config: RenderConfig, centered: Bool) -> CALayer {
         let container = CALayer()
@@ -396,7 +506,7 @@ public final class OverlayFactory: @unchecked Sendable {
     private func createSlideInAnimation(from direction: SlideDirection, duration: Double, delay: Double = 0) -> CAAnimationGroup {
         let group = CAAnimationGroup()
         group.duration = duration
-        group.beginTime = CACurrentMediaTime() + delay
+        group.beginTime = AVCoreAnimationBeginTimeAtZero + delay // FIXED: Use AVCoreAnimationBeginTimeAtZero for video composition
         group.fillMode = .both
         group.isRemovedOnCompletion = false
         
@@ -436,8 +546,11 @@ public final class OverlayFactory: @unchecked Sendable {
         pulse.values = [1.0, 1.0 + intensity, 1.0]
         pulse.keyTimes = [0, 0.3, 1.0]
         pulse.duration = 60.0 / bpm
-        pulse.repeatCount = .greatestFiniteMagnitude
+        pulse.repeatCount = 3 // FIXED: Finite repeat count instead of infinite
         pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        pulse.beginTime = AVCoreAnimationBeginTimeAtZero
+        pulse.fillMode = .forwards
+        pulse.isRemovedOnCompletion = false
         return pulse
     }
     
@@ -453,7 +566,7 @@ public final class OverlayFactory: @unchecked Sendable {
         ]
         
         switch style {
-        case .gradient(let colors):
+        case .gradient(_):
             // Create gradient text
             let gradientText = NSMutableAttributedString(string: text, attributes: attrs)
             // Note: Gradient text requires custom drawing, simplified here
@@ -620,7 +733,7 @@ public final class OverlayFactory: @unchecked Sendable {
         glow.toValue = 12 * intensity
         glow.duration = 60.0 / bpm
         glow.autoreverses = true
-        glow.repeatCount = .greatestFiniteMagnitude
+        glow.repeatCount = 3 // FIXED: Finite repeat count
         return glow
     }
     
@@ -629,7 +742,7 @@ public final class OverlayFactory: @unchecked Sendable {
         beatSync.values = [1.0, 1.0 + intensity, 1.0]
         beatSync.keyTimes = [0, 0.3, 1.0]
         beatSync.duration = 60.0 / beatBPM
-        beatSync.repeatCount = .greatestFiniteMagnitude
+        beatSync.repeatCount = 3 // FIXED: Finite repeat count
         return beatSync
     }
     
@@ -639,7 +752,10 @@ public final class OverlayFactory: @unchecked Sendable {
         pulse.toValue = 1.05
         pulse.duration = 1.2
         pulse.autoreverses = true
-        pulse.repeatCount = .greatestFiniteMagnitude
+        pulse.repeatCount = 2 // FIXED: Finite repeat count instead of infinite
+        pulse.beginTime = AVCoreAnimationBeginTimeAtZero
+        pulse.fillMode = .forwards
+        pulse.isRemovedOnCompletion = false
         return pulse
     }
     
@@ -850,7 +966,7 @@ public final class OverlayFactory: @unchecked Sendable {
         k.values = [1.0, 1.04, 1.0]  // labels can breathe a bit more than bg
         k.keyTimes = [0, 0.5, 1]
         k.duration = max(0.3, duration)
-        k.repeatCount = .greatestFiniteMagnitude
+        k.repeatCount = 5 // FIXED: Finite repeat count
         k.isRemovedOnCompletion = false
         k.fillMode = .both
         k.beginTime = AVCoreAnimationBeginTimeAtZero + 0.2
@@ -888,7 +1004,7 @@ public final class OverlayFactory: @unchecked Sendable {
              UIColor(red: 1.0, green: 0.078, blue: 0.576, alpha: 1.0).cgColor]
         ]
         colorAnimation.duration = 3.0
-        colorAnimation.repeatCount = .greatestFiniteMagnitude
+        colorAnimation.repeatCount = 2 // FIXED: Finite repeat count
         gradientLayer.add(colorAnimation, forKey: "gradientAnimation")
         
         // Text layer
@@ -909,7 +1025,7 @@ public final class OverlayFactory: @unchecked Sendable {
         bounce.values = [1.0, 1.1, 0.95, 1.05, 1.0]
         bounce.keyTimes = [0, 0.3, 0.6, 0.8, 1.0]
         bounce.duration = 2.0
-        bounce.repeatCount = .greatestFiniteMagnitude
+        bounce.repeatCount = 2 // FIXED: Finite repeat count
         bounce.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         
         container.addSublayer(gradientLayer)
@@ -938,21 +1054,21 @@ public final class OverlayFactory: @unchecked Sendable {
             fall.fromValue = -50
             fall.toValue = config.size.height + 50
             fall.duration = Double.random(in: 3.0...6.0)
-            fall.beginTime = CACurrentMediaTime() + Double.random(in: 0...2.0)
-            fall.repeatCount = .greatestFiniteMagnitude
+            fall.beginTime = AVCoreAnimationBeginTimeAtZero + Double.random(in: 0...2.0)
+            fall.repeatCount = 1 // FIXED: Single animation for video composition
             
             // Gentle sway animation
             let sway = CAKeyframeAnimation(keyPath: "position.x")
             sway.values = [startX, startX + 20, startX - 15, startX + 10, startX]
             sway.duration = 2.0
-            sway.repeatCount = .greatestFiniteMagnitude
+            sway.repeatCount = 3 // FIXED: Limited sway cycles
             
             // Rotation animation
             let rotate = CABasicAnimation(keyPath: "transform.rotation")
             rotate.fromValue = 0
             rotate.toValue = Double.pi * 2
             rotate.duration = Double.random(in: 2.0...4.0)
-            rotate.repeatCount = .greatestFiniteMagnitude
+            rotate.repeatCount = 2 // FIXED: Limited rotation cycles
             
             emojiLayer.add(fall, forKey: "fall")
             emojiLayer.add(sway, forKey: "sway")
@@ -994,13 +1110,13 @@ public final class OverlayFactory: @unchecked Sendable {
         pulse.values = [1.0, 1.05, 1.0, 1.08, 1.0]
         pulse.keyTimes = [0, 0.25, 0.5, 0.75, 1.0]
         pulse.duration = 1.5
-        pulse.repeatCount = .greatestFiniteMagnitude
+        pulse.repeatCount = 3 // FIXED: Limited pulse cycles
         
         // Glow animation
         let glow = CAKeyframeAnimation(keyPath: "shadowRadius")
         glow.values = [15, 25, 15, 30, 15]
         glow.duration = 1.5
-        glow.repeatCount = .greatestFiniteMagnitude
+        glow.repeatCount = 3 // FIXED: Finite repeat count
         
         container.addSublayer(background)
         container.addSublayer(textLayer)
@@ -1022,7 +1138,7 @@ public final class OverlayFactory: @unchecked Sendable {
         let bounce = CAKeyframeAnimation(keyPath: "transform.scale")
         bounce.values = [1.0, 1.02, 1.0]
         bounce.duration = 1.8
-        bounce.repeatCount = .greatestFiniteMagnitude
+        bounce.repeatCount = 2 // FIXED: Finite repeat count
         engagementContainer.add(bounce, forKey: "engagementBounce")
         
         // Beat-synced pulse
@@ -1102,7 +1218,7 @@ public final class OverlayFactory: @unchecked Sendable {
         bounce.values = [0.3, 1.2, 0.9, 1.1, 1.0]
         bounce.keyTimes = [0, 0.3, 0.6, 0.8, 1.0]
         bounce.duration = 0.8
-        bounce.beginTime = CACurrentMediaTime() + delay
+        bounce.beginTime = AVCoreAnimationBeginTimeAtZero + delay
         bounce.timingFunction = CAMediaTimingFunction(name: .easeOut)
         bounce.fillMode = .both
         bounce.isRemovedOnCompletion = false
@@ -1209,7 +1325,7 @@ public final class OverlayFactory: @unchecked Sendable {
         let pulse = CAKeyframeAnimation(keyPath: "transform.scale")
         pulse.values = [1.0, 1.01, 1.0]
         pulse.duration = 2.0
-        pulse.repeatCount = .greatestFiniteMagnitude
+        pulse.repeatCount = 3 // FIXED: Limited pulse cycles
         badgeContainer.add(pulse, forKey: "badgePulse")
         
         return badgeContainer
@@ -1251,11 +1367,18 @@ public extension OverlayFactory {
         let videoLayer = CALayer(); videoLayer.frame = parent.frame
         let overlayLayer = CALayer(); overlayLayer.frame = parent.frame
 
-        // Time-window each overlay
+        // Time-window each overlay with proper timing
         for ov in overlays {
             let L = ov.layerBuilder(config)
-            L.beginTime = ov.start.seconds
+            
+            // CRITICAL FIX: Set proper timing for video composition
+            L.beginTime = AVCoreAnimationBeginTimeAtZero + ov.start.seconds
             L.duration = ov.duration.seconds
+            L.fillMode = .both
+            
+            // Ensure all sublayers have proper timing too
+            setProperTimingRecursively(layer: L, startTime: ov.start.seconds, duration: ov.duration.seconds)
+            
             overlayLayer.addSublayer(L)
         }
 
@@ -1266,10 +1389,19 @@ public extension OverlayFactory {
         videoComp.instructions = [instr]
         videoComp.renderSize = renderSize
         videoComp.frameDuration = CMTime(value: 1, timescale: config.fps)
+        
+        // CRITICAL FIX: Create animation tool with proper setup
+        print("[OverlayFactory] Creating animation tool with \(overlays.count) overlays")
+        print("[OverlayFactory] Parent layer frame: \(parent.frame)")
+        print("[OverlayFactory] Video layer frame: \(videoLayer.frame)")
+        print("[OverlayFactory] Overlay layer frame: \(overlayLayer.frame)")
+        print("[OverlayFactory] Overlay layer sublayers count: \(overlayLayer.sublayers?.count ?? 0)")
+        
         videoComp.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: videoLayer, in: parent)
+        print("[OverlayFactory] Successfully created animation tool")
 
         // Export
-        let out = SnapChef.createTempOutputURL()
+        let out = SnapChef.createTempOutputURL(ext: "mp4")
         try? FileManager.default.removeItem(at: out)
         guard let export = AVAssetExportSession(asset: comp, presetName: ExportSettings.videoPreset) else {
             throw NSError(domain: "OverlayFactory", code: -2, userInfo: [NSLocalizedDescriptionKey: "Cannot create export session"])
@@ -1277,15 +1409,91 @@ public extension OverlayFactory {
         export.outputURL = out
         export.outputFileType = .mp4
         export.videoComposition = videoComp
+        export.shouldOptimizeForNetworkUse = true
 
+        print("[OverlayFactory] Starting overlay export to: \(out)")
         return try await withCheckedThrowingContinuation { cont in
-            export.exportAsynchronously {
-                switch export.status {
-                case .completed: cont.resume(returning: out)
-                case .failed: cont.resume(throwing: export.error ?? NSError(domain: "OverlayFactory", code: -3))
-                case .cancelled: cont.resume(throwing: NSError(domain: "OverlayFactory", code: -4))
-                default: cont.resume(throwing: NSError(domain: "OverlayFactory", code: -5))
+            var hasCompleted = false
+            var progressTimer: Timer?
+            
+            // Set up timeout timer (60 seconds for overlay processing)
+            let timeoutTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: false) { _ in
+                guard !hasCompleted else { return }
+                hasCompleted = true
+                progressTimer?.invalidate()
+                export.cancelExport()
+                print("[OverlayFactory] ERROR - Overlay export timed out after 60 seconds")
+                cont.resume(throwing: NSError(domain: "OverlayFactory", code: -6, userInfo: [NSLocalizedDescriptionKey: "Export timeout"]))
+            }
+            
+            // Monitor progress
+            progressTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                let currentProgress = export.progress
+                Task { @MainActor in
+                    await progress(Double(currentProgress))
                 }
+                if export.progress > 0 {
+                    print("[OverlayFactory] Overlay export progress: \(Int(export.progress * 100))%")
+                }
+            }
+            
+            export.exportAsynchronously {
+                guard !hasCompleted else {
+                    print("[OverlayFactory] Export completion called but already handled")
+                    return
+                }
+                hasCompleted = true
+                timeoutTimer.invalidate()
+                progressTimer?.invalidate()
+                
+                print("[OverlayFactory] Overlay export completed with status: \(export.status.rawValue)")
+                
+                switch export.status {
+                case .completed: 
+                    print("[OverlayFactory] SUCCESS - Overlay export completed: \(out)")
+                    cont.resume(returning: out)
+                case .failed: 
+                    let error = export.error ?? NSError(domain: "OverlayFactory", code: -3)
+                    print("[OverlayFactory] ERROR - Overlay export failed: \(error.localizedDescription)")
+                    cont.resume(throwing: error)
+                case .cancelled: 
+                    print("[OverlayFactory] ERROR - Overlay export cancelled")
+                    cont.resume(throwing: NSError(domain: "OverlayFactory", code: -4))
+                default: 
+                    print("[OverlayFactory] ERROR - Overlay export ended with status: \(export.status.rawValue)")
+                    cont.resume(throwing: NSError(domain: "OverlayFactory", code: -5))
+                }
+            }
+        }
+    }
+    
+    /// Recursively sets proper timing for all sublayers in a layer hierarchy
+    private func setProperTimingRecursively(layer: CALayer, startTime: Double, duration: Double) {
+        // Set timing for this layer
+        if layer.beginTime == 0 {
+            layer.beginTime = AVCoreAnimationBeginTimeAtZero + startTime
+        }
+        
+        // Process all animations in this layer
+        if let keys = layer.animationKeys() {
+            for key in keys {
+                if let animation = layer.animation(forKey: key) {
+                    // Ensure animations have proper timing
+                    if animation.beginTime == 0 {
+                        let mutableAnim = animation.mutableCopy() as! CAAnimation
+                        mutableAnim.beginTime = AVCoreAnimationBeginTimeAtZero
+                        mutableAnim.fillMode = .both
+                        mutableAnim.isRemovedOnCompletion = false
+                        layer.add(mutableAnim, forKey: key)
+                    }
+                }
+            }
+        }
+        
+        // Recursively process sublayers
+        if let sublayers = layer.sublayers {
+            for sublayer in sublayers {
+                setProperTimingRecursively(layer: sublayer, startTime: startTime, duration: duration)
             }
         }
     }
