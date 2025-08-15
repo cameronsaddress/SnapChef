@@ -109,9 +109,9 @@ public final class StillWriter: @unchecked Sendable {
         let baseCI = CIImage(image: image) ?? CIImage(color: .black).cropped(to: canvas)
         let fitted = aspectFitCI(baseCI, into: canvas)
 
-        // PREMIUM: Cinematic Ken Burns + Breathe + Parallax effects (15% zoom)
+        // PREMIUM: Subtle Ken Burns + Enhanced Parallax effects (5-8% zoom)
         let totalFrames = max(1, Int(duration.seconds * Double(config.fps)))
-        let maxScale = config.maxKenBurnsScale // Now 15% for cinematic feel
+        let maxScale = min(config.maxKenBurnsScale, 1.08) // Cap at 8% for subtle movement
         let breatheIntensity = config.breatheIntensity
         let parallaxIntensity = config.parallaxIntensity
         var t: Double = 0
@@ -222,9 +222,9 @@ public final class StillWriter: @unchecked Sendable {
             let breathePhase = sin(t * breatheFreq * 2 * .pi)
             let breatheScale = 1.0 + breatheIntensity * CGFloat(breathePhase)
             
-            // 3. Parallax movement (subtle drift)
-            let parallaxX = parallaxIntensity * CGFloat(sin(t * 0.3)) * canvas.width * 0.1
-            let parallaxY = parallaxIntensity * CGFloat(cos(t * 0.2)) * canvas.height * 0.05
+            // 3. Enhanced Parallax movement (more prominent panning)
+            let parallaxX = parallaxIntensity * CGFloat(sin(t * 0.4)) * canvas.width * 0.15
+            let parallaxY = parallaxIntensity * CGFloat(cos(t * 0.3)) * canvas.height * 0.12
             
             // Combine all effects
             let totalScale = kenBurnsScale * breatheScale
@@ -330,9 +330,13 @@ public final class StillWriter: @unchecked Sendable {
     private func aspectFitCI(_ image: CIImage, into canvas: CGRect) -> CIImage {
         let w = image.extent.width, h = image.extent.height
         let sx = canvas.width / w, sy = canvas.height / h
-        let s = min(sx, sy) // full image visible (prevents "way too zoomed in")
+        
+        // Use max instead of min to ensure photo fills entire screen (no black bars)
+        // Either width OR height will be full, the other dimension may be cropped
+        let s = max(sx, sy)
         let scaledW = w * s, scaledH = h * s
         let tx = (canvas.width - scaledW)/2, ty = (canvas.height - scaledH)/2
+        
         return image.transformed(by: CGAffineTransform(scaleX: s, y: s))
             .transformed(by: CGAffineTransform(translationX: tx, y: ty))
             .cropped(to: canvas)
@@ -357,9 +361,9 @@ public final class StillWriter: @unchecked Sendable {
             return applyChromaticAberration(to: image, intensity: dynamicIntensity)
             
         case .lightLeak(let position, let intensity):
-            // Animated light leak that moves with the parallax
-            let parallaxX = config.parallaxIntensity * CGFloat(sin(time * 0.3)) * config.size.width * 0.1
-            let parallaxY = config.parallaxIntensity * CGFloat(cos(time * 0.2)) * config.size.height * 0.05
+            // Animated light leak that moves with the enhanced parallax
+            let parallaxX = config.parallaxIntensity * CGFloat(sin(time * 0.4)) * config.size.width * 0.15
+            let parallaxY = config.parallaxIntensity * CGFloat(cos(time * 0.3)) * config.size.height * 0.12
             let animatedPosition = CGPoint(x: position.x + parallaxX, y: position.y + parallaxY)
             return applyLightLeak(to: image, position: animatedPosition, intensity: intensity)
             

@@ -153,18 +153,10 @@ public actor RenderPlanner {
         return nextBeat
     }
     
-    /// Calculate step duration based on beat intensity and BPM
+    /// Calculate step duration based on beat intensity and BPM - Fixed at 1.5s for viral TikTok appeal
     private func calculateStepDuration(beatMap: BeatMap, intensity: ContentBeatMap.BeatIntensity) -> Double {
-        let baseDuration = 60.0 / beatMap.bpm * 2 // Base duration of 2 beats
-        
-        switch intensity {
-        case .low:
-            return max(1.2, baseDuration * 0.8) // Shorter for low intensity
-        case .medium:
-            return max(1.6, baseDuration) // Standard duration
-        case .high:
-            return max(2.0, baseDuration * 1.2) // Longer for high intensity
-        }
+        // Fixed 1.5 second duration for each step to maximize engagement
+        return 1.5
     }
     
     /// Extract beat analysis from BeatMap (helper function)
@@ -198,15 +190,15 @@ public actor RenderPlanner {
         // 11-13s: Dramatic meal reveal with glow
         // 13-15s: CTA (to be handled by another agent)
         
-        // PHASE 1: HOOK - Anxiety-inducing fridge chaos (0-3s)
+        // PHASE 1: HOOK - Subtle chaos with reduced intensity (0-3s)
         items.append(.init(
             kind: .still(media.beforeFridge),
             timeRange: CMTimeRange(start: .zero, duration: CMTime(seconds: 3, preferredTimescale: 600)),
-            transform: .kenBurns(maxScale: 1.08, seed: 42), // Frantic zoom for anxiety
+            transform: .kenBurns(maxScale: 1.05, seed: 42), // Subtle movement
             filters: [
-                .premiumColorGrade(style: .moody), // Dark, dramatic
-                .chromaticAberration(intensity: 0.8), // Chaos effect
-                .vignette(intensity: 0.6), // Focus attention
+                .premiumColorGrade(style: .warm), // Warmer, less harsh than moody
+                .chromaticAberration(intensity: 0.4), // Reduced chaos effect
+                .vignette(intensity: 0.3), // Lighter vignette
                 .velocityRamp(factor: config.velocityRampFactor) // Speed ramping on beats
             ]
         ))
@@ -229,7 +221,7 @@ public actor RenderPlanner {
             kind: .still(createIngredientMontageImage(ingredients: recipe.ingredients, media: media)),
             timeRange: CMTimeRange(start: CMTime(seconds: 5, preferredTimescale: 600),
                                  duration: CMTime(seconds: 6, preferredTimescale: 600)),
-            transform: .kenBurns(maxScale: 1.12, seed: 7), // Dynamic movement
+            transform: .kenBurns(maxScale: 1.06, seed: 7), // Reduced movement
             filters: [
                 .premiumColorGrade(style: .vibrant), // Pop the colors
                 .velocityRamp(factor: config.velocityRampFactor), // Beat sync speed
@@ -239,23 +231,23 @@ public actor RenderPlanner {
             ]
         ))
 
-        // PHASE 4: REVEAL - Dramatic meal reveal with shock zoom (11-13s)
+        // PHASE 4: REVEAL - Meal reveal with natural colors (11-13s)
         items.append(.init(
             kind: .still(media.cookedMeal),
             timeRange: CMTimeRange(start: CMTime(seconds: 11, preferredTimescale: 600),
                                  duration: CMTime(seconds: 2, preferredTimescale: 600)),
-            transform: .kenBurns(maxScale: 1.25, seed: 99), // DRAMATIC shock zoom
+            transform: .kenBurns(maxScale: 1.08, seed: 99), // Subtle reveal zoom
             filters: [
-                .premiumColorGrade(style: .cinematic), // Hollywood feel
-                .foodEnhancer(intensity: 1.2), // Maximum food appeal
-                .viralPop(warmth: 0.8, punch: 1.0), // Viral-ready colors
-                .lightLeak(position: CGPoint(x: 0.5, y: 0.5), intensity: 0.8), // Heavenly glow
-                .filmGrain(intensity: 0.2), // Premium texture
-                .chromaticAberration(intensity: 0.3) // Dramatic separation
+                .premiumColorGrade(style: .warm), // Natural SnapChef brand colors instead of cinematic
+                .foodEnhancer(intensity: 0.9), // Moderate food appeal
+                .viralPop(warmth: 0.6, punch: 0.7), // More natural viral colors
+                .lightLeak(position: CGPoint(x: 0.5, y: 0.5), intensity: 0.5), // Softer glow
+                .filmGrain(intensity: 0.1), // Subtle texture
+                .chromaticAberration(intensity: 0.15) // Minimal separation
             ]
         ))
 
-        // PHASE 5: CTA Setup (13-15s) - Simple background for CTA
+        // PHASE 5: CTA Setup (13-15s) - Clean background for CTA
         items.append(.init(
             kind: .still(media.cookedMeal),
             timeRange: CMTimeRange(start: CMTime(seconds: 13, preferredTimescale: 600),
@@ -263,18 +255,21 @@ public actor RenderPlanner {
             transform: .identity, // Static for readability
             filters: [
                 .gaussianBlur(radius: 2), // Subtle blur to highlight CTA
-                .premiumColorGrade(style: .warm),
-                .vignette(intensity: 0.4) // Frame the CTA
+                .premiumColorGrade(style: .fresh), // Clean SnapChef brand styling
+                .vignette(intensity: 0.3) // Light frame for CTA
             ]
         ))
         
-        // OVERLAY PHASE 1: Anxiety Hook with Premium Effects (0-3s)
+        // OVERLAY PHASE 1: Anxiety Hook with Premium Effects (0-3s) - Larger, centered text
         overlays.append(.init(
             start: .zero,
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in 
-                OverlayFactory(config: cfg).createHookOverlay(
-                    text: recipe.hook ?? "FRIDGE CHAOS → DINNER MAGIC ✨", config: cfg) 
+                self.createLargerHookOverlay(
+                    text: recipe.hook ?? "FRIDGE CHAOS → DINNER MAGIC ✨", 
+                    config: cfg,
+                    screenScale: cfg.contentsScale
+                )
             }
         ))
         
@@ -287,9 +282,9 @@ public actor RenderPlanner {
             }
         ))
         
-        // OVERLAY PHASE 3: Rapid Ingredient Steps with Beat Cuts (5-11s)
-        let stepTexts = recipe.steps.prefix(4).map { shorten($0.title) }
-        let stepDuration = 6.0 / Double(max(stepTexts.count, 1)) // Divide time evenly
+        // OVERLAY PHASE 3: Rapid Ingredient Steps with Beat Cuts (5-11s) - 1.5s each, vertically centered
+        let stepTexts = recipe.steps.prefix(4).map { removeStepNumbers(shorten($0.title)) }
+        let stepDuration = 1.5 // Fixed 1.5 seconds per step
         
         for (i, text) in stepTexts.enumerated() {
             let stepStart = 5.0 + Double(i) * stepDuration
@@ -298,13 +293,14 @@ public actor RenderPlanner {
             
             overlays.append(.init(
                 start: CMTime(seconds: beatSyncedStart, preferredTimescale: 600),
-                duration: CMTime(seconds: stepDuration * 0.8, preferredTimescale: 600), // Slight overlap
+                duration: CMTime(seconds: stepDuration, preferredTimescale: 600),
                 layerBuilder: { cfg in 
-                    OverlayFactory(config: cfg).createKineticStepOverlay(
-                        text: "\(i+1). \(text)", 
+                    self.createCenteredStepOverlay(
+                        text: text, 
                         index: i, 
-                        beatBPM: beatMap.bpm * 1.2, // Faster for urgency
-                        config: cfg
+                        beatBPM: beatMap.bpm,
+                        config: cfg,
+                        screenScale: cfg.contentsScale
                     )
                 }
             ))
@@ -323,14 +319,16 @@ public actor RenderPlanner {
             }
         ))
         
-        // OVERLAY PHASE 5: Call-to-Action with Pulsing Gradient (13-15s)
+        // OVERLAY PHASE 5: Call-to-Action with Pulsing Gradient (13-15s) - Even larger text
         overlays.append(.init(
             start: CMTime(seconds: 13, preferredTimescale: 600),
             duration: CMTime(seconds: 2, preferredTimescale: 600),
             layerBuilder: { cfg in 
-                OverlayFactory(config: cfg).createCTAOverlay(
+                self.createLargerCTAOverlay(
                     text: "TAP TO GET RECIPE! 👆", 
-                    config: cfg
+                    config: cfg,
+                    screenScale: cfg.contentsScale,
+                    beatBPM: beatMap.bpm
                 )
             }
         ))
@@ -500,6 +498,200 @@ public actor RenderPlanner {
         // Shorter for rapid-fire viral format
         if trimmed.count <= 24 { return trimmed }
         return String(trimmed.prefix(21)) + "…"
+    }
+    
+    /// Remove step numbers and prefixes for cleaner text
+    nonisolated private func removeStepNumbers(_ text: String) -> String {
+        let cleaned = text.replacingOccurrences(of: #"^\d+\.\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^Step\s+\d+:\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^Step\s+\d+\.\s*"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned
+    }
+    
+    /// Create larger hook overlay with center positioning and pulse animation
+    nonisolated private func createLargerHookOverlay(text: String, config: RenderConfig, screenScale: CGFloat) -> CALayer {
+        let L = CALayer()
+        L.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Main text layer with larger font
+        let textLayer = CATextLayer()
+        textLayer.string = NSAttributedString(string: text, attributes: [
+            .font: UIFont.systemFont(ofSize: config.hookFontSize * 1.5, weight: .black), // 1.5x larger
+            .foregroundColor: UIColor.white,
+            .strokeColor: UIColor.black.cgColor,
+            .strokeWidth: -3.0
+        ])
+        textLayer.alignmentMode = .center
+        
+        // Center vertically and horizontally
+        let textSize = textLayer.preferredFrameSize()
+        textLayer.frame = CGRect(
+            x: (config.size.width - textSize.width) / 2,
+            y: (config.size.height - textSize.height) / 2, // Vertically centered
+            width: textSize.width,
+            height: textSize.height
+        )
+        textLayer.contentsScale = screenScale
+        
+        // Glow effect
+        textLayer.shadowColor = UIColor.yellow.cgColor
+        textLayer.shadowRadius = 10
+        textLayer.shadowOpacity = 0.8
+        textLayer.shadowOffset = CGSize.zero
+        
+        // Beat-synced pulse animation
+        let pulse = CABasicAnimation(keyPath: "transform.scale")
+        pulse.fromValue = 1.0
+        pulse.toValue = 1.1
+        pulse.duration = 60.0 / 120.0 // Sync to BPM
+        pulse.autoreverses = true
+        pulse.repeatCount = .greatestFiniteMagnitude
+        textLayer.add(pulse, forKey: "pulse")
+        
+        L.addSublayer(textLayer)
+        return L
+    }
+    
+    /// Create centered step overlay with slide animations and pulse effects
+    nonisolated private func createCenteredStepOverlay(text: String, index: Int, beatBPM: Double, config: RenderConfig, screenScale: CGFloat) -> CALayer {
+        let L = CALayer()
+        L.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Background with subtle gradient for better readability
+        let backgroundLayer = CAGradientLayer()
+        backgroundLayer.colors = [
+            UIColor.black.withAlphaComponent(0.6).cgColor,
+            UIColor.black.withAlphaComponent(0.4).cgColor
+        ]
+        backgroundLayer.locations = [0, 1]
+        backgroundLayer.frame = L.bounds
+        L.addSublayer(backgroundLayer)
+        
+        // Main text layer
+        let textLayer = CATextLayer()
+        textLayer.string = NSAttributedString(string: text, attributes: [
+            .font: UIFont.systemFont(ofSize: config.stepsFontSize * 1.2, weight: .bold),
+            .foregroundColor: UIColor.white,
+            .strokeColor: UIColor.black.cgColor,
+            .strokeWidth: -2.0
+        ])
+        textLayer.alignmentMode = .center
+        
+        // Center vertically on screen
+        let textSize = textLayer.preferredFrameSize()
+        textLayer.frame = CGRect(
+            x: (config.size.width - textSize.width) / 2,
+            y: (config.size.height - textSize.height) / 2, // Vertically centered
+            width: textSize.width,
+            height: textSize.height
+        )
+        textLayer.contentsScale = screenScale
+        
+        // Slide in animation from right
+        let slideIn = CABasicAnimation(keyPath: "position.x")
+        slideIn.fromValue = config.size.width + textSize.width/2
+        slideIn.toValue = config.size.width / 2
+        slideIn.duration = 0.3
+        slideIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        textLayer.add(slideIn, forKey: "slideIn")
+        
+        // Slide out animation to left after 1.2 seconds
+        let slideOut = CABasicAnimation(keyPath: "position.x")
+        slideOut.fromValue = config.size.width / 2
+        slideOut.toValue = -textSize.width/2
+        slideOut.duration = 0.3
+        slideOut.beginTime = CACurrentMediaTime() + 1.2
+        slideOut.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        textLayer.add(slideOut, forKey: "slideOut")
+        
+        // Beat-synced pulse animation
+        let pulse = CABasicAnimation(keyPath: "transform.scale")
+        pulse.fromValue = 1.0
+        pulse.toValue = 1.05
+        pulse.duration = 60.0 / beatBPM
+        pulse.autoreverses = true
+        pulse.repeatCount = .greatestFiniteMagnitude
+        textLayer.add(pulse, forKey: "pulse")
+        
+        L.addSublayer(textLayer)
+        return L
+    }
+    
+    /// Create larger CTA overlay with prominent positioning and beat-synced animations
+    nonisolated private func createLargerCTAOverlay(text: String, config: RenderConfig, screenScale: CGFloat, beatBPM: Double) -> CALayer {
+        let L = CALayer()
+        L.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Animated gradient background
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor.systemPink.withAlphaComponent(0.8).cgColor,
+            UIColor.systemOrange.withAlphaComponent(0.8).cgColor,
+            UIColor.systemYellow.withAlphaComponent(0.8).cgColor
+        ]
+        gradientLayer.locations = [0, 0.5, 1]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.frame = L.bounds
+        
+        // Animated gradient rotation
+        let gradientRotation = CABasicAnimation(keyPath: "transform.rotation")
+        gradientRotation.fromValue = 0
+        gradientRotation.toValue = Double.pi * 2
+        gradientRotation.duration = 3.0
+        gradientRotation.repeatCount = .greatestFiniteMagnitude
+        gradientLayer.add(gradientRotation, forKey: "rotate")
+        
+        L.addSublayer(gradientLayer)
+        
+        // Main CTA text layer with even larger font
+        let textLayer = CATextLayer()
+        textLayer.string = NSAttributedString(string: text, attributes: [
+            .font: UIFont.systemFont(ofSize: config.hookFontSize * 2.0, weight: .black), // 2x larger
+            .foregroundColor: UIColor.white,
+            .strokeColor: UIColor.black.cgColor,
+            .strokeWidth: -4.0
+        ])
+        textLayer.alignmentMode = .center
+        
+        // Prominent positioning - center screen
+        let textSize = textLayer.preferredFrameSize()
+        textLayer.frame = CGRect(
+            x: (config.size.width - textSize.width) / 2,
+            y: (config.size.height - textSize.height) / 2,
+            width: textSize.width,
+            height: textSize.height
+        )
+        textLayer.contentsScale = screenScale
+        
+        // Enhanced glow effect
+        textLayer.shadowColor = UIColor.cyan.cgColor
+        textLayer.shadowRadius = 20
+        textLayer.shadowOpacity = 1.0
+        textLayer.shadowOffset = CGSize.zero
+        
+        // Beat-synced pulse animation - more dramatic
+        let pulse = CABasicAnimation(keyPath: "transform.scale")
+        pulse.fromValue = 1.0
+        pulse.toValue = 1.2
+        pulse.duration = 60.0 / beatBPM
+        pulse.autoreverses = true
+        pulse.repeatCount = .greatestFiniteMagnitude
+        pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        textLayer.add(pulse, forKey: "pulse")
+        
+        // Additional beat-synced glow pulse
+        let glowPulse = CABasicAnimation(keyPath: "shadowRadius")
+        glowPulse.fromValue = 20
+        glowPulse.toValue = 35
+        glowPulse.duration = 60.0 / beatBPM
+        glowPulse.autoreverses = true
+        glowPulse.repeatCount = .greatestFiniteMagnitude
+        textLayer.add(glowPulse, forKey: "glowPulse")
+        
+        L.addSublayer(textLayer)
+        return L
     }
 }
 

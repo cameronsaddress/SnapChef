@@ -71,12 +71,12 @@ public struct RenderConfig: Sendable {
     public var fadeDuration: TimeInterval = 0.25
     public var textStrokeEnabled = true
 
-    // Ken Burns limits - upgraded to cinematic 15% zoom
-    public var maxKenBurnsScale: CGFloat = 1.15 // 15% cinematic zoom
+    // Ken Burns limits - subtle 5-8% zoom for natural movement
+    public var maxKenBurnsScale: CGFloat = 1.08 // 8% subtle zoom
     
-    // Premium effects settings
+    // Premium effects settings - enhanced parallax for more panning
     public var breatheIntensity: CGFloat = 0.02 // 2% pulse for breathe effect
-    public var parallaxIntensity: CGFloat = 0.08 // 8% parallax movement
+    public var parallaxIntensity: CGFloat = 0.12 // 12% enhanced parallax movement
     public var chromaticAberration: CGFloat = 0.5 // RGB aberration intensity
     public var lightLeakIntensity: CGFloat = 0.3 // Light leak effect
     public var velocityRampFactor: CGFloat = 0.6 // Speed ramping on beats

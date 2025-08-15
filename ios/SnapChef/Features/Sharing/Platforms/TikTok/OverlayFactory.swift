@@ -21,106 +21,112 @@ public final class OverlayFactory: @unchecked Sendable {
     public func createHookOverlay(text: String, config: RenderConfig) -> CALayer {
         let L = CALayer(); L.frame = CGRect(origin: .zero, size: config.size)
         
-        // PREMIUM: Create dramatic hook with multiple effects
-        let textContainer = createPremiumTextLayer(text: text, 
-                                                  size: config.hookFontSize, 
-                                                  style: .gradient(colors: [.white, .yellow]), 
-                                                  center: true)
+        // Add professional sparkles behind text
+        let sparkles = createParticleSystem(type: .professionalSparkles, intensity: 0.6)
+        sparkles.position = CGPoint(x: config.size.width / 2, y: -50)
+        sparkles.zPosition = -200
+        L.addSublayer(sparkles)
         
-        // Add particle system for dramatic moment
+        // Create gradient container for hook text
+        let gradientContainer = createSnapChefGradientContainer(
+            text: text,
+            fontSize: config.hookFontSize,
+            config: config,
+            centered: true
+        )
+        gradientContainer.position = CGPoint(x: config.size.width / 2, y: config.size.height * 0.3)
+        gradientContainer.zPosition = 0 // Text in middle layer
+        
+        // Add particle system for dramatic moment (foreground)
         let particles = createParticleSystem(type: .sparkle, intensity: 0.8)
         particles.position = CGPoint(x: config.size.width / 2, y: config.size.height / 2)
+        particles.zPosition = 100
         L.addSublayer(particles)
         
-        textContainer.opacity = 0
+        // Slide in animation from top
+        let slideIn = createSlideInAnimation(from: .top, duration: 0.8)
+        gradientContainer.add(slideIn, forKey: "slideIn")
         
-        // PREMIUM: Kinetic entry with shock zoom (0.5x → 1.2x → 1.0x)
-        let kineticEntry = createKineticEntry(duration: 0.8)
-        textContainer.add(kineticEntry, forKey: "kineticEntry")
+        // Beat-synced pulse animation
+        let beatPulse = createBeatSyncPulse(bpm: config.fallbackBPM)
+        gradientContainer.add(beatPulse, forKey: "beatPulse")
         
-        // Add glitch effect for viral attention
-        let glitch = createGlitchEffect(intensity: 0.3, duration: 2.0)
-        textContainer.add(glitch, forKey: "glitch")
-        
-        // Beat-synced glow pulse
-        let glowPulse = createGlowPulse(color: .yellow, intensity: 0.6, bpm: config.fallbackBPM)
-        textContainer.add(glowPulse, forKey: "glowPulse")
-        
-        L.addSublayer(textContainer)
+        L.addSublayer(gradientContainer)
         return L
     }
 
     public func createKineticStepOverlay(text: String, index: Int, beatBPM: Double, config: RenderConfig) -> CALayer {
         let L = CALayer(); L.frame = CGRect(origin: .zero, size: config.size)
         
-        // PREMIUM: Alternating animation styles for each step
-        let animationStyle: TextAnimationStyle = index % 3 == 0 ? .typewriter(speed: 0.05) : 
-                                               index % 3 == 1 ? .bounce(height: 20) : 
-                                                               .kinetic(zoom: true)
+        // Add subtle professional sparkles behind step text
+        let sparkles = createParticleSystem(type: .professionalSparkles, intensity: 0.3)
+        sparkles.position = CGPoint(x: config.size.width / 2, y: -50)
+        sparkles.zPosition = -200
+        L.addSublayer(sparkles)
         
-        let t = createPremiumTextLayer(text: text, 
-                                      size: config.stepsFontSize, 
-                                      style: animationStyle, 
-                                      center: false)
+        // Create gradient container for step text (no step numbers)
+        let gradientContainer = createSnapChefGradientContainer(
+            text: text,
+            fontSize: config.stepsFontSize,
+            config: config,
+            centered: false
+        )
         
-        // PREMIUM: Velocity ramping entry with overshoot
-        let velocityEntry = createVelocityRampEntry(index: index, beatBPM: beatBPM)
-        t.add(velocityEntry, forKey: "velocityEntry")
+        // Position step text on left side with safe area insets
+        let yPosition = config.safeInsets.top + 100 + CGFloat(index * 80)
+        gradientContainer.position = CGPoint(
+            x: config.safeInsets.left + gradientContainer.frame.width / 2,
+            y: yPosition
+        )
+        gradientContainer.zPosition = 0 // Text in middle layer
         
-        // Add beat-synchronized effects
-        t.add(createBeatSyncEffect(beatBPM: beatBPM, intensity: 0.08), forKey: "beatSync")
+        // Slide in animation from left with staggered delay
+        let slideIn = createSlideInAnimation(from: .left, duration: 0.6, delay: Double(index) * 0.2)
+        gradientContainer.add(slideIn, forKey: "slideIn")
+        
+        // Beat-synchronized pulse
+        let beatPulse = createBeatSyncPulse(bpm: beatBPM, intensity: 0.05)
+        gradientContainer.add(beatPulse, forKey: "beatPulse")
         
         // Add subtle particle trail for movement
         if index % 2 == 0 {
             let trail = createParticleSystem(type: .trail, intensity: 0.4)
-            trail.position = CGPoint(x: config.safeInsets.left + 50, y: config.safeInsets.top + 100)
+            trail.position = CGPoint(x: config.safeInsets.left + 50, y: yPosition)
             L.addSublayer(trail)
         }
         
-        L.addSublayer(t)
+        L.addSublayer(gradientContainer)
         return L
     }
 
     public func createCTAOverlay(text: String, config: RenderConfig) -> CALayer {
         let L = CALayer(); L.frame = CGRect(origin: .zero, size: config.size)
         
-        // PREMIUM: Animated gradient background
-        let sticker = CAGradientLayer()
-        sticker.colors = [UIColor.black.withAlphaComponent(0.9).cgColor, 
-                         UIColor.systemBlue.withAlphaComponent(0.8).cgColor]
-        sticker.startPoint = CGPoint(x: 0, y: 0)
-        sticker.endPoint = CGPoint(x: 1, y: 1)
-        sticker.cornerRadius = 40
+        // Create SnapChef logo with gradient
+        let logoContainer = createSnapChefLogoContainer(config: config)
+        logoContainer.position = CGPoint(x: config.size.width / 2, y: config.size.height - config.safeInsets.bottom - 150)
         
-        // Animated gradient colors
-        let gradientAnimation = CABasicAnimation(keyPath: "colors")
-        gradientAnimation.fromValue = sticker.colors
-        gradientAnimation.toValue = [UIColor.systemBlue.withAlphaComponent(0.9).cgColor, 
-                                    UIColor.systemPurple.withAlphaComponent(0.8).cgColor]
-        gradientAnimation.duration = 2.0
-        gradientAnimation.autoreverses = true
-        gradientAnimation.repeatCount = .greatestFiniteMagnitude
-        sticker.add(gradientAnimation, forKey: "gradientShift")
+        // Create gradient container for CTA text
+        let ctaContainer = createSnapChefGradientContainer(
+            text: text,
+            fontSize: config.ctaFontSize,
+            config: config,
+            centered: true
+        )
+        ctaContainer.position = CGPoint(x: config.size.width / 2, y: config.size.height - config.safeInsets.bottom - 80)
         
-        let pad: CGFloat = 28
-        let t = createPremiumTextLayer(text: text, 
-                                      size: config.ctaFontSize, 
-                                      style: .glow(color: .white, intensity: 0.8), 
-                                      center: true)
+        // Slide in animation from bottom
+        let slideIn = createSlideInAnimation(from: .bottom, duration: 0.8)
+        logoContainer.add(slideIn, forKey: "logoSlideIn")
+        ctaContainer.add(slideIn, forKey: "ctaSlideIn")
         
-        let w = config.size.width - 120
-        let h = t.preferredFrameSize().height + pad*2
-        sticker.frame = CGRect(x: (config.size.width - w)/2,
-                               y: config.size.height - config.safeInsets.bottom - h - 16,
-                               width: w, height: h)
-        t.frame = sticker.bounds.insetBy(dx: pad, dy: pad)
-        
-        // PREMIUM: Pulsing attention effect
+        // Pulsing attention effect
         let pulseAttention = createAttentionPulse()
-        sticker.add(pulseAttention, forKey: "attention")
+        logoContainer.add(pulseAttention, forKey: "logoPulse")
+        ctaContainer.add(pulseAttention, forKey: "ctaPulse")
         
-        sticker.addSublayer(t)
-        L.addSublayer(sticker)
+        L.addSublayer(logoContainer)
+        L.addSublayer(ctaContainer)
         return L
     }
     
@@ -161,18 +167,23 @@ public final class OverlayFactory: @unchecked Sendable {
         let container = CALayer()
         container.frame = CGRect(origin: .zero, size: config.size)
         
-        let hookText = createNeonGradientText(
+        let hookContainer = createSnapChefGradientContainer(
             text: "POV: Your fridge is giving NOTHING",
             fontSize: config.hookFontSize * 0.8,
-            config: config
+            config: config,
+            centered: true
         )
-        hookText.position = CGPoint(x: config.size.width/2, y: config.size.height * 0.2)
+        hookContainer.position = CGPoint(x: config.size.width/2, y: config.size.height * 0.2)
         
         // Add kinetic bounce animation
         let bounce = createBounceAnimation(delay: 0.0)
-        hookText.add(bounce, forKey: "hookBounce")
+        hookContainer.add(bounce, forKey: "hookBounce")
         
-        container.addSublayer(hookText)
+        // Add beat-synced pulse
+        let beatPulse = createBeatSyncPulse(bpm: config.fallbackBPM)
+        hookContainer.add(beatPulse, forKey: "beatPulse")
+        
+        container.addSublayer(hookContainer)
         return container
     }
     
@@ -180,35 +191,23 @@ public final class OverlayFactory: @unchecked Sendable {
         let container = CALayer()
         container.frame = CGRect(origin: .zero, size: config.size)
         
-        let text = createNeonGradientText(
+        let stepContainer = createSnapChefGradientContainer(
             text: stepText,
             fontSize: config.stepsFontSize,
-            config: config
+            config: config,
+            centered: true
         )
-        text.position = CGPoint(x: config.size.width/2, y: config.size.height * 0.15)
+        stepContainer.position = CGPoint(x: config.size.width/2, y: config.size.height * 0.15)
         
-        // Kinetic entry animation
-        let slideUp = CABasicAnimation(keyPath: "transform.translation.y")
-        slideUp.fromValue = 80
-        slideUp.toValue = 0
-        slideUp.duration = 0.5
-        slideUp.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        // Slide in from top animation
+        let slideIn = createSlideInAnimation(from: .top, duration: 0.5)
+        stepContainer.add(slideIn, forKey: "transformEntry")
         
-        let scale = CABasicAnimation(keyPath: "transform.scale")
-        scale.fromValue = 0.8
-        scale.toValue = 1.0
-        scale.duration = 0.5
-        scale.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        // Beat-synced pulse
+        let beatPulse = createBeatSyncPulse(bpm: config.fallbackBPM, intensity: 0.04)
+        stepContainer.add(beatPulse, forKey: "beatPulse")
         
-        let group = CAAnimationGroup()
-        group.animations = [slideUp, scale]
-        group.duration = 0.5
-        group.fillMode = .both
-        group.isRemovedOnCompletion = false
-        
-        text.add(group, forKey: "transformEntry")
-        container.addSublayer(text)
-        
+        container.addSublayer(stepContainer)
         return container
     }
     
@@ -216,21 +215,26 @@ public final class OverlayFactory: @unchecked Sendable {
         let container = CALayer()
         container.frame = CGRect(origin: .zero, size: config.size)
         
-        let revealText = createNeonGradientText(
+        let revealContainer = createSnapChefGradientContainer(
             text: "30 MINUTES LATER...",
             fontSize: config.ctaFontSize * 1.2,
-            config: config
+            config: config,
+            centered: true
         )
-        revealText.position = CGPoint(x: config.size.width/2, y: config.size.height/2)
+        revealContainer.position = CGPoint(x: config.size.width/2, y: config.size.height/2)
         
         // Add particle explosion effect
-        addParticleExplosion(to: container, at: revealText.position, config: config)
+        addParticleExplosion(to: container, at: revealContainer.position, config: config)
         
         // Dramatic entrance
         let dramatic = createDramaticEntrance()
-        revealText.add(dramatic, forKey: "revealDramatic")
+        revealContainer.add(dramatic, forKey: "revealDramatic")
         
-        container.addSublayer(revealText)
+        // Beat-synced pulse
+        let beatPulse = createBeatSyncPulse(bpm: config.fallbackBPM, intensity: 0.06)
+        revealContainer.add(beatPulse, forKey: "beatPulse")
+        
+        container.addSublayer(revealContainer)
         return container
     }
     
@@ -254,12 +258,189 @@ public final class OverlayFactory: @unchecked Sendable {
         
         return container
     }
+    
+    /// Creates a professional sparkle overlay that renders behind text layers
+    public func createProfessionalSparkleOverlay(intensity: CGFloat = 0.5, config: RenderConfig) -> CALayer {
+        let container = CALayer()
+        container.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Create the professional sparkle particle system
+        let sparkleSystem = createParticleSystem(type: .professionalSparkles, intensity: intensity)
+        sparkleSystem.position = CGPoint(x: config.size.width / 2, y: -50)
+        
+        // Ensure particles are behind text by setting low z-position
+        sparkleSystem.zPosition = -200
+        
+        container.addSublayer(sparkleSystem)
+        return container
+    }
+    
+    /// Creates a localized sparkle system behind specific text area
+    public func createLocalizedSparkleOverlay(textPosition: CGPoint, textSize: CGSize, intensity: CGFloat = 0.4, config: RenderConfig) -> CALayer {
+        let container = CALayer()
+        container.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Create sparkles that emanate from above the text area
+        let sparkleSystem = createParticleSystem(type: .professionalSparkles, intensity: intensity)
+        sparkleSystem.position = CGPoint(x: textPosition.x, y: textPosition.y - textSize.height - 50)
+        
+        // Modify emitter size to match text width
+        if let emitterSystem = sparkleSystem as? CAEmitterLayer {
+            emitterSystem.emitterSize = CGSize(width: textSize.width * 1.2, height: 10)
+        }
+        
+        sparkleSystem.zPosition = -150
+        container.addSublayer(sparkleSystem)
+        return container
+    }
 
     // Legacy support - now uses premium text layer
     private func makeText(text: String, size: CGFloat, weight: UIFont.Weight, center: Bool) -> CATextLayer {
         return createPremiumTextLayer(text: text, size: size, style: .glow(color: .white, intensity: 0.3), center: center)
     }
 
+    // MARK: - SNAPCHEF GRADIENT CONTAINER FACTORY
+    
+    private func createSnapChefGradientContainer(text: String, fontSize: CGFloat, config: RenderConfig, centered: Bool) -> CALayer {
+        let container = CALayer()
+        
+        // Create gradient background with SnapChef colors
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor(red: 1.0, green: 0.42, blue: 0.21, alpha: 1.0).cgColor, // Orange #FF6B35
+            UIColor(red: 1.0, green: 0.08, blue: 0.58, alpha: 1.0).cgColor  // Pink #FF1493
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.cornerRadius = 16
+        
+        // Create white text layer
+        let textLayer = CATextLayer()
+        textLayer.string = text
+        textLayer.font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, fontSize, nil)
+        textLayer.fontSize = fontSize
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = centered ? .center : .left
+        textLayer.contentsScale = config.contentsScale
+        textLayer.isWrapped = true
+        
+        // Calculate text size and add padding
+        let textSize = textLayer.preferredFrameSize()
+        let padding: CGFloat = 24
+        let containerSize = CGSize(
+            width: min(textSize.width + padding * 2, config.size.width - 40),
+            height: textSize.height + padding * 2
+        )
+        
+        // Set frames
+        container.frame = CGRect(origin: .zero, size: containerSize)
+        gradientLayer.frame = container.bounds
+        textLayer.frame = container.bounds.insetBy(dx: padding, dy: padding)
+        
+        // Add shadow for depth
+        gradientLayer.shadowColor = UIColor.black.cgColor
+        gradientLayer.shadowOffset = CGSize(width: 0, height: 4)
+        gradientLayer.shadowRadius = 8
+        gradientLayer.shadowOpacity = 0.3
+        
+        container.addSublayer(gradientLayer)
+        container.addSublayer(textLayer)
+        
+        return container
+    }
+    
+    private func createSnapChefLogoContainer(config: RenderConfig) -> CALayer {
+        let container = CALayer()
+        let logoSize = CGSize(width: 200, height: 60)
+        container.frame = CGRect(origin: .zero, size: logoSize)
+        
+        // Create gradient background
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.frame = container.bounds
+        gradientLayer.colors = [
+            UIColor(red: 1.0, green: 0.42, blue: 0.21, alpha: 1.0).cgColor, // Orange #FF6B35
+            UIColor(red: 1.0, green: 0.08, blue: 0.58, alpha: 1.0).cgColor  // Pink #FF1493
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.cornerRadius = 30
+        
+        // Create SnapChef text
+        let textLayer = CATextLayer()
+        textLayer.string = "SnapChef"
+        textLayer.font = CTFontCreateWithName("HelveticaNeue-Heavy" as CFString, 28, nil)
+        textLayer.fontSize = 28
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = .center
+        textLayer.contentsScale = config.contentsScale
+        textLayer.frame = container.bounds
+        
+        // Add shadow
+        gradientLayer.shadowColor = UIColor.black.cgColor
+        gradientLayer.shadowOffset = CGSize(width: 0, height: 4)
+        gradientLayer.shadowRadius = 12
+        gradientLayer.shadowOpacity = 0.4
+        
+        container.addSublayer(gradientLayer)
+        container.addSublayer(textLayer)
+        
+        return container
+    }
+    
+    // MARK: - SLIDE ANIMATIONS
+    
+    private enum SlideDirection {
+        case top, bottom, left, right
+    }
+    
+    private func createSlideInAnimation(from direction: SlideDirection, duration: Double, delay: Double = 0) -> CAAnimationGroup {
+        let group = CAAnimationGroup()
+        group.duration = duration
+        group.beginTime = CACurrentMediaTime() + delay
+        group.fillMode = .both
+        group.isRemovedOnCompletion = false
+        
+        // Slide animation
+        let slide = CABasicAnimation(keyPath: "transform.translation")
+        switch direction {
+        case .top:
+            slide.fromValue = NSValue(cgSize: CGSize(width: 0, height: -100))
+        case .bottom:
+            slide.fromValue = NSValue(cgSize: CGSize(width: 0, height: 100))
+        case .left:
+            slide.fromValue = NSValue(cgSize: CGSize(width: -150, height: 0))
+        case .right:
+            slide.fromValue = NSValue(cgSize: CGSize(width: 150, height: 0))
+        }
+        slide.toValue = NSValue(cgSize: .zero)
+        slide.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        
+        // Fade in
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0
+        fade.toValue = 1
+        fade.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        
+        // Scale bounce
+        let scale = CAKeyframeAnimation(keyPath: "transform.scale")
+        scale.values = [0.8, 1.1, 1.0]
+        scale.keyTimes = [0, 0.6, 1.0]
+        scale.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        
+        group.animations = [slide, fade, scale]
+        return group
+    }
+    
+    private func createBeatSyncPulse(bpm: Double, intensity: CGFloat = 0.03) -> CAKeyframeAnimation {
+        let pulse = CAKeyframeAnimation(keyPath: "transform.scale")
+        pulse.values = [1.0, 1.0 + intensity, 1.0]
+        pulse.keyTimes = [0, 0.3, 1.0]
+        pulse.duration = 60.0 / bpm
+        pulse.repeatCount = .greatestFiniteMagnitude
+        pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        return pulse
+    }
+    
     // MARK: - PREMIUM TEXT LAYER FACTORY
     
     private func createPremiumTextLayer(text: String, size: CGFloat, style: TextAnimationStyle, center: Bool) -> CATextLayer {
@@ -499,7 +680,73 @@ public final class OverlayFactory: @unchecked Sendable {
             cell.alphaSpeed = -2.0
             
             emitter.emitterCells = [cell]
+            
+        case .professionalSparkles:
+            return createProfessionalSparkleSystem(intensity: intensity)
         }
+        
+        return emitter
+    }
+    
+    /// Creates a professional, subtle sparkle system that streams down behind text
+    private func createProfessionalSparkleSystem(intensity: CGFloat) -> CAEmitterLayer {
+        let emitter = CAEmitterLayer()
+        emitter.emitterShape = .line
+        emitter.emitterSize = CGSize(width: config.size.width, height: 10)
+        emitter.emitterPosition = CGPoint(x: config.size.width / 2, y: -50)
+        
+        // Primary sparkle particles
+        let sparkleCell = CAEmitterCell()
+        sparkleCell.contents = createElegantSparkleImage().cgImage
+        sparkleCell.birthRate = Float(8 * intensity) // Subtle birth rate
+        sparkleCell.lifetime = Float(4.0) // Longer lifetime for graceful fall
+        sparkleCell.velocity = CGFloat(60) // Gentle downward velocity
+        sparkleCell.velocityRange = CGFloat(20) // Slight variation
+        sparkleCell.emissionLongitude = .pi / 2 // Downward direction
+        sparkleCell.emissionRange = .pi / 6 // Narrow cone for controlled direction
+        
+        // Physics-based movement with subtle wind effect
+        sparkleCell.yAcceleration = 20 // Gentle gravity effect
+        sparkleCell.xAcceleration = 5 // Subtle horizontal drift (wind effect)
+        
+        // Scale properties for elegance
+        sparkleCell.scale = 0.15 // Small, elegant size
+        sparkleCell.scaleRange = 0.08 // Variation in size
+        sparkleCell.scaleSpeed = -0.02 // Gentle shrinking over time
+        
+        // Alpha properties for fade in/out
+        sparkleCell.alphaRange = 0.3 // Variation in opacity
+        sparkleCell.alphaSpeed = -0.25 // Gentle fade out
+        
+        // Rotation for dynamic feel
+        sparkleCell.spin = .pi / 4 // Gentle rotation
+        sparkleCell.spinRange = .pi / 2 // Variation in rotation speed
+        
+        // Horizontal drift for realism
+        sparkleCell.emissionLongitude = .pi / 2 + CGFloat.random(in: -0.1...0.1)
+        
+        // Secondary micro-sparkles for depth
+        let microCell = CAEmitterCell()
+        microCell.contents = createMicroSparkleImage().cgImage
+        microCell.birthRate = Float(15 * intensity)
+        microCell.lifetime = Float(3.0)
+        microCell.velocity = CGFloat(40)
+        microCell.velocityRange = CGFloat(15)
+        microCell.emissionLongitude = .pi / 2
+        microCell.emissionRange = .pi / 4
+        
+        microCell.yAcceleration = 15
+        microCell.xAcceleration = 3 // Lighter wind effect for micro particles
+        microCell.scale = 0.08
+        microCell.scaleRange = 0.04
+        microCell.scaleSpeed = -0.01
+        microCell.alphaRange = 0.2
+        microCell.alphaSpeed = -0.3
+        microCell.spin = .pi / 6
+        microCell.spinRange = .pi / 3
+        
+        emitter.emitterCells = [sparkleCell, microCell]
+        emitter.zPosition = -100 // Ensure particles render behind text
         
         return emitter
     }
@@ -507,6 +754,7 @@ public final class OverlayFactory: @unchecked Sendable {
     private enum ParticleType {
         case sparkle
         case trail
+        case professionalSparkles
     }
     
     private func createSparkleImage() -> UIImage {
@@ -529,6 +777,69 @@ public final class OverlayFactory: @unchecked Sendable {
         let context = UIGraphicsGetCurrentContext()!
         context.setFillColor(UIColor.yellow.withAlphaComponent(0.8).cgColor)
         context.fillEllipse(in: CGRect(origin: .zero, size: size))
+        
+        return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
+    }
+    
+    /// Creates an elegant sparkle image for professional particle effects
+    private func createElegantSparkleImage() -> UIImage {
+        let size = CGSize(width: 12, height: 12)
+        UIGraphicsBeginImageContextWithOptions(size, false, 0)
+        defer { UIGraphicsEndImageContext() }
+        
+        let context = UIGraphicsGetCurrentContext()!
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        
+        // Create a subtle white sparkle with light gold tint
+        let sparkleColor = UIColor(red: 1.0, green: 0.95, blue: 0.8, alpha: 0.6)
+        context.setFillColor(sparkleColor.cgColor)
+        
+        // Draw a four-pointed star shape
+        context.beginPath()
+        let radius: CGFloat = 4
+        let innerRadius: CGFloat = 1.5
+        
+        for i in 0..<8 {
+            let angle = CGFloat(i) * .pi / 4
+            let currentRadius = i % 2 == 0 ? radius : innerRadius
+            let x = center.x + cos(angle) * currentRadius
+            let y = center.y + sin(angle) * currentRadius
+            
+            if i == 0 {
+                context.move(to: CGPoint(x: x, y: y))
+            } else {
+                context.addLine(to: CGPoint(x: x, y: y))
+            }
+        }
+        context.closePath()
+        context.fillPath()
+        
+        // Add a subtle glow effect
+        context.setShadow(offset: .zero, blur: 2, color: sparkleColor.withAlphaComponent(0.8).cgColor)
+        context.fillEllipse(in: CGRect(x: center.x - 1, y: center.y - 1, width: 2, height: 2))
+        
+        return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
+    }
+    
+    /// Creates micro sparkle particles for depth and subtlety
+    private func createMicroSparkleImage() -> UIImage {
+        let size = CGSize(width: 6, height: 6)
+        UIGraphicsBeginImageContextWithOptions(size, false, 0)
+        defer { UIGraphicsEndImageContext() }
+        
+        let context = UIGraphicsGetCurrentContext()!
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        
+        // Very subtle white dot with minimal opacity
+        let microColor = UIColor.white.withAlphaComponent(0.4)
+        context.setFillColor(microColor.cgColor)
+        
+        // Small circular sparkle
+        context.fillEllipse(in: CGRect(x: center.x - 1.5, y: center.y - 1.5, width: 3, height: 3))
+        
+        // Even smaller bright center
+        context.setFillColor(UIColor.white.withAlphaComponent(0.7).cgColor)
+        context.fillEllipse(in: CGRect(x: center.x - 0.5, y: center.y - 0.5, width: 1, height: 1))
         
         return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
     }
@@ -700,10 +1011,11 @@ public final class OverlayFactory: @unchecked Sendable {
     }
     
     private func createEngagementText(config: RenderConfig) -> CALayer {
-        let textLayer = createNeonGradientText(
+        let engagementContainer = createSnapChefGradientContainer(
             text: "Drop a 🔥 if you'd try this!",
             fontSize: 28,
-            config: config
+            config: config,
+            centered: true
         )
         
         // Gentle bounce animation
@@ -711,9 +1023,13 @@ public final class OverlayFactory: @unchecked Sendable {
         bounce.values = [1.0, 1.02, 1.0]
         bounce.duration = 1.8
         bounce.repeatCount = .greatestFiniteMagnitude
-        textLayer.add(bounce, forKey: "engagementBounce")
+        engagementContainer.add(bounce, forKey: "engagementBounce")
         
-        return textLayer
+        // Beat-synced pulse
+        let beatPulse = createBeatSyncPulse(bpm: config.fallbackBPM, intensity: 0.02)
+        engagementContainer.add(beatPulse, forKey: "beatPulse")
+        
+        return engagementContainer
     }
     
     private func createAppStoreCTA(config: RenderConfig) -> CALayer {
@@ -882,39 +1198,21 @@ public final class OverlayFactory: @unchecked Sendable {
     }
     
     private func createBadge(icon: String, text: String, config: RenderConfig) -> CALayer {
-        let container = CALayer()
-        container.frame = CGRect(x: 0, y: 0, width: 200, height: 40)
+        let badgeContainer = createSnapChefGradientContainer(
+            text: "\(icon) \(text)",
+            fontSize: 16,
+            config: config,
+            centered: true
+        )
         
-        // Background
-        let background = CALayer()
-        background.frame = container.bounds
-        background.backgroundColor = UIColor.black.withAlphaComponent(0.8).cgColor
-        background.cornerRadius = 20
-        background.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
-        background.borderWidth = 1
+        // Add subtle pulse animation
+        let pulse = CAKeyframeAnimation(keyPath: "transform.scale")
+        pulse.values = [1.0, 1.01, 1.0]
+        pulse.duration = 2.0
+        pulse.repeatCount = .greatestFiniteMagnitude
+        badgeContainer.add(pulse, forKey: "badgePulse")
         
-        // Icon
-        let iconLayer = CATextLayer()
-        iconLayer.string = icon
-        iconLayer.fontSize = 20
-        iconLayer.alignmentMode = .center
-        iconLayer.contentsScale = 2.0
-        iconLayer.frame = CGRect(x: 10, y: 10, width: 20, height: 20)
-        
-        // Text
-        let textLayer = CATextLayer()
-        textLayer.string = text
-        textLayer.font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, 16, nil)
-        textLayer.fontSize = 16
-        textLayer.foregroundColor = UIColor.white.cgColor
-        textLayer.contentsScale = 2.0
-        textLayer.frame = CGRect(x: 40, y: 12, width: 150, height: 16)
-        
-        container.addSublayer(background)
-        container.addSublayer(iconLayer)
-        container.addSublayer(textLayer)
-        
-        return container
+        return badgeContainer
     }
 }
 
