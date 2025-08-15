@@ -54,11 +54,15 @@ final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionPro
 
 @objc final class CIFilterCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     
-    nonisolated(unsafe) private let ciContext = CIContext(options: [
-        .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-        .outputColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-        .useSoftwareRenderer: false
-    ])
+    // CRITICAL FIX: Remove force unwraps to prevent EXC_BREAKPOINT crashes
+    nonisolated(unsafe) private let ciContext: CIContext = {
+        let sRGBColorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        return CIContext(options: [
+            .workingColorSpace: sRGBColorSpace,
+            .outputColorSpace: sRGBColorSpace,
+            .useSoftwareRenderer: false
+        ])
+    }()
     
     // Use os_unfair_lock for thread safety
     nonisolated(unsafe) private var renderContextLock = os_unfair_lock()
@@ -210,11 +214,15 @@ final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionPro
         var pipImage = CIImage(cvPixelBuffer: pipBuffer)
         
         // PREMIUM FIX: Add glow to PIP for enhanced visual effect
-        let bloom = CIFilter(name: "CIBloom")!
-        bloom.setValue(pipImage, forKey: kCIInputImageKey)
-        bloom.setValue(10.0, forKey: "inputRadius")
-        bloom.setValue(0.5, forKey: "inputIntensity")
-        pipImage = bloom.outputImage ?? pipImage
+        // CRITICAL FIX: Remove force unwrap to prevent EXC_BREAKPOINT crashes
+        if let bloom = CIFilter(name: "CIBloom") {
+            bloom.setValue(pipImage, forKey: kCIInputImageKey)
+            bloom.setValue(10.0, forKey: "inputRadius")
+            bloom.setValue(0.5, forKey: "inputIntensity")
+            pipImage = bloom.outputImage ?? pipImage
+        } else {
+            print("❌ Failed to create CIBloom filter, using original PIP image")
+        }
         
         // Scale PIP to target frame size
         let pipExtent = pipImage.extent

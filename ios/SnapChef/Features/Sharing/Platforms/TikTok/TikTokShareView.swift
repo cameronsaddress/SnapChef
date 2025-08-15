@@ -16,7 +16,7 @@ struct TikTokShareView: View {
     @State private var showSuccess = false
     @State private var showConfetti = false
     @State private var buttonShake = false
-    @State private var selectedHashtags: Set<String> = []
+    @State private var selectedHashtags: [String] = [] // Array to maintain selection order for FIFO
 
     var body: some View {
         NavigationStack {
@@ -82,7 +82,7 @@ struct TikTokShareView: View {
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                 
-                Text("Choose hashtags for your TikTok video • \(selectedHashtags.count)/15 selected")
+                Text("Choose hashtags for your TikTok video • \(selectedHashtags.count)/5 selected")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.7))
             }
@@ -109,7 +109,7 @@ struct TikTokShareView: View {
             HStack(spacing: 12) {
                 Button("Select All") {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedHashtags = Set(optimizedTags.prefix(15))
+                        selectedHashtags = Array(optimizedTags.prefix(5))
                     }
                 }
                 .font(.system(size: 12, weight: .medium))
@@ -125,7 +125,7 @@ struct TikTokShareView: View {
                 
                 Spacer()
                 
-                Text("\(selectedHashtags.count)/15")
+                Text("\(selectedHashtags.count)/5")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.white.opacity(0.8))
             }
@@ -152,8 +152,8 @@ struct TikTokShareView: View {
                 )
         )
         .onAppear {
-            // Pre-select most popular hashtags
-            selectedHashtags = Set(optimizedTags.prefix(8))
+            // Pre-select exactly 5 most popular hashtags
+            selectedHashtags = Array(optimizedTags.prefix(5))
         }
     }
     
@@ -575,10 +575,16 @@ struct TikTokShareView: View {
     
     private func toggleHashtagSelection(_ hashtag: String) {
         withAnimation(.easeInOut(duration: 0.2)) {
-            if selectedHashtags.contains(hashtag) {
-                selectedHashtags.remove(hashtag)
-            } else if selectedHashtags.count < 15 {
-                selectedHashtags.insert(hashtag)
+            if let index = selectedHashtags.firstIndex(of: hashtag) {
+                // Remove if already selected
+                selectedHashtags.remove(at: index)
+            } else {
+                // Add new hashtag with FIFO logic (max 5)
+                if selectedHashtags.count >= 5 {
+                    // Remove oldest selection (first item) and add new one
+                    selectedHashtags.removeFirst()
+                }
+                selectedHashtags.append(hashtag)
             }
         }
         

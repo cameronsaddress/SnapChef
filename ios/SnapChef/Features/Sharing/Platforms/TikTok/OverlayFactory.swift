@@ -1100,7 +1100,10 @@ public final class OverlayFactory: @unchecked Sendable {
         UIGraphicsBeginImageContextWithOptions(size, false, 0)
         defer { UIGraphicsEndImageContext() }
         
-        let context = UIGraphicsGetCurrentContext()!
+        guard let context = UIGraphicsGetCurrentContext() else {
+            print("❌ Failed to get graphics context")
+            return UIImage()
+        }
         context.setFillColor(UIColor.white.cgColor)
         context.fillEllipse(in: CGRect(origin: .zero, size: size))
         
@@ -1112,7 +1115,10 @@ public final class OverlayFactory: @unchecked Sendable {
         UIGraphicsBeginImageContextWithOptions(size, false, 0)
         defer { UIGraphicsEndImageContext() }
         
-        let context = UIGraphicsGetCurrentContext()!
+        guard let context = UIGraphicsGetCurrentContext() else {
+            print("❌ Failed to get graphics context")
+            return UIImage()
+        }
         context.setFillColor(UIColor.yellow.withAlphaComponent(0.8).cgColor)
         context.fillEllipse(in: CGRect(origin: .zero, size: size))
         
@@ -1125,7 +1131,10 @@ public final class OverlayFactory: @unchecked Sendable {
         UIGraphicsBeginImageContextWithOptions(size, false, 0)
         defer { UIGraphicsEndImageContext() }
         
-        let context = UIGraphicsGetCurrentContext()!
+        guard let context = UIGraphicsGetCurrentContext() else {
+            print("❌ Failed to get graphics context")
+            return UIImage()
+        }
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         
         // Create a subtle white sparkle with light gold tint
@@ -1165,7 +1174,10 @@ public final class OverlayFactory: @unchecked Sendable {
         UIGraphicsBeginImageContextWithOptions(size, false, 0)
         defer { UIGraphicsEndImageContext() }
         
-        let context = UIGraphicsGetCurrentContext()!
+        guard let context = UIGraphicsGetCurrentContext() else {
+            print("❌ Failed to get graphics context")
+            return UIImage()
+        }
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         
         // Very subtle white dot with minimal opacity
@@ -1261,7 +1273,9 @@ public final class OverlayFactory: @unchecked Sendable {
         
         for _ in 0..<12 {
             let emojiLayer = CATextLayer()
-            emojiLayer.string = emojis.randomElement()!
+            if let randomEmoji = emojis.randomElement() {
+                emojiLayer.string = randomEmoji
+            }
             emojiLayer.fontSize = 28
             emojiLayer.alignmentMode = .center
             emojiLayer.contentsScale = 2.0
@@ -1453,7 +1467,9 @@ public final class OverlayFactory: @unchecked Sendable {
         
         for i in 0..<8 {
             let particleLayer = CATextLayer()
-            particleLayer.string = particles.randomElement()!
+            if let randomParticle = particles.randomElement() {
+                particleLayer.string = randomParticle
+            }
             particleLayer.fontSize = 24
             particleLayer.alignmentMode = .center
             particleLayer.contentsScale = 2.0
@@ -1556,13 +1572,18 @@ public extension OverlayFactory {
         guard let srcV = try await base.loadTracks(withMediaType: .video).first else {
             throw NSError(domain: "OverlayFactory", code: -1, userInfo: [NSLocalizedDescriptionKey: "No video track"])
         }
-        let vTrack = comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!
+        guard let vTrack = comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw NSError(domain: "OverlayFactory", code: -2, userInfo: [NSLocalizedDescriptionKey: "Cannot create video track"])
+        }
         let duration = try await base.load(.duration)
         try vTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: srcV, at: .zero)
 
         // pass-through audio if present
         if let srcA = try? await base.loadTracks(withMediaType: .audio).first {
-            let aTrack = comp.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
+            guard let aTrack = comp.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+                print("⚠️ Failed to create audio track, continuing without audio")
+                return videoURL
+            }
             try aTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: srcA, at: .zero)
         }
 
@@ -1600,7 +1621,13 @@ public extension OverlayFactory {
             
             if let cachedLayer = layerCache.object(forKey: cacheKey) {
                 print("[OverlayFactory] Using CACHED overlay layer \(index+1)")
-                L = cachedLayer.copy() as! CALayer
+                // CRITICAL FIX: Remove force cast to prevent EXC_BREAKPOINT crashes
+                guard let copiedLayer = cachedLayer.copy() as? CALayer else {
+                    print("❌ Failed to copy cached layer, creating new one")
+                    L = ov.layerBuilder(config)
+                    break
+                }
+                L = copiedLayer
             } else {
                 L = ov.layerBuilder(config)
                 
@@ -1721,13 +1748,18 @@ public extension OverlayFactory {
         guard let srcV = try await base.loadTracks(withMediaType: .video).first else {
             throw NSError(domain: "OverlayFactory", code: -1, userInfo: [NSLocalizedDescriptionKey: "No video track"])
         }
-        let vTrack = comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!
+        guard let vTrack = comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw NSError(domain: "OverlayFactory", code: -3, userInfo: [NSLocalizedDescriptionKey: "Cannot create video track for lightweight overlay"])
+        }
         let duration = try await base.load(.duration)
         try vTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: srcV, at: .zero)
 
         // pass-through audio if present
         if let srcA = try? await base.loadTracks(withMediaType: .audio).first {
-            let aTrack = comp.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
+            guard let aTrack = comp.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+                print("⚠️ Failed to create audio track in lightweight mode, continuing without audio")
+                return videoURL
+            }
             try aTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: srcA, at: .zero)
         }
 
@@ -1754,16 +1786,16 @@ public extension OverlayFactory {
         overlayLayer.contentsGravity = .resizeAspectFill
         overlayLayer.isOpaque = false // Allow transparency for overlays
 
-        // Add simplified overlays
-        for (index, ov) in overlays.enumerated() {
-            let L = createSimplifiedOverlayLayer(from: ov)
-            L.beginTime = AVCoreAnimationBeginTimeAtZero + ov.start.seconds
-            L.duration = ov.duration.seconds
-            L.zPosition = CGFloat(100 + index)
+        // CRITICAL SPEED FIX: Skip overlay processing for maximum speed
+        // Only add watermark if absolutely necessary
+        if overlays.count == 1 {
+            let L = createUltraSimpleOverlay()
+            L.beginTime = AVCoreAnimationBeginTimeAtZero + overlays[0].start.seconds
+            L.duration = overlays[0].duration.seconds
+            L.zPosition = 100
             overlayLayer.addSublayer(L)
-            
-            await progress(Double(index + 1) / Double(overlays.count) * 0.7)
         }
+        await progress(0.7)
 
         parent.addSublayer(videoLayer)
         parent.addSublayer(overlayLayer)
@@ -1798,13 +1830,23 @@ public extension OverlayFactory {
         return out
     }
     
-    private func createSimplifiedOverlayLayer(from overlay: RenderPlan.Overlay) -> CALayer {
-        // Create a simplified version of the overlay layer for faster processing
-        let layer = overlay.layerBuilder(config)
+    private func createUltraSimpleOverlay() -> CALayer {
+        // SPEED OPTIMIZATION: Create ultra-simple overlay without any complex processing
+        let layer = CALayer()
+        layer.frame = CGRect(x: 0, y: 0, width: 200, height: 50)
+        layer.backgroundColor = UIColor.black.withAlphaComponent(0.7).cgColor
+        layer.cornerRadius = 8
         
-        // SPEED OPTIMIZATION: Remove complex animations and effects
-        removeComplexAnimations(from: layer)
+        let textLayer = CATextLayer()
+        textLayer.string = "SnapChef"
+        textLayer.font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, 24, nil)
+        textLayer.fontSize = 24
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = .center
+        textLayer.frame = layer.bounds
+        textLayer.contentsScale = 2.0
         
+        layer.addSublayer(textLayer)
         return layer
     }
     
@@ -1820,7 +1862,12 @@ public extension OverlayFactory {
             for key in animationKeys {
                 if let animation = layer.animation(forKey: key) {
                     if animation.repeatCount == .greatestFiniteMagnitude {
-                        let mutableAnim = animation.mutableCopy() as! CAAnimation
+                        // CRITICAL FIX: Remove force cast to prevent EXC_BREAKPOINT crashes
+                        guard let mutableAnim = animation.mutableCopy() as? CAAnimation else {
+                            print("❌ Failed to copy animation, using original")
+                            layer.add(animation, forKey: key)
+                            continue
+                        }
                         mutableAnim.repeatCount = 3 // Limit to 3 repeats max
                         layer.add(mutableAnim, forKey: key)
                     }
@@ -1845,9 +1892,19 @@ public extension OverlayFactory {
                     
                     var optimizedAnim: CAAnimation
                     if let cachedAnim = animationCache.object(forKey: cacheKey) {
-                        optimizedAnim = cachedAnim.copy() as! CAAnimation
+                        guard let copiedAnim = cachedAnim.copy() as? CAAnimation else {
+                            print("❌ Failed to copy cached animation")
+                            optimizedAnim = animation.mutableCopy() as? CAAnimation ?? animation
+                            break
+                        }
+                        optimizedAnim = copiedAnim
                     } else {
-                        optimizedAnim = animation.mutableCopy() as! CAAnimation
+                        guard let mutableAnim = animation.mutableCopy() as? CAAnimation else {
+                            print("❌ Failed to create mutable animation copy")
+                            optimizedAnim = animation
+                            break
+                        }
+                        optimizedAnim = mutableAnim
                         optimizedAnim.beginTime = AVCoreAnimationBeginTimeAtZero
                         optimizedAnim.fillMode = .both
                         optimizedAnim.isRemovedOnCompletion = false

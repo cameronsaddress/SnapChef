@@ -465,7 +465,10 @@ public actor RenderPlanner {
         UIGraphicsBeginImageContextWithOptions(size, false, 0)
         defer { UIGraphicsEndImageContext() }
         
-        let context = UIGraphicsGetCurrentContext()!
+        guard let context = UIGraphicsGetCurrentContext() else {
+            print("❌ Failed to get graphics context")
+            return UIImage()
+        }
         context.setFillColor(UIColor.yellow.cgColor)
         
         // Draw star shape
@@ -971,7 +974,10 @@ public actor RenderPlanner {
         UIGraphicsBeginImageContextWithOptions(size, false, 0)
         defer { UIGraphicsEndImageContext() }
         
-        let context = UIGraphicsGetCurrentContext()!
+        guard let context = UIGraphicsGetCurrentContext() else {
+            print("❌ Failed to get graphics context")
+            return UIImage()
+        }
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         
         // Create golden spark with SnapChef branding colors

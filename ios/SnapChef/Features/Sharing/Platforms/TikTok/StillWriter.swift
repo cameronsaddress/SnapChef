@@ -37,7 +37,8 @@ public final class StillWriter: @unchecked Sendable {
         effectCache.countLimit = 20
         
         setupPixelBufferPool()
-        precomputeAnimationCurves()
+        // SPEED OPTIMIZATION: Skip animation precomputation for faster startup
+        // precomputeAnimationCurves()
     }
     
     private func setupPixelBufferPool() {
@@ -403,16 +404,26 @@ public final class StillWriter: @unchecked Sendable {
     /// Apply chromatic aberration effect
     private func applyChromaticAberration(to image: CIImage, intensity: CGFloat) -> CIImage {
         // Split RGB channels and offset them slightly
-        let redOffset = CIFilter(name: "CIAffineTransform")!
+        // CRITICAL FIX: Remove force unwraps to prevent EXC_BREAKPOINT crashes
+        guard let redOffset = CIFilter(name: "CIAffineTransform") else {
+            print("❌ Failed to create CIAffineTransform filter for red channel")
+            return image
+        }
         redOffset.setValue(image, forKey: kCIInputImageKey)
         redOffset.setValue(CGAffineTransform(translationX: intensity * 2, y: 0), forKey: kCIInputTransformKey)
         
-        let blueOffset = CIFilter(name: "CIAffineTransform")!
+        guard let blueOffset = CIFilter(name: "CIAffineTransform") else {
+            print("❌ Failed to create CIAffineTransform filter for blue channel")
+            return image
+        }
         blueOffset.setValue(image, forKey: kCIInputImageKey)
         blueOffset.setValue(CGAffineTransform(translationX: -intensity * 2, y: 0), forKey: kCIInputTransformKey)
         
         // Composite the channels (simplified version)
-        let composite = CIFilter(name: "CIAdditionCompositing")!
+        guard let composite = CIFilter(name: "CIAdditionCompositing") else {
+            print("❌ Failed to create CIAdditionCompositing filter for chromatic aberration")
+            return image
+        }
         composite.setValue(redOffset.outputImage, forKey: kCIInputImageKey)
         composite.setValue(blueOffset.outputImage, forKey: kCIInputBackgroundImageKey)
         
@@ -422,7 +433,11 @@ public final class StillWriter: @unchecked Sendable {
     /// Apply animated light leak effect
     private func applyLightLeak(to image: CIImage, position: CGPoint, intensity: CGFloat) -> CIImage {
         // Create the radial gradient (this is a generator filter - no inputImage needed)
-        let radialGradient = CIFilter(name: "CIRadialGradient")!
+        // CRITICAL FIX: Remove force unwrap to prevent EXC_BREAKPOINT crashes
+        guard let radialGradient = CIFilter(name: "CIRadialGradient") else {
+            print("❌ Failed to create CIRadialGradient filter")
+            return image
+        }
         radialGradient.setValue(CIVector(x: position.x, y: position.y), forKey: "inputCenter")
         radialGradient.setValue(50, forKey: "inputRadius0")
         radialGradient.setValue(200, forKey: "inputRadius1")
@@ -433,7 +448,10 @@ public final class StillWriter: @unchecked Sendable {
         guard let gradientImage = radialGradient.outputImage else { return image }
         
         // Composite the gradient over the background image
-        let composite = CIFilter(name: "CIAdditionCompositing")!
+        guard let composite = CIFilter(name: "CIAdditionCompositing") else {
+            print("❌ Failed to create CIAdditionCompositing filter for light leak")
+            return image
+        }
         composite.setValue(gradientImage, forKey: kCIInputImageKey)
         composite.setValue(image, forKey: kCIInputBackgroundImageKey)
         
@@ -443,7 +461,11 @@ public final class StillWriter: @unchecked Sendable {
     /// Apply film grain effect
     private func applyFilmGrain(to image: CIImage, intensity: CGFloat) -> CIImage {
         // Create random noise (this is a generator filter - no inputImage needed)
-        let noise = CIFilter(name: "CIRandomGenerator")!
+        // CRITICAL FIX: Remove force unwrap to prevent EXC_BREAKPOINT crashes
+        guard let noise = CIFilter(name: "CIRandomGenerator") else {
+            print("❌ Failed to create CIRandomGenerator filter")
+            return image
+        }
         
         // Get the noise image
         guard let noiseImage = noise.outputImage else { return image }
@@ -454,7 +476,10 @@ public final class StillWriter: @unchecked Sendable {
             .cropped(to: image.extent)
         
         // Convert noise to grayscale for film grain effect
-        let grayscale = CIFilter(name: "CIColorMatrix")!
+        guard let grayscale = CIFilter(name: "CIColorMatrix") else {
+            print("❌ Failed to create CIColorMatrix filter")
+            return image
+        }
         grayscale.setValue(scaledNoise, forKey: kCIInputImageKey)
         grayscale.setValue(CIVector(x: 0.299, y: 0.587, z: 0.114, w: 0), forKey: "inputRVector")
         grayscale.setValue(CIVector(x: 0.299, y: 0.587, z: 0.114, w: 0), forKey: "inputGVector")
@@ -464,12 +489,18 @@ public final class StillWriter: @unchecked Sendable {
         guard let grainImage = grayscale.outputImage else { return image }
         
         // Blend the grain with the original image using multiply blend mode
-        let composite = CIFilter(name: "CIMultiplyBlendMode")!
+        guard let composite = CIFilter(name: "CIMultiplyBlendMode") else {
+            print("❌ Failed to create CIMultiplyBlendMode filter")
+            return image
+        }
         composite.setValue(image, forKey: kCIInputBackgroundImageKey)
         composite.setValue(grainImage, forKey: kCIInputImageKey)
         
         // Mix the result with the original based on intensity
-        let mix = CIFilter(name: "CIColorBlendMode")!
+        guard let mix = CIFilter(name: "CIColorBlendMode") else {
+            print("❌ Failed to create CIColorBlendMode filter")
+            return image
+        }
         mix.setValue(image, forKey: kCIInputBackgroundImageKey)
         mix.setValue(composite.outputImage, forKey: kCIInputImageKey)
         

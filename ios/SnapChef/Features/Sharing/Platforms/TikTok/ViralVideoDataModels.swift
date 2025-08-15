@@ -109,25 +109,25 @@ public struct RenderProgress: Sendable {
 
 // SPEED OPTIMIZED Export controls
 public enum ExportSettings {
-    // SPEED OPTIMIZATION: Use different presets for different phases
-    public static let videoPreset = AVAssetExportPresetHighestQuality // Use available preset
-    public static let draftPreset = AVAssetExportPresetMediumQuality // For intermediate steps
-    public static let finalPreset = AVAssetExportPresetHighestQuality // Only for final export
+    // CRITICAL SPEED FIX: Use medium quality for all operations to achieve sub-10s rendering
+    public static let videoPreset = AVAssetExportPresetMediumQuality // Medium quality for speed
+    public static let draftPreset = AVAssetExportPresetLowQuality // Low quality for intermediate steps
+    public static let finalPreset = AVAssetExportPresetMediumQuality // Medium quality even for final
     
-    public static let maxMemoryUsage: UInt64 = 800 * 1024 * 1024
-    public static let maxRenderTime: Double = 5.0 // Reduced from 8s to 5s for better UX
+    public static let maxMemoryUsage: UInt64 = 400 * 1024 * 1024 // Reduced to 400MB
+    public static let maxRenderTime: Double = 8.0 // Target under 8s total
     public static let pixelFormat = kCVPixelFormatType_32BGRA
-    public static let maxFileSize: Int64 = 50 * 1024 * 1024  // 50MB
-    public static let targetFileSize: Int64 = 50 * 1024 * 1024  // 50MB
+    public static let maxFileSize: Int64 = 25 * 1024 * 1024  // Reduced to 25MB for speed
+    public static let targetFileSize: Int64 = 20 * 1024 * 1024  // Target 20MB for speed
     
-    // SPEED OPTIMIZATION: Compression settings for different phases
-    public static let draftBitRate = 4_000_000 // 4 Mbps for drafts
-    public static let finalBitRate = 8_000_000 // 8 Mbps for final
-    public static let fastBitRate = 2_000_000 // 2 Mbps for very fast processing
+    // CRITICAL SPEED FIX: Much lower bitrates for faster processing
+    public static let draftBitRate = 1_500_000 // 1.5 Mbps for drafts
+    public static let finalBitRate = 3_000_000 // 3 Mbps for final (reduced from 8)
+    public static let fastBitRate = 1_000_000 // 1 Mbps for ultra-fast processing
     
-    // Parallel processing limits
-    public static let maxConcurrentSegments = 3
-    public static let cacheLimit = 10
+    // Parallel processing limits - increased for better performance
+    public static let maxConcurrentSegments = 2 // Reduced to avoid memory pressure
+    public static let cacheLimit = 5 // Reduced cache to save memory
 }
 
 // MARK: - RenderPlan + specs shared across renderer/planner/overlays
@@ -216,13 +216,21 @@ public enum FilterSpecBridge {
             switch s {
             // Basic filters
             case .gaussianBlur(let r):
-                let f = CIFilter(name: "CIGaussianBlur")!; f.setValue(r, forKey: kCIInputRadiusKey); filters.append(f)
+                guard let f = CIFilter(name: "CIGaussianBlur") else { break }
+                f.setValue(r, forKey: kCIInputRadiusKey)
+                filters.append(f)
             case .vibrance(let a):
-                let f = CIFilter(name: "CIVibrance")!; f.setValue(a, forKey: "inputAmount"); filters.append(f)
+                guard let f = CIFilter(name: "CIVibrance") else { break }
+                f.setValue(a, forKey: "inputAmount")
+                filters.append(f)
             case .saturation(let s):
-                let f = CIFilter(name: "CIColorControls")!; f.setValue(s, forKey: kCIInputSaturationKey); filters.append(f)
+                guard let f = CIFilter(name: "CIColorControls") else { break }
+                f.setValue(s, forKey: kCIInputSaturationKey)
+                filters.append(f)
             case .contrast(let c):
-                let f = CIFilter(name: "CIColorControls")!; f.setValue(c, forKey: kCIInputContrastKey); filters.append(f)
+                guard let f = CIFilter(name: "CIColorControls") else { break }
+                f.setValue(c, forKey: kCIInputContrastKey)
+                filters.append(f)
                 
             // PREMIUM COLOR GRADES
             case .premiumColorGrade(let style):
@@ -258,11 +266,11 @@ public enum FilterSpecBridge {
         switch style {
         case .warm:
             // Golden hour warmth
-            let temp = CIFilter(name: "CITemperatureAndTint")!
+            guard let temp = CIFilter(name: "CITemperatureAndTint") else { break }
             temp.setValue(CIVector(x: 2000, y: 50), forKey: "inputNeutral") // Warm + slight magenta
             filters.append(temp)
             
-            let curves = CIFilter(name: "CIColorCurves")!
+            guard let curves = CIFilter(name: "CIColorCurves") else { break }
             // Lift shadows, add warmth to highlights
             curves.setValue(CIVector(x: 0, y: 0.05, z: 0.95, w: 1.0), forKey: "inputCurvesDomain")
             filters.append(curves)

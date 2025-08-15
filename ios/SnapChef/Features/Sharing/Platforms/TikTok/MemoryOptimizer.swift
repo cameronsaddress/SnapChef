@@ -37,8 +37,9 @@ public final class MemoryOptimizer: @unchecked Sendable {
     // PREMIUM FIX: Used Metal for thread-safe premium filter chaining and parallel processing
     private lazy var sharedCIContext: CIContext = {
         // Create proper color spaces for CIContext - use sRGB for consistency with photos
-        let workingColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
-        let outputColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        // CRITICAL FIX: Remove force unwraps to prevent EXC_BREAKPOINT crashes
+        let workingColorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        let outputColorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
         
         // Fix: Use Metal for thread-safety instead of EAGL (OpenGL)
         // Metal is thread-safe and doesn't require makeCurrentContext

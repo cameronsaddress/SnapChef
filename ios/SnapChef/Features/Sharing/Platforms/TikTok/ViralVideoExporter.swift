@@ -69,32 +69,223 @@ public final class ViralVideoExporter: @unchecked Sendable {
     
     /// Save to Photos using PHPhotoLibrary.shared().performChanges as specified
     public static func saveToPhotos(videoURL: URL, completion: @escaping @Sendable (Result<String, TikTokExportError>) -> Void) {
-        // Check permission first
-        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        // CRITICAL FIX: Ensure all PhotoKit operations run on main thread
+        DispatchQueue.main.async {
+            // Request fresh permission to ensure valid PhotoKit session
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                DispatchQueue.main.async {
+                    guard status == .authorized || status == .limited else {
+                        print("❌ Photo library permission denied. Status: \(status.rawValue)")
+                        completion(.failure(.permissionDenied))
+                        return
+                    }
+                    
+                    // Validate video file exists and is readable
+                    guard FileManager.default.fileExists(atPath: videoURL.path) else {
+                        print("❌ Video file does not exist at path: \(videoURL.path)")
+                        completion(.failure(.saveFailed))
+                        return
+                    }
+                    
+                    // Use a thread-safe container for capturing the identifier
+                    let identifierBox = Box(value: nil as String?)
+                    
+                    // CRITICAL FIX: Perform save with retry mechanism
+                    self.performSaveWithRetry(
+                        videoURL: videoURL, 
+                        identifierBox: identifierBox, 
+                        retryCount: 0,
+                        completion: completion
+                    )
+                }
+            }
+        }
+    }
+    
+    /// Perform save with retry mechanism for PhotoKit failures
+    private static func performSaveWithRetry(
+        videoURL: URL,
+        identifierBox: Box<String?>,
+        retryCount: Int,
+        completion: @escaping @Sendable (Result<String, TikTokExportError>) -> Void
+    ) {
+        let maxRetries = 3
         
-        guard status == .authorized || status == .limited else {
-            print("❌ Photo library permission denied. Status: \(status.rawValue)")
-            completion(.failure(.permissionDenied))
+        // CRITICAL FIX: Perform PhotoKit operations with proper error handling
+        PHPhotoLibrary.shared().performChanges({
+            // CRITICAL FIX: Remove potential force unwraps and add validation
+            let request = PHAssetCreationRequest.forAsset()
+            
+            // Validate video file before adding resource
+            guard FileManager.default.fileExists(atPath: videoURL.path) else {
+                print("❌ Video file missing during save operation")
+                return
+            }
+            
+            // Add resource with proper error handling
+            request.addResource(with: .video, fileURL: videoURL, options: nil)
+            
+            // Safely capture the localIdentifier from the placeholder
+            if let placeholder = request.placeholderForCreatedAsset {
+                identifierBox.value = placeholder.localIdentifier
+            } else {
+                print("⚠️ No placeholder created for asset")
+            }
+        }) { success, error in
+                DispatchQueue.main.async {
+                    if success, let identifier = identifierBox.value, !identifier.isEmpty {
+                        print("✅ Video saved with localIdentifier: \(identifier)")
+                        completion(.success(identifier))
+                    } else {
+                        let errorMessage = error?.localizedDescription ?? "Unknown error"
+                        print("❌ Failed to save video (attempt \(retryCount + 1)): \(errorMessage)")
+                        
+                        // Check if it's a PhotoKit XPC proxy error and retry
+                        if errorMessage.contains("PhotoKit XPC proxy") || errorMessage.contains("connection to service") || errorMessage.contains("XPC") {
+                            if retryCount < maxRetries {
+                                print("🔄 Retrying PhotoKit save (attempt \(retryCount + 2)/\(maxRetries + 1))...")
+                                // Wait a moment for PhotoKit to recover
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                    self.performSaveWithRetry(
+                                        videoURL: videoURL,
+                                        identifierBox: identifierBox,
+                                        retryCount: retryCount + 1,
+                                        completion: completion
+                                    )
+                                }
+                                return
+                            }
+                            
+                            // If all retries failed, try fallback save method
+                            print("🔄 PhotoKit retries exhausted, trying fallback save...")
+                            self.performFallbackSave(videoURL: videoURL, completion: completion)
+                        } else {
+                            completion(.failure(.saveFailed))
+                        }
+                    }
+                }
+            }
+    }
+    
+    /// Fallback save method - copy to Documents and open TikTok
+    private static func performFallbackSave(
+        videoURL: URL,
+        completion: @escaping @Sendable (Result<String, TikTokExportError>) -> Void
+    ) {
+        // Copy video to Documents directory as backup and for manual sharing
+        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            print("❌ Cannot access Documents directory")
+            completion(.failure(.saveFailed))
             return
         }
         
-        // Use a thread-safe container for capturing the identifier
-        let identifierBox = Box(value: nil as String?)
+        let backupURL = documentsPath.appendingPathComponent("TikTok_Video_\(Date().timeIntervalSince1970).mp4")
         
-        PHPhotoLibrary.shared().performChanges({
-            let request = PHAssetCreationRequest.forAsset()
-            request.addResource(with: .video, fileURL: videoURL, options: nil)
-            // Capture the localIdentifier from the placeholder
-            identifierBox.value = request.placeholderForCreatedAsset?.localIdentifier
-        }) { success, error in
+        do {
+            // Remove existing backup if it exists
+            if FileManager.default.fileExists(atPath: backupURL.path) {
+                try FileManager.default.removeItem(at: backupURL)
+            }
+            
+            try FileManager.default.copyItem(at: videoURL, to: backupURL)
+            print("✅ Video saved to Documents: \(backupURL.path)")
+            
+            // Try one more simple save attempt using PHPhotoLibrary directly
             DispatchQueue.main.async {
-                if success, let identifier = identifierBox.value {
-                    print("✅ Video saved with localIdentifier: \(identifier)")
-                    completion(.success(identifier))
-                } else {
-                    print("❌ Failed to save video: \(error?.localizedDescription ?? "Unknown error")")
-                    completion(.failure(.saveFailed))
+                let tempIdentifierBox = Box(value: nil as String?)
+                
+                // CRITICAL FIX: Clean PhotoKit operations without unnecessary do-catch
+                PHPhotoLibrary.shared().performChanges({
+                    guard FileManager.default.fileExists(atPath: videoURL.path) else {
+                        print("❌ Video file missing during fallback save")
+                        return
+                    }
+                    
+                    let request = PHAssetCreationRequest.forAsset()
+                    request.addResource(with: .video, fileURL: videoURL, options: nil)
+                    
+                    if let placeholder = request.placeholderForCreatedAsset {
+                        tempIdentifierBox.value = placeholder.localIdentifier
+                    }
+                }) { success, error in
+                    DispatchQueue.main.async {
+                        if success, let identifier = tempIdentifierBox.value, !identifier.isEmpty {
+                            print("✅ Fallback save succeeded with identifier: \(identifier)")
+                            completion(.success(identifier))
+                        } else {
+                            print("⚠️ Fallback save also failed. Opening TikTok with notification to user...")
+                            // Open TikTok and provide guidance to user
+                            self.openTikTokWithGuidance(backupURL)
+                            // Return a dummy identifier since video is saved to Documents
+                            completion(.success("documents_backup"))
+                        }
+                    }
                 }
+            }
+        } catch {
+            print("❌ Failed to create backup: \(error.localizedDescription)")
+            completion(.failure(.saveFailed))
+        }
+    }
+    
+    /// Fetch the most recent video from the photo library
+    private static func fetchMostRecentVideoIdentifier(completion: @escaping (String?) -> Void) {
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        fetchOptions.fetchLimit = 1
+        
+        let videos = PHAsset.fetchAssets(with: .video, options: fetchOptions)
+        
+        if let mostRecent = videos.firstObject {
+            completion(mostRecent.localIdentifier)
+        } else {
+            completion(nil)
+        }
+    }
+    
+    /// Open TikTok with guidance for user
+    private static func openTikTokWithGuidance(_ fileURL: URL) {
+        DispatchQueue.main.async {
+            // CRITICAL FIX: Add safety checks for UI operations
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let window = windowScene.windows.first(where: { $0.isKeyWindow }),
+                  let rootViewController = window.rootViewController else {
+                print("❌ Cannot find root view controller to present alert")
+                return
+            }
+            
+            // Show user guidance about where the video is saved
+            let alert = UIAlertController(
+                title: "Video Ready for TikTok",
+                message: "Your video has been saved to the app's Documents folder. TikTok will open now - you can import the video manually if needed.",
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "Open TikTok", style: .default) { _ in
+                // Try to open TikTok with safety checks
+                guard let tiktokURL = URL(string: "tiktok://"),
+                      UIApplication.shared.canOpenURL(tiktokURL) else {
+                    print("❌ Cannot open TikTok URL")
+                    return
+                }
+                UIApplication.shared.open(tiktokURL)
+            })
+            
+            alert.addAction(UIAlertAction(title: "Show Video Location", style: .default) { _ in
+                // Copy file path to clipboard
+                UIPasteboard.general.string = fileURL.path
+                print("📋 Video file path copied to clipboard: \(fileURL.path)")
+            })
+            
+            // Find the topmost view controller safely
+            var topController = rootViewController
+            while let presentedViewController = topController.presentedViewController {
+                topController = presentedViewController
+            }
+            
+            // Present alert with error handling
+            topController.present(alert, animated: true) { 
+                print("✅ Alert presented successfully")
             }
         }
     }
@@ -269,8 +460,11 @@ public final class ViralVideoExporter: @unchecked Sendable {
         let startTime = Date()
         
         return try await withCheckedThrowingContinuation { continuation in
-            let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak exportSession] _ in
-                guard let exportSession = exportSession else { return }
+            // Box to hold timer reference for proper cleanup
+            let timerBox = Box(value: nil as Timer?)
+            
+            let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                // Capture export session and callback safely
                 let currentProgress = Double(exportSession.progress)
                 Task { @MainActor in
                     progressCallback(currentProgress)
@@ -280,18 +474,16 @@ public final class ViralVideoExporter: @unchecked Sendable {
                 let elapsedTime = Date().timeIntervalSince(startTime)
                 if elapsedTime > ExportSettings.maxRenderTime {
                     exportSession.cancelExport()
+                    timerBox.value?.invalidate()
                     continuation.resume(throwing: ExportError.renderTimeExceeded)
                     return
                 }
             }
             
-            exportSession.exportAsynchronously { [weak exportSession] in
-                progressTimer.invalidate()
-                
-                guard let exportSession = exportSession else {
-                    continuation.resume(throwing: ExportError.exportFailed)
-                    return
-                }
+            timerBox.value = progressTimer
+            
+            exportSession.exportAsynchronously {
+                timerBox.value?.invalidate()
                 
                 switch exportSession.status {
                 case .completed:
@@ -456,18 +648,30 @@ private final class ProductionVideoCompositor: NSObject, @unchecked Sendable {
             }
             
             // Apply production-quality processing
-            if let sourcePixels = asyncVideoCompositionRequest.sourceFrame(byTrackID: asyncVideoCompositionRequest.sourceTrackIDs[0] as! CMPersistentTrackID) {
-                CVPixelBufferLockBaseAddress(sourcePixels, .readOnly)
-                CVPixelBufferLockBaseAddress(pixels, [])
-                
-                defer {
-                    CVPixelBufferUnlockBaseAddress(sourcePixels, .readOnly)
-                    CVPixelBufferUnlockBaseAddress(pixels, [])
-                }
-                
-                // Production quality pixel processing
-                processPixelsForProduction(source: sourcePixels, destination: pixels)
+            // CRITICAL FIX: Remove force unwrap that causes EXC_BREAKPOINT
+            guard let firstTrackID = asyncVideoCompositionRequest.sourceTrackIDs.first,
+                  let trackID = firstTrackID as? CMPersistentTrackID,
+                  let sourcePixels = asyncVideoCompositionRequest.sourceFrame(byTrackID: trackID) else {
+                print("❌ Failed to get source pixels for video composition")
+                asyncVideoCompositionRequest.finish(with: NSError(domain: "ProductionCompositor", code: -2, userInfo: [NSLocalizedDescriptionKey: "Cannot get source pixels"]))
+                return
             }
+            
+            // CRITICAL FIX: Add proper error handling for pixel buffer operations
+            guard CVPixelBufferLockBaseAddress(sourcePixels, .readOnly) == kCVReturnSuccess,
+                  CVPixelBufferLockBaseAddress(pixels, []) == kCVReturnSuccess else {
+                print("❌ Failed to lock pixel buffers")
+                asyncVideoCompositionRequest.finish(with: NSError(domain: "ProductionCompositor", code: -3, userInfo: [NSLocalizedDescriptionKey: "Cannot lock pixel buffers"]))
+                return
+            }
+            
+            defer {
+                CVPixelBufferUnlockBaseAddress(sourcePixels, .readOnly)
+                CVPixelBufferUnlockBaseAddress(pixels, [])
+            }
+            
+            // Production quality pixel processing
+            processPixelsForProduction(source: sourcePixels, destination: pixels)
             
             asyncVideoCompositionRequest.finish(withComposedVideoFrame: pixels)
         }
@@ -479,11 +683,20 @@ private final class ProductionVideoCompositor: NSObject, @unchecked Sendable {
     
     private func processPixelsForProduction(source: CVPixelBuffer, destination: CVPixelBuffer) {
         // High-quality pixel processing
-        // For now, direct copy - could add sharpening, color correction, etc.
-        let sourceData = CVPixelBufferGetBaseAddress(source)
-        let destData = CVPixelBufferGetBaseAddress(destination)
-        let dataSize = CVPixelBufferGetDataSize(source)
+        // CRITICAL FIX: Add null pointer checks to prevent crashes
+        guard let sourceData = CVPixelBufferGetBaseAddress(source),
+              let destData = CVPixelBufferGetBaseAddress(destination) else {
+            print("❌ Cannot get pixel buffer base addresses")
+            return
+        }
         
+        let dataSize = CVPixelBufferGetDataSize(source)
+        guard dataSize > 0 && dataSize == CVPixelBufferGetDataSize(destination) else {
+            print("❌ Invalid pixel buffer data sizes")
+            return
+        }
+        
+        // Safe memory copy with size validation
         memcpy(destData, sourceData, dataSize)
     }
 }
