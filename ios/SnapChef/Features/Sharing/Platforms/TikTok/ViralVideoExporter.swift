@@ -210,7 +210,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
             // PREMIUM FIX: Validate duration is exactly as expected  
             let asset = AVAsset(url: finalVideoURL)
             let duration = try await asset.load(.duration).seconds
-            print("✅ Video duration: \(String(format: "%.2f", duration))s (target: \(template.duration.seconds)s)")
+            print("✅ Video duration: \(String(format: "%.2f", duration))s")
             
             // 3. Save to Photos
             let localIdentifier = try await withCheckedThrowingContinuation { continuation in
@@ -220,8 +220,9 @@ public final class ViralVideoExporter: @unchecked Sendable {
             }
             
             // 4. Share to TikTok with premium caption
+            let caption = "🔥 MY FRIDGE CHALLENGE 🔥\nTurned these ingredients into \(recipe.title)!\n#SnapChef #FridgeChallenge #TikTokFood"
             try await withCheckedThrowingContinuation { continuation in
-                Self.shareToTikTok(localIdentifiers: [localIdentifier], caption: CaptionGenerator.defaultCaption(from: recipe)) { result in
+                Self.shareToTikTok(localIdentifiers: [localIdentifier], caption: caption) { result in
                     continuation.resume(with: result)
                 }
             }

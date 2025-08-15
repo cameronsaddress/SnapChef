@@ -21,21 +21,25 @@ struct InstagramShareView: View {
     @State private var captionText = ""
     @State private var errorMessage: String?
     
+    private var backgroundGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(hex: "#833AB4"),
+                Color(hex: "#C13584"),
+                Color(hex: "#E1306C"),
+                Color(hex: "#FD1D1D"),
+                Color(hex: "#F77737")
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
                 // Instagram gradient background
-                LinearGradient(
-                    colors: [
-                        Color(hex: "#833AB4"),
-                        Color(hex: "#C13584"),
-                        Color(hex: "#E1306C"),
-                        Color(hex: "#FD1D1D"),
-                        Color(hex: "#F77737")
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                backgroundGradient
                 .ignoresSafeArea()
                 
                 ScrollView {
@@ -166,7 +170,7 @@ struct InstagramShareView: View {
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
                             
-                            FlowLayout(spacing: 8) {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 8) {
                                 ForEach(suggestedHashtags, id: \.self) { hashtag in
                                     InstagramHashtag(hashtag: hashtag)
                                 }

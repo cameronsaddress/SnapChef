@@ -1,9 +1,4 @@
-//
-//  TikTokShareView.swift
-//  SnapChef
-//
-//  Created on 02/03/2025
-//
+// REPLACE ENTIRE FILE: TikTokShareView.swift
 
 import SwiftUI
 import AVKit
@@ -11,716 +6,124 @@ import Photos
 
 struct TikTokShareView: View {
     let content: ShareContent
-    @Environment(\.dismiss) var dismiss
-    @StateObject private var viralEngine = ViralVideoEngine()  // Use the new viral video engine
-    // PREMIUM FIX: Always use kineticTextSteps template for best engagement
-    private let selectedTemplate: ViralTemplate = .kineticTextSteps
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var engine = ViralVideoEngine()
+    private let template: ViralTemplate = .kineticTextSteps
     @State private var isGenerating = false
-    @State private var generatedVideoURL: URL?
-    @State private var showingVideoPreview = false
-    @State private var errorMessage: String?
-    @State private var showPermissionAlert = false
-    
+    @State private var videoURL: URL?
+    @State private var showPreview = false
+    @State private var error: String?
+
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background
-                LinearGradient(
-                    colors: [
-                        Color(hex: "#000000"),
-                        Color(hex: "#1a1a1a")
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                
+                LinearGradient(colors: [.black, .black.opacity(0.9)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
                 ScrollView {
-                    VStack(spacing: 24) {
-                        // TikTok branding header
-                        VStack(spacing: 8) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "music.note")
-                                    .font(.system(size: 24, weight: .bold))
-                                Text("TikTok Video Generator")
-                                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                            }
-                            .foregroundColor(.white)
-                            
-                            Text("Create a viral cooking video")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.gray)
-                        }
-                        .padding(.top, 20)
-                        
-                        // Single Template - Kinetic Text Only
-                        // Template tiles removed - focusing on kinetic text template only
-                        
-                        // Preview Section - Removed (not needed for current implementation)
-                        // VStack(spacing: 16) {
-                        //     // No title, just the preview
-                        //     TemplatePreview(
-                        //         template: .kineticTextSteps,  // Always use kinetic text
-                        //         content: content
-                        //     )
-                        // }
-                        // .padding(.horizontal, 20)
-                        
-                        // Trending sounds section removed
-                        
-                        // Hashtag Recommendations
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Recommended Hashtags")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                            
-                            FlowLayout(spacing: 8) {
-                                ForEach(recommendedHashtags, id: \.self) { hashtag in
-                                    HashtagChip(hashtag: hashtag)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        // Generate Button
-                        Button(action: generateVideo) {
+                    VStack(spacing: 20) {
+                        header
+                        hashtagChips
+                        Button(action: generate) {
                             ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(hex: "#FF0050"),
-                                                Color(hex: "#00F2EA")
-                                            ],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(height: 56)
-                                
+                                RoundedRectangle(cornerRadius: 14).fill(LinearGradient(colors: [Color(red:1,green:0,blue:0.31), Color(red:0,green:0.95,blue:0.92)], startPoint: .leading, endPoint: .trailing)).frame(height: 56)
                                 if isGenerating {
-                                    HStack(spacing: 12) {
+                                    HStack(spacing: 10) {
                                         ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        Text("\(viralEngine.currentProgress.phase.rawValue)")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(.white)
-                                    }
+                                        Text(engine.currentProgress.phase.rawValue.capitalized)
+                                    }.foregroundColor(.white)
                                 } else {
-                                    Text("Generate TikTok Video")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(.white)
+                                    Text("Generate TikTok Video").bold().foregroundColor(.white)
                                 }
                             }
                         }
                         .disabled(isGenerating)
-                        .padding(.horizontal, 20)
                         .padding(.bottom, 40)
-                    }
+                    }.padding(.horizontal, 20)
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("TikTok Video")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.white)
-                }
-                
+                ToolbarItem(placement: .navigationBarLeading) { Button("Cancel") { dismiss() }.foregroundColor(.white) }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if generatedVideoURL != nil {
-                        Button("Share") {
-                            shareToTikTok()
-                        }
-                        .foregroundColor(Color(hex: "#FF0050"))
-                        .fontWeight(.semibold)
-                    }
+                    if videoURL != nil { Button("Share") { share() }.foregroundColor(.pink) }
                 }
             }
         }
-        .sheet(isPresented: $showingVideoPreview) {
-            if let videoURL = generatedVideoURL {
-                VideoPreviewView(videoURL: videoURL)
-            }
-        }
-        .alert("Error", isPresented: .constant(errorMessage != nil)) {
-            Button("OK") {
-                errorMessage = nil
-            }
-        } message: {
-            if let error = errorMessage {
-                Text(error)
-            }
-        }
-        .alert("Photo Library Access Required", isPresented: $showPermissionAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Open Settings") {
-                if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(settingsUrl)
-                }
-            }
-        } message: {
-            Text("SnapChef needs access to your photo library to save TikTok videos. Please grant permission in Settings.")
+        .sheet(isPresented: $showPreview) { if let url = videoURL { VideoPlayer(player: AVPlayer(url: url)).ignoresSafeArea() } }
+        .alert("Error", isPresented: .constant(error != nil)) { Button("OK") { error = nil } } message: { Text(error ?? "") }
+    }
+
+    private var hashtagChips: some View {
+        let tags = ["SnapChef","FoodTok","FridgeHack","QuickDinner","30MinuteMeals","HomeChef","MealPrep"]
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Recommended Hashtags").font(.headline).foregroundColor(.white)
+            Wrap(tags, spacing: 8) { Text("#\($0)").padding(.horizontal,10).padding(.vertical,6).background(Color.white.opacity(0.08)).cornerRadius(10).foregroundColor(.white) }
         }
     }
-    
-    private var recommendedHashtags: [String] {
-        // PREMIUM FIX: Premium hashtags for maximum viral reach
-        var hashtags = [
-            "SnapChef",
-            "ViralRecipe",
-            "FoodTok",
-            "QuickDinner",
-            "FridgeHack",
-            "RecipeOfTheDay",
-            "CookingHack"
-        ]
-        
-        switch content.type {
-        case .recipe(let recipe):
-            // Add recipe-specific premium tags
-            hashtags.append(contentsOf: [
-                "EasyRecipe",
-                "\(recipe.difficulty.rawValue.capitalized)Cooking",
-                "FoodContent",
-                "Cooking\(Calendar.current.component(.year, from: Date()))",
-                "MealPrep",
-                "HomeChef"
-            ])
-            
-            // Add time-based hashtags
-            if recipe.prepTime + recipe.cookTime <= 30 {
-                hashtags.append(contentsOf: ["30MinuteMeals", "QuickRecipe"])
-            }
-            
-        case .challenge:
-            hashtags.append(contentsOf: [
-                "CookingChallenge",
-                "FoodChallenge",
-                "ChefLife",
-                "Viral"
-            ])
-            
-        default:
-            hashtags.append(contentsOf: ["FoodLover", "Foodie", "InstaFood"])
-        }
-        
-        // Limit to top 10 most relevant hashtags
-        return Array(hashtags.prefix(10))
+
+    private var header: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 8) { Image(systemName:"music.note").font(.system(size: 22, weight: .bold)); Text("TikTok Video Generator").font(.system(size: 22, weight: .bold)) }.foregroundColor(.white)
+            Text("Beat-synced, safe-zone text, gentle motion").foregroundColor(.gray).font(.subheadline)
+        }.padding(.top, 18)
     }
-    
-    private func generateVideo() {
-        // PREMIUM FIX: Simplified video generation with kinetic template
+
+    private func generate() {
+        guard let inputs = content.toRenderInputs() else { return }
+        let (recipe, media) = inputs
         isGenerating = true
         Task {
             do {
-                // Check photo library permission first
-                let photoStatus = await checkPhotoLibraryPermission()
-                guard photoStatus else {
-                    await MainActor.run {
-                        errorMessage = "Photo library access is required to save videos. Please grant permission in Settings."
-                        isGenerating = false
-                    }
-                    return
-                }
-                
-                // Convert content to required format
-                let (viralRecipe, mediaBundle) = try await convertContentToViralFormat(content)
-                
-                // PREMIUM FIX: Always use kineticTextSteps for best engagement
-                let videoURL = try await viralEngine.render(
-                    template: .kineticTextSteps,
-                    recipe: viralRecipe,
-                    media: mediaBundle,
-                    progressHandler: { progress in
-                        await MainActor.run {
-                            // Update UI with progress
-                            // viralEngine.currentProgress is already updated
-                        }
-                    }
-                )
-                
-                await MainActor.run {
-                    generatedVideoURL = videoURL
-                    showingVideoPreview = true
-                }
-                
-                // Automatically save and open TikTok
-                await saveAndShareToTikTok(videoURL: videoURL)
-                
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                }
-            }
-            
-            await MainActor.run {
-                isGenerating = false
-            }
+                let url = try await engine.render(template: template, recipe: recipe, media: media) { _ in }
+                self.videoURL = url; self.showPreview = true
+            } catch { self.error = error.localizedDescription }
+            self.isGenerating = false
         }
     }
-    
-    private func checkPhotoLibraryPermission() async -> Bool {
-        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-        
-        switch status {
-        case .authorized, .limited:
-            return true
-        case .notDetermined:
-            return await withCheckedContinuation { continuation in
-                PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
-                    continuation.resume(returning: newStatus == .authorized || newStatus == .limited)
-                }
-            }
-        case .denied, .restricted:
-            // Show alert to guide user to settings
-            await MainActor.run {
-                showPermissionAlert = true
-            }
-            return false
-        @unknown default:
-            return false
-        }
-    }
-    
-    private func convertContentToViralFormat(_ content: ShareContent) async throws -> (ViralRecipe, MediaBundle) {
-        // Convert Recipe to viral format
-        var viralRecipe: ViralRecipe
-        
-        switch content.type {
-        case .recipe(let recipe):
-            // Convert recipe steps to viral format
-            let steps = recipe.instructions.enumerated().map { index, instruction in
-                ViralRecipe.Step(
-                    title: instruction,
-                    secondsHint: Double(30 + index * 15) // Estimate time per step
-                )
-            }
-            
-            viralRecipe = ViralRecipe(
-                title: recipe.name,
-                hook: "Turn your fridge chaos into \(recipe.name) in \(recipe.prepTime + recipe.cookTime) minutes!",
-                steps: Array(steps.prefix(7)), // Limit to 7 steps max
-                timeMinutes: recipe.prepTime + recipe.cookTime,
-                costDollars: 10, // Estimate
-                calories: recipe.nutrition.calories,
-                ingredients: recipe.ingredients.map { $0.name }
-            )
-            
-        default:
-            // Fallback for non-recipe content
-            viralRecipe = ViralRecipe(
-                title: "SnapChef Creation",
-                hook: "Check out what I made with SnapChef!",
-                steps: [
-                    ViralRecipe.Step(title: "Open fridge", secondsHint: 5),
-                    ViralRecipe.Step(title: "Take photo", secondsHint: 5),
-                    ViralRecipe.Step(title: "Get recipe", secondsHint: 5),
-                    ViralRecipe.Step(title: "Cook", secondsHint: 30),
-                    ViralRecipe.Step(title: "Enjoy!", secondsHint: 5)
-                ],
-                timeMinutes: 15,
-                costDollars: 10,
-                calories: 400,
-                ingredients: ["Your fridge ingredients"]
-            )
-        }
-        
-        // Create media bundle with proper photos
-        print("📸 TikTokShareView: Creating MediaBundle:")
-        print("    - content.beforeImage (fridge): \(content.beforeImage != nil ? "✅ Available (\(content.beforeImage!.size))" : "❌ Missing")")
-        print("    - content.afterImage (meal): \(content.afterImage != nil ? "✅ Available (\(content.afterImage!.size))" : "❌ Missing")")
-        
-        // Validate and prepare photos for video generation
-        let (validFridge, validMeal) = PhotoValidator.preparePhotosForVideo(
-            fridgePhoto: content.beforeImage,
-            mealPhoto: content.afterImage
-        )
-        
-        // WARNING: If photos are nil or invalid, we're creating placeholders which show as black with text
-        let fridgePhoto: UIImage
-        let mealPhoto: UIImage
-        
-        if let validFridgePhoto = validFridge {
-            fridgePhoto = validFridgePhoto
-            print("📸 Using validated fridge photo: \(validFridgePhoto.size)")
-        } else {
-            print("⚠️ WARNING: No valid fridge photo available, creating placeholder")
-            fridgePhoto = createPlaceholderImage(text: "BEFORE")
-        }
-        
-        if let validMealPhoto = validMeal {
-            mealPhoto = validMealPhoto
-            print("📸 Using validated meal photo: \(validMealPhoto.size)")
-        } else {
-            print("⚠️ WARNING: No valid meal photo available, creating placeholder")
-            mealPhoto = createPlaceholderImage(text: "AFTER")
-        }
-        
-        // Get the URL for Mixdown.mp3 from the app bundle
-        let musicURL = Bundle.main.url(forResource: "Mixdown", withExtension: "mp3")
-        if musicURL == nil {
-            print("⚠️ WARNING: Mixdown.mp3 not found in app bundle")
-        } else {
-            print("🎵 TikTokShareView: Found Mixdown.mp3 in app bundle")
-        }
-        
-        // Create MediaBundle - using meal photo for both afterFridge and cookedMeal
-        // TODO: Refactor MediaBundle to remove afterFridge
-        let mediaBundle = MediaBundle(
-            beforeFridge: fridgePhoto,
-            afterFridge: mealPhoto,  // Using meal photo since afterFridge isn't a real concept
-            cookedMeal: mealPhoto,
-            musicURL: musicURL  // Add the background music
-        )
-        
-        print("📸 TikTokShareView: MediaBundle created:")
-        print("    - beforeFridge: \(fridgePhoto.size)")
-        print("    - cookedMeal: \(mealPhoto.size)")
-        print("    - musicURL: \(musicURL != nil ? "✅ Mixdown.mp3" : "❌ No music")")
-        
-        return (viralRecipe, mediaBundle)
-    }
-    
-    private func createPlaceholderImage(text: String) -> UIImage {
-        let size = CGSize(width: 1080, height: 1920)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        
-        return renderer.image { context in
-            // Black background
-            UIColor.black.setFill()
-            context.fill(CGRect(origin: .zero, size: size))
-            
-            // Draw text
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 120, weight: .bold),
-                .foregroundColor: UIColor.white
-            ]
-            
-            let textSize = text.size(withAttributes: attributes)
-            let textRect = CGRect(
-                x: (size.width - textSize.width) / 2,
-                y: (size.height - textSize.height) / 2,
-                width: textSize.width,
-                height: textSize.height
-            )
-            
-            text.draw(in: textRect, withAttributes: attributes)
-        }
-    }
-    
-    private func saveAndShareToTikTok(videoURL: URL) async {
-        // Generate caption with hashtags
-        let caption = generateCaption()
-        
-        // Copy caption to clipboard
-        await MainActor.run {
-            UIPasteboard.general.string = caption
-        }
-        
-        // Use TikTokShareService to save and open TikTok
-        await MainActor.run {
-            TikTokShareService.shareRecipeToTikTok(
-                videoURL: videoURL,
-                customCaption: caption
-            ) { result in
-                switch result {
-                case .success():
-                    // Successfully saved and opened TikTok
-                    DispatchQueue.main.async {
-                        // Dismiss the view after successful share
-                        self.dismiss()
-                    }
-                case .failure(let error):
-                    DispatchQueue.main.async {
-                        self.errorMessage = "Failed to share: \(error.localizedDescription)"
-                    }
-                }
-            }
-        }
-    }
-    
-    private func generateCaption() -> String {
-        var caption = ""
-        
-        // Add content-specific text
-        switch content.type {
-        case .recipe(let recipe):
-            caption = "🔥 MY FRIDGE CHALLENGE 🔥\n"
-            caption += "Just made \(recipe.name) in \(recipe.prepTime + recipe.cookTime) minutes!\n\n"
-        case .challenge(let challenge):
-            caption = "🏆 CHALLENGE COMPLETED 🏆\n"
-            caption += "\(challenge.title)\n\n"
-        default:
-            caption = "Check out what I made with SnapChef! 🍳\n\n"
-        }
-        
-        // Add hashtags
-        let hashtags = recommendedHashtags.map { "#\($0)" }.joined(separator: " ")
-        caption += hashtags
-        caption += "\n\n📱 Made with @SnapChef"
-        
-        return caption
-    }
-    
-    private func shareToTikTok() {
-        guard let videoURL = generatedVideoURL else { return }
-        
-        // Save video to photo library first
-        PHPhotoLibrary.requestAuthorization { status in
-            if status == .authorized {
-                PHPhotoLibrary.shared().performChanges({
-                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
-                }) { success, error in
-                    DispatchQueue.main.async {
-                        if success {
-                            // Open TikTok
-                            if let url = URL(string: "tiktok://") {
-                                UIApplication.shared.open(url)
+
+    private func share() {
+        guard let url = videoURL else { return }
+        ViralVideoExporter.requestPhotoPermission { ok in
+            Task { @MainActor in
+                guard ok else { self.error = "Photo access denied"; return }
+                ViralVideoExporter.saveToPhotos(videoURL: url) { result in
+                    Task { @MainActor in
+                        switch result {
+                        case .success(let identifier):
+                            let caption = "What's in my fridge → dinner. ✨🔥 #SnapChef #FoodTok"
+                            ViralVideoExporter.shareToTikTok(localIdentifiers: [identifier], caption: caption) { share in
+                                Task { @MainActor in
+                                    if case .failure(let e) = share { self.error = e.localizedDescription }
+                                }
                             }
-                        } else {
-                            errorMessage = "Failed to save video: \(error?.localizedDescription ?? "Unknown error")"
+                        case .failure(let e): self.error = e.localizedDescription
                         }
                     }
                 }
-            } else {
-                DispatchQueue.main.async {
-                    errorMessage = "Photo library access denied"
-                }
             }
         }
     }
 }
 
-// MARK: - Viral Template Card
-struct ViralTemplateCard: View {
-    let template: ViralTemplate
-    let isSelected: Bool
-    let action: () -> Void
-    
+// simple wrapping layout
+struct Wrap<Data: RandomAccessCollection, Content: View>: View where Data.Element: Hashable {
+    var data: Data; var spacing: CGFloat; var content: (Data.Element)->Content
+    init(_ d: Data, spacing: CGFloat = 8, @ViewBuilder content: @escaping (Data.Element)->Content) {
+        data = d; self.spacing = spacing; self.content = content
+    }
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                // Template preview thumbnail
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(
-                        LinearGradient(
-                            colors: gradientColors(for: template),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 100, height: 150)
-                    .overlay(
-                        Image(systemName: icon(for: template))
-                            .font(.system(size: 32))
-                            .foregroundColor(.white)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(
-                                isSelected ? Color(hex: "#FF0050") : Color.clear,
-                                lineWidth: 3
-                            )
-                    )
-                
-                Text(name(for: template))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .gray)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .frame(width: 100)
-            }
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    private func gradientColors(for template: ViralTemplate) -> [Color] {
-        switch template {
-        // Only supporting kinetic text
-        case .kineticTextSteps:
-            return [Color(hex: "#667eea"), Color(hex: "#764ba2")]
-        // Commented out other templates
-        // case .beatSyncedCarousel:
-        //     return [Color(hex: "#FF0050"), Color(hex: "#00F2EA")]
-        // case .splitScreenSwipe:
-        //     return [Color(hex: "#F77737"), Color(hex: "#F9A825")]
-        // case .priceTimeChallenge:
-        //     return [Color(hex: "#43e97b"), Color(hex: "#38f9d7")]
-        // case .greenScreenPIP:
-        //     return [Color(hex: "#fa709a"), Color(hex: "#fee140")]
-        // case .test:
-        //     return [Color.orange, Color.yellow]  // Bright orange-yellow for visibility
-        }
-    }
-    
-    private func icon(for template: ViralTemplate) -> String {
-        switch template {
-        case .kineticTextSteps: return "text.bubble"
-        // Commented out other templates
-        // case .beatSyncedCarousel: return "music.note"
-        // case .splitScreenSwipe: return "arrow.left.arrow.right"
-        // case .priceTimeChallenge: return "dollarsign.circle"
-        // case .greenScreenPIP: return "camera.on.rectangle"
-        // case .test: return "photo.on.rectangle"
-        }
-    }
-    
-    private func name(for template: ViralTemplate) -> String {
-        switch template {
-        case .kineticTextSteps: return "Kinetic Text"
-        // Commented out other templates
-        // case .beatSyncedCarousel: return "Beat Sync"
-        // case .splitScreenSwipe: return "Split Screen"
-        // case .priceTimeChallenge: return "Price Challenge"
-        // case .greenScreenPIP: return "Green Screen"
-        // case .test: return "Test (Photos Only)"
-        }
-    }
-}
-
-// Template Card struct removed - using ViralTemplate enum instead
-
-// Template Preview struct removed - not needed for current implementation
-
-// TrendingAudioRow struct removed - not used in current implementation
-
-// MARK: - Hashtag Chip
-struct HashtagChip: View {
-    let hashtag: String
-    @State private var isSelected = false
-    
-    var body: some View {
-        Button(action: { isSelected.toggle() }) {
-            Text("#\(hashtag)")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(isSelected ? .black : .white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    isSelected 
-                        ? Color(hex: "#00F2EA")
-                        : Color.white.opacity(0.1)
-                )
-                .cornerRadius(16)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-// MARK: - Flow Layout
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-    
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = FlowResult(
-            in: proposal.replacingUnspecifiedDimensions().width,
-            subviews: subviews,
-            spacing: spacing
-        )
-        return result.size
-    }
-    
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowResult(
-            in: bounds.width,
-            subviews: subviews,
-            spacing: spacing
-        )
-        for row in result.rows {
-            for item in row.items {
-                let x = bounds.minX + item.x
-                let y = bounds.minY + row.y
-                item.view.place(at: CGPoint(x: x, y: y), proposal: .init(item.size))
-            }
-        }
-    }
-    
-    struct FlowResult {
-        var size: CGSize = .zero
-        var rows: [Row] = []
-        
-        struct Row {
-            var items: [Item] = []
-            var y: CGFloat = 0
-            var height: CGFloat = 0
-        }
-        
-        struct Item {
-            var view: LayoutSubview
-            var size: CGSize
-            var x: CGFloat
-        }
-        
-        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var currentRow = Row()
-            var x: CGFloat = 0
-            var y: CGFloat = 0
-            var maxX: CGFloat = 0
-            
-            for subview in subviews {
-                let size = subview.sizeThatFits(.unspecified)
-                
-                if x + size.width > maxWidth && !currentRow.items.isEmpty {
-                    currentRow.y = y
-                    rows.append(currentRow)
-                    y += currentRow.height + spacing
-                    currentRow = Row()
-                    x = 0
-                }
-                
-                currentRow.items.append(Item(view: subview, size: size, x: x))
-                currentRow.height = max(currentRow.height, size.height)
-                x += size.width + spacing
-                maxX = max(maxX, x - spacing)
-            }
-            
-            if !currentRow.items.isEmpty {
-                currentRow.y = y
-                rows.append(currentRow)
-                y += currentRow.height
-            }
-            
-            size = CGSize(width: maxX, height: y)
-        }
-    }
-}
-
-// MARK: - Video Preview
-struct VideoPreviewView: View {
-    let videoURL: URL
-    @State private var player: AVPlayer?
-    @Environment(\.dismiss) var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            VideoPlayer(player: player)
-                .ignoresSafeArea()
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Done") {
-                            dismiss()
+        let dataArray = Array(data)
+        var width: CGFloat = 0, height: CGFloat = 0
+        return GeometryReader { geo in
+            ZStack(alignment: .topLeading) {
+                ForEach(dataArray, id: \.self) { item in
+                    content(item)
+                        .alignmentGuide(.leading) { d in
+                            if (abs(width - d.width) > geo.size.width) { width = 0; height -= d.height + spacing }
+                            let result = width; if item == dataArray.last { width = 0 }; width -= d.width + spacing; return result
                         }
-                    }
+                        .alignmentGuide(.top) { _ in let result = height; if item == dataArray.last { height = 0 }; return result }
                 }
-                .onAppear {
-                    player = AVPlayer(url: videoURL)
-                    player?.play()
-                }
-                .onDisappear {
-                    player?.pause()
-                }
-        }
+            }
+        }.frame(height: 120)
     }
-}
-
-// MARK: - Preview
-#Preview {
-    TikTokShareView(
-        content: ShareContent(
-            type: .recipe(MockDataProvider.shared.mockRecipe())
-        )
-    )
 }

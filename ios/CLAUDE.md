@@ -2,6 +2,84 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🔴 CRITICAL RULE: BUILD-GUARDIAN IS MANDATORY 🔴
+**EVERY code change MUST be verified by the build-guardian agent**
+- Never consider a task complete without build-guardian verification
+- The build-guardian ensures all our rules are followed
+- It catches build errors, fixes issues, and maintains code quality
+- Failure to use build-guardian violates our core development principles
+
+## 🚨 MANDATORY WORKFLOW - ALWAYS FOLLOW
+
+### 1. Build Verification with Guardian Agent (REQUIRED)
+**After ANY code changes, IMMEDIATELY use the build-guardian agent:**
+```
+MANDATORY: Use build-guardian agent after EVERY code modification
+```
+- The build-guardian agent MUST be invoked before considering ANY task complete
+- It will verify build success, fix compile errors, and ensure compliance
+- It will run SwiftLint to check code style and Swift 6 best practices
+- NEVER mark a task as done without build-guardian verification
+- If build-guardian reports issues, fix them and run it again
+
+**Build-Guardian Checks:**
+1. Runs `xcodebuild` to verify successful compilation
+2. Runs `swiftlint` to check code style and quality
+3. Verifies Swift 6 compliance (actor isolation, Sendable, etc.)
+4. Ensures no debug print statements in production code
+5. Confirms all our coding standards are met
+
+### 2. Error Resolution Protocol (2-ATTEMPT RULE)
+If you cannot fix an error after 2 attempts:
+1. **IMMEDIATELY search online documentation:**
+   - Search: `site:developer.apple.com Swift 6 [exact error message]`
+   - Search: `site:stackoverflow.com iOS 18 SwiftUI [error]`
+   - Search: `site:forums.swift.org Swift 6 concurrency [issue]`
+   - Search: `Swift 6 migration guide [specific problem]`
+2. **Check official sources:**
+   - Apple Developer Documentation
+   - Swift Evolution proposals
+   - WWDC 2024/2025 videos
+   - Swift Forums
+3. **Never guess after 2 failed attempts - ALWAYS research**
+
+### 3. View Creation Policy (STRICT)
+**NEVER create new SwiftUI Views without explicit user permission:**
+- Always ASK before creating any new View file
+- Present the proposed view structure to user first
+- Get confirmation before implementation
+- Only modify existing views unless specifically requested to create new ones
+
+### 4. Swift 6 Compliance (MANDATORY FOR ALL AGENTS)
+**ALL agents MUST be Swift 6 experts and write fully compliant code:**
+- Complete knowledge of Swift 6 documentation and features
+- Strict concurrency checking compliance
+- Proper actor isolation and Sendable conformance
+- Modern async/await patterns
+- No data races or concurrency warnings
+- Use @MainActor, nonisolated, and isolation regions correctly
+- Understand complete Swift 6 type system and generics
+- Apply all Swift 6 best practices and safety features
+
+### 5. Use Agents for Speed
+ALWAYS use specialized agents when applicable:
+- `ios-swift-architect` - For iOS features and architecture
+- `viral-video-engineer` - For video generation
+- `tiktok-specialist` - For TikTok features
+- `ios-qa-engineer` - For debugging and testing
+- `swiftui-designer` - For UI components
+- `gamification-designer` - For engagement features
+- Agents significantly speed up development - USE THEM!
+
+### 6. Task Completion Protocol
+After completing TODO list tasks:
+1. **MANDATORY: Run build-guardian agent to verify everything**
+2. Update documentation (this file, README, or feature docs) if guardian approves
+3. Commit with descriptive message only after guardian verification
+4. Push to GitHub with: `git push origin main` only after all checks pass
+
+**CRITICAL: No task is complete until build-guardian agent confirms success**
+
 ## Project Overview
 SnapChef is an iOS app that transforms fridge/pantry photos into personalized recipes using AI (Grok Vision API), with built-in social sharing and gamification features.
 

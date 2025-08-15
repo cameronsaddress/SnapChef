@@ -26,70 +26,85 @@ struct XShareView: View {
     private let maxCharacters = 280
     private let imageCharacters = 24 // Characters used by image URL
     
+    private var headerView: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "x.square.fill")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
+                Text("Post to X")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
+            
+            Text("Craft the perfect post")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.gray)
+        }
+    }
+    
+    private var tweetComposerSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Compose your post")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.white)
+            
+            // Tweet text editor
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+                
+                TextEditor(text: $tweetText)
+                    .frame(minHeight: 120)
+                    .padding(12)
+                    .foregroundColor(.white)
+                    .scrollContentBackground(.hidden)
+                    .onChange(of: tweetText) { _ in
+                        updateCharacterCount()
+                    }
+                    .onAppear {
+                        if tweetText.isEmpty {
+                            tweetText = generateTweetText()
+                            updateCharacterCount()
+                        }
+                    }
+                
+                if tweetText.isEmpty {
+                    Text("What's happening?")
+                        .foregroundColor(.gray)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 20)
+                        .allowsHitTesting(false)
+                }
+            }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
-            ZStack {
-                // X (Twitter) dark theme background
-                Color.black
-                    .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        VStack(spacing: 8) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "x.square.fill")
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.white)
-                                Text("Post to X")
-                                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                            }
-                            
-                            Text("Craft the perfect post")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.gray)
-                        }
-                        .padding(.top, 20)
-                        
+            mainContent
+        }
+    }
+    
+    private var mainContent: some View {
+        ZStack {
+            // X (Twitter) dark theme background
+            Color.black
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    headerView
+                    .padding(.top, 20)
+                    
                         // Tweet Composer
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("Compose your post")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                            
-                            // Tweet text editor
-                            ZStack(alignment: .topLeading) {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.white.opacity(0.05))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                                    )
-                                
-                                TextEditor(text: $tweetText)
-                                    .frame(minHeight: 120)
-                                    .padding(12)
-                                    .foregroundColor(.white)
-                                    .scrollContentBackground(.hidden)
-                                    .onChange(of: tweetText) { _ in
-                                        updateCharacterCount()
-                                    }
-                                    .onAppear {
-                                        if tweetText.isEmpty {
-                                            tweetText = generateTweetText()
-                                            updateCharacterCount()
-                                        }
-                                    }
-                                
-                                if tweetText.isEmpty {
-                                    Text("What's happening?")
-                                        .foregroundColor(.gray)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 20)
-                                        .allowsHitTesting(false)
-                                }
-                            }
+                            tweetComposerSection
                             
                             // Character count
                             HStack {
@@ -158,21 +173,19 @@ struct XShareView: View {
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundColor(.white)
                                 
-                                FlowLayout(spacing: 8) {
-                                    ForEach(suggestedHashtags, id: \.self) { hashtag in
-                                        XHashtag(
-                                            hashtag: hashtag,
-                                            isSelected: selectedHashtags.contains(hashtag),
-                                            action: {
-                                                if selectedHashtags.contains(hashtag) {
-                                                    selectedHashtags.remove(hashtag)
-                                                } else {
-                                                    selectedHashtags.insert(hashtag)
-                                                }
-                                                tweetText = generateTweetText()
+                                WrappingHStack(suggestedHashtags, spacing: 8) { hashtag in
+                                    XHashtag(
+                                        hashtag: hashtag,
+                                        isSelected: selectedHashtags.contains(hashtag),
+                                        action: {
+                                            if selectedHashtags.contains(hashtag) {
+                                                selectedHashtags.remove(hashtag)
+                                            } else {
+                                                selectedHashtags.insert(hashtag)
                                             }
-                                        )
-                                    }
+                                            tweetText = generateTweetText()
+                                        }
+                                    )
                                 }
                             }
                             .padding(.horizontal, 20)
@@ -222,8 +235,8 @@ struct XShareView: View {
                     }
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
@@ -241,7 +254,6 @@ struct XShareView: View {
                     }
                 }
             }
-        }
         .alert("Posted!", isPresented: $showingShareConfirmation) {
             Button("View on X") {
                 openX()
@@ -646,6 +658,53 @@ struct XTweetPreview: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - WrappingHStack Layout Helper
+struct WrappingHStack<Data: RandomAccessCollection, Content: View>: View where Data.Element: Hashable {
+    var data: Data
+    var spacing: CGFloat
+    var content: (Data.Element) -> Content
+    
+    init(_ data: Data, spacing: CGFloat = 8, @ViewBuilder content: @escaping (Data.Element) -> Content) {
+        self.data = data
+        self.spacing = spacing
+        self.content = content
+    }
+    
+    var body: some View {
+        let dataArray = Array(data)
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+        
+        return GeometryReader { geo in
+            ZStack(alignment: .topLeading) {
+                ForEach(dataArray, id: \.self) { item in
+                    content(item)
+                        .alignmentGuide(.leading) { d in
+                            if (abs(width - d.width) > geo.size.width) {
+                                width = 0
+                                height -= d.height + spacing
+                            }
+                            let result = width
+                            if item == dataArray.last {
+                                width = 0
+                            }
+                            width -= d.width + spacing
+                            return result
+                        }
+                        .alignmentGuide(.top) { _ in
+                            let result = height
+                            if item == dataArray.last {
+                                height = 0
+                            }
+                            return result
+                        }
+                }
+            }
+        }
+        .frame(height: 100) // Adjust height as needed
     }
 }
 

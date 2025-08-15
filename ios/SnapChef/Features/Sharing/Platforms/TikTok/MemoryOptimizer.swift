@@ -181,12 +181,9 @@ public final class MemoryOptimizer: @unchecked Sendable {
     // Process CIImage with FilterSpec filters
     public func processCIImageWithOptimization(_ image: CIImage, filters: [FilterSpec], context: CIContext) throws -> CIImage {
         var processed = image
-        for spec in filters {
-            guard let filter = CIFilter(name: spec.name) else { continue }
+        let ciFilters = FilterSpecBridge.toCIFilters(filters)
+        for filter in ciFilters {
             filter.setValue(processed, forKey: kCIInputImageKey)
-            for (key, value) in spec.params {
-                filter.setValue(value.value, forKey: key)
-            }
             if let output = filter.outputImage {
                 processed = output
             }

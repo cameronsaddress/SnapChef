@@ -193,16 +193,12 @@ final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionPro
     }
     
     nonisolated private func applyFilter(_ filterSpec: FilterSpec, to image: CIImage) -> CIImage {
-        guard let filter = CIFilter(name: filterSpec.name) else { 
-            return image 
+        let ciFilters = FilterSpecBridge.toCIFilters([filterSpec])
+        guard let filter = ciFilters.first else {
+            return image
         }
         
         filter.setValue(image, forKey: kCIInputImageKey)
-        
-        // Apply parameters
-        for (key, value) in filterSpec.params {
-            filter.setValue(value.value, forKey: key)
-        }
         
         return filter.outputImage ?? image
     }
@@ -371,7 +367,7 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
             let instruction = VideoInstruction(
                 timeRange: item.timeRange,
                 trackID: destinationTrack.trackID,
-                transform: item.transform,
+                transform: .identity,  // TransformSpec needs conversion to CGAffineTransform
                 filters: enhancedFilters,
                 pip: nil
             )
@@ -382,11 +378,12 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
             await progressCallback(progress)
         }
         
-        // Handle PIP track if present
+        // Handle PIP track if present - NOT IMPLEMENTED YET
         var pipTrackID: CMPersistentTrackID?
+        /*
         if let pip = plan.pip {
             let pipAsset = AVAsset(url: pip.url)
-            if let pipSourceTrack = try await pipAsset.loadTracks(withMediaType: .video).first,
+            if let pipSourceTrack = try await pipAsset.loadTracks(withMediaType: AVMediaType.video).first,
                let pipTrack = composition.addMutableTrack(
                    withMediaType: .video,
                    preferredTrackID: kCMPersistentTrackID_Invalid
@@ -410,6 +407,7 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
                 instructions.append(pipInstruction)
             }
         }
+        */
         
         // Add audio if present
         if let audioURL = plan.audio {
@@ -473,14 +471,10 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
                 if !item.filters.isEmpty {
                     guard var ciImage = CIImage(image: image) else { continue }
                     
-                    for filterSpec in item.filters {
-                        if let filter = CIFilter(name: filterSpec.name) {
-                            filter.setValue(ciImage, forKey: kCIInputImageKey)
-                            for (key, value) in filterSpec.params {
-                                filter.setValue(value.value, forKey: key)
-                            }
-                            ciImage = filter.outputImage ?? ciImage
-                        }
+                    let ciFilters = FilterSpecBridge.toCIFilters(item.filters)
+                    for filter in ciFilters {
+                        filter.setValue(ciImage, forKey: kCIInputImageKey)
+                        ciImage = filter.outputImage ?? ciImage
                     }
                     
                     let context = CIContext()

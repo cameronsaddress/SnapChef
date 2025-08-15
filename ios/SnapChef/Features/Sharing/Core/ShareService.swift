@@ -38,6 +38,32 @@ struct ShareContent {
     let hashtags: [String]
     var deepLink: URL?
     
+    // Helper for TikTok video generation
+    func toRenderInputs() -> (recipe: ViralRecipe, media: MediaBundle)? {
+        guard case .recipe(let recipe) = type,
+              let beforeImage = beforeImage else { return nil }
+        
+        let viralRecipe = ViralRecipe(
+            title: recipe.name,
+            hook: "Fridge chaos → \(recipe.name) in \(recipe.prepTime + recipe.cookTime) min",
+            steps: recipe.instructions.map { ViralRecipe.Step($0) },
+            timeMinutes: recipe.prepTime + recipe.cookTime,
+            costDollars: nil,
+            calories: nil,  // Recipe doesn't have calories property
+            ingredients: recipe.ingredients.map { $0.name }  // Convert Ingredient objects to strings
+        )
+        
+        let media = MediaBundle(
+            beforeFridge: beforeImage,
+            afterFridge: beforeImage, // Use same image if no after
+            cookedMeal: afterImage ?? beforeImage,
+            brollClips: [],
+            musicURL: Bundle.main.url(forResource: "Mixdown", withExtension: "mp3")
+        )
+        
+        return (recipe: viralRecipe, media: media)
+    }
+    
     init(type: ShareType, beforeImage: UIImage? = nil, afterImage: UIImage? = nil) {
         self.type = type
         self.beforeImage = beforeImage
