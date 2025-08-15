@@ -11,17 +11,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Think like a tech lead: plan, delegate, verify, report
 
 ### Orchestration Workflow:
-1. **Analyze** the user's request
-2. **Plan** which agents are needed
-3. **Deploy** multiple agents IN PARALLEL when tasks are independent
-4. **Coordinate** results from agents
+1. **Analyze** the user's request or build errors
+2. **Plan** which agents are needed for each file/task
+3. **Deploy** ALL agents IN PARALLEL (never sequentially)
+4. **Coordinate** results from all agents
 5. **Verify** with build-guardian
 6. **Report** status to user
 
-### Parallel Agent Execution Examples:
-- Need to fix UI and backend? → Deploy `swiftui-designer` AND `ios-swift-architect` simultaneously
-- Multiple files need updates? → Deploy multiple agents to handle different files
-- Research needed while coding? → Deploy `swift6-troubleshooter` while another agent codes
+### Parallel Agent Execution REQUIREMENTS:
+- **Build Errors**: ONE agent per file with errors, ALL deployed simultaneously
+- **Feature Development**: Multiple agents for different components AT THE SAME TIME
+- **Never Sequential**: If tasks can be parallel, they MUST be parallel
+- **Maximum Speed**: 5 files = 5 agents working simultaneously
+
+### Real Parallel Execution Examples:
+```
+Example 1 - Build Errors:
+- Error in ProfileView.swift → swiftui-designer
+- Error in APIManager.swift → ios-swift-architect  
+- Error in VideoExporter.swift → viral-video-engineer
+DEPLOY ALL 3 AGENTS AT ONCE!
+
+Example 2 - Feature Development:
+- New UI needed → swiftui-designer
+- Backend logic needed → ios-swift-architect
+- Video feature needed → viral-video-engineer
+DEPLOY ALL 3 AGENTS AT ONCE!
+```
 
 ## ⚠️ CRITICAL BUILD COMMAND - NEVER CHANGE ⚠️
 ```bash
@@ -62,8 +78,9 @@ MANDATORY: Use build-guardian agent after EVERY code modification
 
 **Build-Guardian CRITICAL RULES:**
 1. **NEVER FIX CODE YOURSELF** - Only run builds and delegate to experts
-2. **ALWAYS USE PARALLEL AGENTS** - Deploy multiple agents simultaneously for different errors
-3. **VERIFY AFTER FIXES** - Always run build again after agents complete
+2. **ONE AGENT PER FILE** - Deploy separate agents for errors in different files
+3. **ALWAYS PARALLEL** - Deploy all agents simultaneously, not sequentially
+4. **VERIFY AFTER FIXES** - Always run build again after all agents complete
 
 **Build-Guardian MANDATORY Command:**
 ```bash
@@ -74,26 +91,51 @@ xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build 2>&1
 
 **Build-Guardian Workflow:**
 1. **RUN BUILD**: `xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build 2>&1`
-2. **ANALYZE ERRORS**: Parse all error messages and group by type
-3. **DEPLOY AGENTS IN PARALLEL**: 
-   - If multiple files have errors → Deploy multiple agents simultaneously
-   - Swift/iOS errors → `ios-swift-architect` agent
-   - Video/TikTok errors → `viral-video-engineer` agent
-   - UI/SwiftUI errors → `swiftui-designer` agent
-   - CloudKit/Network errors → `ios-qa-engineer` agent
-   - Concurrency errors → `swift6-troubleshooter` agent
-4. **WAIT FOR AGENTS**: Let all deployed agents complete their fixes
+2. **ANALYZE ALL ERRORS**: 
+   - Parse EVERY compilation error from the output
+   - Group errors by FILE (not by type)
+   - Identify the best expert agent for each file's errors
+3. **DEPLOY AGENTS IN PARALLEL - ONE PER FILE**: 
+   - **CRITICAL**: If 5 files have errors → Deploy 5 agents SIMULTANEOUSLY
+   - Each agent handles ALL errors in their assigned file
+   - Agent selection per file type:
+     * `.swift` files in TikTok/ → `viral-video-engineer`
+     * `.swift` files with UI/View → `swiftui-designer`
+     * `.swift` files with concurrency errors → `swift6-troubleshooter`
+     * `.swift` files with CloudKit → `ios-qa-engineer`
+     * All other `.swift` files → `ios-swift-architect`
+4. **WAIT FOR ALL AGENTS**: Let ALL deployed agents complete simultaneously
 5. **VERIFY BUILD**: Run the EXACT same command again
-6. **REPORT**: Provide detailed status with error counts before/after
+6. **REPORT**: 
+   - Initial error count by file
+   - Number of agents deployed in parallel
+   - Final build status after fixes
+
+**Build-Guardian Parallel Deployment Example:**
+```
+If build finds:
+- 3 errors in TikTokShareView.swift
+- 2 errors in OverlayFactory.swift  
+- 1 error in CameraView.swift
+- 4 errors in CloudKitManager.swift
+
+Then deploy ALL 4 agents AT THE SAME TIME:
+1. viral-video-engineer → Fix TikTokShareView.swift (3 errors)
+2. viral-video-engineer → Fix OverlayFactory.swift (2 errors)
+3. swiftui-designer → Fix CameraView.swift (1 error)
+4. ios-qa-engineer → Fix CloudKitManager.swift (4 errors)
+
+All 4 agents work SIMULTANEOUSLY for maximum speed!
+```
 
 **Build-Guardian Checks:**
 1. Runs EXACTLY: `xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build 2>&1`
 2. Captures and analyzes ALL compilation errors
-3. Groups errors by file and type for parallel agent deployment
-4. Runs `swiftlint --quiet` AFTER successful build
-5. Verifies Swift 6 compliance (actor isolation, Sendable, etc.)
-6. Reports exact error counts and locations
-7. NEVER attempts to fix code - only delegates to expert agents
+3. Groups errors by FILE for parallel agent deployment
+4. Deploys ONE agent per file, ALL at the same time
+5. Waits for ALL agents to complete
+6. Runs build again to verify all fixes
+7. NEVER attempts to fix code - only orchestrates expert agents
 
 ### 2. Error Resolution Protocol (2-ATTEMPT RULE)
 If you cannot fix an error after 2 attempts:
