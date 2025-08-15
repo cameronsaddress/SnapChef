@@ -196,9 +196,9 @@ public actor RenderPlanner {
             timeRange: CMTimeRange(start: .zero, duration: CMTime(seconds: 3, preferredTimescale: 600)),
             transform: .kenBurns(maxScale: 1.05, seed: 42), // Subtle movement
             filters: [
-                .premiumColorGrade(style: .warm), // Warmer, less harsh than moody
-                .chromaticAberration(intensity: 0.4), // Reduced chaos effect
-                .vignette(intensity: 0.3), // Lighter vignette
+                .premiumColorGrade(style: .natural), // Remove green tint with natural colors
+                .chromaticAberration(intensity: 0.2), // Minimal effect
+                .vignette(intensity: 0.1), // Very light vignette
                 .velocityRamp(factor: config.velocityRampFactor) // Speed ramping on beats
             ]
         ))
@@ -210,7 +210,7 @@ public actor RenderPlanner {
                                  duration: CMTime(seconds: 2, preferredTimescale: 600)),
             transform: .kenBurns(maxScale: 1.05, seed: 1), // Gentle movement for hope
             filters: [
-                .premiumColorGrade(style: .fresh), // Clean, organized
+                .premiumColorGrade(style: .natural), // Clean, natural colors
                 .foodEnhancer(intensity: 0.7),
                 .lightLeak(position: CGPoint(x: 0.7, y: 0.3), intensity: 0.3) // Subtle hope glow
             ]
@@ -223,7 +223,7 @@ public actor RenderPlanner {
                                  duration: CMTime(seconds: 6, preferredTimescale: 600)),
             transform: .kenBurns(maxScale: 1.06, seed: 7), // Reduced movement
             filters: [
-                .premiumColorGrade(style: .vibrant), // Pop the colors
+                .premiumColorGrade(style: .natural), // Natural vibrant colors
                 .velocityRamp(factor: config.velocityRampFactor), // Beat sync speed
                 .lightLeak(position: CGPoint(x: 0.8, y: 0.2), intensity: 0.4),
                 .breatheEffect(intensity: config.breatheIntensity, bpm: beatMap.bpm),
@@ -238,7 +238,7 @@ public actor RenderPlanner {
                                  duration: CMTime(seconds: 2, preferredTimescale: 600)),
             transform: .kenBurns(maxScale: 1.08, seed: 99), // Subtle reveal zoom
             filters: [
-                .premiumColorGrade(style: .warm), // Natural SnapChef brand colors instead of cinematic
+                .premiumColorGrade(style: .natural), // Clean natural colors without tint
                 .foodEnhancer(intensity: 0.9), // Moderate food appeal
                 .viralPop(warmth: 0.6, punch: 0.7), // More natural viral colors
                 .lightLeak(position: CGPoint(x: 0.5, y: 0.5), intensity: 0.5), // Softer glow
@@ -255,80 +255,78 @@ public actor RenderPlanner {
             transform: .identity, // Static for readability
             filters: [
                 .gaussianBlur(radius: 2), // Subtle blur to highlight CTA
-                .premiumColorGrade(style: .fresh), // Clean SnapChef brand styling
+                .premiumColorGrade(style: .natural), // Clean natural styling
                 .vignette(intensity: 0.3) // Light frame for CTA
             ]
         ))
         
-        // OVERLAY PHASE 1: Anxiety Hook with Premium Effects (0-3s) - Larger, centered text
+        // OVERLAY SEQUENCE: Perfectly timed viral text sequence with alternating animations
+        
+        // OVERLAY PHASE 1: "From this Pic" (0-3s) - Slide in from RIGHT
         overlays.append(.init(
             start: .zero,
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in 
-                self.createLargerHookOverlay(
-                    text: recipe.hook ?? "FRIDGE CHAOS → DINNER MAGIC ✨", 
-                    config: cfg,
-                    screenScale: cfg.contentsScale
-                )
-            }
-        ))
-        
-        // OVERLAY PHASE 2: Brand Promise with Liquid Morph (3-5s)
-        overlays.append(.init(
-            start: CMTime(seconds: 3, preferredTimescale: 600),
-            duration: CMTime(seconds: 2, preferredTimescale: 600),
-            layerBuilder: { cfg in 
-                self.createBrandPromiseOverlay(text: "SnapChef makes it EASY 🚀", config: cfg, screenScale: cfg.contentsScale)
-            }
-        ))
-        
-        // OVERLAY PHASE 3: Rapid Ingredient Steps with Beat Cuts (5-11s) - 1.5s each, vertically centered
-        let stepTexts = recipe.steps.prefix(4).map { removeStepNumbers(shorten($0.title)) }
-        let stepDuration = 1.5 // Fixed 1.5 seconds per step
-        
-        for (i, text) in stepTexts.enumerated() {
-            let stepStart = 5.0 + Double(i) * stepDuration
-            // Sync to beat for each step
-            let beatSyncedStart = findOptimalBeatTiming(from: stepStart, beatMap: beatMap, contentMaps: [])
-            
-            overlays.append(.init(
-                start: CMTime(seconds: beatSyncedStart, preferredTimescale: 600),
-                duration: CMTime(seconds: stepDuration, preferredTimescale: 600),
-                layerBuilder: { cfg in 
-                    self.createCenteredStepOverlay(
-                        text: text, 
-                        index: i, 
-                        beatBPM: beatMap.bpm,
-                        config: cfg,
-                        screenScale: cfg.contentsScale
-                    )
-                }
-            ))
-        }
-        
-        // OVERLAY PHASE 4: Dramatic Reveal Text with Explosion (11-13s)
-        overlays.append(.init(
-            start: CMTime(seconds: 11, preferredTimescale: 600),
-            duration: CMTime(seconds: 2, preferredTimescale: 600),
-            layerBuilder: { cfg in 
-                self.createDramaticRevealOverlay(
-                    text: "\(recipe.timeMinutes ?? 15) MIN MAGIC! 🔥", 
-                    config: cfg,
-                    screenScale: cfg.contentsScale
-                )
-            }
-        ))
-        
-        // OVERLAY PHASE 5: Call-to-Action with Pulsing Gradient (13-15s) - Even larger text
-        overlays.append(.init(
-            start: CMTime(seconds: 13, preferredTimescale: 600),
-            duration: CMTime(seconds: 2, preferredTimescale: 600),
-            layerBuilder: { cfg in 
-                self.createLargerCTAOverlay(
-                    text: "TAP TO GET RECIPE! 👆", 
+                self.createAlternatingSequenceOverlay(
+                    text: "From this Pic", 
                     config: cfg,
                     screenScale: cfg.contentsScale,
-                    beatBPM: beatMap.bpm
+                    slideDirection: .right
+                )
+            }
+        ))
+        
+        // OVERLAY PHASE 2: "AI used whats in my fridge" (3-6s) - Slide in from LEFT  
+        overlays.append(.init(
+            start: CMTime(seconds: 3, preferredTimescale: 600),
+            duration: CMTime(seconds: 3, preferredTimescale: 600),
+            layerBuilder: { cfg in 
+                self.createAlternatingSequenceOverlay(
+                    text: "AI used whats in my fridge", 
+                    config: cfg, 
+                    screenScale: cfg.contentsScale,
+                    slideDirection: .left
+                )
+            }
+        ))
+        
+        // OVERLAY PHASE 3: "to make easy recipes" (6-9s) - Slide in from RIGHT
+        overlays.append(.init(
+            start: CMTime(seconds: 6, preferredTimescale: 600),
+            duration: CMTime(seconds: 3, preferredTimescale: 600),
+            layerBuilder: { cfg in 
+                self.createAlternatingSequenceOverlay(
+                    text: "to make easy recipes", 
+                    config: cfg, 
+                    screenScale: cfg.contentsScale,
+                    slideDirection: .right
+                )
+            }
+        ))
+        
+        // OVERLAY PHASE 4: "of what I like" (9-12s) - Slide in from LEFT
+        overlays.append(.init(
+            start: CMTime(seconds: 9, preferredTimescale: 600),
+            duration: CMTime(seconds: 3, preferredTimescale: 600),
+            layerBuilder: { cfg in 
+                self.createAlternatingSequenceOverlay(
+                    text: "of what I like", 
+                    config: cfg, 
+                    screenScale: cfg.contentsScale,
+                    slideDirection: .left
+                )
+            }
+        ))
+        
+        // OVERLAY PHASE 5: Call-to-Action Text (12-15s) - Special CTA animation
+        overlays.append(.init(
+            start: CMTime(seconds: 12, preferredTimescale: 600),
+            duration: CMTime(seconds: 3, preferredTimescale: 600),
+            layerBuilder: { cfg in 
+                self.createCTATextOverlay(
+                    text: "TAP TO GET RECIPE! 👆", 
+                    config: cfg,
+                    screenScale: cfg.contentsScale
                 )
             }
         ))
@@ -692,6 +690,363 @@ public actor RenderPlanner {
         
         L.addSublayer(textLayer)
         return L
+    }
+    
+    /// Create sequence text overlay with proper animations and text rendering
+    nonisolated private func createSequenceTextOverlay(text: String, config: RenderConfig, screenScale: CGFloat) -> CALayer {
+        let container = CALayer()
+        container.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Create gradient background container
+        let gradientContainer = CALayer()
+        
+        // Create gradient background with SnapChef colors
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor(red: 1.0, green: 0.42, blue: 0.21, alpha: 0.95).cgColor, // Orange #FF6B35
+            UIColor(red: 1.0, green: 0.08, blue: 0.58, alpha: 0.95).cgColor  // Pink #FF1493
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.cornerRadius = 16
+        
+        // Create text layer with proper configuration
+        let textLayer = CATextLayer()
+        textLayer.string = text  // FIXED: Use plain string instead of attributed string
+        textLayer.font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, config.stepsFontSize * 1.4, nil)
+        textLayer.fontSize = config.stepsFontSize * 1.4
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = .center
+        textLayer.contentsScale = screenScale
+        textLayer.isWrapped = true
+        
+        // Calculate proper sizing
+        let textSize = textLayer.preferredFrameSize()
+        let padding: CGFloat = 20
+        let containerWidth = min(textSize.width + padding * 2, config.size.width - 80)
+        let containerHeight = max(textSize.height + padding * 2, 60) // Minimum height
+        
+        // Position container in center of screen  
+        let containerFrame = CGRect(
+            x: (config.size.width - containerWidth) / 2,
+            y: (config.size.height - containerHeight) / 2,
+            width: containerWidth,
+            height: containerHeight
+        )
+        
+        // Set up layer hierarchy properly
+        gradientContainer.frame = containerFrame
+        gradientLayer.frame = CGRect(origin: .zero, size: containerFrame.size)
+        textLayer.frame = CGRect(
+            x: padding,
+            y: padding, 
+            width: containerFrame.width - padding * 2,
+            height: containerFrame.height - padding * 2
+        )
+        
+        // Add shadow for depth
+        gradientLayer.shadowColor = UIColor.black.cgColor
+        gradientLayer.shadowOffset = CGSize(width: 0, height: 4)
+        gradientLayer.shadowRadius = 8
+        gradientLayer.shadowOpacity = 0.4
+        
+        // FIXED: Proper video composition animations
+        // Slide in from right animation
+        let slideIn = CABasicAnimation(keyPath: "position.x")
+        slideIn.fromValue = config.size.width + containerFrame.width/2 // Start off-screen right
+        slideIn.toValue = config.size.width / 2 // Center position
+        slideIn.duration = 0.8
+        slideIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        slideIn.beginTime = AVCoreAnimationBeginTimeAtZero
+        slideIn.fillMode = .both
+        slideIn.isRemovedOnCompletion = false
+        
+        // Slide out to left animation (after 2 seconds)
+        let slideOut = CABasicAnimation(keyPath: "position.x")
+        slideOut.fromValue = config.size.width / 2
+        slideOut.toValue = -containerFrame.width/2 // Exit off-screen left
+        slideOut.duration = 0.6
+        slideOut.beginTime = AVCoreAnimationBeginTimeAtZero + 2.0
+        slideOut.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        slideOut.fillMode = .both
+        slideOut.isRemovedOnCompletion = false
+        
+        // Beat-synced pulse with proper timing
+        let pulse = CABasicAnimation(keyPath: "transform.scale")
+        pulse.fromValue = 1.0
+        pulse.toValue = 1.06
+        pulse.duration = 0.6
+        pulse.autoreverses = true
+        pulse.repeatCount = 4 // Finite repeat for video composition
+        pulse.beginTime = AVCoreAnimationBeginTimeAtZero + 0.5 // Start after slide-in
+        pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        pulse.fillMode = .both
+        pulse.isRemovedOnCompletion = false
+        
+        // Assemble layer hierarchy
+        gradientContainer.addSublayer(gradientLayer)
+        gradientContainer.addSublayer(textLayer)
+        
+        // Apply animations to the container
+        gradientContainer.add(slideIn, forKey: "slideIn")
+        gradientContainer.add(slideOut, forKey: "slideOut")
+        gradientContainer.add(pulse, forKey: "pulse")
+        
+        container.addSublayer(gradientContainer)
+        return container
+    }
+    
+    /// Create alternating sequence overlay with proper slide direction
+    nonisolated private func createAlternatingSequenceOverlay(text: String, config: RenderConfig, screenScale: CGFloat, slideDirection: SlideDirection) -> CALayer {
+        let container = CALayer()
+        container.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Create sequence container
+        let sequenceContainer = CALayer()
+        
+        // Create gradient background with SnapChef colors
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor(red: 1.0, green: 0.42, blue: 0.21, alpha: 0.95).cgColor, // Orange #FF6B35
+            UIColor(red: 1.0, green: 0.08, blue: 0.58, alpha: 0.95).cgColor  // Pink #FF1493
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.cornerRadius = 16
+        
+        // FIXED: Create text layer with guaranteed text rendering
+        let textLayer = CATextLayer()
+        textLayer.string = text  // Use plain string for reliable rendering
+        textLayer.font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, config.stepsFontSize * 1.4, nil)
+        textLayer.fontSize = config.stepsFontSize * 1.4
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = .center
+        textLayer.contentsScale = screenScale
+        textLayer.isWrapped = true
+        
+        // Debug: Ensure text is being set
+        print("[RenderPlanner] Creating alternating sequence overlay with text: '\(text)'")
+        print("[RenderPlanner] Text layer string set to: '\(textLayer.string ?? "nil")'")
+        print("[RenderPlanner] Font size: \(textLayer.fontSize)")
+        
+        // Calculate proper sizing with minimum dimensions
+        let textSize = textLayer.preferredFrameSize()
+        let padding: CGFloat = 20
+        let containerWidth = min(max(textSize.width + padding * 2, 200), config.size.width - 80) // Min 200, max screen-80
+        let containerHeight = max(textSize.height + padding * 2, 60) // Minimum 60 height
+        
+        // Position container in center of screen
+        let containerFrame = CGRect(
+            x: (config.size.width - containerWidth) / 2,
+            y: (config.size.height - containerHeight) / 2,
+            width: containerWidth,
+            height: containerHeight
+        )
+        
+        // Set up layer hierarchy properly
+        sequenceContainer.frame = containerFrame
+        sequenceContainer.opacity = 1.0  // Ensure visibility
+        gradientLayer.frame = CGRect(origin: .zero, size: containerFrame.size)
+        gradientLayer.opacity = 1.0  // Ensure background visibility
+        textLayer.frame = CGRect(
+            x: padding,
+            y: padding,
+            width: containerFrame.width - padding * 2,
+            height: containerFrame.height - padding * 2
+        )
+        textLayer.opacity = 1.0  // Ensure text visibility
+        
+        // Debug positioning
+        print("[RenderPlanner] Sequence container frame: \(sequenceContainer.frame)")
+        print("[RenderPlanner] Gradient layer frame: \(gradientLayer.frame)")
+        print("[RenderPlanner] Text layer frame: \(textLayer.frame)")
+        
+        // Add shadow for depth and visibility
+        gradientLayer.shadowColor = UIColor.black.cgColor
+        gradientLayer.shadowOffset = CGSize(width: 0, height: 4)
+        gradientLayer.shadowRadius = 8
+        gradientLayer.shadowOpacity = 0.4
+        
+        // FIXED: Alternating slide animations based on direction
+        let slideIn = CABasicAnimation(keyPath: "position.x")
+        let slideOut = CABasicAnimation(keyPath: "position.x")
+        
+        switch slideDirection {
+        case .left:
+            // Slide in from left
+            slideIn.fromValue = -containerFrame.width/2
+            slideIn.toValue = config.size.width / 2
+            // Slide out to right
+            slideOut.fromValue = config.size.width / 2
+            slideOut.toValue = config.size.width + containerFrame.width/2
+        case .right:
+            // Slide in from right
+            slideIn.fromValue = config.size.width + containerFrame.width/2
+            slideIn.toValue = config.size.width / 2
+            // Slide out to left
+            slideOut.fromValue = config.size.width / 2
+            slideOut.toValue = -containerFrame.width/2
+        }
+        
+        // Slide in animation (0-0.8s)
+        slideIn.duration = 0.8
+        slideIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        slideIn.beginTime = AVCoreAnimationBeginTimeAtZero
+        slideIn.fillMode = .both
+        slideIn.isRemovedOnCompletion = false
+        
+        // Slide out animation (2.0-2.6s) 
+        slideOut.duration = 0.6
+        slideOut.beginTime = AVCoreAnimationBeginTimeAtZero + 2.0
+        slideOut.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        slideOut.fillMode = .both
+        slideOut.isRemovedOnCompletion = false
+        
+        // Beat-synced pulse while visible (0.8-2.0s)
+        let pulse = CABasicAnimation(keyPath: "transform.scale")
+        pulse.fromValue = 1.0
+        pulse.toValue = 1.06
+        pulse.duration = 0.6
+        pulse.autoreverses = true
+        pulse.repeatCount = 2 // About 2.4s of pulsing total
+        pulse.beginTime = AVCoreAnimationBeginTimeAtZero + 0.8
+        pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        pulse.fillMode = .both
+        pulse.isRemovedOnCompletion = false
+        
+        // Assemble layer hierarchy
+        sequenceContainer.addSublayer(gradientLayer)
+        sequenceContainer.addSublayer(textLayer)
+        
+        // Apply animations to the container
+        sequenceContainer.add(slideIn, forKey: "slideIn")
+        sequenceContainer.add(slideOut, forKey: "slideOut")
+        sequenceContainer.add(pulse, forKey: "pulse")
+        
+        container.addSublayer(sequenceContainer)
+        return container
+    }
+    
+    /// Create CTA text overlay with proper text rendering and animations
+    nonisolated private func createCTATextOverlay(text: String, config: RenderConfig, screenScale: CGFloat) -> CALayer {
+        let container = CALayer()
+        container.frame = CGRect(origin: .zero, size: config.size)
+        
+        // Create CTA container
+        let ctaContainer = CALayer()
+        
+        // Create pulsing gradient background
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor(red: 1.0, green: 0.08, blue: 0.58, alpha: 0.95).cgColor,  // Pink
+            UIColor(red: 0.6, green: 0.196, blue: 0.8, alpha: 0.95).cgColor   // Purple
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.cornerRadius = 20
+        
+        // FIXED: CTA text layer with proper string rendering
+        let textLayer = CATextLayer()
+        textLayer.string = text  // Use plain string
+        textLayer.font = CTFontCreateWithName("HelveticaNeue-Black" as CFString, config.ctaFontSize * 1.6, nil)
+        textLayer.fontSize = config.ctaFontSize * 1.6
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = .center
+        textLayer.contentsScale = screenScale
+        textLayer.isWrapped = true
+        
+        // Debug: Ensure CTA text is being set
+        print("[RenderPlanner] Creating CTA overlay with text: '\(text)'")
+        print("[RenderPlanner] CTA text layer string set to: '\(textLayer.string ?? "nil")'")
+        print("[RenderPlanner] CTA font size: \(textLayer.fontSize)")
+        
+        let textSize = textLayer.preferredFrameSize()
+        let padding: CGFloat = 24
+        let containerWidth = min(textSize.width + padding * 2, config.size.width - 60)
+        let containerHeight = max(textSize.height + padding * 2, 70) // Minimum height
+        
+        // Position at bottom center of screen
+        let containerFrame = CGRect(
+            x: (config.size.width - containerWidth) / 2,
+            y: config.size.height - config.safeInsets.bottom - containerHeight - 120,
+            width: containerWidth,
+            height: containerHeight
+        )
+        
+        // Set up proper layer hierarchy
+        ctaContainer.frame = containerFrame
+        ctaContainer.opacity = 1.0  // Ensure visibility
+        gradientLayer.frame = CGRect(origin: .zero, size: containerFrame.size)
+        gradientLayer.opacity = 1.0  // Ensure background visibility
+        textLayer.frame = CGRect(
+            x: padding,
+            y: padding,
+            width: containerFrame.width - padding * 2,
+            height: containerFrame.height - padding * 2
+        )
+        textLayer.opacity = 1.0  // Ensure text visibility
+        
+        // Debug positioning
+        print("[RenderPlanner] CTA container frame: \(ctaContainer.frame)")
+        print("[RenderPlanner] CTA gradient layer frame: \(gradientLayer.frame)")
+        print("[RenderPlanner] CTA text layer frame: \(textLayer.frame)")
+        
+        // Enhanced shadow and glow
+        gradientLayer.shadowColor = UIColor.magenta.cgColor
+        gradientLayer.shadowOffset = CGSize(width: 0, height: 6)
+        gradientLayer.shadowRadius = 15
+        gradientLayer.shadowOpacity = 0.6
+        
+        // FIXED: Slide in from bottom animation
+        let slideIn = CABasicAnimation(keyPath: "position.y")
+        slideIn.fromValue = config.size.height + containerFrame.height/2 // Start below screen
+        slideIn.toValue = containerFrame.midY // Final position
+        slideIn.duration = 0.8
+        slideIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        slideIn.beginTime = AVCoreAnimationBeginTimeAtZero
+        slideIn.fillMode = .both
+        slideIn.isRemovedOnCompletion = false
+        
+        // Attention-grabbing pulse animation with proper timing
+        let pulse = CAKeyframeAnimation(keyPath: "transform.scale")
+        pulse.values = [1.0, 1.12, 1.0, 1.18, 1.0]
+        pulse.keyTimes = [0, 0.25, 0.5, 0.75, 1.0]
+        pulse.duration = 1.2
+        pulse.repeatCount = 3 // Finite repeat for video composition
+        pulse.beginTime = AVCoreAnimationBeginTimeAtZero + 0.8 // Start after slide-in
+        pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        pulse.fillMode = .both
+        pulse.isRemovedOnCompletion = false
+        
+        // Glow pulse with proper timing
+        let glowPulse = CABasicAnimation(keyPath: "shadowRadius")
+        glowPulse.fromValue = 15
+        glowPulse.toValue = 30
+        glowPulse.duration = 0.8
+        glowPulse.autoreverses = true
+        glowPulse.repeatCount = 4 // Finite repeat
+        glowPulse.beginTime = AVCoreAnimationBeginTimeAtZero + 1.0
+        glowPulse.fillMode = .both
+        glowPulse.isRemovedOnCompletion = false
+        
+        // Assemble layer hierarchy
+        ctaContainer.addSublayer(gradientLayer)
+        ctaContainer.addSublayer(textLayer)
+        
+        // Apply animations to the container
+        ctaContainer.add(slideIn, forKey: "slideIn")
+        ctaContainer.add(pulse, forKey: "pulse")
+        gradientLayer.add(glowPulse, forKey: "glowPulse")
+        
+        container.addSublayer(ctaContainer)
+        return container
+    }
+    
+    // MARK: - Helper Enums
+    
+    /// Slide direction for alternating text animations
+    nonisolated private enum SlideDirection {
+        case left, right
     }
 }
 

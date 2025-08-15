@@ -1367,19 +1367,30 @@ public extension OverlayFactory {
         let videoLayer = CALayer(); videoLayer.frame = parent.frame
         let overlayLayer = CALayer(); overlayLayer.frame = parent.frame
 
-        // Time-window each overlay with proper timing
-        for ov in overlays {
+        // Time-window each overlay with proper timing - FIXED FOR VIDEO COMPOSITION
+        for (index, ov) in overlays.enumerated() {
+            print("[OverlayFactory] Processing overlay \(index+1)/\(overlays.count) - start: \(ov.start.seconds)s, duration: \(ov.duration.seconds)s")
+            
             let L = ov.layerBuilder(config)
             
-            // CRITICAL FIX: Set proper timing for video composition
+            // CRITICAL FIX: Proper video composition timing
             L.beginTime = AVCoreAnimationBeginTimeAtZero + ov.start.seconds
+            L.timeOffset = 0
             L.duration = ov.duration.seconds
-            L.fillMode = .both
             
-            // Ensure all sublayers have proper timing too
+            // Ensure proper opacity for visibility
+            L.opacity = 1.0
+            
+            // Set z-position to ensure overlays render on top
+            L.zPosition = CGFloat(100 + index)
+            
+            print("[OverlayFactory] Layer configured: beginTime=\(L.beginTime), duration=\(L.duration), frame=\(L.frame)")
+            
+            // Fix timing for all sublayers recursively
             setProperTimingRecursively(layer: L, startTime: ov.start.seconds, duration: ov.duration.seconds)
             
             overlayLayer.addSublayer(L)
+            print("[OverlayFactory] Added overlay layer with \(L.sublayers?.count ?? 0) sublayers")
         }
 
         parent.addSublayer(videoLayer)
@@ -1469,30 +1480,37 @@ public extension OverlayFactory {
     
     /// Recursively sets proper timing for all sublayers in a layer hierarchy
     private func setProperTimingRecursively(layer: CALayer, startTime: Double, duration: Double) {
-        // Set timing for this layer
-        if layer.beginTime == 0 {
-            layer.beginTime = AVCoreAnimationBeginTimeAtZero + startTime
-        }
+        // Ensure proper layer visibility
+        layer.opacity = 1.0
         
-        // Process all animations in this layer
+        // Process all animations in this layer with proper video composition timing
         if let keys = layer.animationKeys() {
             for key in keys {
                 if let animation = layer.animation(forKey: key) {
-                    // Ensure animations have proper timing
-                    if animation.beginTime == 0 {
-                        let mutableAnim = animation.mutableCopy() as! CAAnimation
-                        mutableAnim.beginTime = AVCoreAnimationBeginTimeAtZero
-                        mutableAnim.fillMode = .both
-                        mutableAnim.isRemovedOnCompletion = false
-                        layer.add(mutableAnim, forKey: key)
+                    let mutableAnim = animation.mutableCopy() as! CAAnimation
+                    
+                    // Set proper timing for video composition
+                    mutableAnim.beginTime = AVCoreAnimationBeginTimeAtZero
+                    mutableAnim.fillMode = .both
+                    mutableAnim.isRemovedOnCompletion = false
+                    
+                    // Cap infinite animations for video composition
+                    if mutableAnim.repeatCount == .greatestFiniteMagnitude {
+                        // Limit to the duration of the overlay
+                        let animDuration = mutableAnim.duration > 0 ? mutableAnim.duration : 1.0
+                        mutableAnim.repeatCount = Float(duration / animDuration)
                     }
+                    
+                    layer.add(mutableAnim, forKey: key)
+                    print("[OverlayFactory] Fixed animation '\(key)' - beginTime: \(mutableAnim.beginTime), duration: \(mutableAnim.duration), repeatCount: \(mutableAnim.repeatCount)")
                 }
             }
         }
         
         // Recursively process sublayers
         if let sublayers = layer.sublayers {
-            for sublayer in sublayers {
+            for (index, sublayer) in sublayers.enumerated() {
+                sublayer.zPosition = CGFloat(index)
                 setProperTimingRecursively(layer: sublayer, startTime: startTime, duration: duration)
             }
         }

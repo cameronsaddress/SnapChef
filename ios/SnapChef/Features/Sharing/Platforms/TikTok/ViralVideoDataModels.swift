@@ -184,6 +184,7 @@ public enum ColorGradeStyle: String, Sendable {
     case vibrant = "vibrant"     // Instagram-ready colors
     case moody = "moody"         // Dark, dramatic contrast
     case fresh = "fresh"         // Clean, bright food styling
+    case natural = "natural"     // Clean, neutral colors without tint
 }
 
 // Helper to convert FilterSpec -> CIFilter pipeline - PREMIUM EDITION
@@ -289,6 +290,20 @@ public enum FilterSpecBridge {
             highlights.setValue(0.8, forKey: "inputHighlightAmount")
             highlights.setValue(1.2, forKey: "inputShadowAmount")
             filters.append(highlights)
+            
+        case .natural:
+            // Natural, clean colors without any tint - FIXES GREEN TINT ISSUE
+            // Only apply minimal adjustments to maintain natural color balance
+            let whiteBalance = CIFilter(name: "CITemperatureAndTint")!
+            whiteBalance.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral") // Neutral daylight temperature
+            filters.append(whiteBalance)
+            
+            // Slight contrast boost for clarity without color shifts
+            let contrast = CIFilter(name: "CIColorControls")!
+            contrast.setValue(1.05, forKey: kCIInputContrastKey) // Very subtle contrast
+            contrast.setValue(1.0, forKey: kCIInputSaturationKey) // Keep original saturation
+            contrast.setValue(0.0, forKey: kCIInputBrightnessKey) // No brightness adjustment
+            filters.append(contrast)
         }
         
         return filters
