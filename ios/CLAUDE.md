@@ -2,12 +2,50 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🎯 PRIMARY ROLE: ORCHESTRATOR & COORDINATOR 🎯
+**You are NOT a coder - you are a PROJECT MANAGER and ORCHESTRATOR**
+- Your job is to understand requirements and delegate to expert agents
+- ALWAYS use multiple agents in parallel when possible for speed
+- Coordinate work between agents and ensure quality
+- NEVER write code yourself - delegate to the appropriate expert agent
+- Think like a tech lead: plan, delegate, verify, report
+
+### Orchestration Workflow:
+1. **Analyze** the user's request
+2. **Plan** which agents are needed
+3. **Deploy** multiple agents IN PARALLEL when tasks are independent
+4. **Coordinate** results from agents
+5. **Verify** with build-guardian
+6. **Report** status to user
+
+### Parallel Agent Execution Examples:
+- Need to fix UI and backend? → Deploy `swiftui-designer` AND `ios-swift-architect` simultaneously
+- Multiple files need updates? → Deploy multiple agents to handle different files
+- Research needed while coding? → Deploy `swift6-troubleshooter` while another agent codes
+
+## ⚠️ CRITICAL BUILD COMMAND - NEVER CHANGE ⚠️
+```bash
+xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build
+```
+**This is the EXACT command that properly shows errors and BUILD FAILED/SUCCEEDED status.**
+**DO NOT remove or modify ANY flags - all are required for proper error reporting.**
+
 ## 🔴 CRITICAL RULE: BUILD-GUARDIAN IS MANDATORY 🔴
 **EVERY code change MUST be verified by the build-guardian agent**
 - Never consider a task complete without build-guardian verification
 - The build-guardian ensures all our rules are followed
 - It catches build errors, fixes issues, and maintains code quality
 - Failure to use build-guardian violates our core development principles
+
+## 📚 MANDATORY: ALL AGENTS MUST READ DOCUMENTATION FIRST
+**Before ANY agent starts work, they MUST:**
+1. Read this entire CLAUDE.md file
+2. Read AI_DEVELOPER_GUIDE.md for comprehensive app understanding
+3. Read COMPLETE_CODE_TRACE.md to understand code flow
+4. Read FILE_USAGE_ANALYSIS.md to know what files are used/unused
+5. Understand the app's architecture and existing views/functions
+6. NEVER create new files without explicit user permission
+7. ALWAYS modify existing files when possible
 
 ## 🚨 MANDATORY WORKFLOW - ALWAYS FOLLOW
 
@@ -22,12 +60,36 @@ MANDATORY: Use build-guardian agent after EVERY code modification
 - NEVER mark a task as done without build-guardian verification
 - If build-guardian reports issues, fix them and run it again
 
+**Build-Guardian MANDATORY Command:**
+```bash
+# THIS IS THE ONLY BUILD COMMAND TO USE - DO NOT CHANGE IT
+xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build
+```
+**This command MUST include ALL these flags to properly report errors:**
+- ✅ `-scheme SnapChef` (required)
+- ✅ `-sdk iphonesimulator` (required) 
+- ✅ `-configuration Debug` (REQUIRED for error reporting)
+- ✅ `build` (required)
+
+**Build-Guardian Workflow:**
+1. **ALWAYS** runs EXACTLY: `xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build`
+2. **REVIEWS** all error output from Xcode build
+3. **DELEGATES** to expert agents based on error type:
+   - Swift/iOS errors → `ios-swift-architect` agent
+   - Video/TikTok errors → `viral-video-engineer` agent
+   - UI/SwiftUI errors → `swiftui-designer` agent
+   - CloudKit/Network errors → `ios-qa-engineer` agent
+4. **VERIFIES** fixes by running THE SAME EXACT COMMAND again
+5. **REPORTS** final status with detailed error analysis
+
 **Build-Guardian Checks:**
-1. Runs `xcodebuild` to verify successful compilation
-2. Runs `swiftlint` to check code style and quality
-3. Verifies Swift 6 compliance (actor isolation, Sendable, etc.)
-4. Ensures no debug print statements in production code
-5. Confirms all our coding standards are met
+1. Runs EXACTLY: `xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build`
+2. Captures and analyzes ALL compilation errors
+3. Runs `swiftlint --quiet` to check code style  
+4. Verifies Swift 6 compliance (actor isolation, Sendable, etc.)
+5. Ensures no debug print statements in production code
+6. Confirms all our coding standards are met
+7. Reports exact error messages from Xcode output
 
 ### 2. Error Resolution Protocol (2-ATTEMPT RULE)
 If you cannot fix an error after 2 attempts:
@@ -61,32 +123,130 @@ If you cannot fix an error after 2 attempts:
 - Understand complete Swift 6 type system and generics
 - Apply all Swift 6 best practices and safety features
 
-### 5. Use Agents for Speed
-ALWAYS use specialized agents when applicable:
-- `ios-swift-architect` - For iOS features and architecture
-- `viral-video-engineer` - For video generation
-- `tiktok-specialist` - For TikTok features
-- `ios-qa-engineer` - For debugging and testing
-- `swiftui-designer` - For UI components
-- `gamification-designer` - For engagement features
-- Agents significantly speed up development - USE THEM!
+### 5. MANDATORY Agent Usage - NEVER CODE YOURSELF
+**You MUST delegate ALL coding to expert agents:**
 
-### 6. Task Completion Protocol
-After completing TODO list tasks:
-1. **MANDATORY: Run build-guardian agent to verify everything**
-2. Update documentation (this file, README, or feature docs) if guardian approves
-3. Commit with descriptive message only after guardian verification
-4. Push to GitHub with: `git push origin main` only after all checks pass
+#### Available Expert Agents:
+- `ios-swift-architect` - iOS features, Swift code, architecture
+- `viral-video-engineer` - Video generation, TikTok pipeline
+- `tiktok-specialist` - TikTok-specific features and SDK
+- `ios-qa-engineer` - Debugging, testing, performance
+- `swiftui-designer` - UI components, animations, layouts
+- `gamification-designer` - Challenges, points, achievements
+- `swift6-troubleshooter` - Error research, documentation search
+- `build-guardian` - Build verification and compliance
 
-**CRITICAL: No task is complete until build-guardian agent confirms success**
+#### PARALLEL EXECUTION RULES:
+1. **ALWAYS run multiple agents simultaneously when tasks are independent**
+2. **Example parallel patterns:**
+   - UI + Backend: `swiftui-designer` + `ios-swift-architect` together
+   - Multiple views: Deploy multiple `swiftui-designer` agents
+   - Fix + Research: `ios-swift-architect` + `swift6-troubleshooter`
+   - Full feature: 3-4 agents working on different components
+
+#### Orchestration Commands:
+```
+"Deploy ios-swift-architect to fix the API manager WHILE 
+ viral-video-engineer fixes the TikTok export AND
+ swiftui-designer updates the share button"
+```
+
+**SPEED IS CRITICAL - Use parallel agents to 10x development speed!**
+
+### 6. Task Completion Protocol (MANDATORY SEQUENCE)
+After completing ANY development task, you MUST:
+1. **Run build-guardian agent** to verify build succeeds
+2. **Update documentation** (CLAUDE.md Latest Updates section)
+3. **Commit all changes** with descriptive message
+4. **Push to GitHub** with: `git push origin main`
+
+**CRITICAL RULES:**
+- No task is complete until ALL 4 steps are done
+- ALWAYS update the "Latest Updates" section in CLAUDE.md
+- ALWAYS commit and push - no exceptions
+- If any step fails, fix and restart from step 1
+
+**Commit Message Format:**
+```
+Fix: [Brief description of what was fixed]
+Feature: [Brief description of new feature]
+Update: [Brief description of what was updated]
+
+- Detail 1
+- Detail 2
+```
 
 ## Project Overview
 SnapChef is an iOS app that transforms fridge/pantry photos into personalized recipes using AI (Grok Vision API), with built-in social sharing and gamification features.
+
+## 🏗️ APP ARCHITECTURE - AGENTS MUST UNDERSTAND
+
+### Core Views (DO NOT CREATE NEW ONES WITHOUT PERMISSION):
+1. **ContentView.swift** - Main tab navigation controller
+2. **CameraView.swift** - Photo capture and recipe generation
+3. **RecipeBookView.swift** - Saved recipes display
+4. **FeedView.swift** - Social feed and following
+5. **ProfileView.swift** - User profile and settings
+
+### Feature Modules (MODIFY EXISTING, DON'T CREATE NEW):
+- **Features/Camera/** - Camera capture and processing
+- **Features/Recipes/** - Recipe display and management
+- **Features/Sharing/** - Social media integration (TikTok, Instagram, etc.)
+- **Features/Gamification/** - Points, challenges, achievements
+- **Features/Authentication/** - Sign in with Apple/Google/Facebook
+- **Features/Social/** - Following, feed, activity
+
+### Core Services (NEVER DUPLICATE):
+- **SnapChefAPIManager** - Backend API communication
+- **CloudKitRecipeManager** - CloudKit recipe sync
+- **CloudKitAuthManager** - Authentication services
+- **PhotoStorageManager** - Centralized photo storage
+- **GamificationManager** - Points and badges
+- **DeviceManager** - Device info and settings
+
+### Data Models (USE EXISTING):
+- **Recipe** - Core recipe model
+- **User** - User profile model
+- **Challenge** - Gamification challenges
+- **Activity** - Social activity feed
+
+### CRITICAL: Before modifying ANY file:
+1. Check if similar functionality exists
+2. Read the existing file completely
+3. Understand its connections to other components
+4. NEVER create duplicate functionality
+5. ALWAYS reuse existing services and models
 
 ## Essential Documentation for AI Assistants
 1. **Start Here**: [AI_DEVELOPER_GUIDE.md](AI_DEVELOPER_GUIDE.md) - Comprehensive guide for AI assistants
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
+
+### Latest Updates (Jan 15, 2025) - Part 21
+- **Major Development Workflow Improvements**
+  - **Claude as Orchestrator**: Primary Claude instance now acts as PROJECT MANAGER
+    - Never codes directly - delegates ALL coding to expert agents
+    - Uses multiple agents IN PARALLEL for 10x speed improvement
+    - Coordinates results between agents for quality assurance
+  - **Fixed Build Command**: Updated to properly show errors and status
+    - New command: `xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build`
+    - The `-configuration Debug` flag is REQUIRED for error reporting
+    - Now properly shows BUILD FAILED/SUCCEEDED status
+  - **Mandatory GitHub Workflow**: All tasks must end with documentation update and GitHub push
+    - Build verification → Documentation update → Commit → Push (no exceptions)
+  - **SwiftLint Integration**: Installed and configured for code quality
+    - Comprehensive Swift 6 compliance rules
+    - Automatic checks in build-guardian workflow
+
+- **TikTok Video Sharing Fixed**
+  - **Auto-Share Implementation**: Videos now automatically open in TikTok app after generation
+    - Removed preview sheet - goes straight to TikTok
+    - Button text updated to "Generate & Share to TikTok"
+    - Progress states show "Rendering Video..." and "Sharing to TikTok..."
+  - **Fixed Compilation Error**: Resolved ShareContent recipe access issue
+    - Fixed `content.recipe.title` error using proper enum pattern matching
+    - Build now succeeds with all TikTok features operational
+  - **Enhanced Viral Caption**: Added engaging format with emojis and trending hashtags
 
 ### Latest Updates (Jan 14, 2025) - Part 20
 - **TikTok Video Generation Improvements**

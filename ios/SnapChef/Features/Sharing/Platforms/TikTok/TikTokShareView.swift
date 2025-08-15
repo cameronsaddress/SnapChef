@@ -11,7 +11,6 @@ struct TikTokShareView: View {
     private let template: ViralTemplate = .kineticTextSteps
     @State private var isGenerating = false
     @State private var videoURL: URL?
-    @State private var showPreview = false
     @State private var error: String?
 
     var body: some View {
@@ -28,10 +27,10 @@ struct TikTokShareView: View {
                                 if isGenerating {
                                     HStack(spacing: 10) {
                                         ProgressView()
-                                        Text(engine.currentProgress.phase.rawValue.capitalized)
+                                        Text(getProgressText())
                                     }.foregroundColor(.white)
                                 } else {
-                                    Text("Generate TikTok Video").bold().foregroundColor(.white)
+                                    Text("Generate & Share to TikTok").bold().foregroundColor(.white)
                                 }
                             }
                         }
@@ -43,12 +42,8 @@ struct TikTokShareView: View {
             .navigationTitle("TikTok Video")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) { Button("Cancel") { dismiss() }.foregroundColor(.white) }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if videoURL != nil { Button("Share") { share() }.foregroundColor(.pink) }
-                }
             }
         }
-        .sheet(isPresented: $showPreview) { if let url = videoURL { VideoPlayer(player: AVPlayer(url: url)).ignoresSafeArea() } }
         .alert("Error", isPresented: .constant(error != nil)) { Button("OK") { error = nil } } message: { Text(error ?? "") }
     }
 
@@ -63,8 +58,19 @@ struct TikTokShareView: View {
     private var header: some View {
         VStack(spacing: 6) {
             HStack(spacing: 8) { Image(systemName:"music.note").font(.system(size: 22, weight: .bold)); Text("TikTok Video Generator").font(.system(size: 22, weight: .bold)) }.foregroundColor(.white)
-            Text("Beat-synced, safe-zone text, gentle motion").foregroundColor(.gray).font(.subheadline)
+            Text("Auto-shares to TikTok after generation").foregroundColor(.gray).font(.subheadline)
         }.padding(.top, 18)
+    }
+    
+    private func getProgressText() -> String {
+        let phase = engine.currentProgress.phase.rawValue.capitalized
+        if phase.contains("Rendering") {
+            return "Rendering Video..."
+        } else if videoURL != nil {
+            return "Sharing to TikTok..."
+        } else {
+            return phase
+        }
     }
 
     private func generate() {
@@ -74,56 +80,93 @@ struct TikTokShareView: View {
         Task {
             do {
                 let url = try await engine.render(template: template, recipe: recipe, media: media) { _ in }
-                self.videoURL = url; self.showPreview = true
-            } catch { self.error = error.localizedDescription }
-            self.isGenerating = false
+                self.videoURL = url
+                // Automatically share to TikTok after generation
+                await shareToTikTokAutomatically(url: url)
+            } catch { 
+                await MainActor.run {
+                    self.error = error.localizedDescription
+                    self.isGenerating = false
+                }
+            }
         }
     }
 
-    private func share() {
-        guard let url = videoURL else { return }
-        ViralVideoExporter.requestPhotoPermission { ok in
-            Task { @MainActor in
-                guard ok else { self.error = "Photo access denied"; return }
-                ViralVideoExporter.saveToPhotos(videoURL: url) { result in
-                    Task { @MainActor in
-                        switch result {
-                        case .success(let identifier):
-                            let caption = "What's in my fridge → dinner. ✨🔥 #SnapChef #FoodTok"
-                            ViralVideoExporter.shareToTikTok(localIdentifiers: [identifier], caption: caption) { share in
-                                Task { @MainActor in
-                                    if case .failure(let e) = share { self.error = e.localizedDescription }
-                                }
-                            }
-                        case .failure(let e): self.error = e.localizedDescription
-                        }
-                    }
+    @MainActor
+    private func shareToTikTokAutomatically(url: URL) async {
+        // Request photo permission first
+        let hasPermission = await withCheckedContinuation { continuation in
+            ViralVideoExporter.requestPhotoPermission { granted in
+                continuation.resume(returning: granted)
+            }
+        }
+        
+        guard hasPermission else {
+            self.error = "Photo access denied"
+            self.isGenerating = false
+            return
+        }
+        
+        // Save video to Photos
+        let saveResult = await withCheckedContinuation { continuation in
+            ViralVideoExporter.saveToPhotos(videoURL: url) { result in
+                continuation.resume(returning: result)
+            }
+        }
+        
+        switch saveResult {
+        case .success(let identifier):
+            // Share to TikTok with enhanced caption
+            let recipeTitle = {
+                if case .recipe(let recipe) = content.type {
+                    return recipe.name
+                }
+                return "Amazing Recipe"
+            }()
+            let caption = "🔥 FRIDGE TO TABLE CHALLENGE 🔥\n\(recipeTitle) in 30 seconds!\n#SnapChef #FoodTok #FridgeHack #QuickMeals"
+            
+            let shareResult = await withCheckedContinuation { continuation in
+                ViralVideoExporter.shareToTikTok(localIdentifiers: [identifier], caption: caption) { result in
+                    continuation.resume(returning: result)
                 }
             }
+            
+            switch shareResult {
+            case .success:
+                // Success - TikTok app should now be open
+                self.isGenerating = false
+                // Optionally dismiss the view since TikTok is now open
+                dismiss()
+            case .failure(let error):
+                self.error = error.localizedDescription
+                self.isGenerating = false
+            }
+            
+        case .failure(let error):
+            self.error = error.localizedDescription
+            self.isGenerating = false
         }
     }
 }
 
-// simple wrapping layout
+// Simple wrapping layout using LazyVGrid for Swift 6 compatibility
 struct Wrap<Data: RandomAccessCollection, Content: View>: View where Data.Element: Hashable {
-    var data: Data; var spacing: CGFloat; var content: (Data.Element)->Content
-    init(_ d: Data, spacing: CGFloat = 8, @ViewBuilder content: @escaping (Data.Element)->Content) {
-        data = d; self.spacing = spacing; self.content = content
+    let data: Data
+    let spacing: CGFloat
+    let content: (Data.Element) -> Content
+    
+    init(_ d: Data, spacing: CGFloat = 8, @ViewBuilder content: @escaping (Data.Element) -> Content) {
+        data = d
+        self.spacing = spacing
+        self.content = content
     }
+    
     var body: some View {
-        let dataArray = Array(data)
-        var width: CGFloat = 0, height: CGFloat = 0
-        return GeometryReader { geo in
-            ZStack(alignment: .topLeading) {
-                ForEach(dataArray, id: \.self) { item in
-                    content(item)
-                        .alignmentGuide(.leading) { d in
-                            if (abs(width - d.width) > geo.size.width) { width = 0; height -= d.height + spacing }
-                            let result = width; if item == dataArray.last { width = 0 }; width -= d.width + spacing; return result
-                        }
-                        .alignmentGuide(.top) { _ in let result = height; if item == dataArray.last { height = 0 }; return result }
-                }
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: spacing)], spacing: spacing) {
+            ForEach(Array(data), id: \.self) { item in
+                content(item)
             }
-        }.frame(height: 120)
+        }
+        .frame(maxHeight: 120)
     }
 }

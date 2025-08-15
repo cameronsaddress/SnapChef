@@ -115,7 +115,7 @@ public final class StillWriter: @unchecked Sendable {
         let dt = 1.0 / Double(config.fps)
 
         // Log memory usage at start
-        memoryOptimizer.logMemoryProfile("StillWriter start")
+        memoryOptimizer.logMemoryProfile(phase: "StillWriter start")
 
         for frame in 0..<totalFrames {
             // Wait for input to be ready with timeout
@@ -241,7 +241,7 @@ public final class StillWriter: @unchecked Sendable {
             
             // Log memory every 30 frames to detect leaks
             if frame % 30 == 0 {
-                memoryOptimizer.logMemoryProfile("Frame \(frame)")
+                memoryOptimizer.logMemoryProfile(phase: "Frame \(frame)")
             }
         }
 
