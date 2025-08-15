@@ -28,6 +28,9 @@ public enum TikTokExportError: Error, LocalizedError {
     case fetchFailed
     case tiktokNotInstalled
     case shareFailed(String)
+    case connectionTimeout
+    case photoKitUnavailable
+    case retryExhausted
     
     public var errorDescription: String? {
         switch self {
@@ -43,6 +46,42 @@ public enum TikTokExportError: Error, LocalizedError {
             return "TikTok is not installed on this device"
         case .shareFailed(let message):
             return "Share failed: \(message)"
+        case .connectionTimeout:
+            return "Connection timeout. Please check your network and try again."
+        case .photoKitUnavailable:
+            return "Photo library service is temporarily unavailable. Please try again in a moment."
+        case .retryExhausted:
+            return "Unable to save video after multiple attempts. Your video has been saved to the app's Documents folder instead."
+        }
+    }
+    
+    public var isRetryable: Bool {
+        switch self {
+        case .connectionTimeout, .photoKitUnavailable:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    public var userFriendlyMessage: String {
+        switch self {
+        case .photoAccessDenied, .permissionDenied:
+            return "Please allow photo access in Settings to save your TikTok video."
+        case .connectionTimeout:
+            return "Network timeout. Check your connection and tap to retry."
+        case .photoKitUnavailable:
+            return "Photo library busy. Tap to try again."
+        case .retryExhausted:
+            return "Video saved to Documents folder. You can manually share it from there."
+        case .tiktokNotInstalled:
+            return "Install TikTok from the App Store to share videos."
+        case .saveFailed, .fetchFailed:
+            return "Unable to save video. Please try again or check your storage space."
+        case .shareFailed(let message) where message.lowercased().contains("error 5"):
+            return "TikTok sharing failed due to a connection issue. Video was saved to your Photos - you can share it manually."
+        case .shareFailed:
+            return "TikTok sharing failed. Video was saved to your Photos - you can share it manually."
         }
     }
 }
@@ -151,7 +190,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
                     print("❌ Failed to save video (attempt \(retryCount + 1)): \(errorMessage)")
                     
                     // Check if it's a PhotoKit XPC proxy error and retry
-                    if errorMessage.contains("PhotoKit XPC proxy") || errorMessage.contains("connection to service") || errorMessage.contains("XPC") {
+                    if errorMessage.contains("PhotoKit XPC proxy") || errorMessage.contains("connection to service") || errorMessage.contains("XPC") || errorMessage.contains("error 5") {
                         if retryCount < maxRetries {
                             print("🔄 Retrying PhotoKit save (attempt \(retryCount + 2)/\(maxRetries + 1))...")
                             Task {
@@ -170,6 +209,10 @@ public final class ViralVideoExporter: @unchecked Sendable {
                         // If all retries failed, try fallback save method
                         print("🔄 PhotoKit retries exhausted, trying fallback save...")
                         self.performFallbackSave(videoURL: videoURL, completion: completion)
+                    } else if errorMessage.contains("timeout") || errorMessage.contains("network") {
+                        completion(.failure(.connectionTimeout))
+                    } else if errorMessage.contains("unavailable") || errorMessage.contains("busy") {
+                        completion(.failure(.photoKitUnavailable))
                     } else {
                         completion(.failure(.saveFailed))
                     }
@@ -231,8 +274,8 @@ public final class ViralVideoExporter: @unchecked Sendable {
                                 print("⚠️ Fallback save also failed. Opening TikTok with notification to user...")
                                 // Open TikTok and provide guidance to user
                                 self.openTikTokWithGuidance(backupURL)
-                                // Return a dummy identifier since video is saved to Documents
-                                completion(.success("documents_backup"))
+                                // Return specific error for retry exhaustion
+                                completion(.failure(.retryExhausted))
                             }
                         }
                     } catch {
@@ -240,8 +283,8 @@ public final class ViralVideoExporter: @unchecked Sendable {
                             print("⚠️ Fallback save also failed. Opening TikTok with notification to user...")
                             // Open TikTok and provide guidance to user
                             self.openTikTokWithGuidance(backupURL)
-                            // Return a dummy identifier since video is saved to Documents
-                            completion(.success("documents_backup"))
+                            // Return specific error for retry exhaustion
+                            completion(.failure(.retryExhausted))
                         }
                     }
                 }

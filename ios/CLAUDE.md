@@ -91,6 +91,12 @@ xcodebuild -scheme SnapChef -destination 'platform=iOS Simulator,name=iPhone 16 
 **MUST use iPhone 16 Pro simulator - DO NOT change the destination!**
 **The `2>&1` is REQUIRED to capture error output - NEVER remove it!**
 
+**IMPORTANT BUILD TIPS:**
+- **ALWAYS use `build` not `clean build`** - cleaning wastes time and isn't necessary for error checking
+- **ALWAYS check with SwiftLint FIRST** before building: `/opt/homebrew/bin/swiftlint lint --path <file> --quiet`
+- SwiftLint catches syntax errors faster than xcodebuild
+- Only use `clean build` if specifically debugging build cache issues
+
 **Build-Guardian Workflow:**
 1. **RUN BUILD**: `xcodebuild -scheme SnapChef -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -configuration Debug build 2>&1`
 2. **ANALYZE ALL ERRORS**: 
@@ -175,6 +181,7 @@ If you cannot fix an error after 2 attempts:
 **Expert agents MUST NOT test builds after fixing code:**
 - **NEVER run xcodebuild or any build commands**
 - **ONLY the build-guardian agent tests builds**
+- **BUT DO use SwiftLint** to check syntax: `/opt/homebrew/bin/swiftlint lint --path <file> --quiet`
 - **Focus only on fixing the code issues assigned**
 - **Let build-guardian verify all fixes**
 - This prevents duplicate builds and maintains clear responsibility separation
@@ -277,6 +284,17 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 1. **Start Here**: [AI_DEVELOPER_GUIDE.md](AI_DEVELOPER_GUIDE.md) - Comprehensive guide for AI assistants
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
+
+### Latest Updates (Jan 15, 2025) - Part 26
+- **Fixed TikTokShareView Struct Boundaries**
+  - **Compilation Error**: Fixed "extraneous '}' at top level" error in TikTokShareView.swift
+  - **Root Cause**: Incorrect brace placement causing struct boundary issues
+  - **Solution**: 
+    - Removed extra closing brace after toggleHashtagSelection function
+    - Fixed do-catch block nesting in performGeneration function
+    - Properly balanced all braces in the file
+  - **Code Structure**: TikTokShareView struct properly ends at line 662
+  - **Build Status**: ✅ BUILD SUCCEEDED - All compilation errors resolved
 
 ### Latest Updates (Jan 15, 2025) - Part 25
 - **TikTok Video CTA Overlay Enhancement**

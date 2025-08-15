@@ -59,26 +59,8 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         // CRITICAL SPEED FIX: Always use fast single-pass renderer for speed
         print("[ViralVideoRenderer] Using ULTRA-FAST SINGLE-PASS renderer for ALL cases")
         
-        // Add timeout mechanism
-        return try await withThrowingTaskGroup(of: URL.self) { group in
-            // Main rendering task
-            group.addTask {
-                return try await self.renderSinglePass(plan: plan, config: config, progressCallback: progressCallback)
-            }
-            
-            // Timeout task
-            group.addTask {
-                try await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds timeout
-                throw RendererError.exportTimeout
-            }
-            
-            // Return the first completed task (either success or timeout)
-            guard let result = try await group.next() else {
-                throw ViralVideoError.renderFailed
-            }
-            group.cancelAll()
-            return result
-        }
+        // Render directly without timeout wrapper - individual operations handle their own timeouts
+        return try await renderSinglePass(plan: plan, config: config, progressCallback: progressCallback)
     }
 
     // MARK: OPTIMIZED segment creation
@@ -319,26 +301,44 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         exportSession.videoComposition = videoComposition
         exportSession.shouldOptimizeForNetworkUse = true
         
-        // SPEED OPTIMIZATION: Async export with monitoring
+        // SPEED OPTIMIZATION: Async export with monitoring and proper timeout handling
         return try await withCheckedThrowingContinuation { continuation in
-            Task { @MainActor in
-                exportSession.exportAsynchronously {
-                    let exportTime = Date().timeIntervalSince(startTime)
-                    print("[ViralVideoRenderer] ULTRA-FAST export completed in \\(exportTime)s")
+            // Use atomic boolean for completion tracking - thread-safe without locks
+            let completionTracker = CompletionTracker()
+            
+            // Timeout task - give export 25 seconds max  
+            let timeoutTask = Task {
+                try? await Task.sleep(nanoseconds: 25_000_000_000) // 25 seconds
+                if await completionTracker.markCompleted() {
+                    print("[ViralVideoRenderer] Export timeout after 25 seconds, cancelling")
+                    exportSession.cancelExport()
+                    continuation.resume(throwing: RendererError.exportTimeout)
+                }
+            }
+            
+            exportSession.exportAsynchronously {
+                Task {
+                    guard await completionTracker.markCompleted() else { 
+                        return // Already timed out or completed
+                    }
                     
-                    Task {
-                        await progressCallback(1.0)
-                        
-                        switch exportSession.status {
-                        case .completed:
-                            continuation.resume(returning: outputURL)
-                        case .failed:
-                            continuation.resume(throwing: exportSession.error ?? RendererError.exportFailed)
-                        case .cancelled:
-                            continuation.resume(throwing: RendererError.exportCancelled)
-                        default:
-                            continuation.resume(throwing: RendererError.exportFailed)
-                        }
+                    // Cancel timeout task since export completed
+                    timeoutTask.cancel()
+                    
+                    let exportTime = Date().timeIntervalSince(startTime)
+                    print("[ViralVideoRenderer] ULTRA-FAST export completed in \(exportTime)s")
+                    
+                    await progressCallback(1.0)
+                    
+                    switch exportSession.status {
+                    case .completed:
+                        continuation.resume(returning: outputURL)
+                    case .failed:
+                        continuation.resume(throwing: exportSession.error ?? RendererError.exportFailed)
+                    case .cancelled:
+                        continuation.resume(throwing: RendererError.exportCancelled)
+                    default:
+                        continuation.resume(throwing: RendererError.exportFailed)
                     }
                 }
             }
@@ -608,4 +608,15 @@ public final class ViralVideoRenderer: @unchecked Sendable {
 
 public enum RendererError: Error { 
     case cannotCreateVideoTrack, cannotLoadVideoTrack, cannotCreateExportSession, exportFailed, exportCancelled, exportTimeout
+}
+
+// MARK: - Thread-safe completion tracking without NSLock
+private actor CompletionTracker {
+    private var isCompleted = false
+    
+    func markCompleted() -> Bool {
+        guard !isCompleted else { return false }
+        isCompleted = true
+        return true
+    }
 }

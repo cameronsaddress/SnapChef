@@ -1,5 +1,3 @@
-// REPLACE ENTIRE FILE: TikTokShareView.swift
-
 import SwiftUI
 import AVKit
 import Photos
@@ -17,6 +15,9 @@ struct TikTokShareView: View {
     @State private var showConfetti = false
     @State private var buttonShake = false
     @State private var selectedHashtags: [String] = [] // Array to maintain selection order for FIFO
+    @State private var showRetryAlert = false
+    @State private var currentTikTokError: TikTokExportError?
+    @State private var retryAction: (() -> Void)?
 
     var body: some View {
         NavigationStack {
@@ -70,7 +71,34 @@ struct TikTokShareView: View {
                 startButtonShake()
             }
         }
-        .alert("Error", isPresented: .constant(error != nil)) { Button("OK") { error = nil } } message: { Text(error ?? "") }
+        .alert("Error", isPresented: .constant(error != nil && currentTikTokError == nil)) { 
+            Button("OK") { error = nil } 
+        } message: { 
+            Text(error ?? "") 
+        }
+        .alert("Video Generation Issue", isPresented: $showRetryAlert) {
+            if let tikTokError = currentTikTokError, tikTokError.isRetryable {
+                Button("Retry") {
+                    showRetryAlert = false
+                    retryAction?()
+                }
+                Button("Cancel") {
+                    showRetryAlert = false
+                    currentTikTokError = nil
+                    retryAction = nil
+                }
+            } else {
+                Button("OK") {
+                    showRetryAlert = false
+                    currentTikTokError = nil
+                    retryAction = nil
+                }
+            }
+        } message: {
+            if let tikTokError = currentTikTokError {
+                Text(tikTokError.userFriendlyMessage)
+            }
+        }
     }
 
     private var hashtagChips: some View {
@@ -360,53 +388,75 @@ struct TikTokShareView: View {
     }
 
     private func generate() {
+        Task {
+            await performGeneration()
+        }
+    }
+    
+    private func performGeneration() async {
         guard let inputs = content.toRenderInputs() else { return }
         let (recipe, media) = inputs
         
-        // Haptic feedback
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.prepare()
-        impactFeedback.impactOccurred()
+        await MainActor.run {
+            // Haptic feedback
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.prepare()
+            impactFeedback.impactOccurred()
+            
+            isGenerating = true
+        }
         
-        isGenerating = true
-        Task {
-            do {
-                let url = try await engine.render(template: template, recipe: recipe, media: media) { _ in }
-                self.videoURL = url
+        do {
+            let url = try await engine.render(template: template, recipe: recipe, media: media) { _ in }
+            self.videoURL = url
+            
+            // Success haptic feedback
+            await MainActor.run {
+                let successFeedback = UINotificationFeedbackGenerator()
+                successFeedback.notificationOccurred(.success)
                 
-                // Success haptic feedback
-                await MainActor.run {
-                    let successFeedback = UINotificationFeedbackGenerator()
-                    successFeedback.notificationOccurred(.success)
-                    
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                        showSuccess = true
-                        showConfetti = true
-                    }
-                    
-                    // Hide confetti after 3 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                        withAnimation(.easeOut(duration: 0.5)) {
-                            showConfetti = false
-                        }
-                    }
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                    showSuccess = true
+                    showConfetti = true
                 }
                 
-                // Automatically share to TikTok after generation with selected hashtags
-                await shareToTikTokAutomatically(url: url)
-            } catch { 
+                // Hide confetti after 3 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        showConfetti = false
+                    }
+                }
+            }
+            
+            // Automatically share to TikTok after generation with selected hashtags
+            await shareToTikTokAutomatically(url: url)
+        } catch { 
                 await MainActor.run {
                     // Error haptic feedback
                     let errorFeedback = UINotificationFeedbackGenerator()
                     errorFeedback.notificationOccurred(.error)
                     
-                    self.error = error.localizedDescription
+                    // Handle TikTokExportError specifically
+                    if let tikTokError = error as? TikTokExportError {
+                        self.currentTikTokError = tikTokError
+                        if tikTokError.isRetryable {
+                            self.retryAction = {
+                                Task {
+                                    await self.performGeneration()
+                                }
+                            }
+                            self.showRetryAlert = true
+                        } else {
+                            self.showRetryAlert = true
+                        }
+                    } else {
+                        self.error = error.localizedDescription
+                    }
                     self.isGenerating = false
                 }
-            }
         }
     }
-
+    
     @MainActor
     private func shareToTikTokAutomatically(url: URL) async {
         // Request photo permission first
@@ -417,7 +467,13 @@ struct TikTokShareView: View {
         }
         
         guard hasPermission else {
-            self.error = "Photo access denied"
+            self.currentTikTokError = TikTokExportError.photoAccessDenied
+            self.showRetryAlert = true
+            self.retryAction = {
+                Task {
+                    await self.shareToTikTokAutomatically(url: url)
+                }
+            }
             self.isGenerating = false
             return
         }
@@ -483,12 +539,23 @@ struct TikTokShareView: View {
                 }
                 
             case .failure(let error):
-                self.error = error.localizedDescription
+                // Handle TikTok sharing errors with user-friendly messages
+                self.currentTikTokError = error
+                self.showRetryAlert = true
                 self.isGenerating = false
             }
             
         case .failure(let error):
-            self.error = error.localizedDescription
+            // Handle TikTokExportError specifically for better UX
+            self.currentTikTokError = error
+            if error.isRetryable {
+                self.retryAction = {
+                    Task {
+                        await self.shareToTikTokAutomatically(url: url)
+                    }
+                }
+            }
+            self.showRetryAlert = true
             self.isGenerating = false
         }
     }
