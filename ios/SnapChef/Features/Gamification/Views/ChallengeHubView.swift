@@ -122,6 +122,11 @@ struct ChallengeHubView: View {
                 }
             }
             
+            // Trigger challenge sync when challenges page is visited
+            Task {
+                await CloudKitSyncService.shared.triggerChallengeSync()
+            }
+            
             // Prompt for notifications if not already enabled
             if !hasPromptedForNotifications && !ChallengeNotificationManager.shared.notificationsEnabled {
                 hasPromptedForNotifications = true

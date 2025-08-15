@@ -112,6 +112,11 @@ class CloudKitRecipeManager: ObservableObject {
             try await addRecipeToUserProfile(recipeID, type: .created)
         }
         
+        // Trigger manual sync after saving a recipe
+        Task {
+            await CloudKitDataManager.shared.triggerManualSync()
+        }
+        
         print("✅ Recipe processed in CloudKit: \(recipeID)")
         return recipeID
     }

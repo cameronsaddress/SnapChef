@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct BrandedSharePopup: View {
     @StateObject private var shareService = ShareService.shared
@@ -123,6 +124,9 @@ struct BrandedSharePopup: View {
             if let platform = selectedPlatform {
                 platformSpecificView(for: platform)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DismissSharePopup"))) { _ in
+            dismiss()
         }
     }
     

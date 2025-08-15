@@ -100,7 +100,7 @@ struct SnapChefApp: App {
             appState.currentSessionID = sessionID
             
             try? await cloudKitDataManager.registerDevice()
-            await cloudKitDataManager.performFullSync()
+            // Removed automatic sync on app launch - only sync when user visits recipe views
             cloudKitDataManager.trackScreenView("AppLaunch")
             
             // Sync CloudKit photos to PhotoStorageManager

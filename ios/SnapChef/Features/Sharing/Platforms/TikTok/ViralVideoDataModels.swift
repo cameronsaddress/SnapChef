@@ -87,6 +87,13 @@ public struct RenderConfig: Sendable {
     // Screen scale for high-res displays
     public var contentsScale: CGFloat = 2.0
     
+    // SPEED OPTIMIZATION: Performance tuning flags
+    public var enableMetalAcceleration = true
+    public var enableParallelProcessing = true
+    public var enableCaching = true
+    public var maxCacheSize = 100 * 1024 * 1024 // 100MB cache
+    public var reduceEffectsForSpeed = false // Emergency speed mode
+    
     public init() { /* uses the default property values above */ }
 }
 
@@ -100,14 +107,27 @@ public struct RenderProgress: Sendable {
     }
 }
 
-// Export controls
+// SPEED OPTIMIZED Export controls
 public enum ExportSettings {
-    public static let videoPreset = AVAssetExportPresetHighestQuality
+    // SPEED OPTIMIZATION: Use different presets for different phases
+    public static let videoPreset = AVAssetExportPresetHighestQuality // Use available preset
+    public static let draftPreset = AVAssetExportPresetMediumQuality // For intermediate steps
+    public static let finalPreset = AVAssetExportPresetHighestQuality // Only for final export
+    
     public static let maxMemoryUsage: UInt64 = 800 * 1024 * 1024
-    public static let maxRenderTime: Double = 8.0
+    public static let maxRenderTime: Double = 5.0 // Reduced from 8s to 5s for better UX
     public static let pixelFormat = kCVPixelFormatType_32BGRA
     public static let maxFileSize: Int64 = 50 * 1024 * 1024  // 50MB
     public static let targetFileSize: Int64 = 50 * 1024 * 1024  // 50MB
+    
+    // SPEED OPTIMIZATION: Compression settings for different phases
+    public static let draftBitRate = 4_000_000 // 4 Mbps for drafts
+    public static let finalBitRate = 8_000_000 // 8 Mbps for final
+    public static let fastBitRate = 2_000_000 // 2 Mbps for very fast processing
+    
+    // Parallel processing limits
+    public static let maxConcurrentSegments = 3
+    public static let cacheLimit = 10
 }
 
 // MARK: - RenderPlan + specs shared across renderer/planner/overlays
@@ -154,7 +174,7 @@ public enum TransformSpec: Sendable {
 }
 
 // Filters that map to Core Image filters - PREMIUM EDITION
-public enum FilterSpec: Sendable {
+public enum FilterSpec: Sendable, Hashable {
     // Basic filters
     case gaussianBlur(radius: CGFloat)
     case vibrance(CGFloat)

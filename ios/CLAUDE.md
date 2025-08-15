@@ -41,9 +41,10 @@ DEPLOY ALL 3 AGENTS AT ONCE!
 
 ## ⚠️ CRITICAL BUILD COMMAND - NEVER CHANGE ⚠️
 ```bash
-xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build 2>&1
+xcodebuild -scheme SnapChef -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -configuration Debug build 2>&1
 ```
 **This EXACT command properly captures ALL errors and build status.**
+**MUST use iPhone 16 Pro simulator - DO NOT change the destination!**
 **The `2>&1` is REQUIRED to capture error output - DO NOT remove it!**
 
 ## 🔴 CRITICAL RULE: BUILD-GUARDIAN IS MANDATORY 🔴
@@ -85,12 +86,13 @@ MANDATORY: Use build-guardian agent after EVERY code modification
 **Build-Guardian MANDATORY Command:**
 ```bash
 # THIS IS THE ONLY BUILD COMMAND TO USE - DO NOT CHANGE IT
-xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build 2>&1
+xcodebuild -scheme SnapChef -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -configuration Debug build 2>&1
 ```
+**MUST use iPhone 16 Pro simulator - DO NOT change the destination!**
 **The `2>&1` is REQUIRED to capture error output - NEVER remove it!**
 
 **Build-Guardian Workflow:**
-1. **RUN BUILD**: `xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build 2>&1`
+1. **RUN BUILD**: `xcodebuild -scheme SnapChef -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -configuration Debug build 2>&1`
 2. **ANALYZE ALL ERRORS**: 
    - Parse EVERY compilation error from the output
    - Group errors by FILE (not by type)
@@ -129,7 +131,7 @@ All 4 agents work SIMULTANEOUSLY for maximum speed!
 ```
 
 **Build-Guardian Checks:**
-1. Runs EXACTLY: `xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build 2>&1`
+1. Runs EXACTLY: `xcodebuild -scheme SnapChef -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -configuration Debug build 2>&1`
 2. Captures and analyzes ALL compilation errors
 3. Groups errors by FILE for parallel agent deployment
 4. Deploys ONE agent per file, ALL at the same time
@@ -169,18 +171,26 @@ If you cannot fix an error after 2 attempts:
 - Understand complete Swift 6 type system and generics
 - Apply all Swift 6 best practices and safety features
 
-### 5. MANDATORY Agent Usage - NEVER CODE YOURSELF
+### 5. CRITICAL AGENT RULE: NO BUILD TESTING
+**Expert agents MUST NOT test builds after fixing code:**
+- **NEVER run xcodebuild or any build commands**
+- **ONLY the build-guardian agent tests builds**
+- **Focus only on fixing the code issues assigned**
+- **Let build-guardian verify all fixes**
+- This prevents duplicate builds and maintains clear responsibility separation
+
+### 6. MANDATORY Agent Usage - NEVER CODE YOURSELF
 **You MUST delegate ALL coding to expert agents:**
 
 #### Available Expert Agents:
-- `ios-swift-architect` - iOS features, Swift code, architecture
-- `viral-video-engineer` - Video generation, TikTok pipeline
-- `tiktok-specialist` - TikTok-specific features and SDK
-- `ios-qa-engineer` - Debugging, testing, performance
-- `swiftui-designer` - UI components, animations, layouts
-- `gamification-designer` - Challenges, points, achievements
-- `swift6-troubleshooter` - Error research, documentation search
-- `build-guardian` - Build verification and compliance
+- `ios-swift-architect` - iOS features, Swift code, architecture (NO BUILD TESTING)
+- `viral-video-engineer` - Video generation, TikTok pipeline (NO BUILD TESTING)
+- `tiktok-specialist` - TikTok-specific features and SDK (NO BUILD TESTING)
+- `ios-qa-engineer` - Debugging, testing, performance (NO BUILD TESTING)
+- `swiftui-designer` - UI components, animations, layouts (NO BUILD TESTING)
+- `gamification-designer` - Challenges, points, achievements (NO BUILD TESTING)
+- `swift6-troubleshooter` - Error research, documentation search (NO BUILD TESTING)
+- `build-guardian` - Build verification and compliance (ONLY AGENT THAT RUNS BUILDS)
 
 #### PARALLEL EXECUTION RULES:
 1. **ALWAYS run multiple agents simultaneously when tasks are independent**
@@ -199,7 +209,7 @@ If you cannot fix an error after 2 attempts:
 
 **SPEED IS CRITICAL - Use parallel agents to 10x development speed!**
 
-### 6. Task Completion Protocol (MANDATORY SEQUENCE)
+### 7. Task Completion Protocol (MANDATORY SEQUENCE)
 After completing ANY development task, you MUST:
 1. **Run build-guardian agent** to verify build succeeds
 2. **Update documentation** (CLAUDE.md Latest Updates section)
@@ -267,6 +277,25 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 1. **Start Here**: [AI_DEVELOPER_GUIDE.md](AI_DEVELOPER_GUIDE.md) - Comprehensive guide for AI assistants
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
+
+### Latest Updates (Jan 15, 2025) - Part 25
+- **TikTok Video CTA Overlay Enhancement**
+  - **SNAPCHEF Logo Display**: Implemented large SnapChef logo spanning 80% of screen width
+    - Logo positioned at center of screen (y: 0.5) during CTA segment (12-15 seconds)
+    - Uses authentic SnapChef gradient colors: #FF6B35 to #FF1493
+    - Includes sparkles icon (✨) like in HomeView and EnhancedShareSheet
+    - Logo size: 80% screen width x 80px height with 40px corner radius
+  - **Updated CTA Layout**: Completely removed App Store button/badge code as requested
+    - Logo displays prominently in center of screen
+    - Text below logo: "Get it FREE in the App Store Now!"
+    - Clean, focused layout without competing UI elements
+  - **Enhanced Visual Design**:
+    - Large logo with gradient background and white text/icon
+    - Enhanced shadow (12px radius, 0.4 opacity) for depth
+    - Subtle white border (20% opacity) for definition
+    - Bold white CTA text with strong shadow for video visibility
+  - **Animation Consistency**: Maintains existing slide-in and pulse animations
+  - **Build Status**: Clean compilation with zero errors (Swift 6 warnings remain but non-blocking)
 
 ### Latest Updates (Jan 15, 2025) - Part 24
 - **BUILD-GUARDIAN: Fixed Swift 6 Compilation Errors in TikTok Pipeline**

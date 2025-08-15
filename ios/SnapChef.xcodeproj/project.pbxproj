@@ -33,6 +33,7 @@
 		2422E5C1C7E414D8FF5A0B7C /* NetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FDC970FB5C6C618DA4E006 /* NetworkManager.swift */; };
 		2A1E6C5CC0216CD80FA81609 /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 147423E4DF08EDDC2668784C /* CloudKit.framework */; };
 		2D02CE5084479923A9D51FB0 /* ViralVideoRendererPro.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D518D2380480B66FE686C8 /* ViralVideoRendererPro.swift */; };
+		2D3FCBBECA590DA906A60532 /* PantryCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94373B9CA1417FC8E7C430F9 /* PantryCaptureView.swift */; };
 		3061965FBE04EE83D63B5FE5 /* PhotoStorageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3758078876521E833669F17E /* PhotoStorageManager.swift */; };
 		31B2C3E43D384FB39E4DDCA0 /* SDKInitializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBA1C719280079FC83D76F2E /* SDKInitializer.swift */; };
 		32271DE450E0D40801E0AC74 /* ChallengeProofSubmissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32E437105EB7EFBC8764841A /* ChallengeProofSubmissionView.swift */; };
@@ -280,6 +281,7 @@
 		8CE146BB1AFCA8615407AF32 /* meal3.jpg */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.jpeg; name = meal3.jpg; path = SnapChef/Resources/meal3.jpg; sourceTree = "<group>"; };
 		8E2BD9959463FD88F4BE035B /* StreakManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StreakManager.swift; path = SnapChef/Features/Gamification/StreakManager.swift; sourceTree = "<group>"; };
 		8F5498163C882C57847796FD /* UnlockablesStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UnlockablesStore.swift; path = SnapChef/Features/Gamification/UnlockablesStore.swift; sourceTree = "<group>"; };
+		94373B9CA1417FC8E7C430F9 /* PantryCaptureView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PantryCaptureView.swift; path = SnapChef/Features/Camera/PantryCaptureView.swift; sourceTree = "<group>"; };
 		94485059EDFCCAB264B0D728 /* ChallengeDatabase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeDatabase.swift; path = SnapChef/Features/Gamification/ChallengeDatabase.swift; sourceTree = "<group>"; };
 		94CF88BBD5E77A33A82328C4 /* HapticManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HapticManager.swift; path = SnapChef/Core/Utilities/HapticManager.swift; sourceTree = "<group>"; };
 		95FA990D10A449119F5630D4 /* StreakModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StreakModels.swift; path = SnapChef/Core/Models/StreakModels.swift; sourceTree = "<group>"; };
@@ -389,6 +391,7 @@
 				F4737935B5BA6D0B9ABCEB27 /* SnapChef */,
 				FAE14391640BA3821562690E /*  */,
 				F56F891D2E3D282000AF95B7 /* Recovered References */,
+				358FFFFCEF94607D3AEF5F6C /* Features */,
 			);
 			sourceTree = "<group>";
 		};
@@ -488,6 +491,14 @@
 				573B84C17E0DAF8D9FB6BF07 /* meal5.jpg */,
 			);
 			name = Resources;
+			sourceTree = "<group>";
+		};
+		358FFFFCEF94607D3AEF5F6C /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				CCC2412DBCBB32B0EFA78F84 /* Camera */,
+			);
+			name = Features;
 			sourceTree = "<group>";
 		};
 		3B5203769881E398015FCF88 /* Profile */ = {
@@ -849,6 +860,14 @@
 			name = UsernameSetupView.swift;
 			sourceTree = "<group>";
 		};
+		CCC2412DBCBB32B0EFA78F84 /* Camera */ = {
+			isa = PBXGroup;
+			children = (
+				94373B9CA1417FC8E7C430F9 /* PantryCaptureView.swift */,
+			);
+			name = Camera;
+			sourceTree = "<group>";
+		};
 		D45E8C5FF8F5F38555BF7393 /* Messages */ = {
 			isa = PBXGroup;
 			children = (
@@ -1196,6 +1215,7 @@
 				3061965FBE04EE83D63B5FE5 /* PhotoStorageManager.swift in Sources */,
 				4C0A412E093372045DA6780D /* PhotoValidator.swift in Sources */,
 				623D1A9D6546A2BE6A95DD62 /* SimpleMediaBundle.swift in Sources */,
+				2D3FCBBECA590DA906A60532 /* PantryCaptureView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

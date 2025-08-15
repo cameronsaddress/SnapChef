@@ -82,6 +82,10 @@ struct FavoritesView: View {
         .onAppear {
             if cloudKitAuth.isAuthenticated {
                 loadCloudKitFavorites()
+                // Trigger manual sync when favorites page is visited
+                Task {
+                    await CloudKitDataManager.shared.triggerManualSync()
+                }
             }
         }
     }

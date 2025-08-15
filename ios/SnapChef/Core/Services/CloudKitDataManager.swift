@@ -29,7 +29,7 @@ final class CloudKitDataManager: ObservableObject {
         self.publicDB = container.publicCloudDatabase
         self.privateDB = container.privateCloudDatabase
         setupSubscriptions()
-        startPeriodicSync()
+        // Removed automatic periodic sync - only sync when needed
     }
     
     // MARK: - User Preferences Sync
@@ -306,14 +306,14 @@ final class CloudKitDataManager: ObservableObject {
         }
     }
     
-    // MARK: - Periodic Sync
+    // MARK: - Manual Sync (Only when needed)
     
-    private func startPeriodicSync() {
-        Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { _ in // Every 5 minutes
-            Task {
-                await self.performFullSync()
-            }
-        }
+    /// Trigger manual sync - should only be called when:
+    /// - User visits RecipeBookView
+    /// - User pulls to refresh
+    /// - User explicitly saves a new recipe
+    func triggerManualSync() async {
+        await performFullSync()
     }
     
     func performFullSync() async {
@@ -328,7 +328,7 @@ final class CloudKitDataManager: ObservableObject {
             try await registerDevice()
             
             lastSyncDate = Date()
-            print("✅ Full sync completed")
+            print("✅ Manual sync completed")
         } catch {
             syncErrors.append("Sync failed: \(error.localizedDescription)")
         }

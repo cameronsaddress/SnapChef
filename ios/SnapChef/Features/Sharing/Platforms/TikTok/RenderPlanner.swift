@@ -262,13 +262,13 @@ public actor RenderPlanner {
         
         // OVERLAY SEQUENCE: Perfectly timed viral text sequence with alternating animations
         
-        // OVERLAY PHASE 1: "From this Pic" (0-3s) - Slide in from RIGHT
+        // OVERLAY PHASE 1: "From only this pic" (0-3s) - Slide in from RIGHT
         overlays.append(.init(
             start: .zero,
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in 
                 self.createAlternatingSequenceOverlay(
-                    text: "From this Pic", 
+                    text: "From only this pic", 
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .right
@@ -304,13 +304,13 @@ public actor RenderPlanner {
             }
         ))
         
-        // OVERLAY PHASE 4: "of what I like" (9-12s) - Slide in from LEFT
+        // OVERLAY PHASE 4: "of what we like to eat" (9-12s) - Slide in from LEFT
         overlays.append(.init(
             start: CMTime(seconds: 9, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in 
                 self.createAlternatingSequenceOverlay(
-                    text: "of what I like", 
+                    text: "of what we like to eat", 
                     config: cfg, 
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -324,7 +324,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in 
                 self.createCTATextOverlay(
-                    text: "TAP TO GET RECIPE! 👆", 
+                    text: "Get SNAPCHEF! Free on the App Store!", 
                     config: cfg,
                     screenScale: cfg.contentsScale
                 )
@@ -796,7 +796,7 @@ public actor RenderPlanner {
         return container
     }
     
-    /// Create alternating sequence overlay with proper slide direction
+    /// Create alternating sequence overlay with FADE animations and spark effects
     nonisolated private func createAlternatingSequenceOverlay(text: String, config: RenderConfig, screenScale: CGFloat, slideDirection: SlideDirection) -> CALayer {
         let container = CALayer()
         container.frame = CGRect(origin: .zero, size: config.size)
@@ -814,10 +814,11 @@ public actor RenderPlanner {
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
         gradientLayer.cornerRadius = 16
         
-        // FIXED: Create text layer with guaranteed text rendering
+        // FIXED: Create text layer with proper font calculation for full text width
         let textLayer = CATextLayer()
         textLayer.string = text  // Use plain string for reliable rendering
-        textLayer.font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, config.stepsFontSize * 1.4, nil)
+        let font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, config.stepsFontSize * 1.4, nil)
+        textLayer.font = font
         textLayer.fontSize = config.stepsFontSize * 1.4
         textLayer.foregroundColor = UIColor.white.cgColor
         textLayer.alignmentMode = .center
@@ -829,11 +830,17 @@ public actor RenderPlanner {
         print("[RenderPlanner] Text layer string set to: '\(textLayer.string ?? "nil")'")
         print("[RenderPlanner] Font size: \(textLayer.fontSize)")
         
-        // Calculate proper sizing with minimum dimensions
-        let textSize = textLayer.preferredFrameSize()
-        let padding: CGFloat = 20
-        let containerWidth = min(max(textSize.width + padding * 2, 200), config.size.width - 80) // Min 200, max screen-80
-        let containerHeight = max(textSize.height + padding * 2, 60) // Minimum 60 height
+        // FIXED: Calculate actual text dimensions using the font
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: font
+        ]
+        let textSize = (text as NSString).size(withAttributes: textAttributes)
+        let padding: CGFloat = 50 // Increased padding to ensure full text visibility
+        let containerWidth = min(textSize.width + padding * 2, config.size.width - 60) // Ensure text fits
+        let containerHeight = max(textSize.height + padding * 2, 70) // Adequate height
+        
+        print("[RenderPlanner] Calculated text size: \(textSize)")
+        print("[RenderPlanner] Container size: \(CGSize(width: containerWidth, height: containerHeight))")
         
         // Position container in center of screen
         let containerFrame = CGRect(
@@ -845,20 +852,19 @@ public actor RenderPlanner {
         
         // Set up layer hierarchy properly
         sequenceContainer.frame = containerFrame
-        sequenceContainer.opacity = 1.0  // Ensure visibility
+        sequenceContainer.opacity = 0.0  // Start invisible for fade in
         gradientLayer.frame = CGRect(origin: .zero, size: containerFrame.size)
-        gradientLayer.opacity = 1.0  // Ensure background visibility
+        gradientLayer.opacity = 1.0
         textLayer.frame = CGRect(
             x: padding,
-            y: padding,
+            y: (containerFrame.height - textSize.height) / 2, // Center text vertically
             width: containerFrame.width - padding * 2,
-            height: containerFrame.height - padding * 2
+            height: textSize.height
         )
-        textLayer.opacity = 1.0  // Ensure text visibility
+        textLayer.opacity = 1.0
         
         // Debug positioning
         print("[RenderPlanner] Sequence container frame: \(sequenceContainer.frame)")
-        print("[RenderPlanner] Gradient layer frame: \(gradientLayer.frame)")
         print("[RenderPlanner] Text layer frame: \(textLayer.frame)")
         
         // Add shadow for depth and visibility
@@ -867,48 +873,77 @@ public actor RenderPlanner {
         gradientLayer.shadowRadius = 8
         gradientLayer.shadowOpacity = 0.4
         
-        // FIXED: Alternating slide animations based on direction
-        let slideIn = CABasicAnimation(keyPath: "position.x")
-        let slideOut = CABasicAnimation(keyPath: "position.x")
+        // ADD SPARK EFFECTS: Create particle emitter behind text
+        let sparkEmitter = CAEmitterLayer()
+        sparkEmitter.emitterPosition = CGPoint(x: containerFrame.width / 2, y: containerFrame.height / 2)
+        sparkEmitter.emitterShape = .rectangle
+        sparkEmitter.emitterSize = CGSize(width: containerFrame.width * 1.6, height: containerFrame.height * 1.6)  // Double the emitter size
+        sparkEmitter.zPosition = -1 // Behind text but in front of background
         
-        switch slideDirection {
-        case .left:
-            // Slide in from left
-            slideIn.fromValue = -containerFrame.width/2
-            slideIn.toValue = config.size.width / 2
-            // Slide out to right
-            slideOut.fromValue = config.size.width / 2
-            slideOut.toValue = config.size.width + containerFrame.width/2
-        case .right:
-            // Slide in from right
-            slideIn.fromValue = config.size.width + containerFrame.width/2
-            slideIn.toValue = config.size.width / 2
-            // Slide out to left
-            slideOut.fromValue = config.size.width / 2
-            slideOut.toValue = -containerFrame.width/2
-        }
+        let sparkCell = CAEmitterCell()
+        sparkCell.contents = createGoldenSparkImage().cgImage
+        sparkCell.birthRate = 15 // Moderate spark rate
+        sparkCell.lifetime = 2.0
+        sparkCell.velocity = 50
+        sparkCell.velocityRange = 30
+        sparkCell.emissionRange = .pi * 2
+        sparkCell.yAcceleration = 80 // Gravity effect
+        sparkCell.scale = 0.6  // Double the size
+        sparkCell.scaleRange = 0.4  // Double the range
+        sparkCell.alphaSpeed = -0.5
+        sparkCell.spin = .pi
+        sparkCell.spinRange = .pi
         
-        // Slide in animation (0-0.8s)
-        slideIn.duration = 0.8
-        slideIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
-        slideIn.beginTime = AVCoreAnimationBeginTimeAtZero
-        slideIn.fillMode = .both
-        slideIn.isRemovedOnCompletion = false
+        sparkEmitter.emitterCells = [sparkCell]
         
-        // Slide out animation (2.0-2.6s) 
-        slideOut.duration = 0.6
-        slideOut.beginTime = AVCoreAnimationBeginTimeAtZero + 2.0
-        slideOut.timingFunction = CAMediaTimingFunction(name: .easeIn)
-        slideOut.fillMode = .both
-        slideOut.isRemovedOnCompletion = false
+        // FIXED: FADE ANIMATIONS instead of sliding
+        // Fade in animation (0-0.5s)
+        let fadeIn = CABasicAnimation(keyPath: "opacity")
+        fadeIn.fromValue = 0.0
+        fadeIn.toValue = 1.0
+        fadeIn.duration = 0.5
+        fadeIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        fadeIn.beginTime = AVCoreAnimationBeginTimeAtZero
+        fadeIn.fillMode = .both
+        fadeIn.isRemovedOnCompletion = false
         
-        // Beat-synced pulse while visible (0.8-2.0s)
+        // Stay visible with full opacity (0.5-2.5s)
+        
+        // Fade out animation (2.5-3.0s) 
+        let fadeOut = CABasicAnimation(keyPath: "opacity")
+        fadeOut.fromValue = 1.0
+        fadeOut.toValue = 0.0
+        fadeOut.duration = 0.5
+        fadeOut.beginTime = AVCoreAnimationBeginTimeAtZero + 2.5
+        fadeOut.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        fadeOut.fillMode = .both
+        fadeOut.isRemovedOnCompletion = false
+        
+        // Start spark explosion when fade-in completes (at 0.5s)
+        let sparkStart = CABasicAnimation(keyPath: "birthRate")
+        sparkStart.fromValue = 0
+        sparkStart.toValue = 15
+        sparkStart.duration = 0.1
+        sparkStart.beginTime = AVCoreAnimationBeginTimeAtZero + 0.5
+        sparkStart.fillMode = .both
+        sparkStart.isRemovedOnCompletion = false
+        
+        // Stop sparks when fading out (at 2.5s)
+        let sparkStop = CABasicAnimation(keyPath: "birthRate")
+        sparkStop.fromValue = 15
+        sparkStop.toValue = 0
+        sparkStop.duration = 0.1
+        sparkStop.beginTime = AVCoreAnimationBeginTimeAtZero + 2.5
+        sparkStop.fillMode = .both
+        sparkStop.isRemovedOnCompletion = false
+        
+        // Beat-synced pulse while visible (0.8-2.3s)
         let pulse = CABasicAnimation(keyPath: "transform.scale")
         pulse.fromValue = 1.0
         pulse.toValue = 1.06
         pulse.duration = 0.6
         pulse.autoreverses = true
-        pulse.repeatCount = 2 // About 2.4s of pulsing total
+        pulse.repeatCount = 3 // About 3.6s of pulsing total
         pulse.beginTime = AVCoreAnimationBeginTimeAtZero + 0.8
         pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         pulse.fillMode = .both
@@ -916,18 +951,61 @@ public actor RenderPlanner {
         
         // Assemble layer hierarchy
         sequenceContainer.addSublayer(gradientLayer)
+        sequenceContainer.addSublayer(sparkEmitter) // Sparks behind text
         sequenceContainer.addSublayer(textLayer)
         
-        // Apply animations to the container
-        sequenceContainer.add(slideIn, forKey: "slideIn")
-        sequenceContainer.add(slideOut, forKey: "slideOut")
+        // Apply animations
+        sequenceContainer.add(fadeIn, forKey: "fadeIn")
+        sequenceContainer.add(fadeOut, forKey: "fadeOut")
         sequenceContainer.add(pulse, forKey: "pulse")
+        sparkEmitter.add(sparkStart, forKey: "sparkStart")
+        sparkEmitter.add(sparkStop, forKey: "sparkStop")
         
         container.addSublayer(sequenceContainer)
         return container
     }
     
-    /// Create CTA text overlay with proper text rendering and animations
+    /// Create golden spark image for particle effects
+    nonisolated private func createGoldenSparkImage() -> UIImage {
+        let size = CGSize(width: 12, height: 12)
+        UIGraphicsBeginImageContextWithOptions(size, false, 0)
+        defer { UIGraphicsEndImageContext() }
+        
+        let context = UIGraphicsGetCurrentContext()!
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        
+        // Create golden spark with SnapChef branding colors
+        let sparkColor = UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 0.9) // Gold
+        context.setFillColor(sparkColor.cgColor)
+        
+        // Draw a four-pointed star shape
+        context.beginPath()
+        let radius: CGFloat = 5
+        let innerRadius: CGFloat = 2
+        
+        for i in 0..<8 {
+            let angle = CGFloat(i) * .pi / 4
+            let currentRadius = i % 2 == 0 ? radius : innerRadius
+            let x = center.x + cos(angle) * currentRadius
+            let y = center.y + sin(angle) * currentRadius
+            
+            if i == 0 {
+                context.move(to: CGPoint(x: x, y: y))
+            } else {
+                context.addLine(to: CGPoint(x: x, y: y))
+            }
+        }
+        context.closePath()
+        context.fillPath()
+        
+        // Add a bright center
+        context.setFillColor(UIColor.white.withAlphaComponent(0.8).cgColor)
+        context.fillEllipse(in: CGRect(x: center.x - 1, y: center.y - 1, width: 2, height: 2))
+        
+        return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
+    }
+    
+    /// Create CTA text overlay with FADE animations and proper text sizing
     nonisolated private func createCTATextOverlay(text: String, config: RenderConfig, screenScale: CGFloat) -> CALayer {
         let container = CALayer()
         container.frame = CGRect(origin: .zero, size: config.size)
@@ -945,51 +1023,90 @@ public actor RenderPlanner {
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
         gradientLayer.cornerRadius = 20
         
-        // FIXED: CTA text layer with proper string rendering
-        let textLayer = CATextLayer()
-        textLayer.string = text  // Use plain string
-        textLayer.font = CTFontCreateWithName("HelveticaNeue-Black" as CFString, config.ctaFontSize * 1.6, nil)
-        textLayer.fontSize = config.ctaFontSize * 1.6
-        textLayer.foregroundColor = UIColor.white.cgColor
-        textLayer.alignmentMode = .center
-        textLayer.contentsScale = screenScale
-        textLayer.isWrapped = true
+        // Create main CTA text with special gradient for "SNAPCHEF!"
+        let mainTextLayer = CATextLayer()
+        let font = CTFontCreateWithName("HelveticaNeue-Black" as CFString, config.ctaFontSize * 1.4, nil)
+        mainTextLayer.font = font
+        mainTextLayer.fontSize = config.ctaFontSize * 1.4
+        mainTextLayer.foregroundColor = UIColor.white.cgColor
+        mainTextLayer.alignmentMode = .center
+        mainTextLayer.contentsScale = screenScale
+        mainTextLayer.isWrapped = true
+        
+        // Special gradient text for "SNAPCHEF!"
+        let snapchefLayer = createGradientTextLayer("SNAPCHEF!", font: font, screenScale: screenScale)
+        
+        // Split the text to apply gradient only to "SNAPCHEF!"
+        if text.contains("SNAPCHEF!") {
+            let beforeText = "Get "
+            let afterText = " Free on the App Store!"
+            
+            mainTextLayer.string = beforeText + "        " + afterText  // Space for gradient text
+        } else {
+            mainTextLayer.string = text
+        }
         
         // Debug: Ensure CTA text is being set
         print("[RenderPlanner] Creating CTA overlay with text: '\(text)'")
-        print("[RenderPlanner] CTA text layer string set to: '\(textLayer.string ?? "nil")'")
-        print("[RenderPlanner] CTA font size: \(textLayer.fontSize)")
+        print("[RenderPlanner] CTA main text layer string set to: '\(mainTextLayer.string ?? "nil")'")
+        print("[RenderPlanner] CTA font size: \(mainTextLayer.fontSize)")
         
-        let textSize = textLayer.preferredFrameSize()
-        let padding: CGFloat = 24
+        // FIXED: Calculate actual text dimensions using the font
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: font
+        ]
+        let textSize = (text as NSString).size(withAttributes: textAttributes)
+        let padding: CGFloat = 30 // Adequate padding for CTA
         let containerWidth = min(textSize.width + padding * 2, config.size.width - 60)
-        let containerHeight = max(textSize.height + padding * 2, 70) // Minimum height
+        let containerHeight = max(textSize.height + padding * 2, 80) // Minimum height for CTA
         
-        // Position at bottom center of screen
+        print("[RenderPlanner] CTA calculated text size: \(textSize)")
+        print("[RenderPlanner] CTA container size: \(CGSize(width: containerWidth, height: containerHeight))")
+        
+        // Position at bottom-middle of screen (y position around 0.85 of screen height)
         let containerFrame = CGRect(
             x: (config.size.width - containerWidth) / 2,
-            y: config.size.height - config.safeInsets.bottom - containerHeight - 120,
+            y: config.size.height * 0.85 - containerHeight / 2,
             width: containerWidth,
             height: containerHeight
         )
         
         // Set up proper layer hierarchy
         ctaContainer.frame = containerFrame
-        ctaContainer.opacity = 1.0  // Ensure visibility
+        ctaContainer.opacity = 0.0  // Start invisible for fade in
         gradientLayer.frame = CGRect(origin: .zero, size: containerFrame.size)
-        gradientLayer.opacity = 1.0  // Ensure background visibility
-        textLayer.frame = CGRect(
+        gradientLayer.opacity = 1.0
+        // Position main text at top of container
+        mainTextLayer.frame = CGRect(
             x: padding,
             y: padding,
             width: containerFrame.width - padding * 2,
-            height: containerFrame.height - padding * 2
+            height: textSize.height
         )
-        textLayer.opacity = 1.0  // Ensure text visibility
+        mainTextLayer.opacity = 1.0
+        
+        // Position gradient "SNAPCHEF!" text in center
+        if text.contains("SNAPCHEF!") {
+            snapchefLayer.frame = CGRect(
+                x: containerFrame.width / 2 - 60, // Center horizontally
+                y: padding,
+                width: 120,
+                height: textSize.height
+            )
+        }
+        
+        // Add App Store badge below text
+        let appStoreBadge = createAppStoreBadge(config: config, screenScale: screenScale)
+        appStoreBadge.frame = CGRect(
+            x: (containerFrame.width - 120) / 2,
+            y: textSize.height + padding + 10,
+            width: 120,
+            height: 30
+        )
         
         // Debug positioning
         print("[RenderPlanner] CTA container frame: \(ctaContainer.frame)")
-        print("[RenderPlanner] CTA gradient layer frame: \(gradientLayer.frame)")
-        print("[RenderPlanner] CTA text layer frame: \(textLayer.frame)")
+        print("[RenderPlanner] CTA main text layer frame: \(mainTextLayer.frame)")
         
         // Enhanced shadow and glow
         gradientLayer.shadowColor = UIColor.magenta.cgColor
@@ -997,15 +1114,48 @@ public actor RenderPlanner {
         gradientLayer.shadowRadius = 15
         gradientLayer.shadowOpacity = 0.6
         
-        // FIXED: Slide in from bottom animation
-        let slideIn = CABasicAnimation(keyPath: "position.y")
-        slideIn.fromValue = config.size.height + containerFrame.height/2 // Start below screen
-        slideIn.toValue = containerFrame.midY // Final position
-        slideIn.duration = 0.8
-        slideIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
-        slideIn.beginTime = AVCoreAnimationBeginTimeAtZero
-        slideIn.fillMode = .both
-        slideIn.isRemovedOnCompletion = false
+        // Add spark effects for CTA
+        let ctaSparkEmitter = CAEmitterLayer()
+        ctaSparkEmitter.emitterPosition = CGPoint(x: containerFrame.width / 2, y: containerFrame.height / 2)
+        ctaSparkEmitter.emitterShape = .rectangle
+        ctaSparkEmitter.emitterSize = CGSize(width: containerFrame.width, height: containerFrame.height)
+        ctaSparkEmitter.zPosition = -1 // Behind text but in front of background
+        
+        let ctaSparkCell = CAEmitterCell()
+        ctaSparkCell.contents = createGoldenSparkImage().cgImage
+        ctaSparkCell.birthRate = 20 // More sparks for CTA
+        ctaSparkCell.lifetime = 2.5
+        ctaSparkCell.velocity = 60
+        ctaSparkCell.velocityRange = 40
+        ctaSparkCell.emissionRange = .pi * 2
+        ctaSparkCell.yAcceleration = 100 // Strong gravity
+        ctaSparkCell.scale = 0.8  // Double the size
+        ctaSparkCell.scaleRange = 0.6  // Double the range
+        ctaSparkCell.alphaSpeed = -0.4
+        ctaSparkCell.spin = .pi * 1.5
+        ctaSparkCell.spinRange = .pi
+        
+        ctaSparkEmitter.emitterCells = [ctaSparkCell]
+        
+        // FIXED: FADE ANIMATIONS for CTA
+        // Fade in animation (0-0.5s)
+        let fadeIn = CABasicAnimation(keyPath: "opacity")
+        fadeIn.fromValue = 0.0
+        fadeIn.toValue = 1.0
+        fadeIn.duration = 0.5
+        fadeIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        fadeIn.beginTime = AVCoreAnimationBeginTimeAtZero
+        fadeIn.fillMode = .both
+        fadeIn.isRemovedOnCompletion = false
+        
+        // Start spark explosion when fade-in completes (at 0.5s)
+        let sparkStart = CABasicAnimation(keyPath: "birthRate")
+        sparkStart.fromValue = 0
+        sparkStart.toValue = 20
+        sparkStart.duration = 0.1
+        sparkStart.beginTime = AVCoreAnimationBeginTimeAtZero + 0.5
+        sparkStart.fillMode = .both
+        sparkStart.isRemovedOnCompletion = false
         
         // Attention-grabbing pulse animation with proper timing
         let pulse = CAKeyframeAnimation(keyPath: "transform.scale")
@@ -1013,7 +1163,7 @@ public actor RenderPlanner {
         pulse.keyTimes = [0, 0.25, 0.5, 0.75, 1.0]
         pulse.duration = 1.2
         pulse.repeatCount = 3 // Finite repeat for video composition
-        pulse.beginTime = AVCoreAnimationBeginTimeAtZero + 0.8 // Start after slide-in
+        pulse.beginTime = AVCoreAnimationBeginTimeAtZero + 0.8 // Start after fade-in
         pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         pulse.fillMode = .both
         pulse.isRemovedOnCompletion = false
@@ -1031,14 +1181,91 @@ public actor RenderPlanner {
         
         // Assemble layer hierarchy
         ctaContainer.addSublayer(gradientLayer)
-        ctaContainer.addSublayer(textLayer)
+        ctaContainer.addSublayer(ctaSparkEmitter) // Sparks behind CTA text
+        ctaContainer.addSublayer(mainTextLayer)
+        if text.contains("SNAPCHEF!") {
+            ctaContainer.addSublayer(snapchefLayer) // Gradient text overlay
+        }
+        ctaContainer.addSublayer(appStoreBadge) // App Store badge
         
         // Apply animations to the container
-        ctaContainer.add(slideIn, forKey: "slideIn")
+        ctaContainer.add(fadeIn, forKey: "fadeIn")
         ctaContainer.add(pulse, forKey: "pulse")
         gradientLayer.add(glowPulse, forKey: "glowPulse")
+        ctaSparkEmitter.add(sparkStart, forKey: "sparkStart")
         
         container.addSublayer(ctaContainer)
+        return container
+    }
+    
+    // MARK: - Helper Functions for CTA
+    
+    /// Create gradient text layer for "SNAPCHEF!" with orange to pink gradient
+    nonisolated private func createGradientTextLayer(_ text: String, font: CTFont, screenScale: CGFloat) -> CALayer {
+        let container = CALayer()
+        
+        // Create gradient background for text
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor(red: 1.0, green: 0.42, blue: 0.21, alpha: 1.0).cgColor, // #FF6B35
+            UIColor(red: 1.0, green: 0.08, blue: 0.58, alpha: 1.0).cgColor  // #FF1493
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        
+        // Create text layer as mask
+        let textLayer = CATextLayer()
+        textLayer.string = text
+        textLayer.font = font
+        textLayer.fontSize = CTFontGetSize(font)
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = .center
+        textLayer.contentsScale = screenScale
+        
+        // Set frames
+        let textSize = textLayer.preferredFrameSize()
+        container.frame = CGRect(origin: .zero, size: textSize)
+        gradientLayer.frame = container.bounds
+        textLayer.frame = container.bounds
+        
+        // Apply text as mask to gradient
+        gradientLayer.mask = textLayer
+        
+        container.addSublayer(gradientLayer)
+        return container
+    }
+    
+    /// Create App Store badge with icon
+    nonisolated private func createAppStoreBadge(config: RenderConfig, screenScale: CGFloat) -> CALayer {
+        let container = CALayer()
+        container.frame = CGRect(origin: .zero, size: CGSize(width: 120, height: 30))
+        
+        // Background
+        let background = CALayer()
+        background.frame = container.bounds
+        background.backgroundColor = UIColor.black.withAlphaComponent(0.7).cgColor
+        background.cornerRadius = 15
+        
+        // App Store icon (simplified - square with rounded corners)
+        let iconLayer = CALayer()
+        iconLayer.frame = CGRect(x: 5, y: 5, width: 20, height: 20)
+        iconLayer.backgroundColor = UIColor.systemBlue.cgColor
+        iconLayer.cornerRadius = 4
+        
+        // Text
+        let textLayer = CATextLayer()
+        textLayer.string = "App Store"
+        textLayer.font = CTFontCreateWithName("HelveticaNeue-Medium" as CFString, 12, nil)
+        textLayer.fontSize = 12
+        textLayer.foregroundColor = UIColor.white.cgColor
+        textLayer.alignmentMode = .left
+        textLayer.contentsScale = screenScale
+        textLayer.frame = CGRect(x: 30, y: 8, width: 85, height: 14)
+        
+        container.addSublayer(background)
+        container.addSublayer(iconLayer)
+        container.addSublayer(textLayer)
+        
         return container
     }
     

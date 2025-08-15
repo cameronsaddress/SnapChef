@@ -29,6 +29,16 @@ struct CameraView: View {
     @State private var showConfetti = false
     @State private var showWelcomeMessage = false
     
+    // Two-step capture flow state
+    enum CaptureMode {
+        case fridge
+        case pantry
+    }
+    
+    @State private var captureMode: CaptureMode = .fridge
+    @State private var fridgePhoto: UIImage?
+    @State private var showPantryStep = false
+    
     // User preferences for API
     @State private var selectedFoodType: String?
     @State private var selectedDifficulty: String?
@@ -97,7 +107,9 @@ struct CameraView: View {
                         cameraModel: cameraModel,
                         capturePhoto: capturePhoto,
                         isProcessing: isProcessing,
-                        captureAnimation: $captureAnimation
+                        captureAnimation: $captureAnimation,
+                        captureMode: captureMode,
+                        fridgePhoto: fridgePhoto
                     )
                     
                     // Bottom controls with capture button and test button
@@ -153,7 +165,17 @@ struct CameraView: View {
                     },
                     onConfirm: {
                         showingPreview = false
-                        processImage(image)
+                        if captureMode == .fridge {
+                            // Store fridge photo and switch to pantry mode
+                            fridgePhoto = image
+                            captureMode = .pantry
+                            showPantryStep = true
+                        } else {
+                            // Pantry photo captured - process both images
+                            if let fridgeImage = fridgePhoto {
+                                processBothImages(fridgeImage: fridgeImage, pantryImage: image)
+                            }
+                        }
                     }
                 )
                 .transition(.opacity.combined(with: .scale(scale: 1.1)))
@@ -217,6 +239,7 @@ struct CameraView: View {
         .particleExplosion(trigger: $showConfetti)
         .onDisappear {
             cameraModel.stopSession()
+            resetCaptureFlow()
         }
         .fullScreenCover(isPresented: $showingResults) {
             RecipeResultsView(
@@ -269,6 +292,39 @@ struct CameraView: View {
         .navigationBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .overlay(
+            // Pantry step overlay
+            Group {
+                if showPantryStep {
+                    PantryStepOverlay(
+                        fridgePhoto: fridgePhoto,
+                        onSkip: {
+                            // Process only fridge photo
+                            showPantryStep = false
+                            if let fridgeImage = fridgePhoto {
+                                processImage(fridgeImage)
+                            }
+                            resetCaptureFlow()
+                        },
+                        onContinue: {
+                            // Continue to pantry capture
+                            showPantryStep = false
+                        },
+                        onBack: {
+                            // Go back to fridge capture
+                            showPantryStep = false
+                            captureMode = .fridge
+                            fridgePhoto = nil
+                            showingPreview = true
+                        }
+                    )
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+                }
+            }
+        )
     }
     
     private func startScanAnimation() {
@@ -566,6 +622,270 @@ struct CameraView: View {
         }
     }
     
+    private func processBothImages(fridgeImage: UIImage, pantryImage: UIImage) {
+        isProcessing = true
+        capturedImage = fridgeImage // Store the fridge image as the primary image
+        
+        // Stop camera session to save resources while processing
+        cameraModel.stopSession()
+        
+        Task {
+            // Check subscription status
+            if !subscriptionManager.isPremium {
+                let remainingRecipes = subscriptionManager.getRemainingDailyRecipes()
+                if remainingRecipes <= 0 {
+                    isProcessing = false
+                    premiumPromptReason = .dailyLimitReached
+                    showPremiumPrompt = true
+                    cameraModel.requestCameraPermission()
+                    return
+                }
+            }
+            
+            // Generate session ID
+            let sessionId = UUID().uuidString
+            
+            // Track camera session start
+            let sessionData = CameraSessionData(
+                sessionID: sessionId,
+                captureType: "fridge_and_pantry_snap",
+                flashEnabled: cameraModel.flashMode == .on,
+                ingredientsDetected: [],
+                recipesGenerated: 0,
+                aiModel: UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "grok",
+                processingTime: 0
+            )
+            let startTime = Date()
+            
+            // Get existing recipe names to avoid duplicates
+            var existingRecipeNames = appState.allRecipes.map { $0.name }
+            
+            // Fetch CloudKit recipes to include them in duplicate prevention
+            print("📱 Fetching CloudKit recipes for duplicate prevention...")
+            do {
+                let cloudKitSavedRecipes = try await cloudKitRecipeManager.getUserSavedRecipes()
+                let cloudKitCreatedRecipes = try await cloudKitRecipeManager.getUserCreatedRecipes()
+                
+                // Add CloudKit recipe names to the list
+                let cloudKitRecipeNames = (cloudKitSavedRecipes + cloudKitCreatedRecipes).map { $0.name }
+                existingRecipeNames.append(contentsOf: cloudKitRecipeNames)
+                
+                // Remove duplicates
+                existingRecipeNames = Array(Set(existingRecipeNames))
+                
+                print("✅ Total recipes for duplicate prevention: \(existingRecipeNames.count) (Local: \(appState.allRecipes.count), CloudKit: \(cloudKitRecipeNames.count))")
+            } catch {
+                print("⚠️ Failed to fetch CloudKit recipes for duplicate prevention: \(error)")
+                // Continue with just local recipes
+            }
+            
+            // Get food preferences from UserDefaults
+            let foodPreferences = UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? []
+            
+            // If user has food preferences but no specific food type selected, use preferences
+            let effectiveFoodType: String? = if !foodPreferences.isEmpty && selectedFoodType == nil {
+                // Join preferences into a string for the foodType parameter
+                foodPreferences.joined(separator: ", ")
+            } else {
+                selectedFoodType
+            }
+            
+            // Get selected LLM provider from UserDefaults (default to Gemini)
+            let llmProvider = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini"
+            
+            // Call the new API function for both images
+            SnapChefAPIManager.shared.sendBothImagesForRecipeGeneration(
+                fridgeImage: fridgeImage,
+                pantryImage: pantryImage,
+                sessionId: sessionId,
+                dietaryRestrictions: currentDietaryRestrictions,
+                foodType: effectiveFoodType,
+                difficultyPreference: selectedDifficulty,
+                healthPreference: selectedHealthPreference,
+                mealType: selectedMealType,
+                cookingTimePreference: selectedCookingTime,
+                numberOfRecipes: numberOfRecipes,
+                existingRecipeNames: existingRecipeNames,
+                foodPreferences: foodPreferences,
+                llmProvider: llmProvider
+            ) { result in
+                Task { @MainActor in
+                    switch result {
+                    case .success(let apiResponse):
+                        // Convert API recipes to app recipes
+                        let recipes = apiResponse.data.recipes.map { apiRecipe in
+                            SnapChefAPIManager.shared.convertAPIRecipeToAppRecipe(apiRecipe)
+                        }
+                        
+                        // Update state
+                        self.generatedRecipes = recipes
+                        self.detectedIngredients = apiResponse.data.ingredients
+                        
+                        // Store both photos for all generated recipes
+                        print("📸 CameraView: Storing fridge and pantry photos in PhotoStorageManager for \(recipes.count) recipes")
+                        PhotoStorageManager.shared.storeFridgePhoto(
+                            fridgeImage,
+                            for: recipes.map { $0.id }
+                        )
+                        PhotoStorageManager.shared.storePantryPhoto(
+                            pantryImage,
+                            for: recipes.map { $0.id }
+                        )
+                        
+                        // Track camera session completion
+                        let processingTime = Date().timeIntervalSince(startTime)
+                        let completedSession = CameraSessionData(
+                            sessionID: sessionId,
+                            captureType: "fridge_and_pantry_snap",
+                            flashEnabled: cameraModel.flashMode == .on,
+                            ingredientsDetected: apiResponse.data.ingredients.map { $0.name },
+                            recipesGenerated: recipes.count,
+                            aiModel: llmProvider,
+                            processingTime: processingTime
+                        )
+                        await cloudKitDataManager.trackCameraSession(completedSession)
+                        
+                        // Track recipe generation
+                        for recipe in recipes {
+                            let generationData = RecipeGenerationData(
+                                sessionID: sessionId,
+                                recipe: recipe,
+                                ingredients: apiResponse.data.ingredients.map { $0.name },
+                                preferencesJSON: String(describing: [
+                                    "dietary": currentDietaryRestrictions,
+                                    "foodType": effectiveFoodType ?? "",
+                                    "difficulty": selectedDifficulty ?? "",
+                                    "health": selectedHealthPreference ?? "",
+                                    "mealType": selectedMealType ?? "",
+                                    "cookingTime": selectedCookingTime ?? ""
+                                ]),
+                                generationTime: processingTime / Double(recipes.count),
+                                quality: "high"
+                            )
+                            await cloudKitDataManager.trackRecipeGeneration(generationData)
+                        }
+                        
+                        // Track feature usage
+                        await cloudKitDataManager.trackFeatureUse("recipe_generation_with_pantry")
+                        
+                        // Save recipes to CloudKit with the captured fridge photo
+                        print("📸 Uploading \(recipes.count) recipes with fridge and pantry photos to CloudKit...")
+                        for (index, recipe) in recipes.enumerated() {
+                            do {
+                                print("📸 Uploading recipe \(index + 1)/\(recipes.count): '\(recipe.name)'")
+                                let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: fridgeImage)
+                                print("✅ Recipe \(index + 1)/\(recipes.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
+                                
+                                // Also add to user's saved recipes list
+                                try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
+                                print("✅ Recipe added to user's saved list")
+                            } catch {
+                                print("❌ Failed to save recipe \(index + 1)/\(recipes.count) to CloudKit: \(error)")
+                            }
+                        }
+                        print("✅ All \(recipes.count) recipes have been saved with fridge and pantry photos")
+                        
+                        // Increment snaps taken counter
+                        self.appState.incrementSnapsTaken()
+                        
+                        // Increment daily recipe count if not premium
+                        if !self.subscriptionManager.isPremium {
+                            self.subscriptionManager.incrementDailyRecipeCount()
+                        }
+                        
+                        // Track challenge progress for recipe creation
+                        for recipe in recipes {
+                            // Post notification for recipe creation
+                            NotificationCenter.default.post(
+                                name: Notification.Name("RecipeCreated"),
+                                object: recipe
+                            )
+                            
+                            // Award coins based on recipe quality
+                            let quality = self.determineRecipeQuality(recipe)
+                            ChefCoinsManager.shared.awardRecipeCreationCoins(recipeQuality: quality)
+                            
+                            // Track specific challenge actions
+                            if recipe.nutrition.calories < 500 {
+                                ChallengeProgressTracker.shared.trackAction(.calorieTarget, metadata: [
+                                    "calories": recipe.nutrition.calories,
+                                    "recipeId": recipe.id
+                                ])
+                            }
+                            
+                            if recipe.nutrition.protein >= 20 {
+                                ChallengeProgressTracker.shared.trackAction(.proteinTarget, metadata: [
+                                    "protein": recipe.nutrition.protein,
+                                    "recipeId": recipe.id
+                                ])
+                            }
+                            
+                            // Track cuisine if available in tags
+                            if let cuisineTag = recipe.tags.first(where: { tag in
+                                ["italian", "mexican", "chinese", "japanese", "thai", "indian", "french", "american"].contains(tag.lowercased())
+                            }) {
+                                ChallengeProgressTracker.shared.trackAction(.cuisineExplored, metadata: [
+                                    "cuisine": cuisineTag,
+                                    "recipeId": recipe.id
+                                ])
+                            }
+                            
+                            // Check for speed challenges
+                            if recipe.prepTime + recipe.cookTime <= 30 {
+                                ChallengeProgressTracker.shared.trackAction(.timeCompleted, metadata: [
+                                    "totalTime": recipe.prepTime + recipe.cookTime,
+                                    "recipeId": recipe.id
+                                ])
+                            }
+                            
+                            // Track analytics for recipe creation
+                            ChallengeAnalyticsService.shared.trackEvent(.milestoneReached, parameters: [
+                                "milestone": "recipe_created_with_pantry",
+                                "quality": quality.rawValue,
+                                "calories": recipe.nutrition.calories,
+                                "protein": recipe.nutrition.protein,
+                                "totalTime": recipe.prepTime + recipe.cookTime,
+                                "difficulty": recipe.difficulty,
+                                "recipeId": recipe.id.uuidString
+                            ])
+                        }
+                        
+                        // Store the captured image for later use
+                        self.capturedImage = fridgeImage
+                        
+                        // Update UI on main thread
+                        self.generatedRecipes = recipes
+                        self.detectedIngredients = apiResponse.data.ingredients
+                        self.resultsPreloaded = true
+                        
+                        // Dismiss processing overlay first
+                        self.isProcessing = false
+                        
+                        // Small delay to ensure smooth transition
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            self.showingResults = true
+                        }
+                        
+                    case .failure(let error):
+                        self.isProcessing = false
+                        
+                        // Convert API errors to user-friendly errors
+                        if case APIError.authenticationError = error {
+                            self.currentError = .authenticationError("Authentication failed")
+                        } else if case APIError.serverError(_, let message) = error {
+                            self.currentError = .apiError("Server error: \(message)")
+                        } else {
+                            self.currentError = .unknown(error.localizedDescription)
+                        }
+                        
+                        // Restart camera session on error
+                        self.cameraModel.requestCameraPermission()
+                    }
+                }
+            }
+        }
+    }
+    
     private func processTestImage() {
         // Load the test fridge image from bundle
         guard let testImage = UIImage(named: "fridge.jpg") else {
@@ -578,6 +898,12 @@ struct CameraView: View {
         
         // Process it the same way as a captured photo
         processImage(testImage)
+    }
+    
+    private func resetCaptureFlow() {
+        captureMode = .fridge
+        fridgePhoto = nil
+        showPantryStep = false
     }
     
     private func determineRecipeQuality(_ recipe: Recipe) -> RecipeQuality {
@@ -618,6 +944,121 @@ struct CameraView: View {
             return .perfect
         default:
             return .basic
+        }
+    }
+}
+
+// MARK: - Pantry Step Overlay
+struct PantryStepOverlay: View {
+    let fridgePhoto: UIImage?
+    let onSkip: () -> Void
+    let onContinue: () -> Void
+    let onBack: () -> Void
+    
+    @State private var pulseAnimation = false
+    
+    var body: some View {
+        ZStack {
+            // Background overlay
+            Color.black.opacity(0.8)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 30) {
+                Spacer()
+                
+                // Fridge photo preview
+                if let fridgeImage = fridgePhoto {
+                    VStack(spacing: 16) {
+                        Text("Great shot! 📸")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Image(uiImage: fridgeImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 120, height: 120)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                            )
+                            .shadow(color: Color.black.opacity(0.3), radius: 10)
+                    }
+                }
+                
+                // Main message
+                VStack(spacing: 12) {
+                    Text("Got a pantry too? 🥫")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                    
+                    Text("Add your pantry for even better recipes!")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 40)
+                
+                // Action buttons
+                VStack(spacing: 16) {
+                    // Continue button (primary)
+                    Button(action: onContinue) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                            Text("Add Pantry Photo")
+                                .font(.system(size: 18, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.orange, Color.orange.opacity(0.8)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .shadow(color: Color.orange.opacity(0.3), radius: 8, y: 4)
+                        .scaleEffect(pulseAnimation ? 1.05 : 1.0)
+                    }
+                    
+                    // Skip button (secondary)
+                    Button(action: onSkip) {
+                        HStack(spacing: 8) {
+                            Text("Skip - Use Fridge Only")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(.white.opacity(0.8))
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    
+                    // Back button (tertiary)
+                    Button(action: onBack) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.left")
+                                .font(.system(size: 14))
+                            Text("Back")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+                
+                Spacer()
+            }
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                pulseAnimation = true
+            }
         }
     }
 }
@@ -815,24 +1256,95 @@ struct CameraControlsEnhanced: View {
     let capturePhoto: () -> Void
     let isProcessing: Bool
     @Binding var captureAnimation: Bool
+    let captureMode: CameraView.CaptureMode
+    let fridgePhoto: UIImage?
     
     var body: some View {
-        // Instructions only
+        // Instructions based on capture mode
         if !isProcessing {
-            Text(cameraModel.isSessionReady ? "Point at your fridge or pantry" : "Initializing camera...")
-                .font(.system(size: 20, weight: .medium, design: .rounded))
-                .foregroundColor(.white)
-                .padding(.horizontal, 40)
-                .padding(.vertical, 12)
-                .background(
-                    Capsule()
-                        .fill(.ultraThinMaterial)
+            VStack(spacing: 12) {
+                // Progress indicator for pantry mode
+                if captureMode == .pantry {
+                    HStack(spacing: 8) {
+                        Text("Step 2 of 2")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.8))
+                        
+                        // Progress dots
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 8, height: 8)
+                            Circle()
+                                .fill(Color.orange)
+                                .frame(width: 8, height: 8)
+                        }
+                    }
+                }
+                
+                // Main instruction text
+                Text(instructionText)
+                    .font(.system(size: 20, weight: .medium, design: .rounded))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+                    .padding(.vertical, 12)
+                    .background(
+                        Group {
+                            if captureMode == .pantry {
+                                Capsule()
+                                    .fill(.orange.opacity(0.8))
+                            } else {
+                                Capsule()
+                                    .fill(.clear)
+                                    .background(.ultraThinMaterial, in: Capsule())
+                            }
+                        }
                         .overlay(
                             Capsule()
                                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
                         )
-                )
-                .padding(.bottom, 30) // Add spacing below instructions
+                    )
+                
+                // Fridge photo thumbnail for pantry mode
+                if captureMode == .pantry, let fridgeImage = fridgePhoto {
+                    HStack(spacing: 8) {
+                        Image(uiImage: fridgeImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 40, height: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            )
+                        
+                        Text("Fridge photo captured ✓")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                    )
+                }
+            }
+            .padding(.bottom, 30)
+        }
+    }
+    
+    private var instructionText: String {
+        if !cameraModel.isSessionReady {
+            return "Initializing camera..."
+        }
+        
+        switch captureMode {
+        case .fridge:
+            return "Point at your fridge"
+        case .pantry:
+            return "Now point at your pantry 🥫"
         }
     }
 }
@@ -913,4 +1425,5 @@ struct CaptureButtonEnhanced: View {
     CameraView()
         .environmentObject(AppState())
         .environmentObject(DeviceManager())
+        .environmentObject(CloudKitDataManager.shared)
 }

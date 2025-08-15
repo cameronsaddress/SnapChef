@@ -216,7 +216,7 @@ struct MagicalProcessingOverlay: View {
     var body: some View {
         if useGameMode {
             if showAIProcessingView {
-                AIProcessingView(onPlayGameTapped: {
+                AIProcessingView(fridgeImage: nil, pantryImage: nil, onPlayGameTapped: {
                     // User tapped the play game button - transition immediately
                     withAnimation(.easeOut(duration: 0.3)) {
                         showAIProcessingView = false

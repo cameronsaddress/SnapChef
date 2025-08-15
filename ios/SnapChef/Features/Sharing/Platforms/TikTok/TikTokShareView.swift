@@ -15,6 +15,8 @@ struct TikTokShareView: View {
     @State private var error: String?
     @State private var showSuccess = false
     @State private var showConfetti = false
+    @State private var buttonShake = false
+    @State private var selectedHashtags: Set<String> = []
 
     var body: some View {
         NavigationStack {
@@ -22,7 +24,7 @@ struct TikTokShareView: View {
                 LinearGradient(colors: [.black, .black.opacity(0.9)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 24) {
                         header
                         
                         if isGenerating {
@@ -33,43 +35,10 @@ struct TikTokShareView: View {
                             hashtagChips
                         }
                         
-                        Button(action: generate) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 14).fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 1.0, green: 0.078, blue: 0.576),  // Hot Pink
-                                            Color(red: 0.6, green: 0.196, blue: 0.8),   // Purple
-                                            Color(red: 0.0, green: 1.0, blue: 1.0)      // Cyan
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                ).frame(height: 56)
-                                
-                                if isGenerating {
-                                    HStack(spacing: 10) {
-                                        PulsingProgressView()
-                                        Text(getProgressText())
-                                    }.foregroundColor(.white)
-                                } else if showSuccess {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.title2)
-                                            .scaleEffect(showSuccess ? 1.2 : 1.0)
-                                            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showSuccess)
-                                        Text("Shared to TikTok!")
-                                    }.foregroundColor(.white)
-                                } else {
-                                    Text("Generate & Share to TikTok").bold().foregroundColor(.white)
-                                }
-                            }
-                        }
-                        .disabled(isGenerating || showSuccess)
-                        .scaleEffect(isGenerating ? 0.98 : 1.0)
-                        .animation(.easeInOut(duration: 0.15), value: isGenerating)
-                        .padding(.bottom, 40)
-                    }.padding(.horizontal, 20)
+                        generateButton
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 40)
+                    }
                 }
                 
                 // Confetti overlay
@@ -79,9 +48,26 @@ struct TikTokShareView: View {
                         .animation(.easeInOut(duration: 0.5), value: showConfetti)
                 }
             }
-            .navigationTitle("TikTok Video")
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { Button("Cancel") { dismiss() }.foregroundColor(.white) }
+                ToolbarItem(placement: .navigationBarLeading) { 
+                    Button(action: { dismiss() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Back")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(.white)
+                    }
+                }
+            }
+        }
+        .onAppear {
+            // Start button shake animation after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                startButtonShake()
             }
         }
         .alert("Error", isPresented: .constant(error != nil)) { Button("OK") { error = nil } } message: { Text(error ?? "") }
@@ -89,19 +75,85 @@ struct TikTokShareView: View {
 
     private var hashtagChips: some View {
         let optimizedTags = generateSmartHashtags()
-        return VStack(alignment: .leading, spacing: 10) {
-            Text("Optimized Hashtags (15 max)").font(.headline).foregroundColor(.white)
-            Text("70% trending • 30% niche • Always #SnapChef #FoodTok #FridgeChallenge")
-                .font(.caption)
-                .foregroundColor(.gray)
-            Wrap(optimizedTags, spacing: 8) { 
-                Text("#\($0)")
-                    .padding(.horizontal,10)
-                    .padding(.vertical,6)
-                    .background(Color.white.opacity(0.08))
-                    .cornerRadius(10)
-                    .foregroundColor(.white) 
+        return VStack(alignment: .leading, spacing: 16) {
+            // Header section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Select Hashtags")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                
+                Text("Choose hashtags for your TikTok video • \(selectedHashtags.count)/15 selected")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
             }
+            
+            // Hashtag grid with selectable chips
+            VStack(alignment: .leading, spacing: 12) {
+                let rows = optimizedTags.chunked(into: 3)
+                ForEach(Array(rows.enumerated()), id: \.offset) { rowIndex, row in
+                    HStack(spacing: 8) {
+                        ForEach(Array(row.enumerated()), id: \.offset) { tagIndex, tag in
+                            SelectableHashtagChip(
+                                hashtag: tag,
+                                isSelected: selectedHashtags.contains(tag)
+                            ) {
+                                toggleHashtagSelection(tag)
+                            }
+                        }
+                        Spacer()
+                    }
+                }
+            }
+            
+            // Selection actions
+            HStack(spacing: 12) {
+                Button("Select All") {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedHashtags = Set(optimizedTags.prefix(15))
+                    }
+                }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.cyan)
+                
+                Button("Clear All") {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedHashtags.removeAll()
+                    }
+                }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.pink)
+                
+                Spacer()
+                
+                Text("\(selectedHashtags.count)/15")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .padding(.top, 8)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.2),
+                                    Color.white.opacity(0.05)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .onAppear {
+            // Pre-select most popular hashtags
+            selectedHashtags = Set(optimizedTags.prefix(8))
         }
     }
     
@@ -134,10 +186,54 @@ struct TikTokShareView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 8) { Image(systemName:"music.note").font(.system(size: 22, weight: .bold)); Text("TikTok Video Generator").font(.system(size: 22, weight: .bold)) }.foregroundColor(.white)
-            Text("Auto-shares to TikTok after generation").foregroundColor(.gray).font(.subheadline)
-        }.padding(.top, 18)
+        VStack(spacing: 12) {
+            // Main title with icon
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.078, blue: 0.576),
+                                    Color(red: 0.6, green: 0.196, blue: 0.8)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
+                    
+                    Image(systemName: "music.note")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("TikTok Video Generator")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    Text("Select hashtags, generate video, then auto-share to TikTok")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                
+                Spacer()
+            }
+            
+            // Progress indicator
+            HStack(spacing: 16) {
+                StepIndicator(number: "1", title: "Generate", isCompleted: showSuccess, isActive: !showSuccess)
+                
+                ConnectorLine(isCompleted: showSuccess)
+                
+                StepIndicator(number: "2", title: "Share", isCompleted: false, isActive: showSuccess)
+            }
+            .padding(.top, 8)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 16)
     }
     
     private func getProgressText() -> String {
@@ -296,7 +392,7 @@ struct TikTokShareView: View {
                     }
                 }
                 
-                // Automatically share to TikTok after generation
+                // Automatically share to TikTok after generation with selected hashtags
                 await shareToTikTokAutomatically(url: url)
             } catch { 
                 await MainActor.run {
@@ -335,8 +431,10 @@ struct TikTokShareView: View {
         
         switch saveResult {
         case .success(let identifier):
-            // Share to TikTok with viral caption generation
+            // Share to TikTok with viral caption generation and selected hashtags
             let caption: String
+            let selectedHashtagsString = selectedHashtags.isEmpty ? "" : "\n\n" + selectedHashtags.map { "#\($0)" }.joined(separator: " ")
+            
             if case .recipe(let recipe) = content.type {
                 let viralRecipe = ViralRecipe(
                     title: recipe.name,
@@ -347,9 +445,18 @@ struct TikTokShareView: View {
                     calories: recipe.nutrition.calories,
                     ingredients: recipe.ingredients.map { $0.name }
                 )
-                caption = ViralCaptionGenerator.generateRecipeCaption(recipe: viralRecipe)
+                // Generate base caption without hashtags and add our selected ones
+                let baseCaptionWithHashtags = ViralCaptionGenerator.generateRecipeCaption(recipe: viralRecipe)
+                // Remove the automatically generated hashtags and replace with selected ones
+                let baseCaptionComponents = baseCaptionWithHashtags.components(separatedBy: "\n\n")
+                let captionWithoutHashtags = baseCaptionComponents.dropLast(2).joined(separator: "\n\n") // Remove hashtags and app link
+                caption = captionWithoutHashtags + selectedHashtagsString + "\n\nDownload: apps.apple.com/snapchef"
             } else {
-                caption = ViralCaptionGenerator.generateViralCaption(baseCaption: "Check out this amazing recipe transformation!")
+                let baseCaptionWithHashtags = ViralCaptionGenerator.generateViralCaption(baseCaption: "Check out this amazing recipe transformation!")
+                // Remove the automatically generated hashtags and replace with selected ones
+                let baseCaptionComponents = baseCaptionWithHashtags.components(separatedBy: "\n\n")
+                let captionWithoutHashtags = baseCaptionComponents.dropLast(2).joined(separator: "\n\n") // Remove hashtags and app link
+                caption = captionWithoutHashtags + selectedHashtagsString + "\n\nDownload: apps.apple.com/snapchef"
             }
             
             let shareResult = await withCheckedContinuation { continuation in
@@ -362,8 +469,19 @@ struct TikTokShareView: View {
             case .success:
                 // Success - TikTok app should now be open
                 self.isGenerating = false
-                // Optionally dismiss the view since TikTok is now open
-                dismiss()
+                
+                // Auto-dismiss both TikTokShareView and parent share view
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // Dismiss TikTokShareView
+                    dismiss()
+                    
+                    // Also dismiss the parent BrandedSharePopup
+                    NotificationCenter.default.post(
+                        name: Notification.Name("DismissSharePopup"),
+                        object: nil
+                    )
+                }
+                
             case .failure(let error):
                 self.error = error.localizedDescription
                 self.isGenerating = false
@@ -372,6 +490,231 @@ struct TikTokShareView: View {
         case .failure(let error):
             self.error = error.localizedDescription
             self.isGenerating = false
+        }
+    }
+    
+    // MARK: - UI Components
+    
+    private var generateButton: some View {
+        Button(action: generate) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.078, blue: 0.576),  // Hot Pink
+                                Color(red: 0.6, green: 0.196, blue: 0.8),   // Purple
+                                Color(red: 0.0, green: 1.0, blue: 1.0)      // Cyan
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 60)
+                    .shadow(
+                        color: Color(red: 1.0, green: 0.078, blue: 0.576).opacity(0.3),
+                        radius: 15,
+                        y: 8
+                    )
+                
+                if isGenerating {
+                    HStack(spacing: 12) {
+                        PulsingProgressView()
+                        Text(getProgressText())
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                } else if showSuccess {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title2)
+                            .scaleEffect(showSuccess ? 1.2 : 1.0)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showSuccess)
+                        Text("Shared to TikTok!")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                } else {
+                    VStack(spacing: 4) {
+                        Text("Generate & Share to TikTok")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        if selectedHashtags.isEmpty {
+                            Text("(Select hashtags first)")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                                .transition(.opacity.combined(with: .scale))
+                        }
+                    }
+                }
+            }
+        }
+        .disabled(isGenerating || showSuccess)
+        .scaleEffect(isGenerating ? 0.95 : 1.0)
+        .animation(.easeInOut(duration: 0.15), value: isGenerating)
+        .modifier(ShakeEffect(shakeNumber: buttonShake ? 2 : 0))
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func startButtonShake() {
+        withAnimation(.default) {
+            buttonShake = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            buttonShake = false
+            
+            // Repeat every 8-12 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double.random(in: 8...12)) {
+                startButtonShake()
+            }
+        }
+    }
+    
+    private func toggleHashtagSelection(_ hashtag: String) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if selectedHashtags.contains(hashtag) {
+                selectedHashtags.remove(hashtag)
+            } else if selectedHashtags.count < 15 {
+                selectedHashtags.insert(hashtag)
+            }
+        }
+        
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+    }
+}
+
+// MARK: - Supporting Views
+
+struct SelectableHashtagChip: View {
+    let hashtag: String
+    let isSelected: Bool
+    let action: () -> Void
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text("#\(hashtag)")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(isSelected ? .black : .white)
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.black)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        isSelected ?
+                        LinearGradient(
+                            colors: [Color.cyan, Color.cyan.opacity(0.8)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        LinearGradient(
+                            colors: isPressed ? 
+                                [Color.white.opacity(0.2), Color.white.opacity(0.15)] :
+                                [Color.white.opacity(0.12), Color.white.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                isSelected ? Color.cyan.opacity(0.8) : Color.white.opacity(isPressed ? 0.3 : 0.15),
+                                lineWidth: isSelected ? 2 : 1
+                            )
+                    )
+            )
+        }
+        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .scaleEffect(isSelected ? 1.05 : 1.0)
+        .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = pressing
+            }
+        }, perform: {})
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+    }
+}
+
+struct StepIndicator: View {
+    let number: String
+    let title: String
+    let isCompleted: Bool
+    let isActive: Bool
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(
+                        isCompleted ? LinearGradient(
+                            colors: [Color.green, Color.green],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        isActive ? LinearGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.078, blue: 0.576).opacity(0.8),
+                                Color(red: 0.6, green: 0.196, blue: 0.8).opacity(0.8)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) : LinearGradient(
+                            colors: [Color.white.opacity(0.2), Color.white.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 28, height: 28)
+                
+                if isCompleted {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                } else {
+                    Text(number)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                }
+            }
+            
+            Text(title)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(isActive ? 1.0 : 0.6))
+        }
+    }
+}
+
+struct ConnectorLine: View {
+    let isCompleted: Bool
+    
+    var body: some View {
+        Rectangle()
+            .fill(isCompleted ? Color.green : Color.white.opacity(0.3))
+            .frame(height: 2)
+            .frame(maxWidth: .infinity)
+    }
+}
+
+
+// Array extension for chunking
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
         }
     }
 }

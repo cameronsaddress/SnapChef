@@ -116,21 +116,31 @@ struct RecipesView: View {
             withAnimation(.easeOut(duration: 0.5)) {
                 contentVisible = true
             }
-            // Load CloudKit recipes if authenticated
+            // Load CloudKit recipes if authenticated - this is when we sync
             if cloudKitAuth.isAuthenticated {
                 loadCloudKitRecipes(forceRefresh: false)
+                // Trigger manual sync when recipe page is visited
+                Task {
+                    await CloudKitDataManager.shared.triggerManualSync()
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Only check for new recipes when app comes to foreground (don't force refresh)
             if cloudKitAuth.isAuthenticated && hasInitiallyLoaded {
                 loadCloudKitRecipes(forceRefresh: false)
+                // Trigger manual sync when returning to foreground and viewing recipes
+                Task {
+                    await CloudKitDataManager.shared.triggerManualSync()
+                }
             }
         }
         .refreshable {
-            // Pull to refresh - force a fresh fetch
+            // Pull to refresh - force a fresh fetch and sync
             if cloudKitAuth.isAuthenticated {
                 await loadCloudKitRecipesAsync(forceRefresh: true)
+                // Trigger manual sync when user pulls to refresh
+                await CloudKitDataManager.shared.triggerManualSync()
             }
         }
         .sheet(isPresented: $showingFilters) {

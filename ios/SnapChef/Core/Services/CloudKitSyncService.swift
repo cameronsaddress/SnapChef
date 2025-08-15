@@ -408,7 +408,7 @@ final class CloudKitSyncService: ObservableObject {
                 switch status {
                 case .available:
                     print("✅ iCloud available")
-                    self?.setupInitialSync()
+                    // Removed automatic sync - only sync when needed
                 case .noAccount:
                     print("❌ No iCloud account")
                 case .restricted:
@@ -424,13 +424,12 @@ final class CloudKitSyncService: ObservableObject {
         }
     }
     
-    // MARK: - Initial Setup
-    private func setupInitialSync() {
-        Task {
-            await syncChallenges()
-            await syncUserProgress()
-            await syncLeaderboard()
-        }
+    // MARK: - Manual Setup (Only when needed)
+    /// Call this manually when challenge/leaderboard data is needed
+    func triggerChallengeSync() async {
+        await syncChallenges()
+        await syncUserProgress()
+        await syncLeaderboard()
     }
     
     // MARK: - Subscriptions

@@ -20,17 +20,20 @@ public final class PhotoStorageManager: ObservableObject {
     public struct RecipePhotos {
         public let recipeId: UUID
         public let fridgePhoto: UIImage?      // Initial fridge photo
+        public let pantryPhoto: UIImage?      // Pantry photo (optional)
         public let mealPhoto: UIImage?        // Final meal photo
         public let capturedAt: Date
         
-        public init(recipeId: UUID, fridgePhoto: UIImage?, mealPhoto: UIImage?) {
+        public init(recipeId: UUID, fridgePhoto: UIImage?, pantryPhoto: UIImage? = nil, mealPhoto: UIImage?) {
             self.recipeId = recipeId
             self.fridgePhoto = fridgePhoto
+            self.pantryPhoto = pantryPhoto
             self.mealPhoto = mealPhoto
             self.capturedAt = Date()
             
             print("📸 PhotoStorageManager: Storing photos for recipe \(recipeId)")
             print("    - fridgePhoto: \(fridgePhoto != nil ? "✅ \(fridgePhoto!.size)" : "❌ nil")")
+            print("    - pantryPhoto: \(pantryPhoto != nil ? "✅ \(pantryPhoto!.size)" : "❌ nil")")
             print("    - mealPhoto: \(mealPhoto != nil ? "✅ \(mealPhoto!.size)" : "❌ nil")")
         }
     }
@@ -51,6 +54,7 @@ public final class PhotoStorageManager: ObservableObject {
             recipePhotos[recipeId] = RecipePhotos(
                 recipeId: recipeId,
                 fridgePhoto: photo,
+                pantryPhoto: existing?.pantryPhoto,
                 mealPhoto: existing?.mealPhoto
             )
             print("    - Stored for recipe: \(recipeId)")
@@ -67,19 +71,41 @@ public final class PhotoStorageManager: ObservableObject {
         recipePhotos[recipeId] = RecipePhotos(
             recipeId: recipeId,
             fridgePhoto: existing?.fridgePhoto,
+            pantryPhoto: existing?.pantryPhoto,
             mealPhoto: photo
         )
     }
     
-    /// Store both photos for a recipe (called when syncing from CloudKit)
-    public func storePhotos(fridgePhoto: UIImage?, mealPhoto: UIImage?, for recipeId: UUID) {
+    /// Store pantry photo for multiple recipes
+    public func storePantryPhoto(_ photo: UIImage, for recipeIds: [UUID]) {
+        print("📸 PhotoStorageManager: Storing pantry photo for \(recipeIds.count) recipes")
+        print("    - Photo size: \(photo.size)")
+        
+        for recipeId in recipeIds {
+            let existing = recipePhotos[recipeId]
+            recipePhotos[recipeId] = RecipePhotos(
+                recipeId: recipeId,
+                fridgePhoto: existing?.fridgePhoto,
+                pantryPhoto: photo,
+                mealPhoto: existing?.mealPhoto
+            )
+            print("    - Stored pantry photo for recipe: \(recipeId)")
+        }
+        
+        print("📸 PhotoStorageManager: Total stored photos: \(recipePhotos.count)")
+    }
+    
+    /// Store all photos for a recipe (called when syncing from CloudKit)
+    public func storePhotos(fridgePhoto: UIImage?, pantryPhoto: UIImage? = nil, mealPhoto: UIImage?, for recipeId: UUID) {
         print("📸 PhotoStorageManager: Storing CloudKit photos for recipe \(recipeId)")
         print("    - fridgePhoto: \(fridgePhoto != nil ? "✅ \(fridgePhoto!.size)" : "❌ nil")")
+        print("    - pantryPhoto: \(pantryPhoto != nil ? "✅ \(pantryPhoto!.size)" : "❌ nil")")
         print("    - mealPhoto: \(mealPhoto != nil ? "✅ \(mealPhoto!.size)" : "❌ nil")")
         
         recipePhotos[recipeId] = RecipePhotos(
             recipeId: recipeId,
             fridgePhoto: fridgePhoto,
+            pantryPhoto: pantryPhoto,
             mealPhoto: mealPhoto
         )
         
@@ -97,6 +123,7 @@ public final class PhotoStorageManager: ObservableObject {
         if let photos = photos {
             print("    - ✅ Found photos for recipe!")
             print("    - fridgePhoto: \(photos.fridgePhoto != nil ? "✅ \(photos.fridgePhoto!.size)" : "❌")")
+            print("    - pantryPhoto: \(photos.pantryPhoto != nil ? "✅ \(photos.pantryPhoto!.size)" : "❌")")
             print("    - mealPhoto: \(photos.mealPhoto != nil ? "✅ \(photos.mealPhoto!.size)" : "❌")")
         } else {
             print("    - ❌ No photos found for recipe ID: \(recipeId)")

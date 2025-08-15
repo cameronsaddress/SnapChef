@@ -6,8 +6,17 @@ struct AIProcessingView: View {
     @State private var sparkleScale: CGFloat = 1.0
     @State private var buttonShake: CGFloat = 0
     
+    // Photo properties
+    let fridgeImage: UIImage?
+    let pantryImage: UIImage?
+    
     // Callback for when user taps play game button
     var onPlayGameTapped: (() -> Void)? = nil
+    
+    // Computed property to determine if we have both photos
+    private var hasBothPhotos: Bool {
+        fridgeImage != nil && pantryImage != nil
+    }
     
     var body: some View {
         ZStack {
@@ -78,7 +87,7 @@ struct AIProcessingView: View {
                 // Text content with professional animation
                 VStack(spacing: 20) {
                     VStack(spacing: 8) {
-                        Text("Our AI is scanning")
+                        Text(hasBothPhotos ? "Analyzing your fridge and pantry..." : "Analyzing your fridge...")
                             .font(.system(size: 26, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .opacity(textOpacity)
@@ -110,6 +119,54 @@ struct AIProcessingView: View {
                         }
                     }
                     .padding(.vertical, 4)
+                    
+                    // Photo thumbnails when both photos are provided
+                    if hasBothPhotos {
+                        HStack(spacing: 20) {
+                            // Fridge photo thumbnail
+                            VStack(spacing: 8) {
+                                if let fridgeImage = fridgeImage {
+                                    Image(uiImage: fridgeImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 80, height: 80)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                                        .opacity(textOpacity)
+                                        .scaleEffect(textOpacity)
+                                        .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.6), value: textOpacity)
+                                }
+                                
+                                Text("Fridge")
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .opacity(textOpacity)
+                                    .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.6), value: textOpacity)
+                            }
+                            
+                            // Pantry photo thumbnail
+                            VStack(spacing: 8) {
+                                if let pantryImage = pantryImage {
+                                    Image(uiImage: pantryImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 80, height: 80)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                                        .opacity(textOpacity)
+                                        .scaleEffect(textOpacity)
+                                        .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.7), value: textOpacity)
+                                }
+                                
+                                Text("Pantry")
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .opacity(textOpacity)
+                                    .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.7), value: textOpacity)
+                            }
+                        }
+                        .padding(.vertical, 12)
+                    }
                     
                     Text("While our chef prepares\nyour recipes...")
                         .font(.system(size: 28, weight: .semibold, design: .rounded))
@@ -201,5 +258,5 @@ struct AIProcessingView: View {
 }
 
 #Preview {
-    AIProcessingView()
+    AIProcessingView(fridgeImage: nil, pantryImage: nil)
 }
