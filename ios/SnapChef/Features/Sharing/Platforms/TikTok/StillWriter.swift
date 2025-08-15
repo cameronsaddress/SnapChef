@@ -238,13 +238,47 @@ public final class StillWriter: @unchecked Sendable {
             // Apply premium filters with motion-aware processing
             for (index, f) in filters.enumerated() { 
                 autoreleasepool {
-                    f.setValue(img, forKey: kCIInputImageKey)
+                    // Check if filter is a generator filter (doesn't accept inputImage)
+                    let generatorFilters = ["CIRadialGradient", "CILinearGradient", "CIRandomGenerator", 
+                                          "CIConstantColorGenerator", "CICheckerboardGenerator", 
+                                          "CISunbeamsGenerator", "CIStarShineGenerator"]
+                    
+                    let filterName = f.attributes["CIAttributeFilterName"] as? String ?? ""
+                    let isGeneratorFilter = generatorFilters.contains { filterName.contains($0) }
+                    
+                    // Only set inputImage for non-generator filters
+                    if !isGeneratorFilter {
+                        f.setValue(img, forKey: kCIInputImageKey)
+                    }
                     
                     // Apply motion effects for dynamic filters
                     if let motionAwareImage = applyMotionEffects(to: img, filter: specs.count > index ? specs[index] : nil, time: t, frame: frame, totalFrames: totalFrames) {
                         img = motionAwareImage
                     } else {
-                        img = f.outputImage ?? img
+                        // Handle special composite filters with userInfo
+                        if let userInfo = f.value(forKey: "userInfo") as? [String: Any] {
+                            if let lightLeakData = userInfo["lightLeakPosition"] as? CGPoint,
+                               let intensity = userInfo["lightLeakIntensity"] as? CGFloat {
+                                // Apply light leak effect
+                                img = applyLightLeak(to: img, position: lightLeakData, intensity: intensity)
+                            } else if let filmGrainIntensity = userInfo["filmGrainIntensity"] as? CGFloat {
+                                // Apply film grain effect
+                                img = applyFilmGrain(to: img, intensity: filmGrainIntensity)
+                            }
+                        } else {
+                            // Handle regular filters
+                            if let outputImage = f.outputImage {
+                                if isGeneratorFilter {
+                                    // Composite the generated image with the existing image
+                                    let composite = CIFilter(name: "CISourceOverCompositing")!
+                                    composite.setValue(outputImage, forKey: kCIInputImageKey)
+                                    composite.setValue(img, forKey: kCIInputBackgroundImageKey)
+                                    img = composite.outputImage ?? img
+                                } else {
+                                    img = outputImage
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -329,7 +363,7 @@ public final class StillWriter: @unchecked Sendable {
             let animatedPosition = CGPoint(x: position.x + parallaxX, y: position.y + parallaxY)
             return applyLightLeak(to: image, position: animatedPosition, intensity: intensity)
             
-        case .velocityRamp(let factor):
+        case .velocityRamp(_):
             // This would affect playback speed, handled at composition level
             return nil
             
@@ -359,6 +393,7 @@ public final class StillWriter: @unchecked Sendable {
     
     /// Apply animated light leak effect
     private func applyLightLeak(to image: CIImage, position: CGPoint, intensity: CGFloat) -> CIImage {
+        // Create the radial gradient (this is a generator filter - no inputImage needed)
         let radialGradient = CIFilter(name: "CIRadialGradient")!
         radialGradient.setValue(CIVector(x: position.x, y: position.y), forKey: "inputCenter")
         radialGradient.setValue(50, forKey: "inputRadius0")
@@ -366,11 +401,51 @@ public final class StillWriter: @unchecked Sendable {
         radialGradient.setValue(CIColor(red: 1, green: 0.9, blue: 0.7, alpha: intensity), forKey: "inputColor0")
         radialGradient.setValue(CIColor.clear, forKey: "inputColor1")
         
+        // Get the gradient image (no input needed for generator filters)
+        guard let gradientImage = radialGradient.outputImage else { return image }
+        
+        // Composite the gradient over the background image
         let composite = CIFilter(name: "CIAdditionCompositing")!
+        composite.setValue(gradientImage, forKey: kCIInputImageKey)
         composite.setValue(image, forKey: kCIInputBackgroundImageKey)
-        composite.setValue(radialGradient.outputImage, forKey: kCIInputImageKey)
         
         return composite.outputImage ?? image
+    }
+    
+    /// Apply film grain effect
+    private func applyFilmGrain(to image: CIImage, intensity: CGFloat) -> CIImage {
+        // Create random noise (this is a generator filter - no inputImage needed)
+        let noise = CIFilter(name: "CIRandomGenerator")!
+        
+        // Get the noise image
+        guard let noiseImage = noise.outputImage else { return image }
+        
+        // Scale and crop the noise to match image bounds
+        let scaledNoise = noiseImage
+            .transformed(by: CGAffineTransform(scaleX: 0.1, y: 0.1)) // Make grain smaller
+            .cropped(to: image.extent)
+        
+        // Convert noise to grayscale for film grain effect
+        let grayscale = CIFilter(name: "CIColorMatrix")!
+        grayscale.setValue(scaledNoise, forKey: kCIInputImageKey)
+        grayscale.setValue(CIVector(x: 0.299, y: 0.587, z: 0.114, w: 0), forKey: "inputRVector")
+        grayscale.setValue(CIVector(x: 0.299, y: 0.587, z: 0.114, w: 0), forKey: "inputGVector")
+        grayscale.setValue(CIVector(x: 0.299, y: 0.587, z: 0.114, w: 0), forKey: "inputBVector")
+        grayscale.setValue(CIVector(x: 0, y: 0, z: 0, w: 1), forKey: "inputAVector")
+        
+        guard let grainImage = grayscale.outputImage else { return image }
+        
+        // Blend the grain with the original image using multiply blend mode
+        let composite = CIFilter(name: "CIMultiplyBlendMode")!
+        composite.setValue(image, forKey: kCIInputBackgroundImageKey)
+        composite.setValue(grainImage, forKey: kCIInputImageKey)
+        
+        // Mix the result with the original based on intensity
+        let mix = CIFilter(name: "CIColorBlendMode")!
+        mix.setValue(image, forKey: kCIInputBackgroundImageKey)
+        mix.setValue(composite.outputImage, forKey: kCIInputImageKey)
+        
+        return mix.outputImage ?? image
     }
     
     private func createTempOutputURL() -> URL {

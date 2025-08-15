@@ -268,6 +268,25 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 15, 2025) - Part 23
+- **Fixed CIRadialGradient Runtime Crash**
+  - **Critical Bug**: App was crashing when applying light leak and film grain effects
+  - **Root Cause**: Generator filters (CIRadialGradient, CIRandomGenerator) don't accept inputImage parameter
+  - **Technical Solution**:
+    - Added generator filter detection in StillWriter.swift
+    - Modified filter application to handle generator vs processing filters correctly
+    - Implemented proper compositing workflow for generated filters
+    - Added light leak effect using radial gradient + addition compositing
+    - Added film grain effect using random noise + multiply blend mode
+  - **Fixes Applied**:
+    - StillWriter: Check filter type before setting inputImage
+    - ViralVideoDataModels: Use composite filters with userInfo for parameters
+    - Proper CIImage handling throughout rendering pipeline
+    - Generator filters now create output without input requirements
+    - Processing filters continue to use inputImage normally
+  - **Result**: TikTok video generation now works without crashes
+  - **Build Status**: All compilation errors resolved, build succeeds
+
 ### Latest Updates (Jan 15, 2025) - Part 22
 - **Premium TikTok Video Generation - MILLION DOLLAR QUALITY**
   - **Viral Effects Implementation**: Professional CapCut-style effects

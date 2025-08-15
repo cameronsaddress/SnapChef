@@ -346,18 +346,22 @@ public enum FilterSpecBridge {
     }
     
     private static func createLightLeakFilter(position: CGPoint, intensity: CGFloat) -> CIFilter {
-        let radial = CIFilter(name: "CIRadialGradient")!
-        radial.setValue(CIVector(x: position.x, y: position.y), forKey: "inputCenter")
-        radial.setValue(50, forKey: "inputRadius0")
-        radial.setValue(200, forKey: "inputRadius1")
-        radial.setValue(CIColor(red: 1, green: 0.9, blue: 0.7, alpha: intensity), forKey: "inputColor0")
-        radial.setValue(CIColor.clear, forKey: "inputColor1")
-        return radial
+        // Create a custom composite filter that generates a radial gradient and composites it
+        let composite = CIFilter(name: "CIAdditionCompositing")!
+        
+        // Store the gradient parameters in the filter's userInfo for later use
+        // Note: This approach requires the caller to handle the gradient generation
+        // since CIRadialGradient is a generator filter
+        composite.setValue(["lightLeakPosition": position, "lightLeakIntensity": intensity], forKey: "userInfo")
+        
+        return composite
     }
     
     private static func createFilmGrainFilter(intensity: CGFloat) -> CIFilter {
-        let noise = CIFilter(name: "CIRandomGenerator")!
-        return noise
+        // Use a multiply composite filter with stored parameters for film grain
+        let composite = CIFilter(name: "CIMultiplyCompositing")!
+        composite.setValue(["filmGrainIntensity": intensity], forKey: "userInfo")
+        return composite
     }
     
     private static func createVignetteFilter(intensity: CGFloat) -> CIFilter {
