@@ -127,10 +127,10 @@ public final class ViralVideoExporter: @unchecked Sendable {
                 return
             }
             
-            // Copy caption to UIPasteboard for user to paste as specified
+            // Copy enhanced viral caption to UIPasteboard for user to paste as specified
             if let caption = caption {
-                let premiumCaption = "\(caption) ✨🔥 #SnapChef #ViralFoodTok" // PREMIUM FIX: Enhanced with emojis/tags
-                UIPasteboard.general.string = premiumCaption
+                let viralCaption = ViralCaptionGenerator.generateViralCaption(baseCaption: caption)
+                UIPasteboard.general.string = viralCaption
             }
             
             // Create TikTok share request with localIdentifiers
@@ -219,8 +219,8 @@ public final class ViralVideoExporter: @unchecked Sendable {
                 }
             }
             
-            // 4. Share to TikTok with premium caption
-            let caption = "🔥 MY FRIDGE CHALLENGE 🔥\nTurned these ingredients into \(recipe.title)!\n#SnapChef #FridgeChallenge #TikTokFood"
+            // 4. Share to TikTok with viral caption generation
+            let caption = ViralCaptionGenerator.generateRecipeCaption(recipe: recipe)
             try await withCheckedThrowingContinuation { continuation in
                 Self.shareToTikTok(localIdentifiers: [localIdentifier], caption: caption) { result in
                     continuation.resume(with: result)
@@ -485,6 +485,169 @@ private final class ProductionVideoCompositor: NSObject, @unchecked Sendable {
         let dataSize = CVPixelBufferGetDataSize(source)
         
         memcpy(destData, sourceData, dataSize)
+    }
+}
+
+// MARK: - Viral Caption Generator
+/// Generates viral TikTok captions with dynamic hooks, hashtags, and App Store links
+public enum ViralCaptionGenerator: @unchecked Sendable {
+    
+    // Viral opening hooks library
+    private static let viralHooks = [
+        "POV: Your fridge is empty but dinner is in 20 mins 😱",
+        "Tell me you're hungry without telling me 👀",
+        "When your fridge says no but your stomach says yes 🥺",
+        "This is your sign to check your fridge RIGHT NOW 📱",
+        "The way I turned leftovers into this... 🤌",
+        "Nobody: Me at 9pm with random ingredients: 👩‍🍳",
+        "Fridge ingredients said 'good luck' but watch this ✨",
+        "Recipe or no recipe, we're making it WORK 💪"
+    ]
+    
+    /// Generate enhanced viral caption with hooks and App Store link
+    public static func generateViralCaption(baseCaption: String) -> String {
+        let hook = viralHooks.randomElement() ?? viralHooks[0]
+        let hashtags = HashtagOptimizer.generateOptimalHashtags()
+        let appStoreLink = "\n\nDownload: apps.apple.com/snapchef"
+        let engagementTrigger = getRandomEngagementTrigger()
+        
+        return "\(hook)\n\n\(baseCaption)\n\n\(engagementTrigger)\n\n\(hashtags)\(appStoreLink)"
+    }
+    
+    /// Generate recipe-specific viral caption
+    public static func generateRecipeCaption(recipe: ViralRecipe) -> String {
+        let hook = viralHooks.randomElement() ?? viralHooks[0]
+        let recipeStats = generateRecipeStats(recipe: recipe)
+        let hashtags = HashtagOptimizer.generateRecipeSpecificHashtags(recipe: recipe)
+        let appStoreLink = "\n\nDownload: apps.apple.com/snapchef"
+        let engagementTrigger = getRandomEngagementTrigger()
+        
+        return "\(hook)\n\nTurned random ingredients into \(recipe.title)! \(recipeStats)\n\n\(engagementTrigger)\n\n\(hashtags)\(appStoreLink)"
+    }
+    
+    /// Generate recipe stats with emojis
+    private static func generateRecipeStats(recipe: ViralRecipe) -> String {
+        var stats: [String] = []
+        
+        if let time = recipe.timeMinutes {
+            if time <= 30 {
+                stats.append("⏰ \(time) mins")
+            } else {
+                stats.append("⏰ \(time) mins")
+            }
+        }
+        
+        // Difficulty based on steps count
+        let difficulty = recipe.steps.count <= 3 ? "🟢 Easy" : recipe.steps.count <= 5 ? "🟡 Medium" : "🔴 Pro"
+        stats.append(difficulty)
+        
+        if let calories = recipe.calories {
+            stats.append("🔥 \(calories) cal")
+        }
+        
+        return stats.isEmpty ? "" : "[\(stats.joined(separator: " • "))]"
+    }
+    
+    /// Get random engagement trigger
+    private static func getRandomEngagementTrigger() -> String {
+        let triggers = [
+            "Drop a 🔥 if you're making this tonight!",
+            "Tag someone who needs to see this 👇",
+            "Save this for your next fridge raid 📌",
+            "Which ingredient surprised you most? 🤔",
+            "Rate this transformation 1-10 ⭐",
+            "Who else is a fridge wizard? ✨"
+        ]
+        return triggers.randomElement() ?? triggers[0]
+    }
+}
+
+// MARK: - Hashtag Optimizer
+/// Optimizes hashtag selection for maximum TikTok reach
+public enum HashtagOptimizer: @unchecked Sendable {
+    
+    // Core brand hashtags (always included)
+    private static let coreHashtags = ["#SnapChef", "#FoodTok", "#FridgeChallenge"]
+    
+    // Trending hashtags (70% of selection)
+    private static let trendingHashtags = [
+        "#FoodHack", "#QuickMeals", "#RecipeTok", "#FoodPrep", "#CookingHacks",
+        "#EasyRecipes", "#FoodTips", "#Cooking", "#Recipe", "#FoodInspo",
+        "#HomeCook", "#MealPrep", "#FoodieLife", "#QuickCook", "#FoodLover"
+    ]
+    
+    // Niche hashtags (30% of selection)
+    private static let nicheHashtags = [
+        "#FridgeToTable", "#LeftoverMagic", "#PantryRaid", "#CookingTips",
+        "#FoodWaste", "#BudgetMeals", "#CreativeCooking", "#KitchenHacks",
+        "#FoodTransformation", "#IngredientChallenge", "#ZeroWaste", "#MealIdeas"
+    ]
+    
+    /// Generate optimal hashtag mix (15 hashtags max)
+    public static func generateOptimalHashtags() -> String {
+        var selectedHashtags = coreHashtags // Start with core (3)
+        
+        // Add 8 trending hashtags (70% of remaining 12)
+        let shuffledTrending = trendingHashtags.shuffled()
+        selectedHashtags.append(contentsOf: Array(shuffledTrending.prefix(8)))
+        
+        // Add 4 niche hashtags (30% of remaining 12)
+        let shuffledNiche = nicheHashtags.shuffled()
+        selectedHashtags.append(contentsOf: Array(shuffledNiche.prefix(4)))
+        
+        // Add seasonal hashtags if applicable
+        selectedHashtags.append(contentsOf: getSeasonalHashtags())
+        
+        // Limit to 15 hashtags max
+        let finalHashtags = Array(selectedHashtags.prefix(15))
+        return finalHashtags.joined(separator: " ")
+    }
+    
+    /// Generate recipe-specific hashtags
+    public static func generateRecipeSpecificHashtags(recipe: ViralRecipe) -> String {
+        var selectedHashtags = coreHashtags
+        
+        // Add recipe-specific tags
+        if let time = recipe.timeMinutes, time <= 30 {
+            selectedHashtags.append("#QuickMeals")
+            selectedHashtags.append("#30MinuteMeals")
+        }
+        
+        // Check for specific ingredients
+        let ingredients = recipe.ingredients.joined(separator: " ").lowercased()
+        if ingredients.contains("chicken") { selectedHashtags.append("#ChickenRecipes") }
+        if ingredients.contains("pasta") { selectedHashtags.append("#PastaLovers") }
+        if ingredients.contains("vegetable") || ingredients.contains("veggie") {
+            selectedHashtags.append("#VeggieRecipes")
+        }
+        
+        // Add trending and niche hashtags
+        let remainingSlots = 15 - selectedHashtags.count
+        let trendingCount = Int(Double(remainingSlots) * 0.7)
+        let nicheCount = remainingSlots - trendingCount
+        
+        selectedHashtags.append(contentsOf: Array(trendingHashtags.shuffled().prefix(trendingCount)))
+        selectedHashtags.append(contentsOf: Array(nicheHashtags.shuffled().prefix(nicheCount)))
+        
+        return Array(selectedHashtags.prefix(15)).joined(separator: " ")
+    }
+    
+    /// Get seasonal hashtags based on current date
+    private static func getSeasonalHashtags() -> [String] {
+        let month = Calendar.current.component(.month, from: Date())
+        
+        switch month {
+        case 12, 1, 2: // Winter
+            return ["#WinterMeals", "#ComfortFood"]
+        case 3, 4, 5: // Spring
+            return ["#SpringRecipes", "#FreshIngredients"]
+        case 6, 7, 8: // Summer
+            return ["#SummerEats", "#FreshAndLight"]
+        case 9, 10, 11: // Fall
+            return ["#FallFlavors", "#CozyMeals"]
+        default:
+            return []
+        }
     }
 }
 

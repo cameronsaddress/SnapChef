@@ -16,9 +16,11 @@ public final class ViralVideoEngine: ObservableObject {
     private let planner: RenderPlanner
 
     public init(config: RenderConfig = RenderConfig()) {
-        self.config = config
-        self.renderer = ViralVideoRenderer(config: config)
-        self.planner = RenderPlanner(config: config)
+        var configWithScale = config
+        configWithScale.contentsScale = UIScreen.main.scale
+        self.config = configWithScale
+        self.renderer = ViralVideoRenderer(config: configWithScale)
+        self.planner = RenderPlanner(config: configWithScale)
         MemoryOptimizer.shared.startOptimization()
     }
 

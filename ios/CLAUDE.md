@@ -25,10 +25,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## ⚠️ CRITICAL BUILD COMMAND - NEVER CHANGE ⚠️
 ```bash
-xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build
+xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build 2>&1
 ```
-**This is the EXACT command that properly shows errors and BUILD FAILED/SUCCEEDED status.**
-**DO NOT remove or modify ANY flags - all are required for proper error reporting.**
+**This EXACT command properly captures ALL errors and build status.**
+**The `2>&1` is REQUIRED to capture error output - DO NOT remove it!**
 
 ## 🔴 CRITICAL RULE: BUILD-GUARDIAN IS MANDATORY 🔴
 **EVERY code change MUST be verified by the build-guardian agent**
@@ -60,36 +60,40 @@ MANDATORY: Use build-guardian agent after EVERY code modification
 - NEVER mark a task as done without build-guardian verification
 - If build-guardian reports issues, fix them and run it again
 
+**Build-Guardian CRITICAL RULES:**
+1. **NEVER FIX CODE YOURSELF** - Only run builds and delegate to experts
+2. **ALWAYS USE PARALLEL AGENTS** - Deploy multiple agents simultaneously for different errors
+3. **VERIFY AFTER FIXES** - Always run build again after agents complete
+
 **Build-Guardian MANDATORY Command:**
 ```bash
 # THIS IS THE ONLY BUILD COMMAND TO USE - DO NOT CHANGE IT
-xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build
+xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build 2>&1
 ```
-**This command MUST include ALL these flags to properly report errors:**
-- ✅ `-scheme SnapChef` (required)
-- ✅ `-sdk iphonesimulator` (required) 
-- ✅ `-configuration Debug` (REQUIRED for error reporting)
-- ✅ `build` (required)
+**The `2>&1` is REQUIRED to capture error output - NEVER remove it!**
 
 **Build-Guardian Workflow:**
-1. **ALWAYS** runs EXACTLY: `xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build`
-2. **REVIEWS** all error output from Xcode build
-3. **DELEGATES** to expert agents based on error type:
+1. **RUN BUILD**: `xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build 2>&1`
+2. **ANALYZE ERRORS**: Parse all error messages and group by type
+3. **DEPLOY AGENTS IN PARALLEL**: 
+   - If multiple files have errors → Deploy multiple agents simultaneously
    - Swift/iOS errors → `ios-swift-architect` agent
    - Video/TikTok errors → `viral-video-engineer` agent
    - UI/SwiftUI errors → `swiftui-designer` agent
    - CloudKit/Network errors → `ios-qa-engineer` agent
-4. **VERIFIES** fixes by running THE SAME EXACT COMMAND again
-5. **REPORTS** final status with detailed error analysis
+   - Concurrency errors → `swift6-troubleshooter` agent
+4. **WAIT FOR AGENTS**: Let all deployed agents complete their fixes
+5. **VERIFY BUILD**: Run the EXACT same command again
+6. **REPORT**: Provide detailed status with error counts before/after
 
 **Build-Guardian Checks:**
-1. Runs EXACTLY: `xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build`
+1. Runs EXACTLY: `xcodebuild -scheme SnapChef -sdk iphonesimulator -configuration Debug build 2>&1`
 2. Captures and analyzes ALL compilation errors
-3. Runs `swiftlint --quiet` to check code style  
-4. Verifies Swift 6 compliance (actor isolation, Sendable, etc.)
-5. Ensures no debug print statements in production code
-6. Confirms all our coding standards are met
-7. Reports exact error messages from Xcode output
+3. Groups errors by file and type for parallel agent deployment
+4. Runs `swiftlint --quiet` AFTER successful build
+5. Verifies Swift 6 compliance (actor isolation, Sendable, etc.)
+6. Reports exact error counts and locations
+7. NEVER attempts to fix code - only delegates to expert agents
 
 ### 2. Error Resolution Protocol (2-ATTEMPT RULE)
 If you cannot fix an error after 2 attempts:
@@ -221,6 +225,38 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 1. **Start Here**: [AI_DEVELOPER_GUIDE.md](AI_DEVELOPER_GUIDE.md) - Comprehensive guide for AI assistants
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
+
+### Latest Updates (Jan 15, 2025) - Part 22
+- **Premium TikTok Video Generation - MILLION DOLLAR QUALITY**
+  - **Viral Effects Implementation**: Professional CapCut-style effects
+    - Cinematic Ken Burns upgraded from 5% to 15% zoom with easing
+    - Breathe effect with 2% pulse synced to beats
+    - Parallax movement for depth
+    - RGB chromatic aberration on transitions
+    - Light leaks and film grain for premium feel
+  - **Premium UI Components**: Apple-quality design
+    - Animated SnapChef logo with gradient flow (pink→purple→cyan)
+    - Falling emoji particles (🍕🍔🌮🥗🍜) like loading screen
+    - Pulsing "Get SnapChef FREE" CTA button
+    - Confetti animation on successful share
+    - Premium progress indicator with phase emojis
+  - **Smart Viral Features**:
+    - 8 rotating viral hooks ("POV: Your fridge is empty...")
+    - 15 optimized hashtags (70% trending, 30% niche)
+    - Seasonal hashtag detection
+    - App Store link auto-inclusion
+    - Beat-synchronized animations
+  - **Technical Optimizations**:
+    - Metal-accelerated rendering
+    - Parallel segment processing
+    - Predictive asset caching
+    - <5 second render time maintained
+    - <50MB file size optimized
+  - **Build-Guardian Improvements**:
+    - Never fixes code - only delegates to expert agents
+    - Deploys multiple agents in parallel for different errors
+    - Proper error capture with `2>&1` in build command
+    - Groups errors by type for efficient agent deployment
 
 ### Latest Updates (Jan 15, 2025) - Part 21
 - **Major Development Workflow Improvements**

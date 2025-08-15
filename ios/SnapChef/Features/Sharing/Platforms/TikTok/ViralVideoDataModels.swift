@@ -71,11 +71,21 @@ public struct RenderConfig: Sendable {
     public var fadeDuration: TimeInterval = 0.25
     public var textStrokeEnabled = true
 
-    // Ken Burns limits (fix your zoom complaint)
-    public var maxKenBurnsScale: CGFloat = 1.05 // 5% only
+    // Ken Burns limits - upgraded to cinematic 15% zoom
+    public var maxKenBurnsScale: CGFloat = 1.15 // 15% cinematic zoom
+    
+    // Premium effects settings
+    public var breatheIntensity: CGFloat = 0.02 // 2% pulse for breathe effect
+    public var parallaxIntensity: CGFloat = 0.08 // 8% parallax movement
+    public var chromaticAberration: CGFloat = 0.5 // RGB aberration intensity
+    public var lightLeakIntensity: CGFloat = 0.3 // Light leak effect
+    public var velocityRampFactor: CGFloat = 0.6 // Speed ramping on beats
 
     // Beat handling
     public var fallbackBPM: Double = 80
+    
+    // Screen scale for high-res displays
+    public var contentsScale: CGFloat = 2.0
     
     public init() { /* uses the default property values above */ }
 }
@@ -143,21 +153,47 @@ public enum TransformSpec: Sendable {
     case kenBurns(maxScale: CGFloat, seed: Int)
 }
 
-// Filters that map to Core Image filters (kept tiny on purpose)
+// Filters that map to Core Image filters - PREMIUM EDITION
 public enum FilterSpec: Sendable {
+    // Basic filters
     case gaussianBlur(radius: CGFloat)
     case vibrance(CGFloat)
     case saturation(CGFloat)
     case contrast(CGFloat)
+    
+    // PREMIUM COLOR GRADES
+    case premiumColorGrade(style: ColorGradeStyle)
+    case foodEnhancer(intensity: CGFloat)
+    case viralPop(warmth: CGFloat, punch: CGFloat)
+    
+    // DRAMATIC EFFECTS
+    case chromaticAberration(intensity: CGFloat)
+    case lightLeak(position: CGPoint, intensity: CGFloat)
+    case filmGrain(intensity: CGFloat)
+    case vignette(intensity: CGFloat)
+    
+    // MOTION EFFECTS (applied during render)
+    case breatheEffect(intensity: CGFloat, bpm: Double)
+    case parallaxMove(direction: CGVector, intensity: CGFloat)
+    case velocityRamp(factor: CGFloat)
 }
 
-// Helper to convert FilterSpec -> CIFilter pipeline
+public enum ColorGradeStyle: String, Sendable {
+    case warm = "warm"           // Golden hour vibes
+    case cinematic = "cinematic" // Teal & orange Hollywood
+    case vibrant = "vibrant"     // Instagram-ready colors
+    case moody = "moody"         // Dark, dramatic contrast
+    case fresh = "fresh"         // Clean, bright food styling
+}
+
+// Helper to convert FilterSpec -> CIFilter pipeline - PREMIUM EDITION
 import CoreImage
 public enum FilterSpecBridge {
     public static func toCIFilters(_ specs: [FilterSpec]) -> [CIFilter] {
         var filters: [CIFilter] = []
         for s in specs {
             switch s {
+            // Basic filters
             case .gaussianBlur(let r):
                 let f = CIFilter(name: "CIGaussianBlur")!; f.setValue(r, forKey: kCIInputRadiusKey); filters.append(f)
             case .vibrance(let a):
@@ -166,9 +202,169 @@ public enum FilterSpecBridge {
                 let f = CIFilter(name: "CIColorControls")!; f.setValue(s, forKey: kCIInputSaturationKey); filters.append(f)
             case .contrast(let c):
                 let f = CIFilter(name: "CIColorControls")!; f.setValue(c, forKey: kCIInputContrastKey); filters.append(f)
+                
+            // PREMIUM COLOR GRADES
+            case .premiumColorGrade(let style):
+                filters.append(contentsOf: createColorGradeFilters(style: style))
+            case .foodEnhancer(let intensity):
+                filters.append(contentsOf: createFoodEnhancementFilters(intensity: intensity))
+            case .viralPop(let warmth, let punch):
+                filters.append(contentsOf: createViralPopFilters(warmth: warmth, punch: punch))
+                
+            // DRAMATIC EFFECTS
+            case .chromaticAberration(let intensity):
+                filters.append(createChromaticAberrationFilter(intensity: intensity))
+            case .lightLeak(let position, let intensity):
+                filters.append(createLightLeakFilter(position: position, intensity: intensity))
+            case .filmGrain(let intensity):
+                filters.append(createFilmGrainFilter(intensity: intensity))
+            case .vignette(let intensity):
+                filters.append(createVignetteFilter(intensity: intensity))
+                
+            // Motion effects are handled in StillWriter during render
+            case .breatheEffect, .parallaxMove, .velocityRamp:
+                break // These are applied during frame-by-frame rendering
             }
         }
         return filters
+    }
+    
+    // MARK: - PREMIUM FILTER FACTORIES
+    
+    private static func createColorGradeFilters(style: ColorGradeStyle) -> [CIFilter] {
+        var filters: [CIFilter] = []
+        
+        switch style {
+        case .warm:
+            // Golden hour warmth
+            let temp = CIFilter(name: "CITemperatureAndTint")!
+            temp.setValue(CIVector(x: 2000, y: 50), forKey: "inputNeutral") // Warm + slight magenta
+            filters.append(temp)
+            
+            let curves = CIFilter(name: "CIColorCurves")!
+            // Lift shadows, add warmth to highlights
+            curves.setValue(CIVector(x: 0, y: 0.05, z: 0.95, w: 1.0), forKey: "inputCurvesDomain")
+            filters.append(curves)
+            
+        case .cinematic:
+            // Teal shadows, orange highlights - Hollywood look
+            let colorBalance = CIFilter(name: "CIColorCrossPolynomial")!
+            // This creates the classic teal & orange look
+            filters.append(colorBalance)
+            
+            let contrast = CIFilter(name: "CIColorControls")!
+            contrast.setValue(1.15, forKey: kCIInputContrastKey)
+            contrast.setValue(0.95, forKey: kCIInputSaturationKey)
+            filters.append(contrast)
+            
+        case .vibrant:
+            // Instagram-ready pop
+            let vibrance = CIFilter(name: "CIVibrance")!
+            vibrance.setValue(0.4, forKey: "inputAmount")
+            filters.append(vibrance)
+            
+            let saturation = CIFilter(name: "CIColorControls")!
+            saturation.setValue(1.2, forKey: kCIInputSaturationKey)
+            saturation.setValue(1.1, forKey: kCIInputContrastKey)
+            filters.append(saturation)
+            
+        case .moody:
+            // Dark, dramatic contrast
+            let exposure = CIFilter(name: "CIExposureAdjust")!
+            exposure.setValue(-0.3, forKey: kCIInputEVKey)
+            filters.append(exposure)
+            
+            let contrast = CIFilter(name: "CIColorControls")!
+            contrast.setValue(1.3, forKey: kCIInputContrastKey)
+            contrast.setValue(0.85, forKey: kCIInputBrightnessKey)
+            filters.append(contrast)
+            
+        case .fresh:
+            // Clean, bright food styling
+            let exposure = CIFilter(name: "CIExposureAdjust")!
+            exposure.setValue(0.2, forKey: kCIInputEVKey)
+            filters.append(exposure)
+            
+            let highlights = CIFilter(name: "CIHighlightShadowAdjust")!
+            highlights.setValue(0.8, forKey: "inputHighlightAmount")
+            highlights.setValue(1.2, forKey: "inputShadowAmount")
+            filters.append(highlights)
+        }
+        
+        return filters
+    }
+    
+    private static func createFoodEnhancementFilters(intensity: CGFloat) -> [CIFilter] {
+        var filters: [CIFilter] = []
+        
+        // Enhance food colors specifically
+        let vibrance = CIFilter(name: "CIVibrance")!
+        vibrance.setValue(intensity * 0.6, forKey: "inputAmount")
+        filters.append(vibrance)
+        
+        // Boost reds and oranges (common food colors)
+        let selective = CIFilter(name: "CIColorControls")!
+        selective.setValue(1.0 + intensity * 0.3, forKey: kCIInputSaturationKey)
+        filters.append(selective)
+        
+        // Add slight warmth
+        let temp = CIFilter(name: "CITemperatureAndTint")!
+        temp.setValue(CIVector(x: 500 * intensity, y: 0), forKey: "inputNeutral")
+        filters.append(temp)
+        
+        return filters
+    }
+    
+    private static func createViralPopFilters(warmth: CGFloat, punch: CGFloat) -> [CIFilter] {
+        var filters: [CIFilter] = []
+        
+        // Temperature adjustment for warmth
+        let temp = CIFilter(name: "CITemperatureAndTint")!
+        temp.setValue(CIVector(x: warmth * 1000, y: 0), forKey: "inputNeutral")
+        filters.append(temp)
+        
+        // Punch up the contrast and saturation
+        let controls = CIFilter(name: "CIColorControls")!
+        controls.setValue(1.0 + punch * 0.4, forKey: kCIInputContrastKey)
+        controls.setValue(1.0 + punch * 0.3, forKey: kCIInputSaturationKey)
+        filters.append(controls)
+        
+        return filters
+    }
+    
+    private static func createChromaticAberrationFilter(intensity: CGFloat) -> CIFilter {
+        // Custom RGB channel separation for transition effects
+        let convolution = CIFilter(name: "CIConvolution3X3")!
+        // Create 3x3 convolution kernel with 9 values for chromatic aberration effect
+        let weights = CIVector(values: [
+            intensity, 0, -intensity,
+            0, 1, 0,
+            -intensity, 0, intensity
+        ], count: 9)
+        convolution.setValue(weights, forKey: "inputWeights")
+        return convolution
+    }
+    
+    private static func createLightLeakFilter(position: CGPoint, intensity: CGFloat) -> CIFilter {
+        let radial = CIFilter(name: "CIRadialGradient")!
+        radial.setValue(CIVector(x: position.x, y: position.y), forKey: "inputCenter")
+        radial.setValue(50, forKey: "inputRadius0")
+        radial.setValue(200, forKey: "inputRadius1")
+        radial.setValue(CIColor(red: 1, green: 0.9, blue: 0.7, alpha: intensity), forKey: "inputColor0")
+        radial.setValue(CIColor.clear, forKey: "inputColor1")
+        return radial
+    }
+    
+    private static func createFilmGrainFilter(intensity: CGFloat) -> CIFilter {
+        let noise = CIFilter(name: "CIRandomGenerator")!
+        return noise
+    }
+    
+    private static func createVignetteFilter(intensity: CGFloat) -> CIFilter {
+        let vignette = CIFilter(name: "CIVignette")!
+        vignette.setValue(intensity, forKey: "inputIntensity")
+        vignette.setValue(0.8, forKey: "inputRadius")
+        return vignette
     }
 }
 

@@ -55,6 +55,7 @@ public final class StillWriter: @unchecked Sendable {
                                      duration: CMTime,
                                      transform: CGAffineTransform = .identity,
                                      filters: [CIFilter] = [],
+                                     specs: [FilterSpec] = [], // Add filter specs for motion effects
                                      progressCallback: @escaping @Sendable (Double) async -> Void = { _ in }) async throws -> URL {
         let out = createTempOutputURL(); try? FileManager.default.removeItem(at: out)
         let writer = try AVAssetWriter(outputURL: out, fileType: .mp4)
@@ -108,11 +109,17 @@ public final class StillWriter: @unchecked Sendable {
         let baseCI = CIImage(image: image) ?? CIImage(color: .black).cropped(to: canvas)
         let fitted = aspectFitCI(baseCI, into: canvas)
 
-        // Optional gentle Ken Burns baked per-frame (≤5%)
+        // PREMIUM: Cinematic Ken Burns + Breathe + Parallax effects (15% zoom)
         let totalFrames = max(1, Int(duration.seconds * Double(config.fps)))
-        let maxScale = config.maxKenBurnsScale
+        let maxScale = config.maxKenBurnsScale // Now 15% for cinematic feel
+        let breatheIntensity = config.breatheIntensity
+        let parallaxIntensity = config.parallaxIntensity
         var t: Double = 0
         let dt = 1.0 / Double(config.fps)
+        
+        // Beat timing for breathe effect (assuming 80 BPM default)
+        let beatDuration = 60.0 / config.fallbackBPM
+        let breatheFreq = 1.0 / beatDuration
 
         // Log memory usage at start
         memoryOptimizer.logMemoryProfile(phase: "StillWriter start")
@@ -204,21 +211,41 @@ public final class StillWriter: @unchecked Sendable {
             
             let time = CMTime(value: CMTimeValue(frame), timescale: config.fps)
 
-            // subtle scale from 1.0 → maxScale
-            let lerp = CGFloat(Double(frame) / Double(max(1,totalFrames-1)))
-            let s = 1.0 + (maxScale - 1.0) * lerp
-
+            // PREMIUM EFFECTS CALCULATION
+            
+            // 1. Cinematic Ken Burns with easing curve (15% zoom)
+            let progress = Double(frame) / Double(max(1, totalFrames - 1))
+            let easedProgress = easeInOutCubic(progress) // Smooth cinematic easing
+            let kenBurnsScale = 1.0 + (maxScale - 1.0) * CGFloat(easedProgress)
+            
+            // 2. Breathe effect (2% pulse synced to beat)
+            let breathePhase = sin(t * breatheFreq * 2 * .pi)
+            let breatheScale = 1.0 + breatheIntensity * CGFloat(breathePhase)
+            
+            // 3. Parallax movement (subtle drift)
+            let parallaxX = parallaxIntensity * CGFloat(sin(t * 0.3)) * canvas.width * 0.1
+            let parallaxY = parallaxIntensity * CGFloat(cos(t * 0.2)) * canvas.height * 0.05
+            
+            // Combine all effects
+            let totalScale = kenBurnsScale * breatheScale
+            
             var img = fitted.transformed(by:
-                CGAffineTransform(translationX: canvas.midX, y: canvas.midY)
-                    .scaledBy(x: s, y: s)
+                CGAffineTransform(translationX: canvas.midX + parallaxX, y: canvas.midY + parallaxY)
+                    .scaledBy(x: totalScale, y: totalScale)
                     .translatedBy(x: -canvas.midX, y: -canvas.midY)
             )
 
-            // Apply filters with autoreleasepool for memory management
-            for f in filters { 
+            // Apply premium filters with motion-aware processing
+            for (index, f) in filters.enumerated() { 
                 autoreleasepool {
                     f.setValue(img, forKey: kCIInputImageKey)
-                    img = f.outputImage ?? img
+                    
+                    // Apply motion effects for dynamic filters
+                    if let motionAwareImage = applyMotionEffects(to: img, filter: specs.count > index ? specs[index] : nil, time: t, frame: frame, totalFrames: totalFrames) {
+                        img = motionAwareImage
+                    } else {
+                        img = f.outputImage ?? img
+                    }
                 }
             }
 
@@ -275,6 +302,75 @@ public final class StillWriter: @unchecked Sendable {
         return image.transformed(by: CGAffineTransform(scaleX: s, y: s))
             .transformed(by: CGAffineTransform(translationX: tx, y: ty))
             .cropped(to: canvas)
+    }
+    
+    // MARK: - PREMIUM EFFECTS HELPERS
+    
+    /// Smooth easing function for cinematic Ken Burns
+    private func easeInOutCubic(_ t: Double) -> Double {
+        return t < 0.5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3) / 2
+    }
+    
+    /// Apply motion-aware effects to specific filters
+    private func applyMotionEffects(to image: CIImage, filter: FilterSpec?, time: Double, frame: Int, totalFrames: Int) -> CIImage? {
+        guard let filter = filter else { return nil }
+        
+        switch filter {
+        case .chromaticAberration(let intensity):
+            // Apply RGB separation that increases during transitions
+            let transitionFactor = CGFloat(sin(time * 2) * 0.5 + 0.5) // 0-1 oscillation
+            let dynamicIntensity = intensity * transitionFactor
+            return applyChromaticAberration(to: image, intensity: dynamicIntensity)
+            
+        case .lightLeak(let position, let intensity):
+            // Animated light leak that moves with the parallax
+            let parallaxX = config.parallaxIntensity * CGFloat(sin(time * 0.3)) * config.size.width * 0.1
+            let parallaxY = config.parallaxIntensity * CGFloat(cos(time * 0.2)) * config.size.height * 0.05
+            let animatedPosition = CGPoint(x: position.x + parallaxX, y: position.y + parallaxY)
+            return applyLightLeak(to: image, position: animatedPosition, intensity: intensity)
+            
+        case .velocityRamp(let factor):
+            // This would affect playback speed, handled at composition level
+            return nil
+            
+        default:
+            return nil
+        }
+    }
+    
+    /// Apply chromatic aberration effect
+    private func applyChromaticAberration(to image: CIImage, intensity: CGFloat) -> CIImage {
+        // Split RGB channels and offset them slightly
+        let redOffset = CIFilter(name: "CIAffineTransform")!
+        redOffset.setValue(image, forKey: kCIInputImageKey)
+        redOffset.setValue(CGAffineTransform(translationX: intensity * 2, y: 0), forKey: kCIInputTransformKey)
+        
+        let blueOffset = CIFilter(name: "CIAffineTransform")!
+        blueOffset.setValue(image, forKey: kCIInputImageKey)
+        blueOffset.setValue(CGAffineTransform(translationX: -intensity * 2, y: 0), forKey: kCIInputTransformKey)
+        
+        // Composite the channels (simplified version)
+        let composite = CIFilter(name: "CIAdditionCompositing")!
+        composite.setValue(redOffset.outputImage, forKey: kCIInputImageKey)
+        composite.setValue(blueOffset.outputImage, forKey: kCIInputBackgroundImageKey)
+        
+        return composite.outputImage ?? image
+    }
+    
+    /// Apply animated light leak effect
+    private func applyLightLeak(to image: CIImage, position: CGPoint, intensity: CGFloat) -> CIImage {
+        let radialGradient = CIFilter(name: "CIRadialGradient")!
+        radialGradient.setValue(CIVector(x: position.x, y: position.y), forKey: "inputCenter")
+        radialGradient.setValue(50, forKey: "inputRadius0")
+        radialGradient.setValue(200, forKey: "inputRadius1")
+        radialGradient.setValue(CIColor(red: 1, green: 0.9, blue: 0.7, alpha: intensity), forKey: "inputColor0")
+        radialGradient.setValue(CIColor.clear, forKey: "inputColor1")
+        
+        let composite = CIFilter(name: "CIAdditionCompositing")!
+        composite.setValue(image, forKey: kCIInputBackgroundImageKey)
+        composite.setValue(radialGradient.outputImage, forKey: kCIInputImageKey)
+        
+        return composite.outputImage ?? image
     }
     
     private func createTempOutputURL() -> URL {
