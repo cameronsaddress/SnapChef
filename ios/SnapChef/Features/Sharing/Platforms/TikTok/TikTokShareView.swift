@@ -491,6 +491,10 @@ struct TikTokShareView: View {
             let caption: String
             let selectedHashtagsString = selectedHashtags.isEmpty ? "" : "\n\n" + selectedHashtags.map { "#\($0)" }.joined(separator: " ")
             
+            // Debug logging for hashtag verification
+            print("🏷️ Selected hashtags: \(selectedHashtags)")
+            print("🏷️ Hashtags string: \(selectedHashtagsString)")
+            
             if case .recipe(let recipe) = content.type {
                 let viralRecipe = ViralRecipe(
                     title: recipe.name,
@@ -507,12 +511,14 @@ struct TikTokShareView: View {
                 let baseCaptionComponents = baseCaptionWithHashtags.components(separatedBy: "\n\n")
                 let captionWithoutHashtags = baseCaptionComponents.dropLast(2).joined(separator: "\n\n") // Remove hashtags and app link
                 caption = captionWithoutHashtags + selectedHashtagsString + "\n\nDownload: apps.apple.com/snapchef"
+                print("📋 Final caption being sent (recipe): \(caption)")
             } else {
                 let baseCaptionWithHashtags = ViralCaptionGenerator.generateViralCaption(baseCaption: "Check out this amazing recipe transformation!")
                 // Remove the automatically generated hashtags and replace with selected ones
                 let baseCaptionComponents = baseCaptionWithHashtags.components(separatedBy: "\n\n")
                 let captionWithoutHashtags = baseCaptionComponents.dropLast(2).joined(separator: "\n\n") // Remove hashtags and app link
                 caption = captionWithoutHashtags + selectedHashtagsString + "\n\nDownload: apps.apple.com/snapchef"
+                print("📋 Final caption being sent (non-recipe): \(caption)")
             }
             
             let shareResult = await withCheckedContinuation { continuation in

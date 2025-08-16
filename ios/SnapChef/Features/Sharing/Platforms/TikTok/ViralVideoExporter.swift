@@ -388,6 +388,9 @@ public final class ViralVideoExporter: @unchecked Sendable {
             // Copy the provided caption directly to UIPasteboard (it already contains selected hashtags)
             if let caption = caption {
                 UIPasteboard.general.string = caption
+                print("📋 Copying to clipboard: \(caption)")
+            } else {
+                print("📋 No caption provided to copy to clipboard")
             }
             
             // Create TikTok share request with localIdentifiers
