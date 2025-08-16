@@ -324,7 +324,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in 
                 self.createCTATextOverlay(
-                    text: "Get SNAPCHEF! Free on the App Store!", 
+                    text: "Get it free on the App Store", 
                     config: cfg,
                     screenScale: cfg.contentsScale
                 )
@@ -1011,15 +1011,27 @@ public actor RenderPlanner {
         return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
     }
     
-    /// Create CTA text overlay with FADE animations and proper text sizing
+    /// Create CTA text overlay with SnapChef logo and FADE animations
     nonisolated private func createCTATextOverlay(text: String, config: RenderConfig, screenScale: CGFloat) -> CALayer {
         let container = CALayer()
         container.frame = CGRect(origin: .zero, size: config.size)
         
-        // Create CTA container
+        // STEP 1: Create large SnapChef logo at 40% screen height (middle)
+        let logoContainer = createSnapChefLogo(config: config, screenScale: screenScale)
+        let logoWidth = config.size.width * 0.8 // 80% of screen width
+        let logoHeight: CGFloat = 120 // Height for 72pt font + padding
+        logoContainer.frame = CGRect(
+            x: (config.size.width - logoWidth) / 2,
+            y: config.size.height * 0.4 - logoHeight / 2, // Vertically centered at 40%
+            width: logoWidth,
+            height: logoHeight
+        )
+        logoContainer.opacity = 0.0 // Start invisible for fade in
+        
+        // STEP 2: Create CTA container at bottom
         let ctaContainer = CALayer()
         
-        // Create pulsing gradient background
+        // Create pulsing gradient background for CTA
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
             UIColor(red: 1.0, green: 0.08, blue: 0.58, alpha: 0.95).cgColor,  // Pink
@@ -1029,7 +1041,7 @@ public actor RenderPlanner {
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
         gradientLayer.cornerRadius = 20
         
-        // Create main CTA text with special gradient for "SNAPCHEF!"
+        // Create main CTA text
         let mainTextLayer = CATextLayer()
         let font = CTFontCreateWithName("HelveticaNeue-Black" as CFString, config.ctaFontSize * 1.4, nil)
         mainTextLayer.font = font
@@ -1038,26 +1050,14 @@ public actor RenderPlanner {
         mainTextLayer.alignmentMode = .center
         mainTextLayer.contentsScale = screenScale
         mainTextLayer.isWrapped = true
-        
-        // Special gradient text for "SNAPCHEF!"
-        let snapchefLayer = createGradientTextLayer("SNAPCHEF!", font: font, screenScale: screenScale)
-        
-        // Split the text to apply gradient only to "SNAPCHEF!"
-        if text.contains("SNAPCHEF!") {
-            let beforeText = "Get "
-            let afterText = " Free on the App Store!"
-            
-            mainTextLayer.string = beforeText + "        " + afterText  // Space for gradient text
-        } else {
-            mainTextLayer.string = text
-        }
+        mainTextLayer.string = text
         
         // Debug: Ensure CTA text is being set
         print("[RenderPlanner] Creating CTA overlay with text: '\(text)'")
         print("[RenderPlanner] CTA main text layer string set to: '\(mainTextLayer.string ?? "nil")'")
         print("[RenderPlanner] CTA font size: \(mainTextLayer.fontSize)")
         
-        // FIXED: Calculate actual text dimensions using the font
+        // Calculate actual text dimensions using the font
         let textAttributes: [NSAttributedString.Key: Any] = [
             .font: font
         ]
@@ -1072,17 +1072,16 @@ public actor RenderPlanner {
         // Position at bottom-middle of screen (y position around 0.85 of screen height)
         let containerFrame = CGRect(
             x: (config.size.width - containerWidth) / 2,
-            y: config.size.height * 0.85 - containerHeight / 2,
+            y: config.size.height * 0.92 - containerHeight / 2,
             width: containerWidth,
             height: containerHeight
         )
         
-        // Set up proper layer hierarchy
+        // Set up proper layer hierarchy for CTA
         ctaContainer.frame = containerFrame
         ctaContainer.opacity = 0.0  // Start invisible for fade in
         gradientLayer.frame = CGRect(origin: .zero, size: containerFrame.size)
         gradientLayer.opacity = 1.0
-        // Position main text at top of container
         mainTextLayer.frame = CGRect(
             x: padding,
             y: padding,
@@ -1090,16 +1089,6 @@ public actor RenderPlanner {
             height: textSize.height
         )
         mainTextLayer.opacity = 1.0
-        
-        // Position gradient "SNAPCHEF!" text in center
-        if text.contains("SNAPCHEF!") {
-            snapchefLayer.frame = CGRect(
-                x: containerFrame.width / 2 - 60, // Center horizontally
-                y: padding,
-                width: 120,
-                height: textSize.height
-            )
-        }
         
         // Add App Store badge below text
         let appStoreBadge = createAppStoreBadge(config: config, screenScale: screenScale)
@@ -1111,10 +1100,11 @@ public actor RenderPlanner {
         )
         
         // Debug positioning
+        print("[RenderPlanner] Logo container frame: \(logoContainer.frame)")
         print("[RenderPlanner] CTA container frame: \(ctaContainer.frame)")
         print("[RenderPlanner] CTA main text layer frame: \(mainTextLayer.frame)")
         
-        // Enhanced shadow and glow
+        // Enhanced shadow and glow for CTA
         gradientLayer.shadowColor = UIColor.magenta.cgColor
         gradientLayer.shadowOffset = CGSize(width: 0, height: 6)
         gradientLayer.shadowRadius = 15
@@ -1135,44 +1125,54 @@ public actor RenderPlanner {
         ctaSparkCell.velocityRange = 40
         ctaSparkCell.emissionRange = .pi * 2
         ctaSparkCell.yAcceleration = 100 // Strong gravity
-        ctaSparkCell.scale = 0.8  // Double the size
-        ctaSparkCell.scaleRange = 0.6  // Double the range
+        ctaSparkCell.scale = 0.8
+        ctaSparkCell.scaleRange = 0.6
         ctaSparkCell.alphaSpeed = -0.4
         ctaSparkCell.spin = .pi * 1.5
         ctaSparkCell.spinRange = .pi
         
         ctaSparkEmitter.emitterCells = [ctaSparkCell]
         
-        // FIXED: FADE ANIMATIONS for CTA
-        // Fade in animation (0-0.5s)
-        let fadeIn = CABasicAnimation(keyPath: "opacity")
-        fadeIn.fromValue = 0.0
-        fadeIn.toValue = 1.0
-        fadeIn.duration = 0.5
-        fadeIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
-        fadeIn.beginTime = AVCoreAnimationBeginTimeAtZero
-        fadeIn.fillMode = .both
-        fadeIn.isRemovedOnCompletion = false
+        // ANIMATIONS: Logo and CTA fade in together
+        // Logo fade in animation (0-0.5s)
+        let logoFadeIn = CABasicAnimation(keyPath: "opacity")
+        logoFadeIn.fromValue = 0.0
+        logoFadeIn.toValue = 1.0
+        logoFadeIn.duration = 0.5
+        logoFadeIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        logoFadeIn.beginTime = AVCoreAnimationBeginTimeAtZero
+        logoFadeIn.fillMode = .both
+        logoFadeIn.isRemovedOnCompletion = false
         
-        // Start spark explosion when fade-in completes (at 0.5s)
+        // CTA fade in animation (0.2s delay for stagger effect)
+        let ctaFadeIn = CABasicAnimation(keyPath: "opacity")
+        ctaFadeIn.fromValue = 0.0
+        ctaFadeIn.toValue = 1.0
+        ctaFadeIn.duration = 0.5
+        ctaFadeIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        ctaFadeIn.beginTime = AVCoreAnimationBeginTimeAtZero + 0.2
+        ctaFadeIn.fillMode = .both
+        ctaFadeIn.isRemovedOnCompletion = false
+        
+        // Start spark explosion when CTA fade-in completes (at 0.7s)
         let sparkStart = CABasicAnimation(keyPath: "birthRate")
         sparkStart.fromValue = 0
         sparkStart.toValue = 20
         sparkStart.duration = 0.1
-        sparkStart.beginTime = AVCoreAnimationBeginTimeAtZero + 0.5
+        sparkStart.beginTime = AVCoreAnimationBeginTimeAtZero + 0.7
         sparkStart.fillMode = .both
         sparkStart.isRemovedOnCompletion = false
         
-        // Attention-grabbing pulse animation with proper timing
-        let pulse = CAKeyframeAnimation(keyPath: "transform.scale")
-        pulse.values = [1.0, 1.12, 1.0, 1.18, 1.0]
-        pulse.keyTimes = [0, 0.25, 0.5, 0.75, 1.0]
-        pulse.duration = 1.2
-        pulse.repeatCount = 3 // Finite repeat for video composition
-        pulse.beginTime = AVCoreAnimationBeginTimeAtZero + 0.8 // Start after fade-in
-        pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        pulse.fillMode = .both
-        pulse.isRemovedOnCompletion = false
+        // Attention-grabbing pulse animation for CTA
+        let ctaPulse = CAKeyframeAnimation(keyPath: "transform.scale")
+        ctaPulse.values = [1.0, 1.12, 1.0, 1.18, 1.0]
+        ctaPulse.keyTimes = [0, 0.25, 0.5, 0.75, 1.0]
+        ctaPulse.duration = 1.2
+        ctaPulse.repeatCount = 3 // Finite repeat for video composition
+        ctaPulse.beginTime = AVCoreAnimationBeginTimeAtZero + 1.0 // Start after fade-in
+        ctaPulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        ctaPulse.fillMode = .both
+        ctaPulse.isRemovedOnCompletion = false
         
         // Glow pulse with proper timing
         let glowPulse = CABasicAnimation(keyPath: "shadowRadius")
@@ -1181,30 +1181,191 @@ public actor RenderPlanner {
         glowPulse.duration = 0.8
         glowPulse.autoreverses = true
         glowPulse.repeatCount = 4 // Finite repeat
-        glowPulse.beginTime = AVCoreAnimationBeginTimeAtZero + 1.0
+        glowPulse.beginTime = AVCoreAnimationBeginTimeAtZero + 1.2
         glowPulse.fillMode = .both
         glowPulse.isRemovedOnCompletion = false
         
-        // Assemble layer hierarchy
+        // Assemble CTA layer hierarchy
         ctaContainer.addSublayer(gradientLayer)
         ctaContainer.addSublayer(ctaSparkEmitter) // Sparks behind CTA text
         ctaContainer.addSublayer(mainTextLayer)
-        if text.contains("SNAPCHEF!") {
-            ctaContainer.addSublayer(snapchefLayer) // Gradient text overlay
-        }
         ctaContainer.addSublayer(appStoreBadge) // App Store badge
         
-        // Apply animations to the container
-        ctaContainer.add(fadeIn, forKey: "fadeIn")
-        ctaContainer.add(pulse, forKey: "pulse")
+        // Apply animations
+        logoContainer.add(logoFadeIn, forKey: "logoFadeIn")
+        ctaContainer.add(ctaFadeIn, forKey: "ctaFadeIn")
+        ctaContainer.add(ctaPulse, forKey: "ctaPulse")
         gradientLayer.add(glowPulse, forKey: "glowPulse")
         ctaSparkEmitter.add(sparkStart, forKey: "sparkStart")
         
+        // Add both logo and CTA to main container
+        container.addSublayer(logoContainer)
         container.addSublayer(ctaContainer)
         return container
     }
     
     // MARK: - Helper Functions for CTA
+    
+    /// Create large SnapChef logo with gradient and sparkles
+    nonisolated private func createSnapChefLogo(config: RenderConfig, screenScale: CGFloat) -> CALayer {
+        let container = CALayer()
+        
+        // Create gradient background with SnapChef viral colors: Pink → Purple → Cyan
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor(red: 1.0, green: 0.08, blue: 0.58, alpha: 0.98).cgColor,  // Pink #FF1493
+            UIColor(red: 0.6, green: 0.196, blue: 0.8, alpha: 0.98).cgColor,  // Purple #9932CC
+            UIColor(red: 0.0, green: 1.0, blue: 1.0, alpha: 0.98).cgColor     // Cyan #00FFFF
+        ]
+        gradientLayer.locations = [0.0, 0.5, 1.0]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.cornerRadius = 25
+        
+        // Create "SNAPCHEF!" text with 72pt heavy font
+        let logoTextLayer = CATextLayer()
+        let logoFont = CTFontCreateWithName("HelveticaNeue-Black" as CFString, 72, nil) // 72pt for visibility
+        logoTextLayer.font = logoFont
+        logoTextLayer.fontSize = 72
+        logoTextLayer.foregroundColor = UIColor.white.cgColor
+        logoTextLayer.alignmentMode = .center
+        logoTextLayer.contentsScale = screenScale
+        logoTextLayer.string = "SNAPCHEF!"
+        
+        // Calculate text dimensions
+        let logoTextAttributes: [NSAttributedString.Key: Any] = [
+            .font: logoFont
+        ]
+        let logoTextSize = ("SNAPCHEF!" as NSString).size(withAttributes: logoTextAttributes)
+        let logoPadding: CGFloat = 40 // Large padding for prominent logo
+        let logoContainerWidth = logoTextSize.width + logoPadding * 2
+        let logoContainerHeight = logoTextSize.height + logoPadding * 2
+        
+        // Set up layer frames
+        container.frame = CGRect(origin: .zero, size: CGSize(width: logoContainerWidth, height: logoContainerHeight))
+        gradientLayer.frame = container.bounds
+        logoTextLayer.frame = CGRect(
+            x: logoPadding,
+            y: (logoContainerHeight - logoTextSize.height) / 2, // Center text vertically
+            width: logoTextSize.width,
+            height: logoTextSize.height
+        )
+        
+        // Add dramatic shadow and glow effects
+        gradientLayer.shadowColor = UIColor.cyan.cgColor
+        gradientLayer.shadowOffset = CGSize(width: 0, height: 8)
+        gradientLayer.shadowRadius = 25
+        gradientLayer.shadowOpacity = 0.8
+        
+        // Additional text shadow for depth
+        logoTextLayer.shadowColor = UIColor.black.cgColor
+        logoTextLayer.shadowOffset = CGSize(width: 2, height: 2)
+        logoTextLayer.shadowRadius = 4
+        logoTextLayer.shadowOpacity = 0.5
+        
+        // Create sparkle effects around the logo
+        let logoSparkEmitter = CAEmitterLayer()
+        logoSparkEmitter.emitterPosition = CGPoint(x: logoContainerWidth / 2, y: logoContainerHeight / 2)
+        logoSparkEmitter.emitterShape = .rectangle
+        logoSparkEmitter.emitterSize = CGSize(width: logoContainerWidth * 1.4, height: logoContainerHeight * 1.4)
+        logoSparkEmitter.zPosition = -1 // Behind text but in front of background
+        
+        let logoSparkCell = CAEmitterCell()
+        logoSparkCell.contents = createViralSparkImage().cgImage
+        logoSparkCell.birthRate = 25 // High sparkle rate for logo prominence
+        logoSparkCell.lifetime = 3.0
+        logoSparkCell.velocity = 80
+        logoSparkCell.velocityRange = 50
+        logoSparkCell.emissionRange = .pi * 2
+        logoSparkCell.yAcceleration = 120 // Strong gravity for dynamic effect
+        logoSparkCell.scale = 1.0  // Larger sparkles for logo
+        logoSparkCell.scaleRange = 0.8
+        logoSparkCell.alphaSpeed = -0.3
+        logoSparkCell.spin = .pi * 2
+        logoSparkCell.spinRange = .pi * 1.5
+        
+        logoSparkEmitter.emitterCells = [logoSparkCell]
+        
+        // Add pulsing animation for logo prominence
+        let logoPulse = CABasicAnimation(keyPath: "transform.scale")
+        logoPulse.fromValue = 1.0
+        logoPulse.toValue = 1.08
+        logoPulse.duration = 1.0
+        logoPulse.autoreverses = true
+        logoPulse.repeatCount = .greatestFiniteMagnitude
+        logoPulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        
+        // Gradient color cycling animation
+        let colorCycle = CABasicAnimation(keyPath: "colors")
+        colorCycle.fromValue = gradientLayer.colors
+        colorCycle.toValue = [
+            UIColor(red: 0.0, green: 1.0, blue: 1.0, alpha: 0.98).cgColor,     // Cyan #00FFFF
+            UIColor(red: 1.0, green: 0.08, blue: 0.58, alpha: 0.98).cgColor,  // Pink #FF1493
+            UIColor(red: 0.6, green: 0.196, blue: 0.8, alpha: 0.98).cgColor   // Purple #9932CC
+        ]
+        colorCycle.duration = 2.0
+        colorCycle.autoreverses = true
+        colorCycle.repeatCount = .greatestFiniteMagnitude
+        
+        // Assemble layer hierarchy
+        container.addSublayer(gradientLayer)
+        container.addSublayer(logoSparkEmitter) // Sparkles behind logo text
+        container.addSublayer(logoTextLayer)
+        
+        // Apply animations
+        container.add(logoPulse, forKey: "logoPulse")
+        gradientLayer.add(colorCycle, forKey: "colorCycle")
+        
+        print("[RenderPlanner] Created SnapChef logo with size: \(container.frame.size)")
+        return container
+    }
+    
+    /// Create viral sparkle image for logo effects
+    nonisolated private func createViralSparkImage() -> UIImage {
+        let size = CGSize(width: 16, height: 16)
+        UIGraphicsBeginImageContextWithOptions(size, false, 0)
+        defer { UIGraphicsEndImageContext() }
+        
+        guard let context = UIGraphicsGetCurrentContext() else {
+            print("❌ Failed to get graphics context for viral spark")
+            return UIImage()
+        }
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        
+        // Create viral sparkle with gradient colors
+        let sparkColor = UIColor(red: 1.0, green: 0.9, blue: 0.0, alpha: 1.0) // Bright gold
+        context.setFillColor(sparkColor.cgColor)
+        
+        // Draw a six-pointed star shape (more dramatic than four-pointed)
+        context.beginPath()
+        let radius: CGFloat = 7
+        let innerRadius: CGFloat = 3
+        
+        for i in 0..<12 {
+            let angle = CGFloat(i) * .pi / 6
+            let currentRadius = i % 2 == 0 ? radius : innerRadius
+            let x = center.x + cos(angle) * currentRadius
+            let y = center.y + sin(angle) * currentRadius
+            
+            if i == 0 {
+                context.move(to: CGPoint(x: x, y: y))
+            } else {
+                context.addLine(to: CGPoint(x: x, y: y))
+            }
+        }
+        context.closePath()
+        context.fillPath()
+        
+        // Add a bright center with viral colors
+        context.setFillColor(UIColor.white.cgColor)
+        context.fillEllipse(in: CGRect(x: center.x - 2, y: center.y - 2, width: 4, height: 4))
+        
+        // Add outer glow effect
+        context.setFillColor(UIColor.cyan.withAlphaComponent(0.6).cgColor)
+        context.fillEllipse(in: CGRect(x: center.x - 8, y: center.y - 8, width: 16, height: 16))
+        
+        return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
+    }
     
     /// Create gradient text layer for "SNAPCHEF!" with orange to pink gradient
     nonisolated private func createGradientTextLayer(_ text: String, font: CTFont, screenScale: CGFloat) -> CALayer {

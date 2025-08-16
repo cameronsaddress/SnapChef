@@ -1,0 +1,52 @@
+<svg width="1200" height="300" viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="snapchefGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF1493;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#9932CC;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00FFFF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main text -->
+  <text x="600" y="180" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" 
+        font-size="120" font-weight="900" text-anchor="middle" 
+        fill="url(#snapchefGradient)" 
+        style="letter-spacing: 2px;">SNAPCHEF!</text>
+  
+  <!-- Sparkles -->
+  <g fill="white" opacity="0.9">
+    <!-- Star sparkles -->
+    <polygon points="200,75 205,85 215,80 205,95 200,105 195,95 185,80 195,85" />
+    <polygon points="1000,95 1005,105 1015,100 1005,115 1000,125 995,115 985,100 995,105" />
+    <polygon points="150,215 155,225 165,220 155,235 150,245 145,235 135,220 145,225" />
+    <polygon points="1050,175 1055,185 1065,180 1055,195 1050,205 1045,195 1035,180 1045,185" />
+    
+    <!-- Smaller sparkles -->
+    <circle cx="300" cy="50" r="3" />
+    <circle cx="900" cy="250" r="3" />
+    <circle cx="100" cy="150" r="3" />
+    <circle cx="1100" cy="120" r="3" />
+    <circle cx="250" cy="270" r="3" />
+    <circle cx="950" cy="40" r="3" />
+    <circle cx="180" cy="60" r="3" />
+    <circle cx="1020" cy="240" r="3" />
+    
+    <!-- Plus sign sparkles -->
+    <g transform="translate(350,80)">
+      <rect x="-1" y="-8" width="2" height="16" />
+      <rect x="-8" y="-1" width="16" height="2" />
+    </g>
+    <g transform="translate(850,200)">
+      <rect x="-1" y="-8" width="2" height="16" />
+      <rect x="-8" y="-1" width="16" height="2" />
+    </g>
+    <g transform="translate(120,100)">
+      <rect x="-1" y="-6" width="2" height="12" />
+      <rect x="-6" y="-1" width="12" height="2" />
+    </g>
+    <g transform="translate(1080,220)">
+      <rect x="-1" y="-6" width="2" height="12" />
+      <rect x="-6" y="-1" width="12" height="2" />
+    </g>
+  </g>
+</svg>
