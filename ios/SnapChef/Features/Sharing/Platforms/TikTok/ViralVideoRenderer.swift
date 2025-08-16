@@ -462,10 +462,10 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             }
         }
         
-        // CRITICAL SPEED FIX: Only add essential overlays, skip complex animations
-        let essentialOverlays = plan.overlays.prefix(3).map { overlay in
+        // CRITICAL FIX: Use actual overlay content instead of minimal placeholders
+        let essentialOverlays = plan.overlays.prefix(6).map { overlay in
             RenderPlan.Overlay(start: overlay.start, duration: overlay.duration) { config in
-                return self.createMinimalOverlayLayer(from: overlay, config: config)
+                return overlay.layerBuilder(config) // Use real overlay content
             }
         }
         
@@ -544,8 +544,8 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         
         videoComposition.instructions = [instruction]
         
-        // CRITICAL SPEED FIX: Only add overlays if absolutely necessary (< 3 overlays)
-        if !overlays.isEmpty && overlays.count <= 2 {
+        // CRITICAL FIX: Process more overlays for proper text/sparkle content
+        if !overlays.isEmpty && overlays.count <= 8 {
             let parentLayer = CALayer()
             parentLayer.frame = CGRect(origin: .zero, size: config.size)
             parentLayer.backgroundColor = UIColor.clear.cgColor
@@ -557,15 +557,14 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             overlayLayer.frame = parentLayer.bounds
             overlayLayer.backgroundColor = UIColor.clear.cgColor
             
-            // Add only essential overlays with minimal processing
-            for overlay in overlays.prefix(2) {
+            // CRITICAL FIX: Process ALL overlays to show text, containers, and sparkles
+            for overlay in overlays {
                 let layer = overlay.layerBuilder(config)
                 layer.beginTime = AVCoreAnimationBeginTimeAtZero + overlay.start.seconds
                 layer.duration = overlay.duration.seconds
                 
-                // SPEED FIX: Remove all animations to prevent processing overhead
-                layer.removeAllAnimations()
-                removeAnimationsRecursively(from: layer)
+                // SELECTIVE FIX: Keep some animations for visual appeal but remove expensive ones
+                removeExpensiveAnimationsOnly(from: layer)
                 
                 overlayLayer.addSublayer(layer)
             }
@@ -582,19 +581,31 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         return videoComposition
     }
     
-    // SPEED OPTIMIZATION: Remove all animations recursively to speed up composition
+    // SELECTIVE FIX: Remove only expensive animations, keep simple ones for visual appeal
+    private func removeExpensiveAnimationsOnly(from layer: CALayer) {
+        // Keep simple opacity and position animations
+        let expensiveKeys = ["transform.rotation", "transform.scale.x", "transform.scale.y", "shadowOpacity", "shadowRadius"]
+        for key in expensiveKeys {
+            layer.removeAnimation(forKey: key)
+        }
+        
+        // Apply to sublayers
+        layer.sublayers?.forEach { removeExpensiveAnimationsOnly(from: $0) }
+    }
+    
+    // SPEED OPTIMIZATION: Remove all animations recursively when needed
     private func removeAnimationsRecursively(from layer: CALayer) {
         layer.removeAllAnimations()
         layer.sublayers?.forEach { removeAnimationsRecursively(from: $0) }
     }
     
-    // SPEED OPTIMIZATION: Create minimal overlay layers without complex effects
-    private func createMinimalOverlayLayer(from overlay: RenderPlan.Overlay, config: RenderConfig) -> CALayer {
+    // FALLBACK: Create simple overlay when actual overlay content fails
+    private func createFallbackOverlayLayer(config: RenderConfig) -> CALayer {
         let container = CALayer()
         container.frame = CGRect(origin: .zero, size: config.size)
         container.backgroundColor = UIColor.clear.cgColor
         
-        // Create simple text overlay only - no gradients, no animations
+        // Create simple text overlay as fallback
         let textLayer = CATextLayer()
         textLayer.string = "SnapChef" // Simple branding
         textLayer.font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, 32, nil)
