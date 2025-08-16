@@ -314,6 +314,33 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 16, 2025) - Part 30
+- **TikTok Content Posting API and OAuth Integration Complete**
+  - **TikTok Content Posting API Implementation**: Full direct post capability with captions/hashtags
+    - `TikTokContentPostingAPI.swift` - Complete API service for video uploads with captions
+    - Direct Post method supports pre-populated hashtags (user confirmed "#snapchef" works)
+    - Automatic hashtag generation from recipe titles (up to 10 relevant tags)
+    - Caption builder with app store link integration
+    - Both FILE_UPLOAD (chunked) and PULL_FROM_URL methods supported
+    - Proper token refresh integration with TikTokAuthManager
+  - **TikTok OAuth Authentication**: Added as option alongside Apple Sign-In
+    - `TikTokAuthManager.swift` - Full OAuth flow with token management
+    - Added to CloudKitAuthView as authentication option
+    - Automatic token refresh with exponential backoff
+    - Token expiration detection and user-friendly re-authentication
+    - Secure Keychain storage for tokens and refresh tokens
+  - **Token Management Enhancements**: Comprehensive expired token handling
+    - Automatic refresh attempts when token expires
+    - User-friendly error messages: "Your TikTok session has expired. Please sign in again."
+    - Proper 401 status code handling with token clearing
+    - Re-authentication flow integrated in TikTokShareView
+    - Exponential backoff for retry logic (max 3 attempts)
+  - **Info.plist Configuration**: Added TikTok OAuth settings
+    - TikTok client key and secret configured
+    - OAuth redirect URL scheme: `sbawj0946ft24i4wjv` (sandbox)
+    - TikTok app schemes for deep linking
+  - **Build Status**: ✅ All features operational with clean compilation
+
 ### Latest Updates (Jan 16, 2025) - Part 29
 - **Optimized Recipe Loading for Local-First Performance**
   - **RecipesView Optimization**: Modified to show local recipes immediately without waiting for CloudKit
