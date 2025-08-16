@@ -268,7 +268,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in 
                 self.createAlternatingSequenceOverlay(
-                    text: "From only this pic", 
+                    text: "I took a pic of my fridge", 
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .right
@@ -282,7 +282,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in 
                 self.createAlternatingSequenceOverlay(
-                    text: "AI used whats in my fridge", 
+                    text: "and Snap Chef AI", 
                     config: cfg, 
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -296,7 +296,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in 
                 self.createAlternatingSequenceOverlay(
-                    text: "to make easy recipes", 
+                    text: "created easy recipes", 
                     config: cfg, 
                     screenScale: cfg.contentsScale,
                     slideDirection: .right
@@ -310,7 +310,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in 
                 self.createAlternatingSequenceOverlay(
-                    text: "of what we like to eat", 
+                    text: "of foods we like to eat!", 
                     config: cfg, 
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -883,28 +883,24 @@ public actor RenderPlanner {
         sparkEmitter.emitterSize = CGSize(width: containerFrame.width * 1.6, height: containerFrame.height * 1.6)  // Double the emitter size
         sparkEmitter.zPosition = -1 // Behind text but in front of background
         
-        // FIXED: Use food emojis for sparkle effects too
-        let foodEmojis = ["🍕", "🍔", "🌮", "🥗", "🍜", "🍣", "🥘", "🍝"]
-        var foodCells: [CAEmitterCell] = []
+        // RESTORED: Use regular sparkles "✨" for text containers (phases 1-4)
+        let sparkleCell = CAEmitterCell()
+        sparkleCell.contents = createSparkleImage().cgImage
+        sparkleCell.birthRate = 15 // Good rate for sparkles
+        sparkleCell.lifetime = 2.0
+        sparkleCell.velocity = 50
+        sparkleCell.velocityRange = 30
+        sparkleCell.emissionRange = .pi * 2
+        sparkleCell.yAcceleration = 80 // Gravity effect
+        sparkleCell.scale = 0.8  // Good size for sparkles
+        sparkleCell.scaleRange = 0.4
+        sparkleCell.alphaSpeed = -0.5
+        sparkleCell.spin = .pi
+        sparkleCell.spinRange = .pi
         
-        for emoji in foodEmojis {
-            let foodCell = CAEmitterCell()
-            foodCell.contents = createFoodEmojiImage(emoji: emoji).cgImage
-            foodCell.birthRate = 2 // Lower rate per emoji
-            foodCell.lifetime = 2.0
-            foodCell.velocity = 50
-            foodCell.velocityRange = 30
-            foodCell.emissionRange = .pi * 2
-            foodCell.yAcceleration = 80 // Gravity effect
-            foodCell.scale = 0.8  // Good size for food emojis
-            foodCell.scaleRange = 0.4
-            foodCell.alphaSpeed = -0.5
-            foodCell.spin = .pi
-            foodCell.spinRange = .pi
-            foodCells.append(foodCell)
-        }
+        let foodCells = [sparkleCell]
         
-        sparkEmitter.emitterCells = foodCells
+        sparkEmitter.emitterCells = [sparkleCell]
         
         // FIXED: FADE ANIMATIONS instead of sliding
         // Fade in animation (0-0.5s)
@@ -975,9 +971,9 @@ public actor RenderPlanner {
         return container
     }
     
-    /// Create golden spark image for particle effects
-    nonisolated private func createGoldenSparkImage() -> UIImage {
-        let size = CGSize(width: 12, height: 12)
+    /// Create sparkle image for particle effects (✨)
+    nonisolated private func createSparkleImage() -> UIImage {
+        let size = CGSize(width: 16, height: 16)
         UIGraphicsBeginImageContextWithOptions(size, false, 0)
         defer { UIGraphicsEndImageContext() }
         

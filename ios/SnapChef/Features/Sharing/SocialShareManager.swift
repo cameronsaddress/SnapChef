@@ -1,472 +1,203 @@
 import Foundation
 import SwiftUI
-import UIKit
+import Photos
+import AVFoundation
 
-// MARK: - Social Platform
-enum SocialPlatform: String, CaseIterable {
-    case tiktok = "TikTok"
-    case instagram = "Instagram"
-    case twitter = "Twitter"
-    case facebook = "Facebook"
-    case messages = "Messages"
-    
-    var icon: String {
-        switch self {
-        case .tiktok: return "music.note"
-        case .instagram: return "camera"
-        case .twitter: return "bird"
-        case .facebook: return "f.circle"
-        case .messages: return "message"
-        }
-    }
-    
-    var color: Color {
-        switch self {
-        case .tiktok: return Color(hex: "#000000")
-        case .instagram: return Color(hex: "#E4405F")
-        case .twitter: return Color(hex: "#1DA1F2")
-        case .facebook: return Color(hex: "#1877F2")
-        case .messages: return Color(hex: "#43e97b")
-        }
-    }
-    
-    var urlScheme: String? {
-        switch self {
-        case .tiktok: return "tiktok://"
-        case .instagram: return "instagram://"
-        case .twitter: return "twitter://"
-        case .facebook: return "fb://"
-        case .messages: return nil
-        }
-    }
-}
-
-// MARK: - Social Share Manager
 @MainActor
-final class SocialShareManager: ObservableObject {
-    // Fix for Swift concurrency issue with @MainActor singletons
-    static let shared: SocialShareManager = {
-        let instance = SocialShareManager()
-        return instance
-    }()
+class SocialShareManager: ObservableObject {
+    static let shared = SocialShareManager()
     
     @Published var isSharing = false
-    @Published var shareProgress: Double = 0
-    @Published var pendingDeepLink: DeepLink?
+    @Published var shareResult: ShareResult?
     @Published var showRecipeFromDeepLink = false
-    
-    private let baseURL = "https://snapchef.app"
-    private let appStoreURL = "https://apps.apple.com/app/snapchef/id1234567890" // TODO: Update with real App Store ID
-    @Published var lastSharePlatform: SocialPlatform?
-    @Published var shareCount = 0
+    @Published var pendingRecipe: Recipe?
+    @Published var pendingDeepLink: DeepLinkType?
     
     private init() {}
     
-    // Check if platform is available
-    func isPlatformAvailable(_ platform: SocialPlatform) -> Bool {
-        guard let urlScheme = platform.urlScheme,
-              let url = URL(string: urlScheme) else {
-            return platform == .messages // Messages is always available
-        }
-        return UIApplication.shared.canOpenURL(url)
+    enum ShareResult {
+        case success(String)
+        case failure(Error)
     }
     
-    // Share to specific platform
-    func share(image: UIImage, text: String, recipe: Recipe, to platform: SocialPlatform) async throws {
-        isSharing = true
-        shareProgress = 0
-        
-        // Simulate progress
-        for i in 0...10 {
-            try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-            await MainActor.run {
-                shareProgress = Double(i) / 10.0
-            }
-        }
-        
-        // Platform-specific sharing
-        switch platform {
-        case .tiktok:
-            try await shareToTikTok(image: image, text: text, recipe: recipe)
-        case .instagram:
-            try await shareToInstagram(image: image, text: text, recipe: recipe)
-        case .twitter:
-            try await shareToTwitter(text: text, recipe: recipe)
-        case .facebook:
-            try await shareToFacebook(image: image, text: text, recipe: recipe)
-        case .messages:
-            try await shareToMessages(image: image, text: text, recipe: recipe)
-        }
-        
-        // Update stats
-        lastSharePlatform = platform
-        shareCount += 1
-        isSharing = false
-        
-        // Track share analytics
-        trackShare(platform: platform, recipe: recipe)
+    enum SharePlatform {
+        case instagram
+        case tiktok
+        case twitter
+        case messages
+        case general
     }
     
-    // Legacy support for SharePlatform enum
-    static func shareToSocial(platform: SharePlatform, recipe: Recipe, message: String, from viewController: UIViewController) {
-        let shareText = formatShareText(for: platform, recipe: recipe, message: message)
-        let hashtags = getHashtags(for: platform)
-        
-        switch platform {
-        case .tiktok:
-            shareToTikTok(text: shareText, hashtags: hashtags, from: viewController)
-        case .instagram:
-            shareToInstagram(text: shareText, hashtags: hashtags, from: viewController)
-        case .twitter:
-            shareToTwitter(text: shareText, hashtags: hashtags, from: viewController)
-        case .copy:
-            UIPasteboard.general.string = shareText
-        }
-    }
-    
-    private static func formatShareText(for platform: SharePlatform, recipe: Recipe, message: String) -> String {
-        var text = ""
-        
-        if !message.isEmpty {
-            text += "\(message)\n\n"
-        }
-        
-        text += "🍳 Just made \(recipe.name) with @SnapChef!\n"
-        text += "⏱ Only \(recipe.cookTime + recipe.prepTime) minutes\n"
-        text += "📱 AI-powered recipes from what you already have\n\n"
-        
-        if platform != .twitter { // Twitter has character limit
-            text += "Get the app: snapchef.app"
-        }
-        
-        return text
-    }
-    
-    private static func getHashtags(for platform: SharePlatform) -> [String] {
-        let baseHashtags = ["SnapChef", "AIRecipes", "HomeCooking", "FoodHack", "SmartCooking"]
-        
-        switch platform {
-        case .tiktok:
-            return baseHashtags + ["FoodTok", "CookingHacks", "RecipeOfTheDay", "TikTokFood"]
-        case .instagram:
-            return baseHashtags + ["InstaFood", "FoodStagram", "RecipeReels", "CookingReels"]
-        case .twitter:
-            return Array(baseHashtags.prefix(3)) // Fewer hashtags for Twitter
-        case .copy:
-            return baseHashtags
-        }
-    }
-    
-    private static func shareToTikTok(text: String, hashtags: [String], from viewController: UIViewController) {
-        // TikTok doesn't have a direct share API, so we'll use the system share sheet
-        // with a note to open TikTok
-        let hashtagString = hashtags.map { "#\($0)" }.joined(separator: " ")
-        let fullText = "\(text)\n\n\(hashtagString)\n\n📸 Take a photo of your finished dish and share on TikTok!"
-        
-        showShareSheet(
-            items: [fullText],
-            applicationActivities: nil,
-            from: viewController,
-            completion: {
-                // Optionally try to open TikTok
-                if let url = URL(string: "tiktok://"), UIApplication.shared.canOpenURL(url) {
-                    UIApplication.shared.open(url)
-                }
-            }
-        )
-    }
-    
-    private static func shareToInstagram(text: String, hashtags: [String], from viewController: UIViewController) {
-        let hashtagString = hashtags.map { "#\($0)" }.joined(separator: " ")
-        let fullText = "\(text)\n\n\(hashtagString)"
-        
-        // Copy text to clipboard for easy paste
-        UIPasteboard.general.string = fullText
-        
-        // Show share sheet with instruction
-        showShareSheet(
-            items: [fullText, "📸 Text copied! Take a photo of your dish and paste this caption in Instagram"],
-            applicationActivities: nil,
-            from: viewController,
-            completion: {
-                // Try to open Instagram
-                if let url = URL(string: "instagram://camera"), UIApplication.shared.canOpenURL(url) {
-                    UIApplication.shared.open(url)
-                } else if let url = URL(string: "instagram://"), UIApplication.shared.canOpenURL(url) {
-                    UIApplication.shared.open(url)
-                }
-            }
-        )
-    }
-    
-    private static func shareToTwitter(text: String, hashtags: [String], from viewController: UIViewController) {
-        let hashtagString = hashtags.map { "#\($0)" }.joined(separator: " ")
-        let tweetText = "\(text) \(hashtagString)"
-        
-        // Try Twitter app first, then web
-        let twitterURL = "twitter://post?text=\(tweetText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
-        let twitterWebURL = "https://twitter.com/intent/tweet?text=\(tweetText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
-        
-        if let url = URL(string: twitterURL), UIApplication.shared.canOpenURL(url) {
-            UIApplication.shared.open(url)
-        } else if let url = URL(string: twitterWebURL) {
-            UIApplication.shared.open(url)
-        } else {
-            // Fallback to share sheet
-            showShareSheet(items: [tweetText], applicationActivities: nil, from: viewController)
-        }
-    }
-    
-    private static func showShareSheet(
-        items: [Any],
-        applicationActivities: [UIActivity]?,
-        from viewController: UIViewController,
-        completion: (() -> Void)? = nil
-    ) {
-        let activityViewController = UIActivityViewController(
-            activityItems: items,
-            applicationActivities: applicationActivities
-        )
-        
-        // For iPad
-        if let popover = activityViewController.popoverPresentationController {
-            popover.sourceView = viewController.view
-            popover.sourceRect = CGRect(x: viewController.view.bounds.midX, y: viewController.view.bounds.midY, width: 0, height: 0)
-            popover.permittedArrowDirections = []
-        }
-        
-        activityViewController.completionWithItemsHandler = { _, completed, _, _ in
-            if completed {
-                completion?()
-            }
-        }
-        
-        viewController.present(activityViewController, animated: true)
-    }
-    
-    // MARK: - Enhanced Platform Specific Methods
-    
-    private func shareToTikTok(image: UIImage, text: String, recipe: Recipe) async throws {
-        // Save image temporarily
-        let imageData = image.jpegData(compressionQuality: 0.9)
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("snapchef_share.jpg")
-        try imageData?.write(to: tempURL)
-        
-        // Create TikTok share URL with hashtags
-        _ = "#FridgeChallenge #SnapChef #CookingMagic #\(recipe.difficulty.rawValue)Recipe"
-        
-        // Note: Real TikTok integration would use their SDK
-        // For now, open the app with a deep link
-        if let url = URL(string: "tiktok://") {
-            await UIApplication.shared.open(url)
-        }
-    }
-    
-    private func shareToInstagram(image: UIImage, text: String, recipe: Recipe) async throws {
-        // Instagram Stories sharing
-        guard let imageData = image.pngData() else { return }
-        
-        let pasteboardItems: [[String: Any]] = [
-            [
-                "com.instagram.sharedSticker.stickerImage": imageData,
-                "com.instagram.sharedSticker.backgroundTopColor": "#667eea",
-                "com.instagram.sharedSticker.backgroundBottomColor": "#764ba2"
-            ]
-        ]
-        
-        let pasteboardOptions = [
-            UIPasteboard.OptionsKey.expirationDate: Date().addingTimeInterval(300)
-        ]
-        
-        UIPasteboard.general.setItems(pasteboardItems, options: pasteboardOptions)
-        
-        if let url = URL(string: "instagram-stories://share") {
-            await UIApplication.shared.open(url)
-        }
-    }
-    
-    private func shareToTwitter(text: String, recipe: Recipe) async throws {
-        let tweetText = "\(text)\n\nMade with @SnapChef 🔥"
-        let encodedText = tweetText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        
-        if let url = URL(string: "twitter://post?message=\(encodedText)") {
-            await UIApplication.shared.open(url)
-        } else if let webURL = URL(string: "https://twitter.com/intent/tweet?text=\(encodedText)") {
-            await UIApplication.shared.open(webURL)
-        }
-    }
-    
-    private func shareToFacebook(image: UIImage, text: String, recipe: Recipe) async throws {
-        // Facebook sharing would use their SDK
-        // For now, just open the app
-        if let url = URL(string: "fb://") {
-            await UIApplication.shared.open(url)
-        }
-    }
-    
-    private func shareToMessages(image: UIImage, text: String, recipe: Recipe) async throws {
-        // This would be handled by the share sheet
-        // Just marking as complete for now
-    }
-    
-    // MARK: - Analytics
-    
-    private func trackShare(platform: SocialPlatform, recipe: Recipe) {
-        // Track sharing analytics
-        print("Tracked share: \(platform.rawValue) - \(recipe.name)")
-        
-        // Would send to analytics service
-        // Analytics.track("recipe_shared", properties: [
-        //     "platform": platform.rawValue,
-        //     "recipe_id": recipe.id,
-        //     "recipe_name": recipe.name,
-        //     "difficulty": recipe.difficulty.rawValue
-        // ])
-    }
-    
-    // MARK: - Share Incentives
-    
-    func calculateShareRewards() -> ShareReward {
-        let multiplier = min(shareCount / 10 + 1, 5) // Max 5x multiplier
-        let points = 50 * multiplier
-        
-        return ShareReward(
-            points: points,
-            multiplier: multiplier,
-            nextMilestone: (shareCount / 10 + 1) * 10,
-            badge: getBadgeForShareCount(shareCount)
-        )
-    }
-    
-    private func getBadgeForShareCount(_ count: Int) -> String? {
-        switch count {
-        case 1: return "First Share! 🎉"
-        case 5: return "Social Butterfly 🦋"
-        case 10: return "Influencer Status 📱"
-        case 25: return "Viral Chef 🔥"
-        case 50: return "Share Master 👑"
-        case 100: return "Legendary Sharer 🏆"
-        default: return nil
-        }
-    }
-    
-    // MARK: - Deep Link Types
-    enum DeepLink {
+    enum DeepLinkType {
         case recipe(String)
-        case profile(String)
-        case challenge(String)
+    }
+    
+    // MARK: - Public Interface
+    
+    func shareRecipe(_ recipe: Recipe, image: UIImage?, platform: SharePlatform) async {
+        isSharing = true
+        defer { isSharing = false }
         
-        var path: String {
-            switch self {
-            case .recipe(let id):
-                return "recipe/\(id)"
-            case .profile(let id):
-                return "profile/\(id)"
-            case .challenge(let id):
-                return "challenge/\(id)"
+        do {
+            switch platform {
+            case .instagram:
+                try await shareToInstagram(recipe: recipe, image: image)
+            case .tiktok:
+                try await shareToTikTok(recipe: recipe, image: image)
+            case .twitter:
+                try await shareToTwitter(recipe: recipe, image: image)
+            case .messages:
+                try await shareToMessages(recipe: recipe, image: image)
+            case .general:
+                try await shareGeneral(recipe: recipe, image: image)
+            }
+            
+            shareResult = .success("Successfully shared to \(platform)")
+        } catch {
+            shareResult = .failure(error)
+        }
+    }
+    
+    // MARK: - Platform-Specific Sharing
+    
+    private func shareToInstagram(recipe: Recipe, image: UIImage?) async throws {
+        guard let image = image else {
+            throw ShareError.missingImage
+        }
+        
+        // Save image to photo library first
+        try await saveImageToPhotoLibrary(image)
+        
+        // Open Instagram if available
+        if let instagramURL = URL(string: "instagram://app") {
+            if UIApplication.shared.canOpenURL(instagramURL) {
+                await UIApplication.shared.open(instagramURL)
+            } else {
+                throw ShareError.appNotInstalled("Instagram")
             }
         }
     }
     
-    // MARK: - URL Generation
-    
-    func generateRecipeShareURL(recipeID: String) -> URL {
-        let deepLinkPath = DeepLink.recipe(recipeID).path
-        let urlString = "\(baseURL)/\(deepLinkPath)"
-        return URL(string: urlString)!
+    private func shareToTikTok(recipe: Recipe, image: UIImage?) async throws {
+        guard let image = image else {
+            throw ShareError.missingImage
+        }
+        
+        // Save image to photo library first
+        try await saveImageToPhotoLibrary(image)
+        
+        // Open TikTok if available
+        if let tiktokURL = URL(string: "tiktok://") {
+            if UIApplication.shared.canOpenURL(tiktokURL) {
+                await UIApplication.shared.open(tiktokURL)
+            } else {
+                throw ShareError.appNotInstalled("TikTok")
+            }
+        }
     }
     
-    func generateUniversalLink(for recipe: Recipe, cloudKitRecordID: String) -> URL {
-        let urlString = "\(baseURL)/recipe/\(cloudKitRecordID)"
-        return URL(string: urlString)!
+    private func shareToTwitter(recipe: Recipe, image: UIImage?) async throws {
+        let text = generateShareText(for: recipe)
+        let encodedText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        
+        if let twitterURL = URL(string: "twitter://post?message=\(encodedText)") {
+            if UIApplication.shared.canOpenURL(twitterURL) {
+                await UIApplication.shared.open(twitterURL)
+            } else if let webURL = URL(string: "https://twitter.com/intent/tweet?text=\(encodedText)") {
+                await UIApplication.shared.open(webURL)
+            }
+        }
     }
     
-    // MARK: - URL Handling
+    private func shareToMessages(recipe: Recipe, image: UIImage?) async throws {
+        let text = generateShareText(for: recipe)
+        let encodedText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        
+        if let messagesURL = URL(string: "sms:&body=\(encodedText)") {
+            await UIApplication.shared.open(messagesURL)
+        }
+    }
+    
+    private func shareGeneral(recipe: Recipe, image: UIImage?) async throws {
+        // This will trigger the system share sheet
+        // Implementation depends on the calling view
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func generateShareText(for recipe: Recipe) -> String {
+        return "Check out this amazing recipe I found on SnapChef: \(recipe.name)! 🍽️ #SnapChef #Recipe"
+    }
+    
+    // MARK: - Deep Link Handling
     
     func handleIncomingURL(_ url: URL) -> Bool {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: true) else {
-            return false
-        }
-        
-        // Handle different URL schemes
-        if url.scheme == "snapchef" {
-            return handleCustomSchemeURL(components)
-        } else if url.host == "snapchef.app" {
-            return handleUniversalLink(components)
-        }
-        
-        return false
-    }
-    
-    private func handleCustomSchemeURL(_ components: URLComponents) -> Bool {
-        guard let host = components.host else { return false }
-        
-        switch host {
-        case "recipe":
-            if let recipeID = components.path.split(separator: "/").last {
-                pendingDeepLink = .recipe(String(recipeID))
+        // Parse URL to extract recipe ID
+        let urlString = url.absoluteString
+        if urlString.contains("snapchef.app/recipe/") {
+            // Extract recipe ID from URL path
+            let components = url.pathComponents
+            if components.count >= 3 && components[1] == "recipe" {
+                let recipeID = components[2]
+                // Store the pending deep link
+                pendingDeepLink = .recipe(recipeID)
                 showRecipeFromDeepLink = true
                 return true
             }
-        case "profile":
-            if let userID = components.path.split(separator: "/").last {
-                pendingDeepLink = .profile(String(userID))
-                return true
-            }
-        case "challenge":
-            if let challengeID = components.path.split(separator: "/").last {
-                pendingDeepLink = .challenge(String(challengeID))
-                return true
-            }
-        default:
-            break
         }
-        
         return false
     }
     
-    private func handleUniversalLink(_ components: URLComponents) -> Bool {
-        let pathComponents = components.path.split(separator: "/").map(String.init)
-        
-        guard pathComponents.count >= 2 else { return false }
-        
-        switch pathComponents[0] {
-        case "recipe":
-            pendingDeepLink = .recipe(pathComponents[1])
-            showRecipeFromDeepLink = true
-            return true
-        case "profile":
-            pendingDeepLink = .profile(pathComponents[1])
-            return true
-        case "challenge":
-            pendingDeepLink = .challenge(pathComponents[1])
-            return true
-        default:
-            return false
+    func resolvePendingDeepLink() {
+        // This would typically fetch the recipe from CloudKit or the server
+        // For now, just hide the sheet
+        showRecipeFromDeepLink = false
+        pendingRecipe = nil
+        pendingDeepLink = nil
+    }
+    
+    // MARK: - Universal Link Generation
+    
+    func generateUniversalLink(for recipe: Recipe, cloudKitRecordID: String?) -> URL {
+        let baseURL = "https://snapchef.app/recipe"
+        let urlString: String
+        if let recordID = cloudKitRecordID {
+            urlString = "\(baseURL)/\(recordID)"
+        } else {
+            urlString = "\(baseURL)/\(recipe.id.uuidString)"
+        }
+        return URL(string: urlString) ?? URL(string: baseURL)!
+    }
+    
+    private func saveImageToPhotoLibrary(_ image: UIImage) async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetChangeRequest.creationRequestForAsset(from: image)
+            }) { success, error in
+                if success {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: error ?? ShareError.saveFailed)
+                }
+            }
         }
     }
     
-    func resolvePendingDeepLink() {
-        guard let deepLink = pendingDeepLink else { return }
+    // MARK: - Photo Library Permission
+    
+    func requestPhotoLibraryPermission() async -> Bool {
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
         
-        switch deepLink {
-        case .recipe(let recipeID):
-            print("Opening recipe: \(recipeID)")
-        case .profile(let userID):
-            print("Opening profile: \(userID)")
-        case .challenge(let challengeID):
-            print("Opening challenge: \(challengeID)")
+        switch status {
+        case .authorized, .limited:
+            return true
+        case .notDetermined:
+            let newStatus = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            return newStatus == .authorized || newStatus == .limited
+        case .denied, .restricted:
+            return false
+        @unknown default:
+            return false
         }
-        
-        pendingDeepLink = nil
     }
 }
-
-// MARK: - Share Reward Model
-struct ShareReward {
-    let points: Int
-    let multiplier: Int
-    let nextMilestone: Int
-    let badge: String?
-}
-
