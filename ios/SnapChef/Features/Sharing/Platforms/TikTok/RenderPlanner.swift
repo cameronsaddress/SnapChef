@@ -883,21 +883,28 @@ public actor RenderPlanner {
         sparkEmitter.emitterSize = CGSize(width: containerFrame.width * 1.6, height: containerFrame.height * 1.6)  // Double the emitter size
         sparkEmitter.zPosition = -1 // Behind text but in front of background
         
-        let sparkCell = CAEmitterCell()
-        sparkCell.contents = createGoldenSparkImage().cgImage
-        sparkCell.birthRate = 15 // Moderate spark rate
-        sparkCell.lifetime = 2.0
-        sparkCell.velocity = 50
-        sparkCell.velocityRange = 30
-        sparkCell.emissionRange = .pi * 2
-        sparkCell.yAcceleration = 80 // Gravity effect
-        sparkCell.scale = 0.6  // Double the size
-        sparkCell.scaleRange = 0.4  // Double the range
-        sparkCell.alphaSpeed = -0.5
-        sparkCell.spin = .pi
-        sparkCell.spinRange = .pi
+        // FIXED: Use food emojis for sparkle effects too
+        let foodEmojis = ["🍕", "🍔", "🌮", "🥗", "🍜", "🍣", "🥘", "🍝"]
+        var foodCells: [CAEmitterCell] = []
         
-        sparkEmitter.emitterCells = [sparkCell]
+        for emoji in foodEmojis {
+            let foodCell = CAEmitterCell()
+            foodCell.contents = createFoodEmojiImage(emoji: emoji).cgImage
+            foodCell.birthRate = 2 // Lower rate per emoji
+            foodCell.lifetime = 2.0
+            foodCell.velocity = 50
+            foodCell.velocityRange = 30
+            foodCell.emissionRange = .pi * 2
+            foodCell.yAcceleration = 80 // Gravity effect
+            foodCell.scale = 0.8  // Good size for food emojis
+            foodCell.scaleRange = 0.4
+            foodCell.alphaSpeed = -0.5
+            foodCell.spin = .pi
+            foodCell.spinRange = .pi
+            foodCells.append(foodCell)
+        }
+        
+        sparkEmitter.emitterCells = foodCells
         
         // FIXED: FADE ANIMATIONS instead of sliding
         // Fade in animation (0-0.5s)
@@ -1016,20 +1023,22 @@ public actor RenderPlanner {
         let container = CALayer()
         container.frame = CGRect(origin: .zero, size: config.size)
         
-        // STEP 1: Create large SnapChef logo at 40% screen height (middle)
+        // STEP 1: Create CTA container ABOVE the logo (at 35% screen height)
+        let ctaContainer = CALayer()
+        
+        // STEP 2: Create large SnapChef logo at 40% screen height (middle)
         let logoContainer = createSnapChefLogo(config: config, screenScale: screenScale)
-        let logoWidth = config.size.width * 0.8 // 80% of screen width
-        let logoHeight: CGFloat = 120 // Height for 72pt font + padding
+        // Get the actual logo size from the container
+        let actualLogoSize = logoContainer.frame.size
         logoContainer.frame = CGRect(
-            x: (config.size.width - logoWidth) / 2,
-            y: config.size.height * 0.4 - logoHeight / 2, // Vertically centered at 40%
-            width: logoWidth,
-            height: logoHeight
+            x: (config.size.width - actualLogoSize.width) / 2, // FIXED: Center horizontally
+            y: config.size.height * 0.4 - actualLogoSize.height / 2, // Vertically centered at 40%
+            width: actualLogoSize.width,
+            height: actualLogoSize.height
         )
         logoContainer.opacity = 0.0 // Start invisible for fade in
         
-        // STEP 2: Create CTA container at bottom
-        let ctaContainer = CALayer()
+        // STEP 3: Setup CTA styling (moved from bottom to above logo)
         
         // Create pulsing gradient background for CTA
         let gradientLayer = CAGradientLayer()
@@ -1069,10 +1078,10 @@ public actor RenderPlanner {
         print("[RenderPlanner] CTA calculated text size: \(textSize)")
         print("[RenderPlanner] CTA container size: \(CGSize(width: containerWidth, height: containerHeight))")
         
-        // Position at bottom-middle of screen (y position around 0.85 of screen height)
+        // FIXED: Position CTA ABOVE the logo (around 35% screen height)
         let containerFrame = CGRect(
             x: (config.size.width - containerWidth) / 2,
-            y: config.size.height * 0.92 - containerHeight / 2,
+            y: config.size.height * 0.35 - containerHeight / 2, // MOVED: 35% instead of 92%
             width: containerWidth,
             height: containerHeight
         )
@@ -1117,21 +1126,28 @@ public actor RenderPlanner {
         ctaSparkEmitter.emitterSize = CGSize(width: containerFrame.width, height: containerFrame.height)
         ctaSparkEmitter.zPosition = -1 // Behind text but in front of background
         
-        let ctaSparkCell = CAEmitterCell()
-        ctaSparkCell.contents = createGoldenSparkImage().cgImage
-        ctaSparkCell.birthRate = 20 // More sparks for CTA
-        ctaSparkCell.lifetime = 2.5
-        ctaSparkCell.velocity = 60
-        ctaSparkCell.velocityRange = 40
-        ctaSparkCell.emissionRange = .pi * 2
-        ctaSparkCell.yAcceleration = 100 // Strong gravity
-        ctaSparkCell.scale = 0.8
-        ctaSparkCell.scaleRange = 0.6
-        ctaSparkCell.alphaSpeed = -0.4
-        ctaSparkCell.spin = .pi * 1.5
-        ctaSparkCell.spinRange = .pi
+        // FIXED: Use food emojis for CTA sparks too
+        let foodEmojis = ["🍕", "🍔", "🌮", "🥗", "🍜", "🍣", "🥘", "🍝"]
+        var foodCells: [CAEmitterCell] = []
         
-        ctaSparkEmitter.emitterCells = [ctaSparkCell]
+        for emoji in foodEmojis {
+            let foodCell = CAEmitterCell()
+            foodCell.contents = createFoodEmojiImage(emoji: emoji).cgImage
+            foodCell.birthRate = 2.5 // Slightly higher rate for CTA
+            foodCell.lifetime = 2.5
+            foodCell.velocity = 60
+            foodCell.velocityRange = 40
+            foodCell.emissionRange = .pi * 2
+            foodCell.yAcceleration = 100 // Strong gravity
+            foodCell.scale = 0.9
+            foodCell.scaleRange = 0.6
+            foodCell.alphaSpeed = -0.4
+            foodCell.spin = .pi * 1.5
+            foodCell.spinRange = .pi
+            foodCells.append(foodCell)
+        }
+        
+        ctaSparkEmitter.emitterCells = foodCells
         
         // ANIMATIONS: Logo and CTA fade in together
         // Logo fade in animation (0-0.5s)
@@ -1224,13 +1240,13 @@ public actor RenderPlanner {
         
         // Create "SNAPCHEF!" text with 72pt heavy font
         let logoTextLayer = CATextLayer()
-        let logoFont = CTFontCreateWithName("HelveticaNeue-Black" as CFString, 72, nil) // 72pt for visibility
+        let logoFont = CTFontCreateWithName("HelveticaNeue-Black" as CFString, 72, nil) // FIXED: Already using heaviest weight
         logoTextLayer.font = logoFont
         logoTextLayer.fontSize = 72
         logoTextLayer.foregroundColor = UIColor.white.cgColor
         logoTextLayer.alignmentMode = .center
         logoTextLayer.contentsScale = screenScale
-        logoTextLayer.string = "SNAPCHEF!"
+        logoTextLayer.string = "SNAPCHEF!" // Already ALL CAPS
         
         // Calculate text dimensions
         let logoTextAttributes: [NSAttributedString.Key: Any] = [
@@ -1270,21 +1286,28 @@ public actor RenderPlanner {
         logoSparkEmitter.emitterSize = CGSize(width: logoContainerWidth * 1.4, height: logoContainerHeight * 1.4)
         logoSparkEmitter.zPosition = -1 // Behind text but in front of background
         
-        let logoSparkCell = CAEmitterCell()
-        logoSparkCell.contents = createViralSparkImage().cgImage
-        logoSparkCell.birthRate = 25 // High sparkle rate for logo prominence
-        logoSparkCell.lifetime = 3.0
-        logoSparkCell.velocity = 80
-        logoSparkCell.velocityRange = 50
-        logoSparkCell.emissionRange = .pi * 2
-        logoSparkCell.yAcceleration = 120 // Strong gravity for dynamic effect
-        logoSparkCell.scale = 1.0  // Larger sparkles for logo
-        logoSparkCell.scaleRange = 0.8
-        logoSparkCell.alphaSpeed = -0.3
-        logoSparkCell.spin = .pi * 2
-        logoSparkCell.spinRange = .pi * 1.5
+        // FIXED: Create multiple food emoji cells instead of sparkles
+        let foodEmojis = ["🍕", "🍔", "🌮", "🥗", "🍜", "🍣", "🥘", "🍝"]
+        var foodCells: [CAEmitterCell] = []
         
-        logoSparkEmitter.emitterCells = [logoSparkCell]
+        for emoji in foodEmojis {
+            let foodCell = CAEmitterCell()
+            foodCell.contents = createFoodEmojiImage(emoji: emoji).cgImage
+            foodCell.birthRate = 3 // Lower rate per emoji, but multiple emojis
+            foodCell.lifetime = 3.0
+            foodCell.velocity = 80
+            foodCell.velocityRange = 50
+            foodCell.emissionRange = .pi * 2
+            foodCell.yAcceleration = 120 // Strong gravity for dynamic effect
+            foodCell.scale = 1.2  // Larger food emojis
+            foodCell.scaleRange = 0.8
+            foodCell.alphaSpeed = -0.3
+            foodCell.spin = .pi * 2
+            foodCell.spinRange = .pi * 1.5
+            foodCells.append(foodCell)
+        }
+        
+        logoSparkEmitter.emitterCells = foodCells
         
         // Add pulsing animation for logo prominence
         let logoPulse = CABasicAnimation(keyPath: "transform.scale")
@@ -1320,7 +1343,33 @@ public actor RenderPlanner {
         return container
     }
     
-    /// Create viral sparkle image for logo effects
+    /// Create food emoji image for particle effects
+    nonisolated private func createFoodEmojiImage(emoji: String) -> UIImage {
+        let size = CGSize(width: 32, height: 32) // Larger size for emojis
+        UIGraphicsBeginImageContextWithOptions(size, false, 0)
+        defer { UIGraphicsEndImageContext() }
+        
+        // Create attributed string with the emoji
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 28), // Large emoji size
+            .foregroundColor: UIColor.black
+        ]
+        let attributedString = NSAttributedString(string: emoji, attributes: attributes)
+        
+        // Calculate centering position
+        let textSize = attributedString.size()
+        let drawPoint = CGPoint(
+            x: (size.width - textSize.width) / 2,
+            y: (size.height - textSize.height) / 2
+        )
+        
+        // Draw the emoji
+        attributedString.draw(at: drawPoint)
+        
+        return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
+    }
+    
+    /// Create viral sparkle image for logo effects (kept as backup)
     nonisolated private func createViralSparkImage() -> UIImage {
         let size = CGSize(width: 16, height: 16)
         UIGraphicsBeginImageContextWithOptions(size, false, 0)
