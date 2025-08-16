@@ -385,10 +385,9 @@ public final class ViralVideoExporter: @unchecked Sendable {
                 return
             }
             
-            // Copy enhanced viral caption to UIPasteboard for user to paste as specified
+            // Copy the provided caption directly to UIPasteboard (it already contains selected hashtags)
             if let caption = caption {
-                let viralCaption = ViralCaptionGenerator.generateViralCaption(baseCaption: caption)
-                UIPasteboard.general.string = viralCaption
+                UIPasteboard.general.string = caption
             }
             
             // Create TikTok share request with localIdentifiers
