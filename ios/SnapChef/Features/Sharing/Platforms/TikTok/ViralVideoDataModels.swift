@@ -110,20 +110,20 @@ public struct RenderProgress: Sendable {
 // SPEED OPTIMIZED Export controls
 public enum ExportSettings {
     // CRITICAL SPEED FIX: Use medium quality for all operations to achieve sub-10s rendering
-    public static let videoPreset = AVAssetExportPresetMediumQuality // Medium quality for speed
-    public static let draftPreset = AVAssetExportPresetLowQuality // Low quality for intermediate steps
-    public static let finalPreset = AVAssetExportPresetMediumQuality // Medium quality even for final
+    public static let videoPreset = AVAssetExportPresetHighestQuality // Medium quality for speed
+    public static let draftPreset = AVAssetExportPresetHighestQuality // Low quality for intermediate steps
+    public static let finalPreset = AVAssetExportPresetHighestQuality // Medium quality even for final
     
     public static let maxMemoryUsage: UInt64 = 400 * 1024 * 1024 // Reduced to 400MB
     public static let maxRenderTime: Double = 8.0 // Target under 8s total
     public static let pixelFormat = kCVPixelFormatType_32BGRA
-    public static let maxFileSize: Int64 = 25 * 1024 * 1024  // Reduced to 25MB for speed
-    public static let targetFileSize: Int64 = 20 * 1024 * 1024  // Target 20MB for speed
+    public static let maxFileSize: Int64 = 100 * 1024 * 1024  // Reduced to 25MB for speed
+    public static let targetFileSize: Int64 = 80 * 1024 * 1024  // Target 20MB for speed
     
     // CRITICAL SPEED FIX: Much lower bitrates for faster processing
-    public static let draftBitRate = 1_500_000 // 1.5 Mbps for drafts
-    public static let finalBitRate = 3_000_000 // 3 Mbps for final (reduced from 8)
-    public static let fastBitRate = 1_000_000 // 1 Mbps for ultra-fast processing
+    public static let draftBitRate = 8_000_000 // 1.5 Mbps for drafts
+    public static let finalBitRate = 12_000_000 // 3 Mbps for final (reduced from 8)
+    public static let fastBitRate = 6_000_000 // 1 Mbps for ultra-fast processing
     
     // Parallel processing limits - increased for better performance
     public static let maxConcurrentSegments = 2 // Reduced to avoid memory pressure
