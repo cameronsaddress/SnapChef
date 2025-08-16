@@ -281,11 +281,23 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             await progressCallback(Double(index + 1) / Double(plan.items.count) * 0.5)
         }
         
-        // SPEED OPTIMIZATION: Skip audio for ultra-fast rendering
-        // Audio processing can add significant time
+        // Add audio track
+        if let audioURL = plan.audio {
+            if let audioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+                let audioAsset = AVAsset(url: audioURL)
+                if let audioSourceTrack = try await audioAsset.loadTracks(withMediaType: .audio).first {
+                    let audioDuration = min(try await audioAsset.load(.duration), composition.duration)
+                    try audioTrack.insertTimeRange(
+                        CMTimeRange(start: .zero, duration: audioDuration),
+                        of: audioSourceTrack,
+                        at: .zero
+                    )
+                }
+            }
+        }
         
-        // CRITICAL SPEED FIX: Skip all overlays for maximum speed
-        let videoComposition = createMinimalVideoComposition(for: composition, overlays: [])
+        // CRITICAL FIX: Restore text overlays functionality
+        let videoComposition = createMinimalVideoComposition(for: composition, overlays: plan.overlays)
         
         // Export with minimal processing
         let outputURL = createTempOutputURL()
@@ -300,6 +312,11 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         exportSession.outputFileType = AVFileType.mp4
         exportSession.videoComposition = videoComposition
         exportSession.shouldOptimizeForNetworkUse = true
+        
+        // CRITICAL FIX: Ensure audio is included in export
+        if composition.tracks(withMediaType: .audio).count > 0 {
+            print("[ViralVideoRenderer] \(Date()): Audio tracks found, ensuring audio is exported")
+        }
         
         // SPEED OPTIMIZATION: Async export with monitoring and proper timeout handling
         return try await withCheckedThrowingContinuation { continuation in

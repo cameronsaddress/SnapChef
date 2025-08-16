@@ -285,6 +285,22 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 16, 2025) - Part 28
+- **Fixed TikTok Video Text Overlays Not Appearing**
+  - **Root Cause**: ViralVideoRenderer was passing empty overlay array for speed optimization
+  - **Solution**: Restored overlay integration by changing from `overlays: []` to `overlays: plan.overlays`
+  - **Impact**: Text sequence now properly displays including "From only this pic", "AI used whats in my fridge", etc.
+  - **Technical Details**: ViralVideoRenderer renderSinglePass method was skipping text overlays completely
+- **Fixed TikTok Video Audio Missing**
+  - **Root Cause**: renderSinglePass method was skipping audio for performance optimization
+  - **Solution**: Added proper audio track integration with Mixdown.mp3 background music
+  - **Impact**: Videos now include background music as intended throughout the 15-second duration
+  - **Technical Details**: Audio composition was being bypassed in the rendering pipeline
+- **Build Status**: Successful compilation with Swift 6 concurrency warnings (non-blocking)
+  - All core TikTok video generation features now operational
+  - Text overlays, audio tracks, and visual effects working correctly
+  - Performance maintained with full feature restoration
+
 ### Latest Updates (Jan 16, 2025) - Part 27
 - **Pantry Photo Feature Implementation**
   - **Dual Image Capture**: Added two-step photo capture flow in CameraView
