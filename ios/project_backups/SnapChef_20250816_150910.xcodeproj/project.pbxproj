@@ -94,7 +94,6 @@
 		9654016E762E43BDA1AF349A /* ChallengeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9654016E762E43BDA1AF349B /* ChallengeDetailView.swift */; };
 		987825C3548C087B1F64E39E /* CloudKitRecipeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023CAA81A548F3B6C27BEDD8 /* CloudKitRecipeCache.swift */; };
 		98F42CB751FF9BA262A5C760 /* TikTokContentPostingAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = E933F667D5D04636FAECA9A3 /* TikTokContentPostingAPI.swift */; };
-		98F55BD8DDB213ABA0F97996 /* ProgressiveAuthPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = A621693C8808A606AD7697AB /* ProgressiveAuthPrompt.swift */; };
 		995BB052FBFE07B56F814A64 /* fridge2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 87312B0481281640268D11F3 /* fridge2.jpg */; };
 		9C01008B373F103FC52C7997 /* DiscoverUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9825971607DC0CBD048D1A6C /* DiscoverUsersView.swift */; };
 		9E1BC8D270F017F8A4260639 /* UserProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C397E25A597838EAC47C347C /* UserProfileViewModel.swift */; };
@@ -308,7 +307,6 @@
 		A4B5C6D7E8F9012345678902 /* ParticleEmitter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ParticleEmitter.swift; path = SnapChef/Design/ParticleEmitter.swift; sourceTree = "<group>"; };
 		A4C57C769C4C623E7618C155 /* Preview Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = "Preview Assets.xcassets"; path = "SnapChef/Preview Content/Preview Assets.xcassets"; sourceTree = "<group>"; };
 		A5B6C7D8E9F0123456789013 /* InfluencerRecipe.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InfluencerRecipe.swift; path = SnapChef/Core/Models/InfluencerRecipe.swift; sourceTree = "<group>"; };
-		A621693C8808A606AD7697AB /* ProgressiveAuthPrompt.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProgressiveAuthPrompt.swift; path = SnapChef/Features/Authentication/ProgressiveAuthPrompt.swift; sourceTree = "<group>"; };
 		A63C4DB0B7644F30FDA29A28 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = SnapChef/Design/Assets.xcassets; sourceTree = "<group>"; };
 		A6B7C8D9E0F1234567890124 /* InfluencerShowcaseCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InfluencerShowcaseCard.swift; path = SnapChef/Features/Home/InfluencerShowcaseCard.swift; sourceTree = "<group>"; };
 		A7B8C9D0E1F2345678901235 /* InfluencerCarousel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InfluencerCarousel.swift; path = SnapChef/Features/Home/InfluencerCarousel.swift; sourceTree = "<group>"; };
@@ -603,7 +601,6 @@
 				CBCCEB5B6E6253B24330BC8A /* UsernameSetupView.swift */,
 				1B719E521CAD8332D26CB3CC /* UsernameSetupView.swift */,
 				04675FADEFFDAA658BF33A23 /* AuthPromptTrigger.swift */,
-				A621693C8808A606AD7697AB /* ProgressiveAuthPrompt.swift */,
 			);
 			name = Authentication;
 			sourceTree = "<group>";
@@ -1279,7 +1276,6 @@
 				9F7FD834992D01E59690F569 /* AnonymousUserProfile.swift in Sources */,
 				7696053D9D8BEC87FE5F82A7 /* KeychainProfileManager.swift in Sources */,
 				B2617B8AA904EB911155325E /* AuthPromptTrigger.swift in Sources */,
-				98F55BD8DDB213ABA0F97996 /* ProgressiveAuthPrompt.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

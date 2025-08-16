@@ -22,6 +22,9 @@ struct RecipeResultsView: View {
     @State private var shareContent: ShareContent?
     @State private var cloudKitPhotos: [UUID: (before: UIImage?, after: UIImage?)] = [:]
     
+    // Progressive authentication trigger
+    @StateObject private var authTrigger = AuthPromptTrigger.shared
+    
     enum ActiveSheet: Identifiable {
         case recipeDetail(Recipe)
         case shareGenerator(Recipe)
@@ -227,6 +230,22 @@ struct RecipeResultsView: View {
             Task {
                 await fetchAllCloudKitPhotos()
             }
+            
+            // Track recipe creation and check for first-time user authentication prompt
+            if !recipes.isEmpty {
+                appState.trackAnonymousAction(.recipeCreated)
+                
+                // Check for progressive authentication trigger after first recipe success
+                if let anonymousProfile = appState.anonymousProfile,
+                   anonymousProfile.recipesCreatedCount == 1,
+                   !CloudKitAuthManager.shared.isAuthenticated {
+                    
+                    // Show progressive auth prompt after 2 second delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        AuthPromptTrigger.shared.onFirstRecipeSuccess()
+                    }
+                }
+            }
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
@@ -279,6 +298,12 @@ struct RecipeResultsView: View {
             }
         } message: {
             Text("You haven't saved any recipes yet. They will be lost if you exit now.")
+        }
+        // Progressive Authentication Prompt
+        .sheet(isPresented: $authTrigger.shouldShowPrompt) {
+            ProgressiveAuthPrompt()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
     

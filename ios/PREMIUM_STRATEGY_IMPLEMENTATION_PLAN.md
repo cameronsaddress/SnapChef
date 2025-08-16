@@ -1,14 +1,60 @@
 # SnapChef Premium Strategy Implementation Plan
-## "Hook, Habit, Monetize" Freemium Model
+## "Hook, Habit, Monetize" Freemium Model (2-Tier System)
 
 ---
 
 ## 📋 Executive Summary
-Transform SnapChef from a rigid paywall system to a progressive freemium model that hooks users first, builds habits, then monetizes at peak engagement.
+Transform SnapChef from a rigid paywall system to a progressive freemium model with 2 pricing tiers (Starter/Premium) that hooks users first, builds habits, then monetizes at peak engagement.
 
 **Timeline**: 2-3 days of development
 **Risk Level**: Low (backwards compatible, gradual rollout)
 **Expected Impact**: 3-5x increase in conversion rate
+**Pricing Tiers**: 2 (Starter Free + Premium Paid)
+
+---
+
+## 📊 2-Tier Pricing Structure (Matching Current Implementation)
+
+### Starter (Free)
+- **Recipes**: 3 per day (after honeymoon)
+- **Videos**: 1 per day  
+- **Effects**: Basic only
+- **Save Favorites**: Limited (10 max)
+- **AI Chef**: Default personality
+- **Support**: Community
+- **Trial**: 7-day premium trial
+
+### Premium ($9.99/mo or $79.99/yr - Save 33%)
+- **Recipes**: Unlimited
+- **Videos**: Unlimited
+- **Effects**: All premium effects & filters
+- **Save Favorites**: Unlimited cookbook
+- **AI Chef**: Advanced AI with better suggestions
+- **Nutrition**: Detailed health insights
+- **Support**: Priority support
+- **No Ads**: Ad-free experience
+
+**Product IDs** (Already Configured):
+- Monthly: `com.snapchef.premium.monthly`
+- Yearly: `com.snapchef.premium.yearly`
+
+---
+
+## 🔧 Existing Implementation (Already Built)
+
+### ✅ Completed Components:
+- **SubscriptionManager.swift** - Full StoreKit 2 integration
+- **SubscriptionView.swift** - Premium upgrade UI with pricing
+- **Product IDs** - Monthly & yearly subscriptions configured
+- **Transaction handling** - Purchase, restore, and verification
+- **Progressive Authentication** - Anonymous tracking & smart prompts
+
+### 🎯 What's Missing (Need to Build):
+1. **Usage Limits** - No daily limits currently enforced
+2. **Honeymoon Phase** - No progressive onboarding
+3. **Usage Counters** - No visual feedback on limits
+4. **Smart Paywalls** - No contextual upgrade prompts
+5. **Feature Gates** - Premium features not restricted
 
 ---
 
@@ -33,11 +79,16 @@ enum UserPhase {
     case standard     // Day 31+: Full restrictions
 }
 
+enum SubscriptionTier {
+    case starter      // Free tier with limits
+    case premium      // Paid tier with everything
+}
+
 struct DailyLimits {
-    let recipes: Int
-    let videos: Int
-    let premiumEffects: Bool
-    let challengeMultiplier: Double
+    let recipes: Int          // Starter: 3, Premium: Unlimited
+    let videos: Int           // Starter: 1, Premium: Unlimited
+    let premiumEffects: Bool  // Starter: false, Premium: true
+    let challengeMultiplier: Double  // Starter: 1.0x, Premium: 2.0x
 }
 ```
 
@@ -140,32 +191,36 @@ struct DailyLimits {
 
 ---
 
-## Phase 5: Premium Tiers Implementation (Day 2)
+## Phase 5: Premium Tier Optimization (Day 2)
 
-### 5.1 Add Pro Tier
+### 5.1 Optimize 2-Tier System
 
 #### Task 5.1.1: Update Subscription Products
 **File**: `SnapChef/Core/Services/SubscriptionManager.swift` (MODIFY)
-- [ ] Add Pro tier product IDs
-- [ ] Define Pro tier benefits
-- [ ] Update `SubscriptionTier` enum
-- [ ] Add tier comparison logic
+- [ ] Define clear Starter (free) tier limits
+- [ ] Define comprehensive Premium tier benefits
+- [ ] Update `SubscriptionTier` enum to 2 tiers only
+- [ ] Simplify tier comparison logic
 
 #### Task 5.1.2: Update SubscriptionView
 **File**: `SnapChef/Features/Authentication/SubscriptionView.swift` (MODIFY)
-- [ ] Add 3-tier selection UI
-- [ ] Show feature comparison table
-- [ ] Highlight "Most Popular" on Premium
-- [ ] Add Pro benefits section
-- [ ] Update pricing display
+- [ ] Create simple 2-tier comparison UI
+- [ ] Show clear feature comparison table (Starter vs Premium)
+- [ ] Add "Upgrade to Premium" prominent CTA
+- [ ] Display savings with annual plan
+- [ ] Simplify pricing display (monthly/annual only)
 
-#### Task 5.1.3: Gate Pro Features
+#### Task 5.1.3: Implement Premium Feature Gates
 **Files**: Various feature files (MODIFY)
-- [ ] Custom AI personalities (ChefPersonalitySelector.swift)
-- [ ] Collaboration tools (NEW)
-- [ ] Early access features
-- [ ] Unlimited cloud storage
-- [ ] Advanced analytics dashboard
+- [ ] Check `SubscriptionManager.shared.isPremium` for feature access
+- [ ] Gate unlimited recipes (remove 3/day limit for premium)
+- [ ] Gate unlimited videos (remove 1/day limit for premium)
+- [ ] Gate advanced AI features (better recipe suggestions)
+- [ ] Gate unlimited favorites (10 max for free users)
+- [ ] Gate nutrition tracking (premium only)
+- [ ] Gate premium effects & filters in video generation
+- [ ] Add "Premium" badges to locked features
+- [ ] Show upgrade prompts when hitting limits
 
 ---
 
@@ -266,13 +321,14 @@ struct DailyLimits {
 
 ---
 
-## 📊 Success Metrics
+## 📊 Success Metrics (2-Tier System)
 
 ### Primary KPIs
-- **Conversion Rate**: Target 5-8% (up from ~2%)
-- **Trial-to-Paid**: Target 40% conversion
+- **Free-to-Premium Conversion**: Target 5-8% (up from ~2%)
+- **Honeymoon-to-Premium**: Target 40% conversion
 - **D7 Retention**: Target 35% (up from 25%)
-- **ARPU**: Target $1.20 (up from $0.40)
+- **ARPU**: Target $0.90 (simpler 2-tier pricing)
+- **Premium Retention**: Target 80% monthly retention
 
 ### Secondary Metrics
 - Paywall dismissal rate

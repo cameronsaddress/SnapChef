@@ -33,6 +33,9 @@ final class AppState: ObservableObject {
     // CloudKit Session Tracking
     @Published var currentSessionID: String = ""
     
+    // Progressive Authentication
+    @Published var anonymousProfile: AnonymousUserProfile?
+    
     private let userDefaults = UserDefaults.standard
     private let firstLaunchKey = "hasLaunchedBefore"
     private let userJoinDateKey = "userJoinDate"
@@ -61,6 +64,9 @@ final class AppState: ObservableObject {
         
         // Load total snaps taken
         self.totalSnapsTaken = userDefaults.integer(forKey: totalSnapsTakenKey)
+        
+        // Load anonymous profile
+        self.anonymousProfile = KeychainProfileManager.shared.getOrCreateProfile()
         
         // Initialize challenge system
         initializeChallengeSystem()
@@ -358,6 +364,79 @@ final class AppState: ObservableObject {
         pendingChallengeRewards.removeAll()
         showChallengeCompletion = false
     }
+    
+    // MARK: - Progressive Authentication Methods
+    
+    /// Tracks anonymous user actions and updates profile
+    func trackAnonymousAction(_ action: AnonymousAction) {
+        guard var profile = anonymousProfile else { return }
+        
+        // Update counters based on action type
+        switch action {
+        case .recipeCreated:
+            profile.recipesCreatedCount += 1
+        case .recipeViewed:
+            profile.recipesViewedCount += 1
+        case .videoGenerated:
+            profile.videosGeneratedCount += 1
+        case .videoShared:
+            profile.videosSharedCount += 1
+        case .appOpened:
+            profile.appOpenCount += 1
+        case .challengeViewed:
+            profile.challengesViewed += 1
+        case .socialExplored:
+            profile.socialFeaturesExplored += 1
+        }
+        
+        // Update last active timestamp
+        profile.updateLastActive()
+        
+        // Save updated profile
+        if KeychainProfileManager.shared.saveProfile(profile) {
+            self.anonymousProfile = profile
+        }
+        
+        // Check if we should show authentication prompt
+        checkAuthPromptConditions(for: action)
+    }
+    
+    /// Checks if authentication prompt should be shown based on current action
+    private func checkAuthPromptConditions(for action: AnonymousAction) {
+        guard let profile = anonymousProfile else { return }
+        
+        // Only prompt if user is still anonymous
+        guard profile.authenticationState == .anonymous else { return }
+        
+        let authTrigger = AuthPromptTrigger.shared
+        
+        // Trigger appropriate prompt based on action
+        switch action {
+        case .recipeCreated:
+            if profile.recipesCreatedCount == 1 {
+                authTrigger.onFirstRecipeSuccess()
+            }
+        case .videoGenerated:
+            authTrigger.onViralContentCreated()
+        case .videoShared:
+            authTrigger.onShareAttempt()
+        case .socialExplored:
+            authTrigger.onSocialFeatureExplored()
+        case .challengeViewed:
+            if profile.challengesViewed >= 2 {
+                authTrigger.onChallengeInterest()
+            }
+        case .appOpened:
+            if profile.daysSinceLastActive >= 1 && profile.appOpenCount >= 3 {
+                authTrigger.onReturningUser()
+            }
+        case .recipeViewed:
+            // Check for high engagement trigger
+            if profile.engagementScore >= 3.0 && profile.daysSinceFirstLaunch >= 3 {
+                authTrigger.onWeeklyHighEngagement()
+            }
+        }
+    }
 }
 
 enum AppError: LocalizedError {
@@ -378,4 +457,15 @@ enum AppError: LocalizedError {
             return "Error: \(message)"
         }
     }
+}
+
+/// Enumeration of anonymous user actions for progressive authentication tracking
+enum AnonymousAction: String, CaseIterable, Sendable {
+    case recipeCreated = "recipe_created"
+    case recipeViewed = "recipe_viewed"
+    case videoGenerated = "video_generated"
+    case videoShared = "video_shared"
+    case appOpened = "app_opened"
+    case challengeViewed = "challenge_viewed"
+    case socialExplored = "social_explored"
 }

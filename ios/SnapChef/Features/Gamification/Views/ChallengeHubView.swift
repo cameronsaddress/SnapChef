@@ -4,12 +4,15 @@ struct ChallengeHubView: View {
     @StateObject private var gamificationManager = GamificationManager.shared
     @StateObject private var premiumManager = PremiumChallengeManager.shared
     @StateObject private var authManager = CloudKitAuthManager.shared
+    @StateObject private var authTrigger = AuthPromptTrigger.shared
+    @EnvironmentObject var appState: AppState
     @State private var selectedFilter: ChallengeFilter = .all
     @State private var showingDailyCheckIn = false
     @State private var selectedChallenge: Challenge?
     @State private var refreshID = UUID()
     @State private var hasPromptedForNotifications = false
     @State private var showingPremiumView = false
+    @State private var showingAuthPrompt = false
     
     private enum ChallengeFilter: String, CaseIterable {
         case all = "All"
@@ -28,17 +31,25 @@ struct ChallengeHubView: View {
     }
     
     private var filteredChallenges: [Challenge] {
+        let challenges: [Challenge]
         switch selectedFilter {
         case .all:
             let allChallenges = gamificationManager.activeChallenges + gamificationManager.completedChallenges
-            return premiumManager.isPremiumUser ? allChallenges + premiumManager.premiumChallenges : allChallenges
+            challenges = premiumManager.isPremiumUser ? allChallenges + premiumManager.premiumChallenges : allChallenges
         case .active:
-            return gamificationManager.activeChallenges
+            challenges = gamificationManager.activeChallenges
         case .completed:
-            return gamificationManager.completedChallenges
+            challenges = gamificationManager.completedChallenges
         case .premium:
-            return premiumManager.premiumChallenges
+            challenges = premiumManager.premiumChallenges
         }
+        
+        // Apply blur overlay for non-authenticated users
+        return challenges
+    }
+    
+    private var shouldBlurChallenges: Bool {
+        return !authManager.isAuthenticated
     }
     
     var body: some View {
@@ -63,6 +74,10 @@ struct ChallengeHubView: View {
                         
                         // Challenges List
                         challengesList
+                            .blur(radius: shouldBlurChallenges ? 3 : 0)
+                            .overlay(
+                                shouldBlurChallenges ? challengeAuthOverlay : nil
+                            )
                     }
                     .padding()
                 }
@@ -78,11 +93,12 @@ struct ChallengeHubView: View {
                                 .foregroundColor(.primary)
                         }
                         
-                        NavigationLink(destination: AnalyticsView()) {
-                            Image(systemName: "chart.xyaxis.line")
-                                .font(.body)
-                                .foregroundColor(.primary)
-                        }
+                        // TODO: Re-enable when ChallengeAnalyticsService is implemented
+                        // NavigationLink(destination: AnalyticsView()) {
+                        //     Image(systemName: "chart.xyaxis.line")
+                        //         .font(.body)
+                        //         .foregroundColor(.primary)
+                        // }
                         
                         Button(action: {
                             withAnimation {
@@ -108,13 +124,17 @@ struct ChallengeHubView: View {
             .sheet(isPresented: $authManager.showAuthSheet) {
                 CloudKitAuthView(requiredFor: .challenges)
             }
+            .sheet(isPresented: $showingAuthPrompt) {
+                ProgressiveAuthPrompt()
+            }
         }
         .onAppear {
-            // Check if authentication is required
-            if authManager.isAuthRequiredFor(feature: .challenges) {
-                authManager.promptAuthForFeature(.challenges)
-                return
-            }
+            // Track that user viewed challenges for progressive auth
+            appState.trackAnonymousAction(.challengeViewed)
+            
+            // Note: Basic challenge viewing is allowed for anonymous users
+            // Premium features require authentication
+            
             // Create mock challenges if needed
             if gamificationManager.activeChallenges.isEmpty {
                 Task {
@@ -298,7 +318,7 @@ struct ChallengeHubView: View {
                             isLocked: !premiumManager.isPremiumUser
                         ) {
                             if premiumManager.isPremiumUser {
-                                selectedChallenge = challenge
+                                handleChallengeInteraction(challenge: challenge)
                             } else {
                                 showingPremiumView = true
                             }
@@ -309,7 +329,7 @@ struct ChallengeHubView: View {
                         ))
                     } else {
                         ChallengeCardView(challenge: challenge) {
-                            selectedChallenge = challenge
+                            handleChallengeInteraction(challenge: challenge)
                         }
                         .transition(.asymmetric(
                             insertion: .scale.combined(with: .opacity),
@@ -404,6 +424,88 @@ struct ChallengeHubView: View {
             refreshID = UUID()
         }
     }
+    
+    // MARK: - Progressive Authentication Methods
+    
+    private func handleChallengeInteraction(challenge: Challenge) {
+        if !authManager.isAuthenticated {
+            // Track the interaction
+            appState.trackAnonymousAction(.challengeViewed)
+            
+            // Trigger progressive authentication prompt
+            authTrigger.onChallengeInterest()
+            
+            // Show the prompt if conditions are met
+            if authTrigger.shouldShowPrompt {
+                showingAuthPrompt = true
+            }
+        } else {
+            selectedChallenge = challenge
+        }
+    }
+    
+    // MARK: - Challenge Auth Overlay
+    
+    private var challengeAuthOverlay: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            
+            GlassmorphicCard(content: {
+                VStack(spacing: 16) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color(hex: "#ffa726"), Color(hex: "#ff7043")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    
+                    Text("Join Cooking Challenges")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                    
+                    Text("Sign in to participate in daily challenges, earn rewards, and compete with other chefs!")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 16)
+                    
+                    Button(action: {
+                        authTrigger.onChallengeInterest()
+                        showingAuthPrompt = true
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.badge.plus")
+                                .font(.headline)
+                            Text("Sign In to Join")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "#ffa726"), Color(hex: "#ff7043")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(24)
+                    }
+                    .padding(.top, 8)
+                }
+                .padding(24)
+            }, glowColor: Color(hex: "#ffa726"))
+            .padding(.horizontal, 20)
+            
+            Spacer()
+        }
+    }
 }
 
 // MARK: - Supporting Views
@@ -479,6 +581,8 @@ private struct FilterTab: View {
 }
 
 // MARK: - Analytics View
+// TODO: Re-implement when ChallengeAnalyticsService is available
+/*
 struct AnalyticsView: View {
     @StateObject private var analytics = ChallengeAnalyticsService.shared
     
@@ -606,6 +710,7 @@ struct AnalyticsView: View {
         .navigationBarTitleDisplayMode(.large)
     }
 }
+*/
 
 private struct AnalyticsStatCard: View {
     let title: String

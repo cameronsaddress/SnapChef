@@ -39,8 +39,10 @@ enum PostingMethod: String, CaseIterable {
 struct TikTokShareView: View {
     let content: ShareContent
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var appState: AppState
     @StateObject private var engine = ViralVideoEngine()
     @StateObject private var contentAPI = TikTokContentPostingAPI.shared
+    @StateObject private var authTrigger = AuthPromptTrigger.shared
     private let template: ViralTemplate = .kineticTextSteps
     @State private var isGenerating = false
     @State private var videoURL: URL?
@@ -162,6 +164,9 @@ struct TikTokShareView: View {
             }
         } message: {
             Text(tokenExpiredMessage)
+        }
+        .sheet(isPresented: $authTrigger.shouldShowPrompt) {
+            ProgressiveAuthPrompt()
         }
     }
 
@@ -681,6 +686,16 @@ struct TikTokShareView: View {
                     withAnimation(.easeOut(duration: 0.5)) {
                         showConfetti = false
                     }
+                }
+            }
+            
+            // Track video generation for progressive authentication
+            await MainActor.run {
+                appState.trackAnonymousAction(.videoGenerated)
+                
+                // If user is not authenticated, trigger progressive auth prompt
+                if !CloudKitAuthManager.shared.isAuthenticated {
+                    AuthPromptTrigger.shared.onViralContentCreated()
                 }
             }
             
