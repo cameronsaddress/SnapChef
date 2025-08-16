@@ -4,11 +4,13 @@ struct RecipesView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitRecipeCache = CloudKitRecipeCache.shared
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var photoStorage = PhotoStorageManager.shared
     @State private var selectedCategory = "All"
     @State private var searchText = ""
     @State private var contentVisible = false
     @State private var showingFilters = false
     @State private var hasInitiallyLoaded = false
+    @State private var isBackgroundSyncing = false
     
     // Filter states
     @State private var selectedDifficulty: Recipe.Difficulty?
@@ -62,21 +64,28 @@ struct RecipesView: View {
                                 .staggeredFade(index: 3, isShowing: contentVisible)
                         }
                         
-                        // Loading indicator for CloudKit
-                        if cloudKitRecipeCache.isLoading {
+                        // Subtle background sync indicator (non-blocking)
+                        if isBackgroundSyncing && hasInitiallyLoaded {
                             HStack {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "#667eea")))
-                                Text(hasInitiallyLoaded ? "Checking for new recipes..." : "Loading saved recipes...")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.8))
+                                    .scaleEffect(0.7)
+                                Text("Syncing new recipes...")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.6))
                             }
-                            .padding()
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
                             .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.white.opacity(0.1))
+                                Capsule()
+                                    .fill(Color.white.opacity(0.05))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                    )
                             )
-                            .staggeredFade(index: 4, isShowing: contentVisible)
+                            .transition(.scale.combined(with: .opacity))
+                            .animation(.easeInOut(duration: 0.3), value: isBackgroundSyncing)
                         }
                         
                         // Recipe Grid
@@ -116,31 +125,23 @@ struct RecipesView: View {
             withAnimation(.easeOut(duration: 0.5)) {
                 contentVisible = true
             }
-            // Load CloudKit recipes if authenticated - this is when we sync
+            hasInitiallyLoaded = true
+            
+            // OPTIMIZATION: Start background CloudKit sync without blocking UI
             if cloudKitAuth.isAuthenticated {
-                loadCloudKitRecipes(forceRefresh: false)
-                // Trigger manual sync when recipe page is visited
-                Task {
-                    await CloudKitDataManager.shared.triggerManualSync()
-                }
+                startBackgroundCloudKitSync()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            // Only check for new recipes when app comes to foreground (don't force refresh)
+            // OPTIMIZATION: Background sync when returning to foreground
             if cloudKitAuth.isAuthenticated && hasInitiallyLoaded {
-                loadCloudKitRecipes(forceRefresh: false)
-                // Trigger manual sync when returning to foreground and viewing recipes
-                Task {
-                    await CloudKitDataManager.shared.triggerManualSync()
-                }
+                startBackgroundCloudKitSync()
             }
         }
         .refreshable {
-            // Pull to refresh - force a fresh fetch and sync
+            // OPTIMIZATION: Pull to refresh is faster - only trigger explicit sync
             if cloudKitAuth.isAuthenticated {
-                await loadCloudKitRecipesAsync(forceRefresh: true)
-                // Trigger manual sync when user pulls to refresh
-                await CloudKitDataManager.shared.triggerManualSync()
+                await performForegroundSync()
             }
         }
         .sheet(isPresented: $showingFilters) {
@@ -163,8 +164,18 @@ struct RecipesView: View {
     }
     
     var filteredRecipes: [Recipe] {
-        // Combine local and CloudKit cached recipes
-        let allRecipes = appState.recentRecipes + cloudKitRecipeCache.cachedRecipes
+        // OPTIMIZATION: Prioritize local recipes for instant display
+        // Show local recipes immediately, then merge CloudKit recipes
+        let localRecipes = appState.recentRecipes + appState.savedRecipes
+        let cloudKitRecipes = cloudKitRecipeCache.cachedRecipes
+        
+        // Remove duplicates - local recipes take precedence
+        let localRecipeIds = Set(localRecipes.map { $0.id })
+        let uniqueCloudKitRecipes = cloudKitRecipes.filter { !localRecipeIds.contains($0.id) }
+        
+        // Combine with local recipes first for instant display
+        let allRecipes = localRecipes + uniqueCloudKitRecipes
+        
         return allRecipes.filter { recipe in
             // Search filter
             let matchesSearch = searchText.isEmpty || 
@@ -235,38 +246,83 @@ struct RecipesView: View {
         }
     }
     
-    // MARK: - CloudKit Integration
-    private func loadCloudKitRecipes(forceRefresh: Bool = false) {
+    // MARK: - Optimized CloudKit Integration
+    
+    /// Start background CloudKit sync without blocking UI
+    private func startBackgroundCloudKitSync() {
+        guard !isBackgroundSyncing else { return }
+        
+        print("📱 RecipesView: Starting background CloudKit sync...")
+        isBackgroundSyncing = true
+        
         Task {
-            await loadCloudKitRecipesAsync(forceRefresh: forceRefresh)
+            do {
+                // Get recipes from cache (intelligent caching)
+                let recipes = await cloudKitRecipeCache.getRecipes(forceRefresh: false)
+                print("✅ RecipesView: Background sync got \(recipes.count) recipes")
+                
+                // Fetch photos in background without blocking UI
+                await fetchPhotosInBackground(for: recipes)
+                
+                // Trigger manual sync for latest data
+                await CloudKitDataManager.shared.triggerManualSync()
+                
+                await MainActor.run {
+                    isBackgroundSyncing = false
+                }
+            } catch {
+                print("❌ RecipesView: Background sync failed: \(error)")
+                await MainActor.run {
+                    isBackgroundSyncing = false
+                }
+            }
         }
     }
     
-    private func loadCloudKitRecipesAsync(forceRefresh: Bool = false) async {
-        print("📱 RecipesView: Loading CloudKit recipes (forceRefresh: \(forceRefresh))")
+    /// Perform foreground sync for pull-to-refresh
+    private func performForegroundSync() async {
+        print("📱 RecipesView: Performing foreground sync...")
+        isBackgroundSyncing = true
         
-        // Use the cache which handles intelligent loading
-        let recipes = await cloudKitRecipeCache.getRecipes(forceRefresh: forceRefresh)
-        
-        if !hasInitiallyLoaded {
-            hasInitiallyLoaded = true
+        do {
+            // Force refresh for pull-to-refresh
+            let recipes = await cloudKitRecipeCache.getRecipes(forceRefresh: true)
+            print("✅ RecipesView: Foreground sync got \(recipes.count) recipes")
+            
+            // Fetch photos with higher priority
+            await fetchPhotosInBackground(for: recipes)
+            
+            // Trigger manual sync
+            await CloudKitDataManager.shared.triggerManualSync()
+            
+        } catch {
+            print("❌ RecipesView: Foreground sync failed: \(error)")
         }
         
-        print("✅ RecipesView: Got \(recipes.count) recipes from cache")
+        isBackgroundSyncing = false
+    }
+    
+    /// Fetch photos in background without blocking main UI thread
+    private func fetchPhotosInBackground(for recipes: [Recipe]) async {
+        guard !recipes.isEmpty else { return }
         
-        // Fetch photos for CloudKit recipes that don't have them in savedRecipesWithPhotos
-        if !recipes.isEmpty {
-            print("🎬 RecipesView: Fetching photos for CloudKit recipes...")
-            let recipesNeedingPhotos = recipes.filter { recipe in
-                !appState.savedRecipesWithPhotos.contains(where: { $0.recipe.id == recipe.id })
+        print("📸 RecipesView: Fetching photos for \(recipes.count) recipes in background...")
+        
+        // Filter recipes that need photos and aren't already in PhotoStorageManager
+        let recipesNeedingPhotos = recipes.filter { recipe in
+            // Check PhotoStorageManager first (single source of truth)
+            if let photos = photoStorage.getPhotos(for: recipe.id) {
+                return photos.fridgePhoto == nil || photos.mealPhoto == nil
             }
-            
-            if !recipesNeedingPhotos.isEmpty {
-                print("🎬 RecipesView: \(recipesNeedingPhotos.count) recipes need photos")
-                await CloudKitRecipeManager.shared.fetchPhotosForRecipes(recipesNeedingPhotos, appState: appState)
-            } else {
-                print("✅ RecipesView: All recipes already have photos cached")
-            }
+            // Fallback check for recipes not in PhotoStorageManager
+            return !appState.savedRecipesWithPhotos.contains(where: { $0.recipe.id == recipe.id })
+        }
+        
+        if !recipesNeedingPhotos.isEmpty {
+            print("📸 RecipesView: \(recipesNeedingPhotos.count) recipes need photos")
+            await CloudKitRecipeManager.shared.fetchPhotosForRecipes(recipesNeedingPhotos, appState: appState)
+        } else {
+            print("✅ RecipesView: All recipes already have photos cached locally")
         }
     }
 }
@@ -704,62 +760,43 @@ struct RecipeGridCard: View {
     }
     
     private func getBeforePhotoForRecipe() -> UIImage? {
-        // Use PhotoStorageManager as single source of truth
-        if let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id) {
-            if let photo = photos.fridgePhoto {
-                print("📸 RecipeCard: Found before photo for \(recipe.name) in PhotoStorageManager:")
-                print("    - Size: \(photo.size)")
-                print("    - Has CGImage: \(photo.cgImage != nil)")
-                return photo
-            }
+        // OPTIMIZATION: Use PhotoStorageManager as primary source for instant retrieval
+        if let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id),
+           let photo = photos.fridgePhoto {
+            return photo
         }
         
-        // Fallback to appState for backwards compatibility
-        if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }) {
-            if let photo = savedRecipe.beforePhoto {
-                print("📸 RecipeCard: Found before photo for \(recipe.name) in appState (legacy):")
-                print("    - Size: \(photo.size)")
-                print("    - Migrating to PhotoStorageManager...")
-                // Migrate to PhotoStorageManager
+        // Fallback to appState for backwards compatibility with instant migration
+        if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }),
+           let photo = savedRecipe.beforePhoto {
+            // Migrate to PhotoStorageManager in background for future instant access
+            Task(priority: .background) {
                 PhotoStorageManager.shared.storePhotos(
                     fridgePhoto: photo,
                     mealPhoto: savedRecipe.afterPhoto,
                     for: recipe.id
                 )
-                return photo
+                print("📸 RecipeCard: Migrated legacy photos to PhotoStorageManager for \(recipe.name)")
             }
+            return photo
         }
-        print("⚠️ RecipeCard: No before photo found for \(recipe.name)")
+        
         return nil
     }
     
     private func getAfterPhotoForRecipe() -> UIImage? {
-        // Use PhotoStorageManager as single source of truth
-        if let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id) {
-            if let photo = photos.mealPhoto {
-                print("📸 RecipeCard: Found after photo for \(recipe.name) in PhotoStorageManager:")
-                print("    - Size: \(photo.size)")
-                print("    - Has CGImage: \(photo.cgImage != nil)")
-                return photo
-            }
+        // OPTIMIZATION: Use PhotoStorageManager as primary source for instant retrieval
+        if let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id),
+           let photo = photos.mealPhoto {
+            return photo
         }
         
-        // Fallback to appState for backwards compatibility
-        if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }) {
-            if let photo = savedRecipe.afterPhoto {
-                print("📸 RecipeCard: Found after photo for \(recipe.name) in appState (legacy):")
-                print("    - Size: \(photo.size)")
-                print("    - Migrating to PhotoStorageManager...")
-                // Migrate to PhotoStorageManager
-                PhotoStorageManager.shared.storePhotos(
-                    fridgePhoto: savedRecipe.beforePhoto,
-                    mealPhoto: photo,
-                    for: recipe.id
-                )
-                return photo
-            }
+        // Fallback to appState for backwards compatibility (migration handled in getBeforePhotoForRecipe)
+        if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }),
+           let photo = savedRecipe.afterPhoto {
+            return photo
         }
-        print("⚠️ RecipeCard: No after photo found for \(recipe.name)")
+        
         return nil
     }
 }

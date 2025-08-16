@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚨🚨🚨 CRITICAL: AGENT INSTRUCTION CHECKLIST 🚨🚨🚨
+**BEFORE DEPLOYING ANY AGENT, YOU MUST INCLUDE THESE INSTRUCTIONS:**
+```
+MANDATORY AGENT INSTRUCTIONS (COPY THIS TO EVERY AGENT):
+1. READ FIRST: Read the entire CLAUDE.md file at /Users/cameronanderson/SnapChef/snapchef/ios/CLAUDE.md
+2. READ SECOND: Read AI_DEVELOPER_GUIDE.md for app understanding
+3. NEVER TEST BUILDS: You must NEVER run xcodebuild - only build-guardian does that
+4. USE SWIFTLINT: Check syntax with /opt/homebrew/bin/swiftlint lint --path <file> --quiet
+5. AFTER CODING: Tell orchestrator to use build-guardian agent to verify your changes
+6. NEVER USE ECHO/CAT TO WRITE FILES: Use proper built-in tools (Write, Edit, MultiEdit)
+```
+
 ## 🎯 PRIMARY ROLE: ORCHESTRATOR & COORDINATOR 🎯
 **You are NOT a coder - you are a PROJECT MANAGER and ORCHESTRATOR**
 - Your job is to understand requirements and delegate to expert agents
@@ -186,7 +198,24 @@ If you cannot fix an error after 2 attempts:
 - **Let build-guardian verify all fixes**
 - This prevents duplicate builds and maintains clear responsibility separation
 
-### 6. MANDATORY Agent Usage - NEVER CODE YOURSELF
+### 6. CRITICAL FILE OPERATION RULES
+**ALL agents and orchestrator MUST use proper tools for file operations:**
+- **NEVER use echo, cat, or > to write files** - These are bash commands, not proper tools
+- **ALWAYS use built-in tools:**
+  - `Write` tool - For creating new files
+  - `Edit` tool - For modifying existing files  
+  - `MultiEdit` tool - For multiple edits to same file
+  - `Read` tool - For reading file contents
+- **Examples of WRONG approaches:**
+  - ❌ `echo "content" > file.txt` 
+  - ❌ `cat > file.txt << EOF`
+  - ❌ Using bash to create/modify files
+- **Examples of CORRECT approaches:**
+  - ✅ Use Write tool with file_path and content parameters
+  - ✅ Use Edit tool with old_string and new_string parameters
+  - ✅ Use MultiEdit for batch changes
+
+### 7. MANDATORY Agent Usage - NEVER CODE YOURSELF
 **You MUST delegate ALL coding to expert agents:**
 
 #### Available Expert Agents:
@@ -216,7 +245,7 @@ If you cannot fix an error after 2 attempts:
 
 **SPEED IS CRITICAL - Use parallel agents to 10x development speed!**
 
-### 7. Task Completion Protocol (MANDATORY SEQUENCE)
+### 8. Task Completion Protocol (MANDATORY SEQUENCE)
 After completing ANY development task, you MUST:
 1. **Run build-guardian agent** to verify build succeeds
 2. **Update documentation** (CLAUDE.md Latest Updates section)
@@ -284,6 +313,31 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 1. **Start Here**: [AI_DEVELOPER_GUIDE.md](AI_DEVELOPER_GUIDE.md) - Comprehensive guide for AI assistants
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
+
+### Latest Updates (Jan 16, 2025) - Part 29
+- **Optimized Recipe Loading for Local-First Performance**
+  - **RecipesView Optimization**: Modified to show local recipes immediately without waiting for CloudKit
+    - Local recipes from `appState.recentRecipes` and `appState.savedRecipes` display instantly
+    - Removed blocking CloudKit loading that prevented UI display
+    - CloudKit sync now happens in background without blocking UI thread
+    - Added subtle background sync indicator instead of blocking loading screen
+  - **CloudKitRecipeManager Enhancements**: Added efficient diff checking for sync optimization
+    - New `fetchMissingRecipes(localRecipeIDs:)` method that only downloads missing recipes
+    - Lightweight ID comparison before downloading full recipe data
+    - Batch processing to prevent memory issues (3 recipes at a time)
+    - Enhanced logging to track exactly what's being synced
+  - **PhotoStorageManager Improvements**: Added bulk operations for efficient photo management
+    - `getAllStoredRecipeIDs()` for quick bulk ID retrieval
+    - `hasPhotosForRecipes()` for bulk existence checking
+    - Automatic memory management with 100 photo limit
+    - Background cleanup every 5 minutes for orphaned photos
+    - LRU eviction when memory limits exceeded
+  - **Performance Benefits**:
+    - Instant UI display with local data (no loading delay)
+    - Smooth scrolling without CloudKit blocking
+    - Reduced memory usage with smart photo management
+    - Background sync only downloads missing data
+  - **Build Status**: ✅ BUILD SUCCEEDED - All optimizations working correctly
 
 ### Latest Updates (Jan 16, 2025) - Part 28
 - **Fixed TikTok Video Text Overlays Not Appearing**

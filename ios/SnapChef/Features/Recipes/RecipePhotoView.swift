@@ -38,29 +38,38 @@ struct RecipePhotoView: View {
     }
     
     private var displayBeforePhoto: UIImage? {
-        // Use PhotoStorageManager as primary source
+        // OPTIMIZATION: Use PhotoStorageManager as primary source for instant display
         if let storedPhoto = storedPhotos?.fridgePhoto {
             return storedPhoto
         }
-        // Fall back to CloudKit photo
-        if let cloudKitPhoto = beforePhoto {
-            return cloudKitPhoto
+        // Legacy fallback to appState for immediate display of older recipes
+        if let legacyPhoto = savedRecipe?.beforePhoto {
+            // Migrate to PhotoStorageManager in background
+            Task {
+                PhotoStorageManager.shared.storePhotos(
+                    fridgePhoto: legacyPhoto,
+                    mealPhoto: savedRecipe?.afterPhoto,
+                    for: recipe.id
+                )
+            }
+            return legacyPhoto
         }
-        // Legacy fallback to appState
-        return savedRecipe?.beforePhoto
+        // Fall back to CloudKit photo (slower, loaded asynchronously)
+        return beforePhoto
     }
     
     private var displayAfterPhoto: UIImage? {
-        // Use PhotoStorageManager as primary source
+        // OPTIMIZATION: Use PhotoStorageManager as primary source for instant display
         if let storedPhoto = storedPhotos?.mealPhoto {
             return storedPhoto
         }
-        // Fall back to CloudKit photo
-        if let cloudKitPhoto = afterPhoto {
-            return cloudKitPhoto
+        // Legacy fallback to appState for immediate display of older recipes
+        if let legacyPhoto = savedRecipe?.afterPhoto {
+            // Migration already handled in displayBeforePhoto
+            return legacyPhoto
         }
-        // Legacy fallback to appState
-        return savedRecipe?.afterPhoto
+        // Fall back to CloudKit photo (slower, loaded asynchronously)
+        return afterPhoto
     }
     
     private var halfWidth: CGFloat? {
@@ -108,7 +117,13 @@ struct RecipePhotoView: View {
         }
         .frame(width: width, height: height)
         .onAppear {
-            loadPhotosFromCloudKit()
+            // OPTIMIZATION: Only load from CloudKit if no local photos exist
+            if displayBeforePhoto == nil || displayAfterPhoto == nil {
+                loadPhotosFromCloudKit()
+            } else {
+                // We have local photos, so we're not loading
+                isLoadingPhotos = false
+            }
         }
         .fullScreenCover(isPresented: $showingAfterPhotoCapture) {
             AfterPhotoCaptureView(
@@ -264,14 +279,20 @@ struct RecipePhotoView: View {
     }
     
     private func loadPhotosFromCloudKit() {
-        Task {
+        // OPTIMIZATION: Load photos in low priority background task
+        Task(priority: .background) {
             do {
-                isLoadingPhotos = true
+                print("📸 RecipePhotoView: Loading photos from CloudKit for recipe \(recipe.id)")
                 let photos = try await cloudKitRecipeManager.fetchRecipePhotos(for: recipe.id.uuidString)
                 
                 await MainActor.run {
-                    self.beforePhoto = photos.before
-                    self.afterPhoto = photos.after
+                    // Only update if we don't already have these photos locally
+                    if photos.before != nil && self.displayBeforePhoto == nil {
+                        self.beforePhoto = photos.before
+                    }
+                    if photos.after != nil && self.displayAfterPhoto == nil {
+                        self.afterPhoto = photos.after
+                    }
                     
                     // Store CloudKit photos in PhotoStorageManager (single source of truth)
                     if photos.before != nil || photos.after != nil {
@@ -286,7 +307,7 @@ struct RecipePhotoView: View {
                     self.isLoadingPhotos = false
                 }
             } catch {
-                print("Failed to load photos from CloudKit: \(error)")
+                print("⚠️ RecipePhotoView: Failed to load photos from CloudKit: \(error)")
                 await MainActor.run {
                     self.isLoadingPhotos = false
                 }

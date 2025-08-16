@@ -121,6 +121,315 @@ class CloudKitRecipeManager: ObservableObject {
         return recipeID
     }
     
+    // MARK: - Efficient Background Sync
+    
+    /// Fetch only missing recipes based on provided local recipe IDs (optimized)
+    func fetchMissingRecipes(localRecipeIDs: Set<String>) async throws -> [Recipe] {
+        print("🔍 Starting optimized recipe sync with \(localRecipeIDs.count) local recipes...")
+        
+        // Get all recipe IDs from CloudKit (lightweight query)
+        let cloudKitRecipeIDs = try await fetchAllRecipeIDs()
+        print("☁️ Found \(cloudKitRecipeIDs.count) recipes in CloudKit")
+        print("📱 Local recipes provided: \(localRecipeIDs.count)")
+        
+        // Find missing recipe IDs (exist in CloudKit but not locally)
+        let missingRecipeIDs = cloudKitRecipeIDs.subtracting(localRecipeIDs)
+        print("📋 Missing recipes to sync: \(missingRecipeIDs.count)")
+        
+        if missingRecipeIDs.isEmpty {
+            print("✅ All recipes are already synced - no download needed")
+            return []
+        }
+        
+        // Log what we're syncing for transparency
+        print("🔄 Syncing missing recipe IDs: \(Array(missingRecipeIDs).prefix(5))\(missingRecipeIDs.count > 5 ? "..." : "")")
+        
+        // Batch download missing recipes
+        var syncedRecipes: [Recipe] = []
+        let batchSize = 10 // Download in batches to avoid memory issues
+        
+        for batch in Array(missingRecipeIDs).chunked(into: batchSize) {
+            print("📥 Downloading batch of \(batch.count) recipes...")
+            
+            let batchRecipes = await withTaskGroup(of: Recipe?.self) { group in
+                for recipeID in batch {
+                    group.addTask {
+                        do {
+                            let recipe = try await self.fetchRecipeFromCloudKit(recipeID)
+                            print("✅ Downloaded recipe: \(recipe.name) (\(recipeID))")
+                            return recipe
+                        } catch {
+                            print("❌ Failed to fetch recipe \(recipeID): \(error)")
+                            return nil
+                        }
+                    }
+                }
+                
+                var recipes: [Recipe] = []
+                for await recipe in group {
+                    if let recipe = recipe {
+                        recipes.append(recipe)
+                    }
+                }
+                return recipes
+            }
+            
+            syncedRecipes.append(contentsOf: batchRecipes)
+            print("✅ Synced batch: \(batchRecipes.count) recipes")
+        }
+        
+        print("🎉 Optimized sync complete: Downloaded \(syncedRecipes.count) new recipes")
+        return syncedRecipes
+    }
+    
+    /// Legacy method for backwards compatibility - uses cached recipes as local set
+    func fetchMissingRecipes() async throws -> [Recipe] {
+        print("🔍 Starting efficient recipe sync - checking for missing recipes...")
+        
+        // Get locally cached recipe IDs
+        let localRecipeIDs = Set(cachedRecipes.keys)
+        
+        // Use the optimized method
+        return try await fetchMissingRecipes(localRecipeIDs: localRecipeIDs)
+    }
+    
+    /// Background sync that doesn't block UI - optimized to use local recipe IDs
+    @MainActor
+    func performBackgroundSync(localRecipeIDs: Set<String>? = nil) {
+        Task.detached(priority: .background) {
+            do {
+                let startTime = Date()
+                print("🚀 Starting optimized background sync...")
+                
+                // Use provided local IDs or fall back to cached recipes
+                let localIDs: Set<String>
+                if let providedIDs = localRecipeIDs {
+                    localIDs = providedIDs
+                } else {
+                    localIDs = await MainActor.run { Set(self.cachedRecipes.keys) }
+                }
+                
+                let newRecipes = try await self.fetchMissingRecipes(localRecipeIDs: localIDs)
+                await self.syncMissingPhotos(for: newRecipes)
+                
+                let duration = Date().timeIntervalSince(startTime)
+                
+                await MainActor.run {
+                    print("🎉 Optimized background sync completed in \(String(format: "%.2f", duration))s")
+                    print("   - New recipes synced: \(newRecipes.count)")
+                    print("   - Total cached recipes: \(self.cachedRecipes.count)")
+                }
+            } catch {
+                await MainActor.run {
+                    print("❌ Background sync failed: \(error)")
+                }
+            }
+        }
+    }
+    
+    /// Optimized photo sync - checks PhotoStorageManager first to avoid unnecessary downloads
+    private func syncMissingPhotos(for recipes: [Recipe]) async {
+        print("📸 Starting optimized photo sync for \(recipes.count) recipes...")
+        
+        // Get recipe IDs that already have photos to avoid unnecessary downloads
+        let recipeIDsWithPhotos = await MainActor.run {
+            PhotoStorageManager.shared.getRecipeIDsWithPhotos()
+        }
+        
+        let recipesToSync = recipes.filter { recipe in
+            !recipeIDsWithPhotos.contains(recipe.id)
+        }
+        
+        print("📸 PhotoStorageManager check: \(recipeIDsWithPhotos.count) recipes already have photos")
+        print("📸 Filtered to \(recipesToSync.count) recipes needing photo sync")
+        
+        if recipesToSync.isEmpty {
+            print("✅ All recipes already have photos in PhotoStorageManager - no download needed")
+            return
+        }
+        
+        // Log what we're syncing for transparency
+        let recipeNames = recipesToSync.prefix(3).map { $0.name }
+        print("🔄 Syncing photos for: \(recipeNames.joined(separator: ", "))\(recipesToSync.count > 3 ? "..." : "")")
+        
+        // Process in smaller batches to avoid overwhelming memory
+        let photoBatches = recipesToSync.chunked(into: 3) // Even smaller batches for photos
+        
+        for (batchIndex, batch) in photoBatches.enumerated() {
+            print("📸 Processing photo batch \(batchIndex + 1)/\(photoBatches.count) (\(batch.count) recipes)")
+            
+            await withTaskGroup(of: Void.self) { group in
+                for recipe in batch {
+                    group.addTask {
+                        let recipeID = recipe.id
+                        
+                        // Double-check PhotoStorageManager to avoid race conditions
+                        let hasPhotos = await MainActor.run {
+                            PhotoStorageManager.shared.hasAnyPhotos(for: recipeID)
+                        }
+                        
+                        if hasPhotos {
+                            print("📸 Recipe \(recipe.name) photos found in PhotoStorageManager - skipping download")
+                            return
+                        }
+                        
+                        // Fetch photos from CloudKit
+                        do {
+                            print("📥 Downloading photos for recipe: \(recipe.name)")
+                            let (beforePhoto, afterPhoto) = try await self.fetchRecipePhotos(for: recipeID.uuidString)
+                            
+                            // Store photos in PhotoStorageManager
+                            await MainActor.run {
+                                PhotoStorageManager.shared.storePhotos(
+                                    fridgePhoto: beforePhoto,
+                                    mealPhoto: afterPhoto,
+                                    for: recipeID
+                                )
+                            }
+                            
+                            let photoStatus = "before: \(beforePhoto != nil ? "✓" : "✗"), after: \(afterPhoto != nil ? "✓" : "✗")"
+                            print("✅ Synced photos for \(recipe.name): \(photoStatus)")
+                        } catch {
+                            print("❌ Failed to sync photos for \(recipe.name): \(error)")
+                        }
+                    }
+                }
+            }
+            
+            print("✅ Completed photo batch \(batchIndex + 1)/\(photoBatches.count)")
+        }
+        
+        print("📸 Optimized photo sync completed: processed \(recipesToSync.count) recipes")
+    }
+    
+    /// Get all recipe IDs from CloudKit (lightweight query)
+    private func fetchAllRecipeIDs() async throws -> Set<String> {
+        print("🔍 Fetching all recipe IDs from CloudKit...")
+        
+        let predicate = NSPredicate(value: true) // Get all recipes
+        let query = CKQuery(recordType: "Recipe", predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        
+        var allRecipeIDs: Set<String> = []
+        var cursor: CKQueryOperation.Cursor? = nil
+        
+        repeat {
+            let operation: CKQueryOperation
+            if let cursor = cursor {
+                operation = CKQueryOperation(cursor: cursor)
+            } else {
+                operation = CKQueryOperation(query: query)
+            }
+            
+            // Set desired keys to only fetch ID (minimal data transfer)
+            operation.desiredKeys = ["id"]
+            operation.resultsLimit = 100 // Process in chunks
+            
+            let (records, nextCursor) = try await withCheckedThrowingContinuation { continuation in
+                var fetchedRecords: [CKRecord] = []
+                
+                operation.recordMatchedBlock = { recordID, result in
+                    switch result {
+                    case .success(let record):
+                        fetchedRecords.append(record)
+                    case .failure(let error):
+                        print("❌ Failed to fetch record \(recordID): \(error)")
+                    }
+                }
+                
+                operation.queryResultBlock = { result in
+                    switch result {
+                    case .success(let cursor):
+                        continuation.resume(returning: (fetchedRecords, cursor))
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+                
+                // Try both databases
+                privateDB.add(operation)
+            }
+            
+            // Extract recipe IDs
+            for record in records {
+                if let recipeID = record["id"] as? String {
+                    allRecipeIDs.insert(recipeID)
+                }
+            }
+            
+            cursor = nextCursor
+            print("📊 Fetched \(records.count) recipe IDs (total: \(allRecipeIDs.count))")
+            
+        } while cursor != nil
+        
+        // Also check public database
+        do {
+            let publicOperation = CKQueryOperation(query: query)
+            publicOperation.desiredKeys = ["id"]
+            publicOperation.resultsLimit = 100
+            
+            let (publicRecords, _): ([CKRecord], CKQueryOperation.Cursor?) = try await withCheckedThrowingContinuation { continuation in
+                var fetchedRecords: [CKRecord] = []
+                
+                publicOperation.recordMatchedBlock = { recordID, result in
+                    switch result {
+                    case .success(let record):
+                        fetchedRecords.append(record)
+                    case .failure(let error):
+                        print("❌ Failed to fetch public record \(recordID): \(error)")
+                    }
+                }
+                
+                publicOperation.queryResultBlock = { result in
+                    switch result {
+                    case .success:
+                        continuation.resume(returning: (fetchedRecords, nil))
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+                
+                publicDB.add(publicOperation)
+            }
+            
+            // Add public recipe IDs
+            for record in publicRecords {
+                if let recipeID = record["id"] as? String {
+                    allRecipeIDs.insert(recipeID)
+                }
+            }
+            
+            print("📊 Added \(publicRecords.count) public recipe IDs")
+            
+        } catch {
+            print("⚠️ Failed to fetch public recipes: \(error)")
+        }
+        
+        print("✅ Total recipe IDs found: \(allRecipeIDs.count)")
+        return allRecipeIDs
+    }
+    
+    /// Fetch a single recipe from CloudKit (internal method)
+    private func fetchRecipeFromCloudKit(_ recipeID: String) async throws -> Recipe {
+        let recordID = CKRecord.ID(recordName: recipeID)
+        
+        do {
+            // Try private database first
+            let record = try await privateDB.record(for: recordID)
+            let recipe = try parseRecipeFromRecord(record)
+            cachedRecipes[recipeID] = recipe
+            print("☁️ Recipe fetched from private CloudKit: \(recipeID)")
+            return recipe
+        } catch {
+            // Try public database
+            let record = try await publicDB.record(for: recordID)
+            let recipe = try parseRecipeFromRecord(record)
+            cachedRecipes[recipeID] = recipe
+            print("☁️ Recipe fetched from public CloudKit: \(recipeID)")
+            return recipe
+        }
+    }
+    
     // MARK: - Recipe Fetching
     
     /// Fetch a recipe by ID (checks cache first, then CloudKit)
@@ -159,20 +468,50 @@ class CloudKitRecipeManager: ObservableObject {
         }
     }
     
-    /// Batch fetch recipes by IDs
+    /// Batch fetch recipes by IDs (optimized with concurrent downloads)
     func fetchRecipes(by recipeIDs: [String]) async throws -> [Recipe] {
-        var recipes: [Recipe] = []
+        print("📥 Batch fetching \(recipeIDs.count) recipes...")
+        
+        // Separate cached and missing recipes
+        var cachedRecipes: [Recipe] = []
+        var missingIDs: [String] = []
         
         for id in recipeIDs {
-            do {
-                let recipe = try await fetchRecipe(by: id)
-                recipes.append(recipe)
-            } catch {
-                print("❌ Failed to fetch recipe \(id): \(error)")
+            if let cached = self.cachedRecipes[id] {
+                cachedRecipes.append(cached)
+                print("📱 Recipe \(id) found in cache")
+            } else {
+                missingIDs.append(id)
             }
         }
         
-        return recipes
+        print("📊 Cache hit: \(cachedRecipes.count), Cache miss: \(missingIDs.count)")
+        
+        // Concurrent download of missing recipes
+        let downloadedRecipes = await withTaskGroup(of: Recipe?.self) { group in
+            for id in missingIDs {
+                group.addTask {
+                    do {
+                        return try await self.fetchRecipeFromCloudKit(id)
+                    } catch {
+                        print("❌ Failed to fetch recipe \(id): \(error)")
+                        return nil
+                    }
+                }
+            }
+            
+            var recipes: [Recipe] = []
+            for await recipe in group {
+                if let recipe = recipe {
+                    recipes.append(recipe)
+                }
+            }
+            return recipes
+        }
+        
+        let allRecipes = cachedRecipes + downloadedRecipes
+        print("✅ Batch fetch complete: \(allRecipes.count) recipes")
+        return allRecipes
     }
     
     // MARK: - User Profile Recipe Management
@@ -293,8 +632,10 @@ class CloudKitRecipeManager: ObservableObject {
         }
     }
     
-    /// Get user's saved recipes
+    /// Get user's saved recipes (optimized)
     func getUserSavedRecipes() async throws -> [Recipe] {
+        print("📖 Getting user's saved recipes...")
+        
         // Ensure references are loaded first
         if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
             // Try to load references if they haven't been loaded yet
@@ -327,11 +668,15 @@ class CloudKitRecipeManager: ObservableObject {
             print("📱 Using cached references: \(userSavedRecipeIDs.count) saved")
         }
         
-        return try await fetchRecipes(by: Array(userSavedRecipeIDs))
+        let recipes = try await fetchRecipes(by: Array(userSavedRecipeIDs))
+        print("📖 Retrieved \(recipes.count) saved recipes")
+        return recipes
     }
     
-    /// Get user's created recipes
+    /// Get user's created recipes (optimized)
     func getUserCreatedRecipes() async throws -> [Recipe] {
+        print("🍳 Getting user's created recipes...")
+        
         // Ensure references are loaded first
         if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
             // Try to load references if they haven't been loaded yet
@@ -364,11 +709,15 @@ class CloudKitRecipeManager: ObservableObject {
             print("📱 Using cached references: \(userCreatedRecipeIDs.count) created")
         }
         
-        return try await fetchRecipes(by: Array(userCreatedRecipeIDs))
+        let recipes = try await fetchRecipes(by: Array(userCreatedRecipeIDs))
+        print("🍳 Retrieved \(recipes.count) created recipes")
+        return recipes
     }
     
-    /// Get user's favorited recipes
+    /// Get user's favorited recipes (optimized)
     func getUserFavoritedRecipes() async throws -> [Recipe] {
+        print("❤️ Getting user's favorited recipes...")
+        
         // Ensure references are loaded first
         if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
             // Try to load references if they haven't been loaded yet
@@ -394,7 +743,9 @@ class CloudKitRecipeManager: ObservableObject {
             }
         }
         
-        return try await fetchRecipes(by: Array(userFavoritedRecipeIDs))
+        let recipes = try await fetchRecipes(by: Array(userFavoritedRecipeIDs))
+        print("❤️ Retrieved \(recipes.count) favorited recipes")
+        return recipes
     }
     
     // MARK: - Recipe Sharing
@@ -442,6 +793,84 @@ class CloudKitRecipeManager: ObservableObject {
         }
         
         return recipes
+    }
+    
+    // MARK: - Public Sync Methods
+    
+    /// Check if local cache is up to date with CloudKit
+    func isCacheUpToDate() async throws -> Bool {
+        print("🔍 Checking if cache is up to date...")
+        
+        let cloudKitRecipeIDs = try await fetchAllRecipeIDs()
+        let localRecipeIDs = Set(cachedRecipes.keys)
+        
+        let isUpToDate = cloudKitRecipeIDs.isSubset(of: localRecipeIDs)
+        print("📊 Cache status: \(isUpToDate ? "✅ Up to date" : "⚠️ Needs sync")")
+        print("   CloudKit: \(cloudKitRecipeIDs.count) recipes")
+        print("   Local: \(localRecipeIDs.count) recipes")
+        
+        return isUpToDate
+    }
+    
+    /// Get sync statistics
+    func getSyncStats() async throws -> SyncStats {
+        print("📊 Calculating sync statistics...")
+        
+        let cloudKitRecipeIDs = try await fetchAllRecipeIDs()
+        let localRecipeIDs = Set(cachedRecipes.keys)
+        let missingRecipeIDs = cloudKitRecipeIDs.subtracting(localRecipeIDs)
+        
+        let photosWithRecipes = await MainActor.run {
+            PhotoStorageManager.shared.getRecipeIDsWithPhotos()
+        }
+        
+        let localRecipeUUIDs = Set(localRecipeIDs.compactMap { UUID(uuidString: $0) })
+        let recipesNeedingPhotos = localRecipeUUIDs.subtracting(photosWithRecipes)
+        
+        let stats = SyncStats(
+            totalCloudKitRecipes: cloudKitRecipeIDs.count,
+            totalLocalRecipes: localRecipeIDs.count,
+            missingRecipes: missingRecipeIDs.count,
+            recipesWithPhotos: photosWithRecipes.count,
+            recipesNeedingPhotos: recipesNeedingPhotos.count
+        )
+        
+        print("📊 Sync Stats:")
+        print("   Total CloudKit recipes: \(stats.totalCloudKitRecipes)")
+        print("   Total local recipes: \(stats.totalLocalRecipes)")
+        print("   Missing recipes: \(stats.missingRecipes)")
+        print("   Recipes with photos: \(stats.recipesWithPhotos)")
+        print("   Recipes needing photos: \(stats.recipesNeedingPhotos)")
+        
+        return stats
+    }
+    
+    /// Perform intelligent sync (only fetch what's needed)
+    func performIntelligentSync() async throws -> SyncResult {
+        print("🧠 Starting intelligent sync...")
+        
+        let startTime = Date()
+        
+        // Get missing recipes
+        let newRecipes = try await fetchMissingRecipes()
+        
+        // Sync photos for recipes that need them
+        await syncMissingPhotos(for: Array(cachedRecipes.values))
+        
+        let endTime = Date()
+        let duration = endTime.timeIntervalSince(startTime)
+        
+        let result = SyncResult(
+            newRecipesSynced: newRecipes.count,
+            photosDownloaded: 0, // We could track this more precisely if needed
+            duration: duration,
+            success: true
+        )
+        
+        print("🧠 Intelligent sync completed in \(String(format: "%.2f", duration))s")
+        print("   New recipes: \(result.newRecipesSynced)")
+        
+        return result
     }
     
     // MARK: - Helper Methods
@@ -699,6 +1128,44 @@ class CloudKitRecipeManager: ObservableObject {
         print("📊 CloudKit: Photo fetch complete for recipe '\(recipeTitle)' - Before: \(beforePhoto != nil ? "✓" : "✗"), After: \(afterPhoto != nil ? "✓" : "✗")")
         
         return (beforePhoto, afterPhoto)
+    }
+}
+
+
+// MARK: - Sync Data Structures
+
+/// Statistics about sync status
+struct SyncStats {
+    let totalCloudKitRecipes: Int
+    let totalLocalRecipes: Int
+    let missingRecipes: Int
+    let recipesWithPhotos: Int
+    let recipesNeedingPhotos: Int
+    
+    var isUpToDate: Bool {
+        return missingRecipes == 0
+    }
+    
+    var completionPercentage: Double {
+        guard totalCloudKitRecipes > 0 else { return 100.0 }
+        return (Double(totalLocalRecipes) / Double(totalCloudKitRecipes)) * 100.0
+    }
+}
+
+/// Result of a sync operation
+struct SyncResult {
+    let newRecipesSynced: Int
+    let photosDownloaded: Int
+    let duration: TimeInterval
+    let success: Bool
+    let error: Error?
+    
+    init(newRecipesSynced: Int, photosDownloaded: Int, duration: TimeInterval, success: Bool, error: Error? = nil) {
+        self.newRecipesSynced = newRecipesSynced
+        self.photosDownloaded = photosDownloaded
+        self.duration = duration
+        self.success = success
+        self.error = error
     }
 }
 
