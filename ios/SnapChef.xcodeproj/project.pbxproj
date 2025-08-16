@@ -62,6 +62,7 @@
 		54A4DAB682CD343D318FB54B /* ChallengeAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4F9C285D07CBD89E2776441 /* ChallengeAnalytics.swift */; };
 		550DACB0343DCB43E2555692 /* AuthenticationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5C0A42EA6865AC0A0E520C /* AuthenticationManager.swift */; };
 		55D45942E079AE7B0264F5EA /* InstagramTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86ABA89E269FAC5C70AB6BC0 /* InstagramTemplates.swift */; };
+		55FCAC2180C248434210D0DE /* TikTokAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A297D6A1F5C990A76FD3E125 /* TikTokAuthManager.swift */; };
 		56E3EB5DC2EB662A9C6C3F59 /* RewardSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79D60B603855BD2E41D0CFA /* RewardSystem.swift */; };
 		57A353FC46B94AC45DD9FD34 /* PremiumUpgradePrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB84A651E63FD43617AD03E0 /* PremiumUpgradePrompt.swift */; };
 		588722A57F6F8FB4733B9E2D /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13C669CCD49BD9E3C3961EBE /* SubscriptionManager.swift */; };
@@ -91,6 +92,7 @@
 		95F0BA545EB8C9DE5E5F92D4 /* ViralVideoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34771E7E9C40635B7CE1F7AA /* ViralVideoEngine.swift */; };
 		9654016E762E43BDA1AF349A /* ChallengeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9654016E762E43BDA1AF349B /* ChallengeDetailView.swift */; };
 		987825C3548C087B1F64E39E /* CloudKitRecipeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023CAA81A548F3B6C27BEDD8 /* CloudKitRecipeCache.swift */; };
+		98F42CB751FF9BA262A5C760 /* TikTokContentPostingAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = E933F667D5D04636FAECA9A3 /* TikTokContentPostingAPI.swift */; };
 		995BB052FBFE07B56F814A64 /* fridge2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 87312B0481281640268D11F3 /* fridge2.jpg */; };
 		9C01008B373F103FC52C7997 /* DiscoverUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9825971607DC0CBD048D1A6C /* DiscoverUsersView.swift */; };
 		9E1BC8D270F017F8A4260639 /* UserProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C397E25A597838EAC47C347C /* UserProfileViewModel.swift */; };
@@ -294,6 +296,7 @@
 		A1B2C3D4E5F6789012345679 /* ComboEffects.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ComboEffects.swift; path = SnapChef/Design/ComboEffects.swift; sourceTree = "<group>"; };
 		A222D311FA8E5A63B5427FCE /* AIPersonalityManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AIPersonalityManager.swift; path = SnapChef/Features/AIPersonality/AIPersonalityManager.swift; sourceTree = "<group>"; };
 		A2497A406F39E88783FD77B5 /* ChallengeSharingManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeSharingManager.swift; path = SnapChef/Features/Gamification/ChallengeSharingManager.swift; sourceTree = "<group>"; };
+		A297D6A1F5C990A76FD3E125 /* TikTokAuthManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TikTokAuthManager.swift; path = SnapChef/Core/Services/TikTokAuthManager.swift; sourceTree = "<group>"; };
 		A2B3C4D5E6F7890123456780 /* ExplosionEffect.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExplosionEffect.swift; path = SnapChef/Design/ExplosionEffect.swift; sourceTree = "<group>"; };
 		A3B4C5D6E7F8901234567891 /* FlickTrailEffect.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FlickTrailEffect.swift; path = SnapChef/Design/FlickTrailEffect.swift; sourceTree = "<group>"; };
 		A4B5C6D7E8F9012345678902 /* ParticleEmitter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ParticleEmitter.swift; path = SnapChef/Design/ParticleEmitter.swift; sourceTree = "<group>"; };
@@ -335,6 +338,7 @@
 		E6894D4A002027CFDEEBB5AA /* AchievementGalleryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AchievementGalleryView.swift; path = SnapChef/Features/Gamification/Views/AchievementGalleryView.swift; sourceTree = "<group>"; };
 		E808FB0C31658D7A40220ACC /* LaunchAnimationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LaunchAnimationView.swift; path = SnapChef/App/LaunchAnimationView.swift; sourceTree = "<group>"; };
 		E87A2C28C6D3131BBBAA4407 /* ActivityFeedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ActivityFeedView.swift; path = SnapChef/Features/Sharing/ActivityFeedView.swift; sourceTree = "<group>"; };
+		E933F667D5D04636FAECA9A3 /* TikTokContentPostingAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TikTokContentPostingAPI.swift; path = SnapChef/Features/Sharing/Platforms/TikTok/TikTokContentPostingAPI.swift; sourceTree = "<group>"; };
 		EE91B3DA162238B01A3650B8 /* CloudKitStreakManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitStreakManager.swift; path = SnapChef/Core/Services/CloudKitStreakManager.swift; sourceTree = "<group>"; };
 		F190CCE2F51225F63B9697D6 /* GlassmorphicComponents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GlassmorphicComponents.swift; path = SnapChef/Design/GlassmorphicComponents.swift; sourceTree = "<group>"; };
 		F43329C15A8E8386F4370D4E /* SnapChefApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SnapChefApp.swift; path = SnapChef/App/SnapChefApp.swift; sourceTree = "<group>"; };
@@ -392,6 +396,7 @@
 				FAE14391640BA3821562690E /*  */,
 				F56F891D2E3D282000AF95B7 /* Recovered References */,
 				358FFFFCEF94607D3AEF5F6C /* Features */,
+				DE1AE878754E3F7811D721D6 /* Core */,
 			);
 			sourceTree = "<group>";
 		};
@@ -497,6 +502,7 @@
 			isa = PBXGroup;
 			children = (
 				CCC2412DBCBB32B0EFA78F84 /* Camera */,
+				957976ACBE56F364DB8740B7 /* Sharing */,
 			);
 			name = Features;
 			sourceTree = "<group>";
@@ -625,6 +631,14 @@
 			name = Users;
 			sourceTree = "<group>";
 		};
+		7335DD3151CDD84BA36B73FC /* TikTok */ = {
+			isa = PBXGroup;
+			children = (
+				E933F667D5D04636FAECA9A3 /* TikTokContentPostingAPI.swift */,
+			);
+			name = TikTok;
+			sourceTree = "<group>";
+		};
 		7418BA3326D726F02447E331 /* Home */ = {
 			isa = PBXGroup;
 			children = (
@@ -703,6 +717,14 @@
 				0FCC9F8D9AE29902BE9D1FB5 /* Foundation.framework */,
 			);
 			name = iOS;
+			sourceTree = "<group>";
+		};
+		957976ACBE56F364DB8740B7 /* Sharing */ = {
+			isa = PBXGroup;
+			children = (
+				C5108AF3AA30302B3C9EAF8D /* Platforms */,
+			);
+			name = Sharing;
 			sourceTree = "<group>";
 		};
 		9DB7DB598F4184818C8C7B9C /* Preview Content */ = {
@@ -835,6 +857,14 @@
 			name = ViewModels;
 			sourceTree = "<group>";
 		};
+		C5108AF3AA30302B3C9EAF8D /* Platforms */ = {
+			isa = PBXGroup;
+			children = (
+				7335DD3151CDD84BA36B73FC /* TikTok */,
+			);
+			name = Platforms;
+			sourceTree = "<group>";
+		};
 		C5652B40604108248A1E9076 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -885,6 +915,22 @@
 				86ABA89E269FAC5C70AB6BC0 /* InstagramTemplates.swift */,
 			);
 			name = Instagram;
+			sourceTree = "<group>";
+		};
+		DE1AE878754E3F7811D721D6 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				E010881AA9B8EFEF5A21DEA1 /* Services */,
+			);
+			name = Core;
+			sourceTree = "<group>";
+		};
+		E010881AA9B8EFEF5A21DEA1 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A297D6A1F5C990A76FD3E125 /* TikTokAuthManager.swift */,
+			);
+			name = Services;
 			sourceTree = "<group>";
 		};
 		E3E9809E6206FE248F20867E /* Gamification */ = {
@@ -1216,6 +1262,8 @@
 				4C0A412E093372045DA6780D /* PhotoValidator.swift in Sources */,
 				623D1A9D6546A2BE6A95DD62 /* SimpleMediaBundle.swift in Sources */,
 				2D3FCBBECA590DA906A60532 /* PantryCaptureView.swift in Sources */,
+				55FCAC2180C248434210D0DE /* TikTokAuthManager.swift in Sources */,
+				98F42CB751FF9BA262A5C760 /* TikTokContentPostingAPI.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

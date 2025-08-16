@@ -1,8 +1,8 @@
 import Foundation
 import SwiftUI
 
-struct Recipe: Identifiable, Codable {
-    let id: UUID
+public struct Recipe: Identifiable, Codable, Sendable {
+    public let id: UUID
     let name: String
     let description: String
     let ingredients: [Ingredient]
@@ -16,12 +16,10 @@ struct Recipe: Identifiable, Codable {
     let createdAt: Date
     let tags: [String]
     let dietaryInfo: DietaryInfo
-    
-    enum Difficulty: String, Codable, CaseIterable {
+    enum Difficulty: String, Codable, CaseIterable, Sendable {
         case easy = "Easy"
         case medium = "Medium"
         case hard = "Hard"
-        
         var color: String {
             switch self {
             case .easy: return "#4CAF50"
@@ -48,7 +46,7 @@ struct Recipe: Identifiable, Codable {
     }
 }
 
-struct Ingredient: Identifiable, Codable {
+struct Ingredient: Identifiable, Codable, Sendable {
     let id: UUID
     let name: String
     let quantity: String
@@ -56,7 +54,7 @@ struct Ingredient: Identifiable, Codable {
     let isAvailable: Bool
 }
 
-struct Nutrition: Codable {
+struct Nutrition: Codable, Sendable {
     let calories: Int
     let protein: Int
     let carbs: Int
@@ -66,21 +64,21 @@ struct Nutrition: Codable {
     let sodium: Int?
 }
 
-struct RecipeGenerationRequest: Codable {
+struct RecipeGenerationRequest: Codable, Sendable {
     let imageBase64: String
     let dietaryPreferences: [String]
     let mealType: String?
     let servings: Int
 }
 
-struct DietaryInfo: Codable {
+struct DietaryInfo: Codable, Sendable {
     let isVegetarian: Bool
     let isVegan: Bool
     let isGlutenFree: Bool
     let isDairyFree: Bool
 }
 
-struct RecipeGenerationResponse: Codable {
+struct RecipeGenerationResponse: Codable, Sendable {
     let success: Bool
     let recipes: [Recipe]?
     let error: String?

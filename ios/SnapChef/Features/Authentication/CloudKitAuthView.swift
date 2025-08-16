@@ -3,6 +3,7 @@ import AuthenticationServices
 
 struct CloudKitAuthView: View {
     @StateObject private var authManager = CloudKitAuthManager.shared
+    @StateObject private var tikTokAuthManager = TikTokAuthManager.shared
     @Environment(\.dismiss) private var dismiss
     
     let requiredFor: AuthRequiredFeature?
@@ -10,6 +11,7 @@ struct CloudKitAuthView: View {
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var loadingMessage = "Signing in..."
     
     init(requiredFor: AuthRequiredFeature? = nil) {
         self.requiredFor = requiredFor
@@ -76,6 +78,33 @@ struct CloudKitAuthView: View {
                         .signInWithAppleButtonStyle(.white)
                         .frame(height: 50)
                         .cornerRadius(25)
+                        
+                        // Sign in with TikTok
+                        Button(action: {
+                            handleTikTokSignIn()
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "music.note")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                
+                                Text("Continue with TikTok")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.black, Color(hex: "#FF0050")],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(25)
+                        }
+                        .disabled(isLoading)
                     }
                     .padding(.horizontal, 24)
                     .disabled(isLoading)
@@ -103,7 +132,7 @@ struct CloudKitAuthView: View {
             Text(errorMessage)
         }
         .overlay(
-            isLoading ? LoadingOverlay(message: "Signing in...") : nil
+            isLoading ? LoadingOverlay(message: loadingMessage) : nil
         )
         .sheet(isPresented: $authManager.showUsernameSelection) {
             UsernameSetupView()
@@ -117,6 +146,7 @@ struct CloudKitAuthView: View {
                 switch result {
                 case .success(let authorization):
                     isLoading = true
+                    loadingMessage = "Signing in with Apple..."
                     try await authManager.signInWithApple(authorization: authorization)
                     
                     // Check if we need username setup
@@ -141,6 +171,29 @@ struct CloudKitAuthView: View {
             } catch {
                 await MainActor.run {
                     errorMessage = "Authentication failed: \(error.localizedDescription)"
+                    showError = true
+                    isLoading = false
+                }
+            }
+        }
+    }
+    
+    private func handleTikTokSignIn() {
+        Task {
+            do {
+                isLoading = true
+                loadingMessage = "Connecting to TikTok..."
+                let tikTokUser = try await tikTokAuthManager.authenticate()
+                
+                // Create SnapChef account integration if TikTok auth succeeds
+                // For now, just dismiss the auth view
+                await MainActor.run {
+                    isLoading = false
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "TikTok sign in failed: \(error.localizedDescription)"
                     showError = true
                     isLoading = false
                 }

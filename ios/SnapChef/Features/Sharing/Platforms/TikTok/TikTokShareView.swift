@@ -3,10 +3,44 @@ import AVKit
 import Photos
 import UIKit
 
+// MARK: - Posting Method Enum
+enum PostingMethod: String, CaseIterable {
+    case shareKit = "shareKit"
+    case directPost = "directPost"
+    
+    var title: String {
+        switch self {
+        case .shareKit:
+            return "Open in TikTok"
+        case .directPost:
+            return "Direct Post"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .shareKit:
+            return "Opens TikTok app for manual posting"
+        case .directPost:
+            return "Posts directly with auto-filled caption"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .shareKit:
+            return "square.and.arrow.up"
+        case .directPost:
+            return "bolt.fill"
+        }
+    }
+}
+
 struct TikTokShareView: View {
     let content: ShareContent
     @Environment(\.dismiss) private var dismiss
     @StateObject private var engine = ViralVideoEngine()
+    @StateObject private var contentAPI = TikTokContentPostingAPI.shared
     private let template: ViralTemplate = .kineticTextSteps
     @State private var isGenerating = false
     @State private var videoURL: URL?
@@ -18,6 +52,10 @@ struct TikTokShareView: View {
     @State private var showRetryAlert = false
     @State private var currentTikTokError: TikTokExportError?
     @State private var retryAction: (() -> Void)?
+    @State private var postingMethod: PostingMethod = .shareKit
+    @State private var showDirectPostPreview = false
+    @State private var showTokenExpiredAlert = false
+    @State private var tokenExpiredMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -33,7 +71,17 @@ struct TikTokShareView: View {
                         } else if showSuccess {
                             successState
                         } else {
+                            postingMethodSelector
+                            
+                            if postingMethod == .directPost {
+                                tikTokAuthStatus
+                            }
+                            
                             hashtagChips
+                            
+                            if postingMethod == .directPost && showDirectPostPreview {
+                                captionPreview
+                            }
                         }
                         
                         generateButton
@@ -66,6 +114,9 @@ struct TikTokShareView: View {
             }
         }
         .onAppear {
+            // Check token status when view appears
+            checkTokenStatus()
+            
             // Start button shake animation after a delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 startButtonShake()
@@ -98,6 +149,19 @@ struct TikTokShareView: View {
             if let tikTokError = currentTikTokError {
                 Text(tikTokError.userFriendlyMessage)
             }
+        }
+        .alert("TikTok Session Expired", isPresented: $showTokenExpiredAlert) {
+            Button("Sign In") {
+                showTokenExpiredAlert = false
+                Task {
+                    await reauthenticateUser()
+                }
+            }
+            Button("Cancel") {
+                showTokenExpiredAlert = false
+            }
+        } message: {
+            Text(tokenExpiredMessage)
         }
     }
 
@@ -182,7 +246,199 @@ struct TikTokShareView: View {
         .onAppear {
             // Pre-select exactly 5 most popular hashtags
             selectedHashtags = Array(optimizedTags.prefix(5))
+            // Show caption preview after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showDirectPostPreview = true
+                }
+            }
         }
+    }
+    
+    // MARK: - Posting Method Selector
+    
+    private var postingMethodSelector: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Sharing Method")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+            
+            HStack(spacing: 12) {
+                ForEach(PostingMethod.allCases, id: \.self) { method in
+                    PostingMethodCard(
+                        method: method,
+                        isSelected: postingMethod == method
+                    ) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            postingMethod = method
+                        }
+                        
+                        // Haptic feedback
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.2),
+                                    Color.white.opacity(0.05)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+    }
+    
+    // MARK: - TikTok Authentication Status
+    
+    private var tikTokAuthStatus: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                let authStatus = getAuthenticationStatus()
+                Image(systemName: authStatus.icon)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(authStatus.color)
+                
+                Text("TikTok Authentication")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                Text(authStatus.statusText)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(authStatus.color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(authStatus.color.opacity(0.2))
+                    .cornerRadius(8)
+            }
+            
+            if !contentAPI.hasValidToken || isTokenExpired() {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(getAuthPromptText())
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                    
+                    Button(getAuthButtonText()) {
+                        Task {
+                            await reauthenticateUser()
+                        }
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        LinearGradient(
+                            colors: isTokenExpired() ? [Color.orange, Color.red] : [Color.pink, Color.purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(12)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            getAuthenticationStatus().color.opacity(0.3),
+                            lineWidth: 1
+                        )
+                )
+        )
+    }
+    
+    // MARK: - Caption Preview
+    
+    private var captionPreview: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Caption Preview")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(.white)
+            
+            let caption = buildCaptionPreview()
+            
+            ScrollView {
+                Text(caption)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.black.opacity(0.3))
+                    )
+            }
+            .frame(maxHeight: 120)
+            
+            HStack {
+                Text("\(caption.count)/2200 characters")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+                
+                Spacer()
+                
+                if caption.count > 2200 {
+                    Text("Too long")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.red)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .transition(.opacity.combined(with: .scale))
+    }
+    
+    private func buildCaptionPreview() -> String {
+        let title: String
+        switch content.type {
+        case .recipe(let recipe):
+            title = "🔥 \(recipe.name) made from fridge ingredients!"
+        case .challenge(let challenge):
+            title = "🏆 Completed: \(challenge.title)"
+        case .achievement(let badge):
+            title = "🎯 Achievement unlocked: \(badge)"
+        case .profile:
+            title = "👨‍🍳 Check out my SnapChef profile!"
+        case .teamInvite(let teamName, _):
+            title = "🏆 Join my cooking team: \(teamName)"
+        }
+        
+        return contentAPI.buildCaption(
+            text: title,
+            hashtags: selectedHashtags,
+            appLink: "apps.apple.com/snapchef"
+        )
     }
     
     /// Generate smart hashtag selection based on recipe and current trends
@@ -428,8 +684,12 @@ struct TikTokShareView: View {
                 }
             }
             
-            // Automatically share to TikTok after generation with selected hashtags
-            await shareToTikTokAutomatically(url: url)
+            // Share based on selected posting method
+            if postingMethod == .shareKit {
+                await shareToTikTokAutomatically(url: url)
+            } else {
+                await postDirectlyToTikTok(url: url)
+            }
         } catch { 
                 await MainActor.run {
                     // Error haptic feedback
@@ -603,18 +863,27 @@ struct TikTokShareView: View {
                             .font(.title2)
                             .scaleEffect(showSuccess ? 1.2 : 1.0)
                             .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showSuccess)
-                        Text("Shared to TikTok!")
+                        Text(postingMethod == .shareKit ? "Shared to TikTok!" : "Posted Directly!")
                             .font(.system(size: 16, weight: .semibold))
                     }
                     .foregroundColor(.white)
                 } else {
                     VStack(spacing: 4) {
-                        Text("Generate & Share to TikTok")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.white)
+                        HStack(spacing: 8) {
+                            Image(systemName: postingMethod.icon)
+                                .font(.system(size: 16, weight: .bold))
+                            Text(postingMethod == .shareKit ? "Generate & Open in TikTok" : "Generate & Post Directly")
+                                .font(.system(size: 18, weight: .bold))
+                        }
+                        .foregroundColor(.white)
                         
                         if selectedHashtags.isEmpty {
                             Text("(Select hashtags first)")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                                .transition(.opacity.combined(with: .scale))
+                        } else if postingMethod == .directPost && !contentAPI.hasValidToken {
+                            Text("(Sign in to TikTok first)")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.7))
                                 .transition(.opacity.combined(with: .scale))
@@ -623,10 +892,118 @@ struct TikTokShareView: View {
                 }
             }
         }
-        .disabled(isGenerating || showSuccess)
+        .disabled(isGenerating || showSuccess || (postingMethod == .directPost && !contentAPI.hasValidToken) || selectedHashtags.isEmpty)
         .scaleEffect(isGenerating ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isGenerating)
         .modifier(ShakeEffect(shakeNumber: buttonShake ? 2 : 0))
+    }
+    
+    // MARK: - Direct Post Method
+    
+    @MainActor
+    private func postDirectlyToTikTok(url: URL) async {
+        do {
+            // Check token validity before upload
+            if isTokenExpired() {
+                tokenExpiredMessage = "Your TikTok session has expired. Please sign in again to continue."
+                showTokenExpiredAlert = true
+                isGenerating = false
+                return
+            }
+            
+            // Build caption from content and selected hashtags
+            let title: String
+            switch content.type {
+            case .recipe(let recipe):
+                title = "🔥 \(recipe.name) made from fridge ingredients!"
+            case .challenge(let challenge):
+                title = "🏆 Completed: \(challenge.title)"
+            case .achievement(let badge):
+                title = "🎯 Achievement unlocked: \(badge)"
+            case .profile:
+                title = "👨‍🍳 Check out my SnapChef profile!"
+            case .teamInvite(let teamName, _):
+                title = "🏆 Join my cooking team: \(teamName)"
+            }
+            
+            // Upload with progress tracking
+            let publishId = try await contentAPI.uploadWithShareContent(
+                content: content,
+                videoURL: url
+            ) { progress in
+                // Update UI with upload progress
+            }
+            
+            // Check status periodically
+            var attempts = 0
+            let maxAttempts = 10
+            
+            while attempts < maxAttempts {
+                let status = try await contentAPI.checkPublishStatus(publishId: publishId)
+                
+                switch status.data.status {
+                case "SENT_TO_USER_INBOX":
+                    // Success!
+                    await MainActor.run {
+                        let successFeedback = UINotificationFeedbackGenerator()
+                        successFeedback.notificationOccurred(.success)
+                        
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                            showSuccess = true
+                            showConfetti = true
+                        }
+                        
+                        // Hide confetti after 3 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            withAnimation(.easeOut(duration: 0.5)) {
+                                showConfetti = false
+                            }
+                        }
+                        
+                        isGenerating = false
+                    }
+                    return
+                    
+                case "FAILED":
+                    throw TikTokAPIError.uploadFailed(status.data.fail_reason ?? "Upload failed")
+                    
+                default:
+                    // Still processing, wait and retry
+                    try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                    attempts += 1
+                }
+            }
+            
+            // Timeout
+            throw TikTokAPIError.uploadFailed("Upload timeout - please check your TikTok app")
+            
+        } catch {
+            await MainActor.run {
+                let errorFeedback = UINotificationFeedbackGenerator()
+                errorFeedback.notificationOccurred(.error)
+                
+                // Check for token expiration errors specifically
+                if let apiError = error as? TikTokAPIError, case .unauthorized(let message) = apiError {
+                    // Token has expired during operation
+                    tokenExpiredMessage = "Your TikTok session expired while uploading. Please sign in again."
+                    showTokenExpiredAlert = true
+                } else if let apiError = error as? TikTokAPIError {
+                    if apiError.isRetryable {
+                        self.retryAction = {
+                            Task {
+                                await self.postDirectlyToTikTok(url: url)
+                            }
+                        }
+                        self.showRetryAlert = true
+                    } else {
+                        self.error = getUserFriendlyErrorMessage(apiError)
+                    }
+                } else {
+                    self.error = getUserFriendlyErrorMessage(error)
+                }
+                self.isGenerating = false
+            }
+        }
     }
     
     // MARK: - Helper Functions
@@ -664,6 +1041,93 @@ struct TikTokShareView: View {
         // Haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
+    }
+    
+    // MARK: - Token Management Helper Methods
+    
+    private func checkTokenStatus() {
+        // Check token when view appears and update UI accordingly
+        Task {
+            let hasValid = await checkValidToken()
+            await MainActor.run {
+                if !hasValid && postingMethod == .directPost {
+                    // Update UI to reflect expired state if needed
+                }
+            }
+        }
+    }
+    
+    private func isTokenExpired() -> Bool {
+        return !contentAPI.hasValidToken
+    }
+    
+    private func checkValidToken() async -> Bool {
+        // Use TikTokAuthManager to check token validity
+        return TikTokAuthManager.shared.isAuthenticatedUser()
+    }
+    
+    private func reauthenticateUser() async {
+        do {
+            let _ = try await TikTokAuthManager.shared.authenticate()
+            
+            // Update contentAPI with new token
+            await MainActor.run {
+                if let tokens = TikTokAuthManager.shared.getCurrentTokens() {
+                    contentAPI.setAccessToken(tokens.accessToken)
+                }
+            }
+        } catch {
+            await MainActor.run {
+                self.error = "Failed to sign in to TikTok. Please try again."
+            }
+        }
+    }
+    
+    private func getAuthenticationStatus() -> (icon: String, color: Color, statusText: String) {
+        if contentAPI.hasValidToken && !isTokenExpired() {
+            return ("checkmark.circle.fill", .green, "Connected")
+        } else if isTokenExpired() {
+            return ("exclamationmark.triangle.fill", .orange, "Session Expired")
+        } else {
+            return ("person.circle", .gray, "Not Connected")
+        }
+    }
+    
+    private func getAuthPromptText() -> String {
+        if isTokenExpired() {
+            return "Your TikTok session has expired. Sign in again to continue."
+        } else {
+            return "Sign in to TikTok to enable direct posting"
+        }
+    }
+    
+    private func getAuthButtonText() -> String {
+        if isTokenExpired() {
+            return "Sign In Again"
+        } else {
+            return "Sign in with TikTok"
+        }
+    }
+    
+    private func getUserFriendlyErrorMessage(_ error: Error) -> String {
+        if let apiError = error as? TikTokAPIError {
+            switch apiError {
+            case .unauthorized:
+                return "Your TikTok session has expired. Please sign in again."
+            case .forbidden:
+                return "You don't have permission to post to TikTok. Please check your account settings."
+            case .rateLimited:
+                return "Too many requests. Please wait a moment and try again."
+            case .networkError:
+                return "Unable to connect to TikTok. Please check your connection and try again."
+            case .uploadFailed:
+                return "Failed to upload video. Please try again or check your internet connection."
+            default:
+                return "An error occurred while connecting to TikTok. Please try again."
+            }
+        } else {
+            return "An unexpected error occurred. Please try again."
+        }
     }
 }
 
@@ -876,3 +1340,104 @@ struct PulsingProgressView: View {
 }
 
 // ConfettiView is already defined in RecipeResultsView.swift
+
+// MARK: - PostingMethodCard
+
+struct PostingMethodCard: View {
+    let method: PostingMethod
+    let isSelected: Bool
+    let action: () -> Void
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(
+                            isSelected ?
+                            LinearGradient(
+                                colors: [Color.cyan, Color.purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ) :
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.15), Color.white.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+                    
+                    Image(systemName: method.icon)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(isSelected ? .white : .white.opacity(0.7))
+                }
+                
+                // Title
+                Text(method.title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(isSelected ? .white : .white.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                
+                // Description
+                Text(method.description)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(isSelected ? .white.opacity(0.9) : .white.opacity(0.6))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .padding(.vertical, 16)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        isSelected ?
+                        LinearGradient(
+                            colors: [
+                                Color.cyan.opacity(0.2),
+                                Color.purple.opacity(0.2)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        LinearGradient(
+                            colors: isPressed ?
+                                [Color.white.opacity(0.15), Color.white.opacity(0.1)] :
+                                [Color.white.opacity(0.08), Color.white.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(
+                                isSelected ?
+                                LinearGradient(
+                                    colors: [Color.cyan, Color.purple],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ) :
+                                LinearGradient(
+                                    colors: [Color.white.opacity(isPressed ? 0.3 : 0.15)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: isSelected ? 2 : 1
+                            )
+                    )
+            )
+        }
+        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .scaleEffect(isSelected ? 1.02 : 1.0)
+        .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = pressing
+            }
+        }, perform: {})
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isPressed)
+    }
+}

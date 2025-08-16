@@ -91,6 +91,14 @@
                 <string>sbawj0946ft24i4wjv</string>
             </array>
         </dict>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>snapchef-oauth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>snapchef</string>
+            </array>
+        </dict>
     </array>
     <key>TikTokClientKey</key>
     <string>sbawj0946ft24i4wjv</string>

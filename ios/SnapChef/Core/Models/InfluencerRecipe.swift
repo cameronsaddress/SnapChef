@@ -2,14 +2,14 @@ import SwiftUI
 import Foundation
 
 // Wrapper for Recipe with additional display properties
-struct InfluencerShowcaseRecipe {
+struct InfluencerShowcaseRecipe: Sendable {
     let recipe: Recipe
     let cuisine: String
     let tags: [String]
     let rating: Double
 }
 
-struct InfluencerRecipe: Identifiable {
+struct InfluencerRecipe: Identifiable, Sendable {
     let id = UUID()
     let influencerName: String
     let influencerHandle: String
