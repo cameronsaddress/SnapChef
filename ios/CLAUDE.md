@@ -285,6 +285,27 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
 
+### Latest Updates (Jan 16, 2025) - Part 27
+- **Pantry Photo Feature Implementation**
+  - **Dual Image Capture**: Added two-step photo capture flow in CameraView
+    - First captures fridge photo, then prompts for pantry photo
+    - New capture modes: `.fridge` and `.pantry` with visual indicators
+    - "Capture Your Pantry" UI appears after fridge photo
+  - **Server Integration**: Full support for dual image processing
+    - `sendBothImagesForRecipeGeneration` in SnapChefAPIManager sends both images
+    - Multipart form data with `fridge_image` and `pantry_image` fields
+    - Server analyzes both images and combines ingredients
+  - **Enhanced LLM Processing**:
+    - Updated server prompt to handle single OR dual image scenarios
+    - First image recognized as fridge, second as pantry
+    - Ingredients tracked by location (fridge vs pantry)
+    - Recipes intelligently use ingredients from both storage areas
+  - **API Updates**:
+    - Server main.py updated with `pantry_image` parameter
+    - Dynamic prompt building based on image count
+    - Both Grok and Gemini APIs support dual images
+  - **Build Status**: iOS app builds successfully with all features operational
+
 ### Latest Updates (Jan 15, 2025) - Part 26
 - **Fixed TikTokShareView Struct Boundaries**
   - **Compilation Error**: Fixed "extraneous '}' at top level" error in TikTokShareView.swift
