@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import UIKit
 
 /// Wrapper for CloudKit recipes with their photos cached locally
 struct CloudKitRecipeWithPhotos: Codable {
@@ -46,7 +47,7 @@ extension CloudKitRecipeManager {
             let photos = try await fetchRecipePhotos(for: recipeID)
             
             // Find the recipe in app state - check both recent and saved recipes
-            var foundRecipe: Recipe? = nil
+            var foundRecipe: Recipe?
             
             // Check recent recipes
             if let recipe = appState.recentRecipes.first(where: { $0.id.uuidString == recipeID }) {

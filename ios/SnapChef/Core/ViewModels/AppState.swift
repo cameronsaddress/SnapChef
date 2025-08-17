@@ -36,6 +36,10 @@ final class AppState: ObservableObject {
     // Progressive Authentication
     @Published var anonymousProfile: AnonymousUserProfile?
     
+    // Progressive Premium Integration
+    private let userLifecycle = UserLifecycleManager.shared
+    private let usageTracker = UsageTracker.shared
+    
     private let userDefaults = UserDefaults.standard
     private let firstLaunchKey = "hasLaunchedBefore"
     private let userJoinDateKey = "userJoinDate"
@@ -96,6 +100,10 @@ final class AppState: ObservableObject {
         
         // Also add to all recipes
         allRecipes.insert(recipe, at: 0)
+        
+        // Track in Progressive Premium systems
+        userLifecycle.trackRecipeCreated()
+        usageTracker.trackRecipeGenerated()
     }
     
     func toggleRecipeSave(_ recipe: Recipe) {
@@ -139,6 +147,9 @@ final class AppState: ObservableObject {
     func incrementSnapsTaken() {
         totalSnapsTaken += 1
         userDefaults.set(totalSnapsTaken, forKey: totalSnapsTakenKey)
+        
+        // Track app usage for lifecycle management
+        userLifecycle.updateLastActive()
     }
     
     func clearError() {
@@ -346,6 +357,9 @@ final class AppState: ObservableObject {
         
         // Track in gamification manager
         gamificationManager.trackRecipeCreated(recipe)
+        
+        // Track anonymous action for progressive auth
+        trackAnonymousAction(.recipeCreated)
     }
     
     func claimPendingRewards() {
@@ -379,10 +393,17 @@ final class AppState: ObservableObject {
             profile.recipesViewedCount += 1
         case .videoGenerated:
             profile.videosGeneratedCount += 1
+            // Track in Progressive Premium systems
+            userLifecycle.trackVideoShared()
+            usageTracker.trackVideoCreated()
         case .videoShared:
             profile.videosSharedCount += 1
+            // Track in Progressive Premium systems
+            userLifecycle.trackVideoShared()
         case .appOpened:
             profile.appOpenCount += 1
+            // Track app open for lifecycle management
+            userLifecycle.updateLastActive()
         case .challengeViewed:
             profile.challengesViewed += 1
         case .socialExplored:
@@ -436,6 +457,38 @@ final class AppState: ObservableObject {
                 authTrigger.onWeeklyHighEngagement()
             }
         }
+    }
+    
+    // MARK: - Progressive Premium Helpers
+    
+    /// Gets current daily limits based on user lifecycle and subscription
+    func getCurrentLimits() -> DailyLimits {
+        return userLifecycle.getDailyLimits()
+    }
+    
+    /// Checks if user can create more recipes today
+    func canCreateRecipe() -> Bool {
+        return !usageTracker.hasReachedRecipeLimit()
+    }
+    
+    /// Checks if user can create more videos today
+    func canCreateVideo() -> Bool {
+        return !usageTracker.hasReachedVideoLimit()
+    }
+    
+    /// Gets remaining recipe count for today
+    func getRemainingRecipes() -> Int {
+        return usageTracker.getRemainingRecipes()
+    }
+    
+    /// Gets remaining video count for today
+    func getRemainingVideos() -> Int {
+        return usageTracker.getRemainingVideos()
+    }
+    
+    /// Records usage when user opens the app (lifecycle tracking)
+    func trackAppOpen() {
+        trackAnonymousAction(.appOpened)
     }
 }
 

@@ -256,29 +256,20 @@ final class UsageTracker: ObservableObject {
     }
 
     private func getCurrentRecipeLimit() -> Int {
-        // TODO: Integrate with UserLifecycleManager and SubscriptionManager
-        // For now, return simple logic based on premium status
-        if isPremiumUser() {
-            return -1 // Unlimited
-        } else {
-            return 3 // Free tier limit
-        }
+        // Get dynamic limits from UserLifecycleManager
+        let limits = UserLifecycleManager.shared.getDailyLimits()
+        return limits.recipes
     }
 
     private func getCurrentVideoLimit() -> Int {
-        // TODO: Integrate with UserLifecycleManager and SubscriptionManager
-        // For now, return simple logic based on premium status
-        if isPremiumUser() {
-            return -1 // Unlimited
-        } else {
-            return 1 // Free tier limit
-        }
+        // Get dynamic limits from UserLifecycleManager
+        let limits = UserLifecycleManager.shared.getDailyLimits()
+        return limits.videos
     }
 
     private func isPremiumUser() -> Bool {
-        // TODO: Replace with actual SubscriptionManager check
-        // For now, check UserDefaults for testing
-        return userDefaults.bool(forKey: "is_premium_user")
+        // Use actual SubscriptionManager check
+        return SubscriptionManager.shared.isPremium
     }
 
     private func trackAnalyticsEvent(_ eventName: String, metadata: [String: Any]) {

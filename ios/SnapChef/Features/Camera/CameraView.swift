@@ -4,6 +4,9 @@ import AVFoundation
 struct CameraView: View {
     @StateObject private var cameraModel = CameraModel()
     @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @StateObject private var usageTracker = UsageTracker.shared
+    @StateObject private var userLifecycleManager = UserLifecycleManager.shared
+    @StateObject private var paywallTriggerManager = PaywallTriggerManager.shared
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
     @EnvironmentObject var cloudKitDataManager: CloudKitDataManager
@@ -92,13 +95,60 @@ struct CameraView: View {
             // UI overlay
             if !showingPreview {
                 VStack {
-                    // Top bar
-                    CameraTopBar(onClose: { 
-                        // Try dismiss first (for modal presentation)
-                        dismiss()
-                        // Also set tab to 0 (for tab presentation)
-                        selectedTab = 0
-                    })
+                    // Top bar with usage counter
+                    VStack(spacing: 12) {
+                        // Honeymoon banner (if applicable)
+                        if userLifecycleManager.currentPhase == .honeymoon {
+                            HoneymoonBanner()
+                        }
+                        
+                        // Top controls with usage counter
+                        HStack {
+                            // Close button
+                            Button(action: { 
+                                // Try dismiss first (for modal presentation)
+                                dismiss()
+                                // Also set tab to 0 (for tab presentation)
+                                selectedTab = 0
+                            }) {
+                                ZStack {
+                                    BlurredCircle()
+                                    
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.white)
+                                }
+                                .frame(width: 44, height: 44)
+                            }
+                            
+                            Spacer()
+                            
+                            // Usage counter - only show when user has limits (not unlimited)
+                            if !subscriptionManager.isPremium {
+                                let dailyLimits = userLifecycleManager.getDailyLimits()
+                                if dailyLimits.recipes != -1 {
+                                    UsageCounterView.recipes(
+                                        current: usageTracker.todaysUsage.recipeCount,
+                                        limit: dailyLimits.recipes
+                                    )
+                                    .onTapGesture {
+                                        // Check if should show paywall
+                                        if paywallTriggerManager.shouldShowPaywall(for: .recipeLimitReached) {
+                                            showPremiumPrompt = true
+                                            premiumPromptReason = .dailyLimitReached
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            // AI Assistant
+                            AIAssistantIndicator()
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 60)
+                    }
                     
                     Spacer()
                     
@@ -286,6 +336,15 @@ struct CameraView: View {
                         isPresented: $showPremiumPrompt,
                         reason: premiumPromptReason
                     )
+                    .onDisappear {
+                        // Record dismissal if user dismisses without upgrading
+                        if !subscriptionManager.isPremium {
+                            paywallTriggerManager.recordPaywallDismissed()
+                        } else {
+                            // User converted!
+                            paywallTriggerManager.recordPaywallConverted()
+                        }
+                    }
                 }
             }
         )
@@ -366,13 +425,18 @@ struct CameraView: View {
         cameraModel.stopSession()
         
         Task {
-            // Check subscription status
+            // Check subscription status and usage limits
             if !subscriptionManager.isPremium {
-                let remainingRecipes = subscriptionManager.getRemainingDailyRecipes()
-                if remainingRecipes <= 0 {
+                if usageTracker.hasReachedRecipeLimit() {
                     isProcessing = false
-                    premiumPromptReason = .dailyLimitReached
-                    showPremiumPrompt = true
+                    
+                    // Record paywall shown and trigger it
+                    if paywallTriggerManager.shouldShowPaywall(for: .recipeLimitReached) {
+                        paywallTriggerManager.recordPaywallShown(context: .recipeLimitReached)
+                        premiumPromptReason = .dailyLimitReached
+                        showPremiumPrompt = true
+                    }
+                    
                     cameraModel.requestCameraPermission()
                     return
                 }
@@ -480,6 +544,12 @@ struct CameraView: View {
                         )
                         await cloudKitDataManager.trackCameraSession(completedSession)
                         
+                        // Track usage with UsageTracker for daily limits
+                        self.usageTracker.trackRecipeGenerated()
+                        
+                        // Track with UserLifecycleManager
+                        self.userLifecycleManager.trackRecipeCreated()
+                        
                         // Track recipe generation
                         for recipe in recipes {
                             let generationData = RecipeGenerationData(
@@ -502,6 +572,16 @@ struct CameraView: View {
                         
                         // Track feature usage
                         await cloudKitDataManager.trackFeatureUse("recipe_generation")
+                        
+                        // Check if paywall should be triggered after successful generation
+                        if let suggestedContext = self.paywallTriggerManager.getSuggestedPaywallContext() {
+                            if self.paywallTriggerManager.shouldShowPaywall(for: suggestedContext) {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                    self.premiumPromptReason = .dailyLimitReached
+                                    self.showPremiumPrompt = true
+                                }
+                            }
+                        }
                         
                         // Save recipes to CloudKit with the captured fridge photo
                         print("📸 Uploading \(recipes.count) recipes with the same fridge photo to CloudKit...")
@@ -630,13 +710,18 @@ struct CameraView: View {
         cameraModel.stopSession()
         
         Task {
-            // Check subscription status
+            // Check subscription status and usage limits for dual images
             if !subscriptionManager.isPremium {
-                let remainingRecipes = subscriptionManager.getRemainingDailyRecipes()
-                if remainingRecipes <= 0 {
+                if usageTracker.hasReachedRecipeLimit() {
                     isProcessing = false
-                    premiumPromptReason = .dailyLimitReached
-                    showPremiumPrompt = true
+                    
+                    // Record paywall shown and trigger it
+                    if paywallTriggerManager.shouldShowPaywall(for: .recipeLimitReached) {
+                        paywallTriggerManager.recordPaywallShown(context: .recipeLimitReached)
+                        premiumPromptReason = .dailyLimitReached
+                        showPremiumPrompt = true
+                    }
+                    
                     cameraModel.requestCameraPermission()
                     return
                 }
@@ -744,6 +829,12 @@ struct CameraView: View {
                             processingTime: processingTime
                         )
                         await cloudKitDataManager.trackCameraSession(completedSession)
+                        
+                        // Track usage with UsageTracker for dual images
+                        self.usageTracker.trackRecipeGenerated()
+                        
+                        // Track with UserLifecycleManager
+                        self.userLifecycleManager.trackRecipeCreated()
                         
                         // Track recipe generation
                         for recipe in recipes {

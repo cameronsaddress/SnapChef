@@ -162,7 +162,7 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
             self.currentUser = nil
         }
 
-        throw TikTokAuthError.tokenRefreshFailed
+        throw lastError ?? TikTokAuthError.tokenRefreshFailed
     }
 
     /// Signs out the current user
@@ -543,7 +543,7 @@ struct TikTokErrorResponse: Codable, Sendable {
 
 /// TikTok user model
 struct TikTokUser: Identifiable, Codable, Sendable {
-    let id = UUID()
+    let id: UUID
     let openID: String
     let unionID: String?
     let displayName: String
@@ -559,6 +559,7 @@ struct TikTokUser: Identifiable, Codable, Sendable {
     let videoCount: Int
 
     init(from userData: UserInfoResponse.UserData) {
+        self.id = UUID()
         self.openID = userData.user.open_id
         self.unionID = userData.user.union_id
         self.displayName = userData.user.display_name

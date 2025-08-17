@@ -268,28 +268,49 @@ class SubscriptionManager: ObservableObject {
         return isPremium ? 2.0 : 1.0
     }
     
-    // MARK: - Free Tier Limits
-    func getRemainingDailyRecipes() -> Int {
-        guard !isPremium else { return Int.max }
-        
-        // Check today's recipe count from UserDefaults
-        let today = Calendar.current.startOfDay(for: Date())
-        let lastResetDate = UserDefaults.standard.object(forKey: "lastRecipeResetDate") as? Date ?? Date.distantPast
-        let recipeCount = UserDefaults.standard.integer(forKey: "dailyRecipeCount")
-        
-        if Calendar.current.isDate(lastResetDate, inSameDayAs: today) {
-            return max(0, 100 - recipeCount) // 100 free recipes per day (for testing)
-        } else {
-            // Reset count for new day
-            UserDefaults.standard.set(today, forKey: "lastRecipeResetDate")
-            UserDefaults.standard.set(0, forKey: "dailyRecipeCount")
-            return 100
-        }
+    // MARK: - Dynamic Limits System
+    
+    /// Get current daily limits based on user lifecycle phase and subscription status
+    func getCurrentLimits() -> DailyLimits {
+        return UserLifecycleManager.shared.getDailyLimits()
     }
     
+    /// Get remaining recipes for today using UsageTracker
+    func getRemainingRecipes() -> Int {
+        return UsageTracker.shared.getRemainingRecipes()
+    }
+    
+    /// Get remaining videos for today using UsageTracker
+    func getRemainingVideos() -> Int {
+        return UsageTracker.shared.getRemainingVideos()
+    }
+    
+    /// Check if user has reached daily limit for a specific tracker feature
+    func hasReachedDailyLimit(for feature: TrackerFeature) -> Bool {
+        return UsageTracker.shared.hasReachedLimit(for: feature)
+    }
+    
+    /// Get remaining usage for a lifecycle feature
+    func getRemainingUsage(for feature: UsageFeature) -> Int {
+        return UserLifecycleManager.shared.getRemainingUsage(for: feature)
+    }
+    
+    /// Check if user has reached daily limit for a lifecycle feature
+    func hasReachedDailyLimit(for feature: UsageFeature) -> Bool {
+        return UserLifecycleManager.shared.hasReachedDailyLimit(for: feature)
+    }
+    
+    // MARK: - Legacy Support (Deprecated)
+    
+    /// @deprecated Use getRemainingRecipes() instead
+    func getRemainingDailyRecipes() -> Int {
+        return getRemainingRecipes()
+    }
+    
+    /// @deprecated Use UsageTracker.shared.trackRecipeGenerated() instead
     func incrementDailyRecipeCount() {
-        let count = UserDefaults.standard.integer(forKey: "dailyRecipeCount")
-        UserDefaults.standard.set(count + 1, forKey: "dailyRecipeCount")
+        UsageTracker.shared.trackRecipeGenerated()
+        UserLifecycleManager.shared.trackRecipeCreated()
     }
     
     // MARK: - Price Formatting
