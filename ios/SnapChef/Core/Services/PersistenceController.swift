@@ -8,13 +8,14 @@ struct PersistenceController {
     static var preview: PersistenceController = {
         let result = PersistenceController(inMemory: true)
         let viewContext = result.container.viewContext
-        
+
         // Add sample data for previews if needed
         do {
             try viewContext.save()
         } catch {
-            let nsError = error as NSError
-            fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+            // In preview mode, log error but don't crash
+            print("Preview Core Data save error: \(error.localizedDescription)")
+            // Preview data is transient, so failure is acceptable
         }
         return result
     }()
@@ -23,7 +24,7 @@ struct PersistenceController {
 
     init(inMemory: Bool = false) {
         container = NSPersistentCloudKitContainer(name: "ChallengeModels")
-        
+
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
         } else {
@@ -34,17 +35,17 @@ struct PersistenceController {
                 storeDescription.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: "iCloud.com.snapchefapp.app")
             }
         }
-        
-        container.loadPersistentStores { (storeDescription, error) in
+
+        container.loadPersistentStores { _, error in
             if let error = error as NSError? {
                 // In production, handle this error appropriately
                 print("Core Data failed to load: \(error), \(error.userInfo)")
-                
+
                 // For development, we'll continue without persistence
                 // This allows the app to run even if Core Data setup fails
             }
         }
-        
+
         container.viewContext.automaticallyMergesChangesFromParent = true
     }
 }

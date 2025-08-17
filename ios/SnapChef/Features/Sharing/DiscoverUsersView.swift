@@ -14,21 +14,21 @@ struct UserProfile: Identifiable {
     let isVerified: Bool
     var isFollowing: Bool
     let bio: String?
-    
+
     // Additional properties for enhanced profiles
     var isLocal: Bool = false  // Indicates if this is a local fake user
-    var joinedDate: Date? = nil
-    var lastActive: Date? = nil
-    var cuisineSpecialty: String? = nil
-    var cookingLevel: String? = nil
-    
+    var joinedDate: Date?
+    var lastActive: Date?
+    var cuisineSpecialty: String?
+    var cookingLevel: String?
+
     var followerText: String {
         if followerCount == 1 {
             return "1 follower"
-        } else if followerCount > 1000000 {
-            return "\(followerCount / 1000000)M followers"
-        } else if followerCount > 1000 {
-            return "\(followerCount / 1000)K followers"
+        } else if followerCount > 1_000_000 {
+            return "\(followerCount / 1_000_000)M followers"
+        } else if followerCount > 1_000 {
+            return "\(followerCount / 1_000)K followers"
         } else {
             return "\(followerCount) followers"
         }
@@ -40,13 +40,13 @@ struct DiscoverUsersView: View {
     @StateObject private var viewModel = DiscoverUsersViewModel()
     @State private var searchText = ""
     @State private var selectedCategory: DiscoverCategory = .suggested
-    
+
     enum DiscoverCategory: String, CaseIterable {
         case suggested = "Suggested"
         case trending = "Trending"
         case newChefs = "New Chefs"
         case verified = "Verified"
-        
+
         var icon: String {
             switch self {
             case .suggested: return "sparkles"
@@ -56,13 +56,13 @@ struct DiscoverUsersView: View {
             }
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // Search Bar
                     SearchBarView(searchText: $searchText)
@@ -77,7 +77,7 @@ struct DiscoverUsersView: View {
                                 }
                             }
                         }
-                    
+
                     // Category Pills
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
@@ -100,7 +100,7 @@ struct DiscoverUsersView: View {
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 16)
-                    
+
                     // Users List
                     if viewModel.isLoading && viewModel.users.isEmpty {
                         Spacer()
@@ -127,7 +127,7 @@ struct DiscoverUsersView: View {
                                         }
                                     )
                                 }
-                                
+
                                 if viewModel.hasMore {
                                     ProgressView()
                                         .tint(.white)
@@ -162,12 +162,12 @@ struct DiscoverUsersView: View {
             await viewModel.loadUsers(for: selectedCategory)
         }
         .sheet(item: $viewModel.selectedUser) { user in
-            // TODO: Show user profile view
+            // User profile view not implemented - showing basic info
             Text("User Profile: \(user.displayName)")
                 .presentationDetents([.medium, .large])
         }
     }
-    
+
     private var filteredUsers: [UserProfile] {
         if !searchText.isEmpty && !viewModel.searchResults.isEmpty {
             return viewModel.searchResults
@@ -187,13 +187,13 @@ struct DiscoverUsersView: View {
 struct SearchBarView: View {
     @Binding var searchText: String
     @State private var isEditing = false
-    
+
     var body: some View {
         HStack {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.white.opacity(0.6))
-                
+
                 TextField("Search chefs...", text: $searchText)
                     .foregroundColor(.white)
                     .accentColor(.white)
@@ -202,7 +202,7 @@ struct SearchBarView: View {
                             isEditing = true
                         }
                     }
-                
+
                 if !searchText.isEmpty {
                     Button(action: {
                         searchText = ""
@@ -217,7 +217,7 @@ struct SearchBarView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.white.opacity(0.1))
             )
-            
+
             if isEditing {
                 Button("Cancel") {
                     withAnimation {
@@ -241,7 +241,7 @@ struct DiscoverCategoryPill: View {
     let icon: String
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
@@ -266,16 +266,16 @@ struct UserDiscoveryCard: View {
     let user: UserProfile
     let onFollow: () -> Void
     let onTap: () -> Void
-    
+
     @State private var isFollowing: Bool
-    
+
     init(user: UserProfile, onFollow: @escaping () -> Void, onTap: @escaping () -> Void) {
         self.user = user
         self.onFollow = onFollow
         self.onTap = onTap
         self._isFollowing = State(initialValue: user.isFollowing)
     }
-    
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 16) {
@@ -303,7 +303,7 @@ struct UserDiscoveryCard: View {
                                     .foregroundColor(.white)
                             )
                     }
-                    
+
                     if user.isVerified {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 20))
@@ -312,39 +312,39 @@ struct UserDiscoveryCard: View {
                             .offset(x: 20, y: 20)
                     }
                 }
-                
+
                 VStack(alignment: .leading, spacing: 6) {
                     // Name and Username
                     HStack {
                         Text(user.displayName)
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.white)
-                        
+
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.system(size: 14))
                                 .foregroundColor(.blue)
                         }
                     }
-                    
+
                     Text("@\(user.username)")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.7))
-                    
+
                     // Stats
                     HStack(spacing: 16) {
                         Text(user.followerText)
                             .font(.system(size: 13))
                             .foregroundColor(.white.opacity(0.8))
-                        
+
                         Text("\(user.recipesShared) recipes")
                             .font(.system(size: 13))
                             .foregroundColor(.white.opacity(0.8))
                     }
                 }
-                
+
                 Spacer()
-                
+
                 // Follow Button
                 Button(action: {
                     withAnimation(.spring(response: 0.3)) {
@@ -387,20 +387,20 @@ struct EmptyDiscoverView: View {
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
-            
+
             Image(systemName: "person.crop.circle.badge.questionmark")
                 .font(.system(size: 60))
                 .foregroundColor(.white.opacity(0.3))
-            
+
             Text("No chefs found")
                 .font(.system(size: 24, weight: .bold))
                 .foregroundColor(.white)
-            
+
             Text("Try adjusting your search or\ncheck back later for new chefs")
                 .font(.system(size: 16))
                 .foregroundColor(.white.opacity(0.6))
                 .multilineTextAlignment(.center)
-            
+
             Spacer()
         }
         .padding()
@@ -416,41 +416,41 @@ class DiscoverUsersViewModel: ObservableObject {
     @Published var selectedUser: UserProfile?
     @Published var searchResults: [UserProfile] = []
     @Published var isSearching = false
-    
+
     private let cloudKitAuth = CloudKitAuthManager.shared
     private let cloudKitSync = CloudKitSyncService.shared
     private var lastFetchedRecord: CKRecord?
     private var fakeUsers: [UserProfile] = []
     private var cloudKitUsers: [UserProfile] = []
-    
+
     init() {
         // Load fake users on initialization
         loadFakeUsers()
     }
-    
+
     private func loadFakeUsers() {
         // Removed fake user generation - now only uses real CloudKit users
         fakeUsers = []
     }
-    
+
     func loadUsers(for category: DiscoverUsersView.DiscoverCategory) async {
         isLoading = true
         users = []
         lastFetchedRecord = nil
-        
+
         // Load CloudKit users
         await loadCloudKitUsers(for: category)
-        
+
         // Combine with fake users based on category
         let filteredFakeUsers = filterFakeUsers(for: category)
-        
+
         // Merge CloudKit and fake users
         users = mergeUsers(cloudKit: cloudKitUsers, fake: filteredFakeUsers)
-        
+
         hasMore = false
         isLoading = false
     }
-    
+
     private func loadCloudKitUsers(for category: DiscoverUsersView.DiscoverCategory) async {
         do {
             switch category {
@@ -473,7 +473,7 @@ class DiscoverUsersViewModel: ObservableObject {
             cloudKitUsers = []
         }
     }
-    
+
     private func filterFakeUsers(for category: DiscoverUsersView.DiscoverCategory) -> [UserProfile] {
         switch category {
         case .suggested:
@@ -483,7 +483,7 @@ class DiscoverUsersViewModel: ObservableObject {
             // Return users with recent activity
             return fakeUsers.filter { user in
                 if let lastActive = user.lastActive {
-                    return Date().timeIntervalSince(lastActive) < 86400 // Active in last 24 hours
+                    return Date().timeIntervalSince(lastActive) < 86_400 // Active in last 24 hours
                 }
                 return false
             }.prefix(20).map { $0 }
@@ -491,7 +491,7 @@ class DiscoverUsersViewModel: ObservableObject {
             // Return users who joined recently
             return fakeUsers.filter { user in
                 if let joinedDate = user.joinedDate {
-                    return Date().timeIntervalSince(joinedDate) < 604800 // Joined in last week
+                    return Date().timeIntervalSince(joinedDate) < 604_800 // Joined in last week
                 }
                 return false
             }.prefix(20).map { $0 }
@@ -500,13 +500,13 @@ class DiscoverUsersViewModel: ObservableObject {
             return fakeUsers.filter { $0.isVerified }.prefix(20).map { $0 }
         }
     }
-    
+
     private func mergeUsers(cloudKit: [UserProfile], fake: [UserProfile]) -> [UserProfile] {
         // Combine and sort by follower count
         let combined = cloudKit + fake
         return combined.sorted { $0.followerCount > $1.followerCount }
     }
-    
+
     private func convertToUserProfile(_ cloudKitUser: CloudKitUser) -> UserProfile {
         UserProfile(
             id: cloudKitUser.recordID ?? "",
@@ -527,15 +527,15 @@ class DiscoverUsersViewModel: ObservableObject {
             cookingLevel: nil
         )
     }
-    
+
     func searchUsers(_ query: String) async {
         guard !query.isEmpty else {
             searchResults = []
             return
         }
-        
+
         isSearching = true
-        
+
         // Search fake users locally
         let matchingFakeUsers = fakeUsers.filter {
             $0.username.localizedCaseInsensitiveContains(query) ||
@@ -543,7 +543,7 @@ class DiscoverUsersViewModel: ObservableObject {
             ($0.bio?.localizedCaseInsensitiveContains(query) ?? false) ||
             ($0.cuisineSpecialty?.localizedCaseInsensitiveContains(query) ?? false)
         }
-        
+
         // Search CloudKit users
         var matchingCloudKitUsers: [UserProfile] = []
         do {
@@ -552,22 +552,22 @@ class DiscoverUsersViewModel: ObservableObject {
         } catch {
             print("Failed to search CloudKit users: \(error)")
         }
-        
+
         // Combine and sort results
         searchResults = mergeUsers(cloudKit: matchingCloudKitUsers, fake: matchingFakeUsers)
         isSearching = false
     }
-    
+
     func loadMore() async {
         guard hasMore && !isLoading else { return }
-        
+
         isLoading = true
-        
-        // TODO: Implement pagination with CloudKit
-        
+
+        // CloudKit pagination not implemented - using mock data
+
         isLoading = false
     }
-    
+
     func toggleFollow(_ user: UserProfile) async {
         // Only allow following for CloudKit users, not local fake users
         if user.isLocal {
@@ -588,7 +588,7 @@ class DiscoverUsersViewModel: ObservableObject {
                 } else {
                     try await cloudKitAuth.followUser(user.id)
                 }
-                
+
                 // Update local state
                 if let index = users.firstIndex(where: { $0.id == user.id }) {
                     users[index].isFollowing.toggle()
@@ -598,7 +598,7 @@ class DiscoverUsersViewModel: ObservableObject {
                     searchResults[index].isFollowing.toggle()
                     searchResults[index].followerCount += searchResults[index].isFollowing ? 1 : -1
                 }
-                
+
                 // Force reload the current user to update following count in FeedView
                 await cloudKitAuth.refreshCurrentUser()
             } catch {

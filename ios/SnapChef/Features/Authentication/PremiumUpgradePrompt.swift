@@ -6,26 +6,26 @@ struct PremiumUpgradePrompt: View {
     @StateObject private var userLifecycle = UserLifecycleManager.shared
     @StateObject private var usageTracker = UsageTracker.shared
     let reason: UpgradeReason
-    
+
     enum UpgradeReason {
         case dailyLimitReached
         case premiumFeature(String)
         case videoLimitReached
         case challengeLimitReached
-        
+
         var title: String {
             switch self {
             case .dailyLimitReached:
                 return "Recipe Limit Reached"
             case .videoLimitReached:
                 return "Video Limit Reached"
-            case .premiumFeature(_):
+            case .premiumFeature:
                 return "Premium Feature"
             case .challengeLimitReached:
                 return "Challenge Limit Reached"
             }
         }
-        
+
         @MainActor
         func message(userLifecycle: UserLifecycleManager) -> String {
             switch self {
@@ -43,7 +43,7 @@ struct PremiumUpgradePrompt: View {
                 return "You've reached your daily challenge limit. Upgrade for unlimited challenges and 2x rewards!"
             }
         }
-        
+
         var icon: String {
             switch self {
             case .dailyLimitReached:
@@ -57,7 +57,7 @@ struct PremiumUpgradePrompt: View {
             }
         }
     }
-    
+
     var body: some View {
         ZStack {
             // Background blur
@@ -66,7 +66,7 @@ struct PremiumUpgradePrompt: View {
                 .onTapGesture {
                     isPresented = false
                 }
-            
+
             // Content card
             VStack(spacing: 24) {
                 // Close button
@@ -78,7 +78,7 @@ struct PremiumUpgradePrompt: View {
                             .foregroundColor(.white.opacity(0.6))
                     }
                 }
-                
+
                 // Icon
                 ZStack {
                     Circle()
@@ -93,24 +93,24 @@ struct PremiumUpgradePrompt: View {
                             )
                         )
                         .frame(width: 80, height: 80)
-                    
+
                     Image(systemName: reason.icon)
                         .font(.system(size: 40))
                         .foregroundColor(.white)
                 }
-                
+
                 // Title
                 Text(reason.title)
                     .font(.system(size: 28, weight: .bold))
                     .foregroundColor(.white)
-                
+
                 // Message
                 Text(reason.message(userLifecycle: userLifecycle))
                     .font(.system(size: 18))
                     .foregroundColor(.white.opacity(0.9))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                
+
                 // Benefits - Dynamic based on user phase
                 VStack(alignment: .leading, spacing: 12) {
                     if userLifecycle.currentPhase == .honeymoon {
@@ -119,12 +119,12 @@ struct PremiumUpgradePrompt: View {
                             .foregroundColor(.green)
                             .padding(.bottom, 4)
                     }
-                    
+
                     BenefitRow(icon: "infinity", text: "Unlimited recipes every day")
                     BenefitRow(icon: "video.fill", text: "Unlimited TikTok videos")
                     BenefitRow(icon: "sparkles", text: "Premium video effects")
                     BenefitRow(icon: "trophy.fill", text: "2x challenge rewards")
-                    
+
                     if userLifecycle.currentPhase == .honeymoon {
                         let daysRemaining = 7 - userLifecycle.daysActive
                         Text("\(daysRemaining) days of free premium remaining")
@@ -134,7 +134,7 @@ struct PremiumUpgradePrompt: View {
                     }
                 }
                 .padding(.vertical, 16)
-                
+
                 // Upgrade button
                 MagneticButton(
                     title: "Upgrade to Premium",
@@ -143,29 +143,46 @@ struct PremiumUpgradePrompt: View {
                         showSubscriptionView = true
                     }
                 )
-                
-                // Continue with limited - Dynamic based on reason
-                switch reason {
-                case .dailyLimitReached, .videoLimitReached:
-                    Button(action: { isPresented = false }) {
-                        VStack(spacing: 4) {
-                            Text("Continue with Free")
-                                .font(.system(size: 16, weight: .medium))
-                            Text("Resets at midnight")
-                                .font(.system(size: 12))
-                                .opacity(0.7)
+
+                // Additional actions
+                HStack(spacing: 20) {
+                    // Restore Purchases button
+                    Button(action: {
+                        Task {
+                            await SubscriptionManager.shared.restorePurchases()
+                            if SubscriptionManager.shared.isPremium {
+                                isPresented = false
+                            }
                         }
-                        .foregroundColor(.white.opacity(0.6))
+                    }) {
+                        Text("Restore Purchases")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.5))
+                            .underline()
                     }
-                    .padding(.top, 8)
-                default:
-                    Button(action: { isPresented = false }) {
-                        Text("Maybe Later")
-                            .font(.system(size: 16))
+                    
+                    // Continue with limited - Dynamic based on reason
+                    switch reason {
+                    case .dailyLimitReached, .videoLimitReached:
+                        Button(action: { isPresented = false }) {
+                            VStack(spacing: 4) {
+                                Text("Continue with Free")
+                                    .font(.system(size: 16, weight: .medium))
+                                Text("Resets at midnight")
+                                    .font(.system(size: 12))
+                                    .opacity(0.7)
+                            }
                             .foregroundColor(.white.opacity(0.6))
+                        }
+                    default:
+                        Button(action: { isPresented = false }) {
+                            Text("Maybe Later")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
                     }
-                    .padding(.top, 8)
                 }
+                .padding(.top, 8)
             }
             .padding(32)
             .background(
@@ -200,18 +217,18 @@ struct PremiumUpgradePrompt: View {
 struct BenefitRow: View {
     let icon: String
     let text: String
-    
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 20))
                 .foregroundColor(Color(hex: "#667eea"))
                 .frame(width: 28)
-            
+
             Text(text)
                 .font(.system(size: 16))
                 .foregroundColor(.white)
-            
+
             Spacer()
         }
     }

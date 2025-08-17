@@ -15,11 +15,11 @@ enum TikTokTemplate: String, CaseIterable {
     case timelapse = "Cooking Timelapse"
     case splitScreen = "Split Screen"
     case test = "Test (Photos Only)"  // Simple test template - no effects
-    
+
     var name: String {
         return rawValue
     }
-    
+
     var description: String {
         switch self {
         case .beforeAfterReveal:
@@ -36,7 +36,7 @@ enum TikTokTemplate: String, CaseIterable {
             return "Simple test: 1 second before photo, 1 second after photo, no effects"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .beforeAfterReveal: return "arrow.left.arrow.right"
@@ -47,7 +47,7 @@ enum TikTokTemplate: String, CaseIterable {
         case .test: return "photo.on.rectangle"
         }
     }
-    
+
     var gradientColors: [Color] {
         switch self {
         case .beforeAfterReveal:
@@ -64,7 +64,7 @@ enum TikTokTemplate: String, CaseIterable {
             return [Color.orange, Color.yellow]  // Bright orange-yellow for visibility
         }
     }
-    
+
     @ViewBuilder
     func previewContent(_ content: ShareContent) -> some View {
         switch self {
@@ -89,7 +89,7 @@ enum TikTokTemplate: String, CaseIterable {
 struct BeforeAfterPreview: View {
     let content: ShareContent
     @State private var showAfter = false
-    
+
     var body: some View {
         ZStack {
             // Before state
@@ -114,7 +114,7 @@ struct BeforeAfterPreview: View {
                             Text("BEFORE")
                                 .font(.system(size: 24, weight: .black))
                                 .foregroundColor(.white)
-                            
+
                             Image(systemName: "refrigerator")
                                 .font(.system(size: 60))
                                 .foregroundColor(.white.opacity(0.8))
@@ -123,7 +123,7 @@ struct BeforeAfterPreview: View {
                 }
                 .transition(.opacity)
             }
-            
+
             // After state
             if showAfter {
                 Group {
@@ -136,7 +136,7 @@ struct BeforeAfterPreview: View {
                                     Text("AFTER")
                                         .font(.system(size: 24, weight: .black))
                                         .foregroundColor(.white)
-                                    
+
                                     if case .recipe(let recipe) = content.type {
                                         Text(recipe.name)
                                             .font(.system(size: 16, weight: .bold))
@@ -156,7 +156,7 @@ struct BeforeAfterPreview: View {
                             Text("AFTER")
                                 .font(.system(size: 24, weight: .black))
                                 .foregroundColor(.white)
-                            
+
                             if case .recipe(let recipe) = content.type {
                                 Text(recipe.name)
                                     .font(.system(size: 18, weight: .bold))
@@ -182,7 +182,7 @@ struct QuickRecipePreview: View {
     let content: ShareContent
     @State private var currentStep = 0
     let steps = ["📸 Snap", "🤖 AI Magic", "🍳 Cook", "😋 Enjoy!"]
-    
+
     var body: some View {
         ZStack {
             // Background with photos cycling
@@ -205,7 +205,7 @@ struct QuickRecipePreview: View {
                         .overlay(Color.black.opacity(0.5))
                 }
             }
-            
+
             VStack(spacing: 20) {
                 Text("60-SECOND RECIPE")
                     .font(.system(size: 18, weight: .black))
@@ -213,7 +213,7 @@ struct QuickRecipePreview: View {
                     .padding(8)
                     .background(Color.black.opacity(0.7))
                     .cornerRadius(8)
-                
+
                 Text(steps[currentStep])
                     .font(.system(size: 32))
                     .transition(.slide)
@@ -235,7 +235,7 @@ struct QuickRecipePreview: View {
 struct Ingredients360Preview: View {
     let content: ShareContent
     @State private var rotation: Double = 0
-    
+
     var body: some View {
         ZStack {
             // Rotating background photo
@@ -248,7 +248,7 @@ struct Ingredients360Preview: View {
                     .overlay(Color.black.opacity(0.4))
                     .rotation3DEffect(.degrees(rotation / 2), axis: (x: 0, y: 1, z: 0))
             }
-            
+
             VStack(spacing: 20) {
                 Text("360° VIEW")
                     .font(.system(size: 18, weight: .black))
@@ -256,7 +256,7 @@ struct Ingredients360Preview: View {
                     .padding(8)
                     .background(Color.black.opacity(0.7))
                     .cornerRadius(8)
-                
+
                 if content.afterImage == nil {
                     Image(systemName: "cube.transparent")
                         .font(.system(size: 60))
@@ -277,7 +277,7 @@ struct Ingredients360Preview: View {
 struct TimelapsePreview: View {
     let content: ShareContent
     @State private var progress: CGFloat = 0
-    
+
     var body: some View {
         ZStack {
             // Animated background transitioning between photos
@@ -300,7 +300,7 @@ struct TimelapsePreview: View {
                         .overlay(Color.black.opacity(0.4))
                 }
             }
-            
+
             VStack(spacing: 20) {
                 Text("TIMELAPSE")
                     .font(.system(size: 18, weight: .black))
@@ -308,18 +308,18 @@ struct TimelapsePreview: View {
                     .padding(8)
                     .background(Color.black.opacity(0.7))
                     .cornerRadius(8)
-                
+
                 ZStack {
                     Circle()
                         .stroke(Color.white.opacity(0.3), lineWidth: 8)
                         .frame(width: 80, height: 80)
-                    
+
                     Circle()
                         .trim(from: 0, to: progress)
                         .stroke(Color.white, lineWidth: 8)
                         .frame(width: 80, height: 80)
                         .rotationEffect(.degrees(-90))
-                    
+
                     Image(systemName: "play.fill")
                         .font(.system(size: 30))
                         .foregroundColor(.white)
@@ -337,7 +337,7 @@ struct TimelapsePreview: View {
 
 struct SplitScreenPreview: View {
     let content: ShareContent
-    
+
     var body: some View {
         HStack(spacing: 0) {
             // Left side - Before
@@ -350,7 +350,7 @@ struct SplitScreenPreview: View {
                         .clipped()
                         .overlay(Color.black.opacity(0.3))
                 }
-                
+
                 VStack {
                     Text("BEFORE")
                         .font(.system(size: 14, weight: .bold))
@@ -358,7 +358,7 @@ struct SplitScreenPreview: View {
                         .padding(6)
                         .background(Color.black.opacity(0.7))
                         .cornerRadius(6)
-                    
+
                     if content.beforeImage == nil {
                         Image(systemName: "refrigerator")
                             .font(.system(size: 40))
@@ -368,11 +368,11 @@ struct SplitScreenPreview: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.black.opacity(0.3))
-            
+
             Rectangle()
                 .fill(Color.white)
                 .frame(width: 2)
-            
+
             // Right side - After
             ZStack {
                 if let afterImage = content.afterImage {
@@ -383,7 +383,7 @@ struct SplitScreenPreview: View {
                         .clipped()
                         .overlay(Color.black.opacity(0.3))
                 }
-                
+
                 VStack {
                     Text("AFTER")
                         .font(.system(size: 14, weight: .bold))
@@ -391,7 +391,7 @@ struct SplitScreenPreview: View {
                         .padding(6)
                         .background(Color.black.opacity(0.7))
                         .cornerRadius(6)
-                    
+
                     if content.afterImage == nil {
                         Image(systemName: "sparkles")
                             .font(.system(size: 40))
@@ -412,7 +412,7 @@ struct TrendingAudio: Identifiable {
     let name: String
     let artist: String
     let useCount: Int
-    
+
     static let suggestions = [
         TrendingAudio(name: "Cooking Dance", artist: "TikTok Sounds", useCount: 234),
         TrendingAudio(name: "Recipe Reveal", artist: "FoodTok", useCount: 189),
@@ -427,7 +427,7 @@ struct TrendingAudio: Identifiable {
 struct TestTemplatePreview: View {
     let content: ShareContent
     @State private var showingAfter = false
-    
+
     var body: some View {
         ZStack {
             // Simple display - before or after

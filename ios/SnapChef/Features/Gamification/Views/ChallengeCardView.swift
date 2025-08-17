@@ -3,14 +3,14 @@ import SwiftUI
 struct ChallengeCardView: View {
     let challenge: Challenge
     let onTap: () -> Void
-    
+
     @State private var isPressed = false
     @State private var particleOffset: CGFloat = 0
-    
+
     private var progressPercentage: Double {
         min(challenge.currentProgress, 1.0)
     }
-    
+
     private var progressColor: Color {
         switch challenge.type {
         case .daily:
@@ -23,7 +23,7 @@ struct ChallengeCardView: View {
             return Color(hex: "#feca57")
         }
     }
-    
+
     private var typeIcon: String {
         switch challenge.type {
         case .daily:
@@ -36,7 +36,7 @@ struct ChallengeCardView: View {
             return "person.3.fill"
         }
     }
-    
+
     var body: some View {
         Button(action: onTap) {
             GlassmorphicCard(content: {
@@ -48,26 +48,26 @@ struct ChallengeCardView: View {
                             Circle()
                                 .fill(progressColor.opacity(0.2))
                                 .frame(width: 40, height: 40)
-                            
+
                             Image(systemName: typeIcon)
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundColor(progressColor)
                         }
-                        
+
                         VStack(alignment: .leading, spacing: 4) {
                             Text(challenge.title)
                                 .font(.headline)
                                 .foregroundColor(.primary)
-                            
+
                             HStack(spacing: 4) {
                                 Image(systemName: "person.2.fill")
                                     .font(.caption2)
                                 Text("\(challenge.participants)")
                                     .font(.caption)
-                                
+
                                 Text("•")
                                     .foregroundColor(.secondary)
-                                
+
                                 Image(systemName: "clock.fill")
                                     .font(.caption2)
                                 Text(challenge.timeRemaining)
@@ -75,9 +75,9 @@ struct ChallengeCardView: View {
                             }
                             .foregroundColor(.secondary)
                         }
-                        
+
                         Spacer()
-                        
+
                         // Reward preview
                         if challenge.points > 0 {
                             HStack(spacing: 4) {
@@ -90,7 +90,7 @@ struct ChallengeCardView: View {
                             }
                         }
                     }
-                    
+
                     // Description
                     Text(challenge.description)
                         .font(.subheadline)
@@ -98,7 +98,7 @@ struct ChallengeCardView: View {
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    
+
                     // Progress section
                     VStack(spacing: 8) {
                         // Progress bar
@@ -108,7 +108,7 @@ struct ChallengeCardView: View {
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color.gray.opacity(0.2))
                                     .frame(height: 8)
-                                
+
                                 // Progress fill
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(
@@ -120,7 +120,7 @@ struct ChallengeCardView: View {
                                     )
                                     .frame(width: geometry.size.width * progressPercentage, height: 8)
                                     .animation(.spring(response: 0.5, dampingFraction: 0.8), value: progressPercentage)
-                                
+
                                 // Shimmer effect
                                 if progressPercentage > 0 {
                                     RoundedRectangle(cornerRadius: 8)
@@ -146,22 +146,22 @@ struct ChallengeCardView: View {
                             }
                         }
                         .frame(height: 8)
-                        
+
                         // Progress text
                         HStack {
                             Text(challenge.requirements.first ?? "")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            
+
                             Spacer()
-                            
+
                             Text("\(Int(progressPercentage * 100))%")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundColor(progressColor)
                         }
                     }
-                    
+
                     // Status badges
                     HStack(spacing: 8) {
                         if challenge.isCompleted {
@@ -183,16 +183,10 @@ struct ChallengeCardView: View {
                                 color: .blue
                             )
                         }
-                        
-                        // TODO: Add rank from leaderboard data
-                        // if let rank = leaderboardRank {
-                        //     StatusBadge(
-                        //         text: "#\(rank)",
-                        //         icon: "trophy.fill",
-                        //         color: .orange
-                        //     )
-                        // }
-                        
+
+                        // Leaderboard rank not implemented - would show user's rank in challenge
+                        // Feature disabled until leaderboard integration is complete
+
                         Spacer()
                     }
                 }
@@ -213,7 +207,7 @@ private struct StatusBadge: View {
     let text: String
     let icon: String
     let color: Color
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
@@ -243,14 +237,14 @@ struct ChallengeCardView_Previews: PreviewProvider {
                     type: .daily,
                     points: 100,
                     coins: 10,
-                    endDate: Date().addingTimeInterval(86400),
+                    endDate: Date().addingTimeInterval(86_400),
                     requirements: ["2/3 recipes"],
                     currentProgress: 0.67,
                     participants: 567
                 ),
                 onTap: {}
             )
-            
+
             ChallengeCardView(
                 challenge: {
                     var challenge = Challenge(
@@ -259,10 +253,10 @@ struct ChallengeCardView_Previews: PreviewProvider {
                         type: .weekly,
                         points: 500,
                         coins: 50,
-                        endDate: Date().addingTimeInterval(604800),
+                        endDate: Date().addingTimeInterval(604_800),
                         requirements: ["10/10 recipes"],
                         currentProgress: 1.0,
-                        participants: 2345
+                        participants: 2_345
                     )
                     challenge.isCompleted = true
                     return challenge

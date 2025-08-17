@@ -9,13 +9,13 @@ struct LeaderboardView: View {
     @State private var showShareSheet = false
     @State private var searchText = ""
     @State private var animateRankChange = false
-    
+
     enum LeaderboardTimeframe: String, CaseIterable {
         case daily = "Today"
         case weekly = "This Week"
         case monthly = "This Month"
         case allTime = "All Time"
-        
+
         var icon: String {
             switch self {
             case .daily: return "sun.max.fill"
@@ -25,13 +25,13 @@ struct LeaderboardView: View {
             }
         }
     }
-    
+
     enum LeaderboardRegion: String, CaseIterable {
         case global = "Global"
         case country = "Country"
         case city = "City"
         case friends = "Friends"
-        
+
         var icon: String {
             switch self {
             case .global: return "globe"
@@ -41,10 +41,10 @@ struct LeaderboardView: View {
             }
         }
     }
-    
+
     var filteredLeaderboard: [LeaderboardEntry] {
         let baseLeaderboard = selectedTimeframe == .weekly ? gamificationManager.weeklyLeaderboard : gamificationManager.globalLeaderboard
-        
+
         if searchText.isEmpty {
             return baseLeaderboard
         } else {
@@ -53,20 +53,20 @@ struct LeaderboardView: View {
             }
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // Header with User Stats
                     UserStatsHeader()
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
                         .padding(.bottom, 20)
-                    
+
                     // Filter Controls
                     VStack(spacing: 16) {
                         // Timeframe Selector
@@ -86,7 +86,7 @@ struct LeaderboardView: View {
                             }
                             .padding(.horizontal, 20)
                         }
-                        
+
                         // Region Selector
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
@@ -104,12 +104,12 @@ struct LeaderboardView: View {
                             }
                             .padding(.horizontal, 20)
                         }
-                        
+
                         // Search Bar
                         HStack {
                             Image(systemName: "magnifyingglass")
                                 .foregroundColor(.white.opacity(0.6))
-                            
+
                             TextField("Search players...", text: $searchText)
                                 .foregroundColor(.white)
                                 .autocapitalization(.none)
@@ -126,7 +126,7 @@ struct LeaderboardView: View {
                         .padding(.horizontal, 20)
                     }
                     .padding(.bottom, 20)
-                    
+
                     // Leaderboard List
                     if isLoading {
                         Spacer()
@@ -143,7 +143,7 @@ struct LeaderboardView: View {
                                         .padding(.horizontal, 20)
                                         .padding(.bottom, 20)
                                 }
-                                
+
                                 // Rest of the leaderboard
                                 ForEach(filteredLeaderboard.dropFirst(searchText.isEmpty ? 3 : 0)) { entry in
                                     LeaderboardRow(entry: entry)
@@ -178,10 +178,10 @@ struct LeaderboardView: View {
             animateRankChange = true
         }
     }
-    
+
     private func loadLeaderboard() {
         isLoading = true
-        
+
         // Simulate network delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             // In real app, fetch from server based on filters
@@ -191,16 +191,16 @@ struct LeaderboardView: View {
             }
         }
     }
-    
+
     private func generateShareText() -> String {
         let rank = gamificationManager.userStats.weeklyRank ?? 0
         return """
         🏆 I'm ranked #\(rank) on SnapChef this week!
-        
+
         Level \(gamificationManager.userStats.level) | \(gamificationManager.userStats.totalPoints) points
-        
+
         Think you can beat me? Download SnapChef and join the competition!
-        
+
         #SnapChef #CookingChallenge #Leaderboard
         """
     }
@@ -209,7 +209,7 @@ struct LeaderboardView: View {
 // MARK: - User Stats Header
 struct UserStatsHeader: View {
     @StateObject private var gamificationManager = GamificationManager.shared
-    
+
     var body: some View {
         GlassmorphicCard {
             VStack(spacing: 16) {
@@ -218,20 +218,20 @@ struct UserStatsHeader: View {
                         Text("Your Ranking")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white.opacity(0.7))
-                        
+
                         HStack(alignment: .lastTextBaseline, spacing: 4) {
                             Text("#\(gamificationManager.userStats.weeklyRank ?? 0)")
                                 .font(.system(size: 32, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
-                            
+
                             Image(systemName: "arrow.up")
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(Color(hex: "#43e97b"))
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     VStack(alignment: .trailing, spacing: 8) {
                         HStack(spacing: 12) {
                             StatBubble(
@@ -239,7 +239,7 @@ struct UserStatsHeader: View {
                                 value: "\(gamificationManager.userStats.currentStreak)",
                                 label: "Streak"
                             )
-                            
+
                             StatBubble(
                                 icon: "star.fill",
                                 value: "\(gamificationManager.userStats.level)",
@@ -248,26 +248,26 @@ struct UserStatsHeader: View {
                         }
                     }
                 }
-                
+
                 // Progress to next rank
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("Next Rank")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white.opacity(0.7))
-                        
+
                         Spacer()
-                        
+
                         Text("250 points to go")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white.opacity(0.7))
                     }
-                    
+
                     GeometryReader { geometry in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(Color.white.opacity(0.2))
-                            
+
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(
                                     LinearGradient(
@@ -295,7 +295,7 @@ struct StatBubble: View {
     let icon: String
     let value: String
     let label: String
-    
+
     var body: some View {
         VStack(spacing: 4) {
             HStack(spacing: 4) {
@@ -305,7 +305,7 @@ struct StatBubble: View {
                     .font(.system(size: 16, weight: .bold, design: .rounded))
             }
             .foregroundColor(.white)
-            
+
             Text(label)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.white.opacity(0.6))
@@ -324,7 +324,7 @@ struct TimeframeButton: View {
     let timeframe: LeaderboardView.LeaderboardTimeframe
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
@@ -355,7 +355,7 @@ struct RegionButton: View {
     let region: LeaderboardView.LeaderboardRegion
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
@@ -385,7 +385,7 @@ struct RegionButton: View {
 struct TopThreePlayersView: View {
     let players: [LeaderboardEntry]
     @State private var animateIn = false
-    
+
     var body: some View {
         HStack(alignment: .bottom, spacing: 20) {
             // 2nd Place
@@ -395,15 +395,15 @@ struct TopThreePlayersView: View {
                     .opacity(animateIn ? 1 : 0)
                     .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1), value: animateIn)
             }
-            
+
             // 1st Place
-            if players.count > 0 {
+            if !players.isEmpty {
                 TopPlayerCard(entry: players[0], place: 1, height: 180)
                     .scaleEffect(animateIn ? 1 : 0.8)
                     .opacity(animateIn ? 1 : 0)
                     .animation(.spring(response: 0.5, dampingFraction: 0.8), value: animateIn)
             }
-            
+
             // 3rd Place
             if players.count > 2 {
                 TopPlayerCard(entry: players[2], place: 3, height: 120)
@@ -423,7 +423,7 @@ struct TopPlayerCard: View {
     let entry: LeaderboardEntry
     let place: Int
     let height: CGFloat
-    
+
     var medalColor: Color {
         switch place {
         case 1: return Color(hex: "#ffd700")
@@ -432,7 +432,7 @@ struct TopPlayerCard: View {
         default: return .gray
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 8) {
             // Medal
@@ -440,28 +440,28 @@ struct TopPlayerCard: View {
                 Circle()
                     .fill(medalColor)
                     .frame(width: 50, height: 50)
-                
+
                 Text("\(place)")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
             }
             .shadow(color: medalColor.opacity(0.5), radius: 10)
-            
+
             // Player Info
             VStack(spacing: 4) {
                 Image(systemName: entry.avatar)
                     .font(.system(size: 30))
                     .foregroundColor(.white)
-                
+
                 Text(entry.username)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
-                
+
                 Text("\(entry.points)")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                
+
                 if let country = entry.country {
                     Text(country)
                         .font(.system(size: 12))
@@ -494,7 +494,7 @@ struct TopPlayerCard: View {
 struct LeaderboardRow: View {
     let entry: LeaderboardEntry
     @State private var isPressed = false
-    
+
     var body: some View {
         GlassmorphicCard {
             HStack(spacing: 16) {
@@ -503,7 +503,7 @@ struct LeaderboardRow: View {
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(entry.isCurrentUser ? Color(hex: "#667eea") : .white)
                     .frame(width: 50, alignment: .leading)
-                
+
                 // Avatar
                 Image(systemName: entry.avatar)
                     .font(.system(size: 24))
@@ -517,26 +517,26 @@ struct LeaderboardRow: View {
                                     : Color.white.opacity(0.2)
                             )
                     )
-                
+
                 // User Info
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text(entry.username)
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
-                        
+
                         if entry.isCurrentUser {
                             Text("(You)")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(Color(hex: "#667eea"))
                         }
                     }
-                    
+
                     HStack(spacing: 8) {
                         Label("\(entry.level)", systemImage: "star.fill")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white.opacity(0.7))
-                        
+
                         if let country = entry.country {
                             Text("• \(country)")
                                 .font(.system(size: 12))
@@ -544,15 +544,15 @@ struct LeaderboardRow: View {
                         }
                     }
                 }
-                
+
                 Spacer()
-                
+
                 // Points
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(entry.points)")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
-                    
+
                     Text("points")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.6))
@@ -565,7 +565,7 @@ struct LeaderboardRow: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 isPressed = true
             }
-            
+
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isPressed = false

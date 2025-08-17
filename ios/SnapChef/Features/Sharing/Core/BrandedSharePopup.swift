@@ -15,16 +15,16 @@ struct BrandedSharePopup: View {
     @State private var animationScale: CGFloat = 0.8
     @State private var animationOpacity: Double = 0
     @Environment(\.dismiss) var dismiss
-    
+
     let content: ShareContent
-    
+
     // Platform grid layout - 3 columns for better visibility
     private let columns = [
         GridItem(.flexible()),
         GridItem(.flexible()),
         GridItem(.flexible())
     ]
-    
+
     // Show all major platforms for consistent experience
     private var displayPlatforms: [SharePlatformType] {
         // Always show these platforms, regardless of installation
@@ -40,7 +40,7 @@ struct BrandedSharePopup: View {
             .more
         ]
     }
-    
+
     var body: some View {
         ZStack {
             // Background blur
@@ -51,7 +51,7 @@ struct BrandedSharePopup: View {
                         dismiss()
                     }
                 }
-            
+
             // Popup content
             VStack(spacing: 0) {
                 // Handle bar
@@ -60,19 +60,19 @@ struct BrandedSharePopup: View {
                     .frame(width: 40, height: 5)
                     .padding(.top, 12)
                     .padding(.bottom, 20)
-                
+
                 // Title
                 Text("Share your creation")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.primary)
                     .padding(.bottom, 8)
-                
+
                 // Subtitle
                 Text("Choose where to share your masterpiece")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.secondary)
                     .padding(.bottom, 24)
-                
+
                 // Platform grid
                 LazyVGrid(columns: columns, spacing: 20) {
                     ForEach(displayPlatforms, id: \.self) { platform in
@@ -87,7 +87,7 @@ struct BrandedSharePopup: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 30)
-                
+
                 // Cancel button
                 Button(action: {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -129,14 +129,14 @@ struct BrandedSharePopup: View {
             dismiss()
         }
     }
-    
+
     private func handlePlatformSelection(_ platform: SharePlatformType) {
         selectedPlatform = platform
-        
+
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
-        
+
         // Check if app is available or use fallback
         if platform.isAvailable || shouldShowCustomView(platform) {
             // Handle platform-specific actions
@@ -144,11 +144,11 @@ struct BrandedSharePopup: View {
             case .tiktok, .instagram, .instagramStory:
                 // Show platform-specific view (works even if app not installed)
                 showingPlatformView = true
-                
+
             case .twitter:
                 // Show X-specific view
                 showingPlatformView = true
-                
+
             case .facebook, .whatsapp:
                 // Try direct share or fallback to web
                 Task {
@@ -160,18 +160,18 @@ struct BrandedSharePopup: View {
                         dismiss()
                     }
                 }
-                
+
             case .messages:
                 // Show message composer
                 showingPlatformView = true
-                
+
             case .copy:
                 // Direct copy to clipboard
                 Task {
                     await shareService.share(to: platform)
                     dismiss()
                 }
-                
+
             case .more:
                 // Show system share sheet
                 Task {
@@ -183,7 +183,7 @@ struct BrandedSharePopup: View {
             showWebFallback(for: platform)
         }
     }
-    
+
     private func shouldShowCustomView(_ platform: SharePlatformType) -> Bool {
         // These platforms have custom views that work even without the app
         switch platform {
@@ -193,7 +193,7 @@ struct BrandedSharePopup: View {
             return false
         }
     }
-    
+
     private func showWebFallback(for platform: SharePlatformType) {
         // Open web version or show instructions
         // This will be handled by ShareService
@@ -201,7 +201,7 @@ struct BrandedSharePopup: View {
             await shareService.share(to: platform)
         }
     }
-    
+
     @ViewBuilder
     private func platformSpecificView(for platform: SharePlatformType) -> some View {
         switch platform {
@@ -226,9 +226,9 @@ struct PlatformButton: View {
     let platform: SharePlatformType
     let isSelected: Bool
     let action: () -> Void
-    
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
@@ -251,13 +251,13 @@ struct PlatformButton: View {
                             radius: isPressed ? 2 : 8,
                             y: isPressed ? 1 : 4
                         )
-                    
+
                     Image(systemName: platform.icon)
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundColor(.white)
                 }
                 .scaleEffect(isPressed ? 0.95 : 1.0)
-                
+
                 // Platform name
                 Text(platform.rawValue)
                     .font(.system(size: 11, weight: .medium))
@@ -277,7 +277,6 @@ struct PlatformButton: View {
         )
     }
 }
-
 
 // MARK: - Preview
 #Preview {

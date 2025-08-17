@@ -5,7 +5,7 @@ struct ContentView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var deviceManager: DeviceManager
     @State private var showingLaunchAnimation = true
-    
+
     var body: some View {
         ZStack {
             if showingLaunchAnimation {
@@ -20,7 +20,7 @@ struct ContentView: View {
                 MagicalBackground()
                     .ignoresSafeArea()
                     .zIndex(0)
-                
+
                 // Main navigation on top
                 Group {
                     if appState.isFirstLaunch {
@@ -40,7 +40,7 @@ struct ContentView: View {
 struct MainTabView: View {
     @State private var selectedTab = 0
     @EnvironmentObject var authManager: AuthenticationManager
-    
+
     var body: some View {
         // Single NavigationStack at the root level
         NavigationStack {
@@ -83,12 +83,12 @@ struct MainTabView: View {
                     }
                 }
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
-                
+
                 // Custom morphing tab bar (hide when camera is selected)
                 if selectedTab != 1 {
                     VStack {
                         Spacer()
-                        
+
                         MorphingTabBar(selectedTab: $selectedTab)
                             .padding(.horizontal, 30)
                             .padding(.bottom, 30)
@@ -116,20 +116,20 @@ struct SocialFeedView: View {
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @State private var showingDiscoverUsers = false
     @State private var isRefreshing = false
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // Social Stats Header
                     socialStatsHeader
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
                         .padding(.bottom, 16)
-                    
+
                     // Activity Feed Content
                     ActivityFeedView()
                         .environmentObject(appState)
@@ -161,13 +161,13 @@ struct SocialFeedView: View {
             await cloudKitAuth.updateSocialCounts()
         }
     }
-    
+
     private func refreshSocialData() async {
         isRefreshing = true
         await cloudKitAuth.updateSocialCounts()
         isRefreshing = false
     }
-    
+
     private var socialStatsHeader: some View {
         VStack(spacing: 16) {
             // User Info Row
@@ -189,28 +189,28 @@ struct SocialFeedView: View {
                                 .foregroundColor(.white)
                         )
                 }
-                
+
                 // Stats
                 HStack(spacing: 24) {
                     socialStatItem(
                         count: cloudKitAuth.currentUser?.followerCount ?? 0,
                         label: "Followers"
                     )
-                    
+
                     socialStatItem(
                         count: cloudKitAuth.currentUser?.followingCount ?? 0,
                         label: "Following"
                     )
-                    
+
                     socialStatItem(
                         count: cloudKitAuth.currentUser?.recipesShared ?? 0,
                         label: "Recipes"
                     )
                 }
-                
+
                 Spacer()
             }
-            
+
             // Discover Button
             Button(action: {
                 showingDiscoverUsers = true
@@ -254,13 +254,13 @@ struct SocialFeedView: View {
                 )
         )
     }
-    
+
     private func socialStatItem(count: Int, label: String) -> some View {
         VStack(spacing: 4) {
             Text("\(count)")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(.white)
-            
+
             Text(label)
                 .font(.system(size: 12))
                 .foregroundColor(.white.opacity(0.7))

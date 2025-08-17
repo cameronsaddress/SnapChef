@@ -3,6 +3,8 @@ import CoreMotion
 
 // MARK: - Magical Animated Background
 struct MagicalBackground: View {
+    @EnvironmentObject var deviceManager: DeviceManager
+    
     var body: some View {
         ZStack {
             // Simple static gradient background
@@ -17,11 +19,13 @@ struct MagicalBackground: View {
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-            
-            // Subtle mesh gradient overlay
-            StaticMeshGradientLayer()
-                .ignoresSafeArea()
-                .opacity(0.5)
+
+            // Conditional mesh gradient overlay based on performance settings
+            if deviceManager.shouldUseHeavyEffects {
+                StaticMeshGradientLayer()
+                    .ignoresSafeArea()
+                    .opacity(0.5)
+            }
         }
     }
 }
@@ -37,21 +41,21 @@ struct StaticMeshGradientLayer: View {
                 Color(hex: "#4facfe").opacity(0.2),
                 Color(hex: "#43e97b").opacity(0.2)
             ]
-            
+
             // Create static mesh points
             let cols = 3
             let rows = 3
-            
+
             for row in 0..<rows {
                 for col in 0..<cols {
                     let x = (size.width / CGFloat(cols - 1)) * CGFloat(col)
                     let y = (size.height / CGFloat(rows - 1)) * CGFloat(row)
-                    
+
                     let center = CGPoint(x: x, y: y)
                     let radius: CGFloat = 300
-                    
+
                     let gradient = Gradient(colors: [colors[(col + row) % colors.count], Color.clear])
-                    
+
                     context.fill(
                         Circle().path(in: CGRect(
                             x: center.x - radius,
@@ -76,7 +80,7 @@ struct StaticMeshGradientLayer: View {
 struct MeshGradientLayer: View {
     let phase: CGFloat
     let breathe: CGFloat
-    
+
     var body: some View {
         Canvas { context, size in
             let colors: [Color] = [
@@ -88,25 +92,25 @@ struct MeshGradientLayer: View {
                 Color(hex: "#43e97b"), // Green
                 Color(hex: "#38f9d7")  // Teal
             ]
-            
+
             // Create mesh points
             let cols = 4
             let rows = 5
-            
+
             for row in 0..<rows {
                 for col in 0..<cols {
                     let x = (size.width / CGFloat(cols - 1)) * CGFloat(col)
                     let y = (size.height / CGFloat(rows - 1)) * CGFloat(row)
-                    
+
                     // Animate position with sine waves
                     let offsetX = sin(phase + CGFloat(col) * 0.5) * 20 * (1 + breathe)
                     let offsetY = cos(phase + CGFloat(row) * 0.5) * 20 * (1 + breathe)
-                    
+
                     let center = CGPoint(x: x + offsetX, y: y + offsetY)
                     let radius = 200 + sin(phase * 2 + CGFloat(col + row)) * 50
-                    
+
                     let gradient = Gradient(colors: [colors[(col + row) % colors.count], Color.clear])
-                    
+
                     context.fill(
                         Circle().path(in: CGRect(
                             x: center.x - radius,
@@ -130,9 +134,9 @@ struct MeshGradientLayer: View {
 // MARK: - Aurora Borealis Effect
 struct AuroraLayer: View {
     let shimmer: CGFloat
-    
+
     var body: some View {
-        GeometryReader { geometry in
+        GeometryReader { _ in
             ZStack {
                 ForEach(0..<3) { index in
                     Wave(
@@ -164,30 +168,30 @@ struct Wave: Shape {
     var frequency: CGFloat
     var phase: CGFloat
     var opacity: CGFloat
-    
+
     var animatableData: CGFloat {
         get { phase }
         set { phase = newValue }
     }
-    
+
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let width = rect.width
         let height = rect.height
         let midHeight = height / 2
-        
+
         path.move(to: CGPoint(x: 0, y: midHeight))
-        
+
         for x in stride(from: 0, to: width, by: 1) {
             let relativeX = x / width
             let y = sin(relativeX * .pi * frequency * 2 + phase) * amplitude + midHeight
             path.addLine(to: CGPoint(x: x, y: y))
         }
-        
+
         path.addLine(to: CGPoint(x: width, y: height))
         path.addLine(to: CGPoint(x: 0, y: height))
         path.closeSubpath()
-        
+
         return path
     }
 }
@@ -195,7 +199,7 @@ struct Wave: Shape {
 // MARK: - Floating Orbs
 struct FloatingOrbsLayer: View {
     let phase: CGFloat
-    
+
     var body: some View {
         GeometryReader { geometry in
             ForEach(0..<8) { index in
@@ -218,13 +222,13 @@ struct FloatingOrb: View {
     let initialPosition: CGPoint
     let phase: CGFloat
     let delay: Double
-    
+
     private var position: CGPoint {
         let x = initialPosition.x + sin(phase + delay) * 50
         let y = initialPosition.y + cos(phase * 0.7 + delay) * 30
         return CGPoint(x: x, y: y)
     }
-    
+
     var body: some View {
         Circle()
             .fill(
@@ -250,38 +254,50 @@ struct FloatingOrb: View {
 final class ParticleSystem: ObservableObject {
     @Published var particles: [Particle] = []
     private var timer: Timer?
-    
-    func start() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+    private var isLowPowerMode: Bool = false
+    private var maxParticles: Int = 50
+
+    func start(lowPowerMode: Bool = false) {
+        isLowPowerMode = lowPowerMode
+        maxParticles = lowPowerMode ? 10 : 50
+        
+        let interval = lowPowerMode ? 0.5 : 0.1 // Slower creation in low power mode
+        
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
             Task { @MainActor in
-                self.createParticle()
+                if !lowPowerMode || self.particles.count < 5 {
+                    self.createParticle()
+                }
                 self.updateParticles()
             }
         }
     }
-    
+
     func stop() {
         timer?.invalidate()
         timer = nil
+        particles.removeAll()
     }
-    
+
     private func createParticle() {
+        guard particles.count < maxParticles else { return }
+        
         let particle = Particle(
             position: CGPoint(x: CGFloat.random(in: 0...UIScreen.main.bounds.width), y: UIScreen.main.bounds.height + 50),
             velocity: CGVector(dx: CGFloat.random(in: -20...20), dy: CGFloat.random(in: -100 ... -50)),
-            size: CGFloat.random(in: 2...6),
-            lifespan: Double.random(in: 3...5)
+            size: CGFloat.random(in: isLowPowerMode ? 1...3 : 2...6),
+            lifespan: Double.random(in: isLowPowerMode ? 1...2 : 3...5)
         )
         particles.append(particle)
     }
-    
+
     private func updateParticles() {
         particles = particles.compactMap { particle in
             var updatedParticle = particle
             updatedParticle.position.x += updatedParticle.velocity.dx * 0.016
             updatedParticle.position.y += updatedParticle.velocity.dy * 0.016
             updatedParticle.lifespan -= 0.016
-            
+
             return updatedParticle.lifespan > 0 ? updatedParticle : nil
         }
     }
@@ -297,9 +313,9 @@ struct Particle: Identifiable {
 
 struct ParticleSystemView: View {
     @ObservedObject var system: ParticleSystem
-    
+
     var body: some View {
-        Canvas { context, size in
+        Canvas { context, _ in
             for particle in system.particles {
                 let opacity = particle.lifespan / 5.0
                 context.fill(
@@ -319,9 +335,9 @@ struct ParticleSystemView: View {
 // MARK: - Ripple Effect Layer
 struct RippleEffectLayer: View {
     @State private var ripples: [Ripple] = []
-    
+
     var body: some View {
-        Canvas { context, size in
+        Canvas { context, _ in
             for ripple in ripples {
                 let opacity = 1.0 - (ripple.scale / 3.0)
                 context.stroke(
@@ -340,17 +356,17 @@ struct RippleEffectLayer: View {
             createRipple(at: location)
         }
     }
-    
+
     private func createRipple(at location: CGPoint) {
         let ripple = Ripple(position: location)
         ripples.append(ripple)
-        
+
         withAnimation(.easeOut(duration: 1.5)) {
             if let index = ripples.firstIndex(where: { $0.id == ripple.id }) {
                 ripples[index].scale = 3
             }
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             ripples.removeAll { $0.id == ripple.id }
         }
@@ -368,12 +384,12 @@ struct Ripple: Identifiable {
 class MotionObserver: ObservableObject {
     @Published var x: Double = 0
     @Published var y: Double = 0
-    
+
     private let manager = CMMotionManager()
-    
+
     init() {
         manager.deviceMotionUpdateInterval = 0.1
-        manager.startDeviceMotionUpdates(to: .main) { motion, error in
+        manager.startDeviceMotionUpdates(to: .main) { motion, _ in
             guard let motion = motion else { return }
             self.x = motion.gravity.x
             self.y = motion.gravity.y
@@ -384,7 +400,7 @@ class MotionObserver: ObservableObject {
 // MARK: - Parallax Effect Modifier
 struct ParallaxEffect: ViewModifier {
     @ObservedObject var motion: MotionObserver
-    
+
     func body(content: Content) -> some View {
         content
             .offset(

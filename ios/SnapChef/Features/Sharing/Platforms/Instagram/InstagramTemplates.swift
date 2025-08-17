@@ -14,11 +14,11 @@ enum InstagramTemplate: String, CaseIterable {
     case minimal = "Minimal"
     case bold = "Bold"
     case gradient = "Gradient"
-    
+
     var name: String {
         return rawValue
     }
-    
+
     var icon: String {
         switch self {
         case .classic: return "square.grid.2x2"
@@ -28,7 +28,7 @@ enum InstagramTemplate: String, CaseIterable {
         case .gradient: return "circle.hexagongrid"
         }
     }
-    
+
     var gradient: LinearGradient {
         switch self {
         case .classic:
@@ -78,11 +78,11 @@ enum StickerType: String, CaseIterable {
     case hashtag = "Hashtag"
     case emoji = "Emoji"
     case custom = "Custom"
-    
+
     var name: String {
         return rawValue
     }
-    
+
     var emoji: String {
         switch self {
         case .poll: return "📊"
@@ -94,7 +94,7 @@ enum StickerType: String, CaseIterable {
         case .custom: return "✨"
         }
     }
-    
+
     var text: String {
         switch self {
         case .poll: return "Vote Now!"
@@ -135,7 +135,7 @@ struct InstagramPreview: View {
     let isStory: Bool
     let backgroundColor: Color
     @State private var animationOffset: CGFloat = 0
-    
+
     var body: some View {
         ZStack {
             // Device frame
@@ -149,7 +149,7 @@ struct InstagramPreview: View {
                     RoundedRectangle(cornerRadius: isStory ? 40 : 20)
                         .stroke(Color.white.opacity(0.2), lineWidth: 2)
                 )
-            
+
             // Screen content
             RoundedRectangle(cornerRadius: isStory ? 36 : 16)
                 .fill(backgroundColor)
@@ -169,7 +169,7 @@ struct InstagramPreview: View {
         }
         .offset(y: animationOffset)
     }
-    
+
     @ViewBuilder
     var previewContent: some View {
         VStack(spacing: 12) {
@@ -179,26 +179,26 @@ struct InstagramPreview: View {
                     Circle()
                         .fill(Color.white.opacity(0.3))
                         .frame(width: 32, height: 32)
-                    
+
                     VStack(alignment: .leading, spacing: 2) {
                         Text("@snapchef")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.white)
-                        
+
                         Text("My Kitchen")
                             .font(.system(size: 10))
                             .foregroundColor(.white.opacity(0.7))
                     }
-                    
+
                     Spacer()
-                    
+
                     Image(systemName: "ellipsis")
                         .font(.system(size: 14))
                         .foregroundColor(.white)
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
-                
+
                 // Content preview
                 VStack(spacing: 8) {
                     Text(recipe.name)
@@ -206,7 +206,7 @@ struct InstagramPreview: View {
                         .foregroundColor(.white)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
-                    
+
                     // Mini template preview
                     RoundedRectangle(cornerRadius: 8)
                         .fill(template.gradient.opacity(0.3))
@@ -217,9 +217,9 @@ struct InstagramPreview: View {
                         )
                 }
                 .padding(.horizontal, 12)
-                
+
                 Spacer()
-                
+
                 // Footer
                 if isStory {
                     HStack(spacing: 16) {

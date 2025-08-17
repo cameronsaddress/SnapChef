@@ -7,23 +7,23 @@ class CloudKitAnalytics {
     static let shared = CloudKitAnalytics()
     private let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
     private let database = CKContainer(identifier: "iCloud.com.snapchefapp.app").publicCloudDatabase
-    
+
     // Batch events to reduce API calls
     private var eventQueue: [AnalyticsEvent] = []
     private let batchSize = 20
     private var batchTimer: Timer?
-    
+
     private init() {
         setupBatchTimer()
     }
-    
+
     // MARK: - Navigation Tracking (Lightweight)
-    
+
     func trackScreenView(_ screenName: String) {
         // Only track main screens, not every view
         let mainScreens = ["Home", "Camera", "Recipes", "Feed", "Profile", "ChallengeHub"]
         guard mainScreens.contains(screenName) else { return }
-        
+
         let event = AnalyticsEvent(
             eventType: "screen_view",
             eventName: screenName,
@@ -31,9 +31,9 @@ class CloudKitAnalytics {
         )
         queueEvent(event)
     }
-    
+
     // MARK: - Feature Usage Tracking
-    
+
     func trackFeatureUsage(_ feature: String, details: [String: Any]? = nil) {
         // Track important feature usage
         let importantFeatures = [
@@ -43,9 +43,9 @@ class CloudKitAnalytics {
             "achievement_earned",
             "premium_feature_used"
         ]
-        
+
         guard importantFeatures.contains(feature) else { return }
-        
+
         let event = AnalyticsEvent(
             eventType: "feature_usage",
             eventName: feature,
@@ -54,12 +54,12 @@ class CloudKitAnalytics {
         )
         queueEvent(event)
     }
-    
+
     // MARK: - User Preferences Sync
-    
+
     func syncUserPreferences(_ preferences: UserPreferences) async throws {
         guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { return }
-        
+
         let record = CKRecord(recordType: "UserPreferences")
         record["userID"] = userID
         record["dietaryRestrictions"] = preferences.dietaryRestrictions
@@ -70,7 +70,7 @@ class CloudKitAnalytics {
         record["notificationSettings"] = preferences.notificationSettings
         record["themePreference"] = preferences.themePreference
         record["lastUpdated"] = Date()
-        
+
         do {
             _ = try await database.save(record)
             print("✅ User preferences synced to CloudKit")
@@ -79,29 +79,29 @@ class CloudKitAnalytics {
             throw error
         }
     }
-    
+
     func fetchUserPreferences() async throws -> UserPreferences? {
         guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { return nil }
-        
+
         let predicate = NSPredicate(format: "userID == %@", userID)
         let query = CKQuery(recordType: "UserPreferences", predicate: predicate)
-        
+
         do {
             let results = try await database.records(matching: query)
             guard let record = results.matchResults.first?.0,
                   let fetchedRecord = try? results.matchResults.first?.1.get() else {
                 return nil
             }
-            
+
             return UserPreferences(from: fetchedRecord)
         } catch {
             print("❌ Failed to fetch preferences: \(error)")
             throw error
         }
     }
-    
+
     // MARK: - Social Share Tracking
-    
+
     func trackSocialShare(platform: String, contentType: String, contentID: String?) async {
         let record = CKRecord(recordType: "SocialShare")
         record["userID"] = UserDefaults.standard.string(forKey: "currentUserID") ?? "anonymous"
@@ -109,7 +109,7 @@ class CloudKitAnalytics {
         record["contentType"] = contentType
         record["contentID"] = contentID
         record["sharedAt"] = Date()
-        
+
         // Fire and forget - don't wait for response
         Task {
             do {
@@ -120,12 +120,12 @@ class CloudKitAnalytics {
             }
         }
     }
-    
+
     // MARK: - Batch Processing
-    
+
     private func queueEvent(_ event: AnalyticsEvent) {
         eventQueue.append(event)
-        
+
         // Send immediately if batch is full
         if eventQueue.count >= batchSize {
             Task {
@@ -133,7 +133,7 @@ class CloudKitAnalytics {
             }
         }
     }
-    
+
     private func setupBatchTimer() {
         // Send events every 30 seconds if any are queued
         batchTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
@@ -144,13 +144,13 @@ class CloudKitAnalytics {
             }
         }
     }
-    
+
     private func sendBatch() async {
         guard !eventQueue.isEmpty else { return }
-        
+
         let eventsToSend = eventQueue
         eventQueue.removeAll()
-        
+
         // Create records for batch save
         let records = eventsToSend.map { event in
             let record = CKRecord(recordType: "AnalyticsEvent")
@@ -164,13 +164,13 @@ class CloudKitAnalytics {
             record["appVersion"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
             return record
         }
-        
+
         // Batch save
         do {
             let operation = CKModifyRecordsOperation(recordsToSave: records)
             operation.savePolicy = .allKeys
             operation.qualityOfService = .background
-            
+
             database.add(operation)
             print("📊 Sent \(records.count) analytics events")
         } catch {
@@ -196,9 +196,9 @@ struct UserPreferences: Codable {
     var aiModelPreference: String = "gpt-4"
     var notificationSettings: String = "all"
     var themePreference: String = "auto"
-    
+
     init() {}
-    
+
     init(from record: CKRecord) {
         self.dietaryRestrictions = record["dietaryRestrictions"] as? [String] ?? []
         self.cuisinePreferences = record["cuisinePreferences"] as? [String] ?? []

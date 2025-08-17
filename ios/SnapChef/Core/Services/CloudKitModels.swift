@@ -7,21 +7,21 @@ struct FollowRelation {
     let followingID: String
     let followedAt: Date
     let isActive: Bool
-    
+
     init(followerID: String, followingID: String, followedAt: Date = Date(), isActive: Bool = true) {
         self.followerID = followerID
         self.followingID = followingID
         self.followedAt = followedAt
         self.isActive = isActive
     }
-    
+
     init(from record: CKRecord) {
         followerID = record[CKField.Follow.followerID] as? String ?? ""
         followingID = record[CKField.Follow.followingID] as? String ?? ""
         followedAt = record[CKField.Follow.followedAt] as? Date ?? Date()
         isActive = (record[CKField.Follow.isActive] as? Int64 ?? 1) == 1
     }
-    
+
     func toCKRecord() -> CKRecord {
         let record = CKRecord(recordType: CloudKitConfig.followRecordType)
         record[CKField.Follow.followerID] = followerID
@@ -37,21 +37,21 @@ struct RecipeLike {
     let recipeID: String
     let likedAt: Date
     let recipeOwnerID: String
-    
+
     init(userID: String, recipeID: String, recipeOwnerID: String, likedAt: Date = Date()) {
         self.userID = userID
         self.recipeID = recipeID
         self.recipeOwnerID = recipeOwnerID
         self.likedAt = likedAt
     }
-    
+
     init(from record: CKRecord) {
         userID = record[CKField.RecipeLike.userID] as? String ?? ""
         recipeID = record[CKField.RecipeLike.recipeID] as? String ?? ""
         recipeOwnerID = record[CKField.RecipeLike.recipeOwnerID] as? String ?? ""
         likedAt = record[CKField.RecipeLike.likedAt] as? Date ?? Date()
     }
-    
+
     func toCKRecord() -> CKRecord {
         let record = CKRecord(recordType: CloudKitConfig.recipeLikeRecordType)
         record[CKField.RecipeLike.userID] = userID
@@ -69,7 +69,7 @@ struct RecipeView {
     let viewDuration: Int
     let recipeOwnerID: String
     let source: String
-    
+
     init(userID: String?, recipeID: String, recipeOwnerID: String, viewDuration: Int = 0, source: String = "feed") {
         self.userID = userID
         self.recipeID = recipeID
@@ -78,7 +78,7 @@ struct RecipeView {
         self.viewDuration = viewDuration
         self.source = source
     }
-    
+
     init(from record: CKRecord) {
         userID = record[CKField.RecipeView.userID] as? String
         recipeID = record[CKField.RecipeView.recipeID] as? String ?? ""
@@ -87,7 +87,7 @@ struct RecipeView {
         recipeOwnerID = record[CKField.RecipeView.recipeOwnerID] as? String ?? ""
         source = record[CKField.RecipeView.source] as? String ?? "unknown"
     }
-    
+
     func toCKRecord() -> CKRecord {
         let record = CKRecord(recordType: CloudKitConfig.recipeViewRecordType)
         record[CKField.RecipeView.userID] = userID ?? ""
@@ -110,7 +110,7 @@ struct RecipeComment {
     let isDeleted: Bool
     let parentCommentID: String?
     var likeCount: Int
-    
+
     init(id: String = UUID().uuidString, userID: String, recipeID: String, content: String, parentCommentID: String? = nil) {
         self.id = id
         self.userID = userID
@@ -122,7 +122,7 @@ struct RecipeComment {
         self.parentCommentID = parentCommentID
         self.likeCount = 0
     }
-    
+
     init(from record: CKRecord) {
         id = record[CKField.RecipeComment.id] as? String ?? UUID().uuidString
         userID = record[CKField.RecipeComment.userID] as? String ?? ""
@@ -134,7 +134,7 @@ struct RecipeComment {
         parentCommentID = record[CKField.RecipeComment.parentCommentID] as? String
         likeCount = Int(record[CKField.RecipeComment.likeCount] as? Int64 ?? 0)
     }
-    
+
     func toCKRecord() -> CKRecord {
         let record = CKRecord(recordType: CloudKitConfig.recipeCommentRecordType)
         record[CKField.RecipeComment.id] = id
@@ -163,7 +163,7 @@ struct UserChallenge {
     var proofImageURL: String?
     var notes: String?
     var teamID: String?
-    
+
     init(userID: String, challengeID: String, status: String, progress: Double, startedAt: Date, completedAt: Date? = nil, earnedPoints: Int, earnedCoins: Int, proofImageURL: String? = nil, notes: String? = nil, teamID: String? = nil) {
         self.userID = userID
         self.challengeID = challengeID
@@ -177,7 +177,7 @@ struct UserChallenge {
         self.notes = notes
         self.teamID = teamID
     }
-    
+
     init(from record: CKRecord) {
         userID = record[CKField.UserChallenge.userID] as? String ?? ""
         challengeID = (record[CKField.UserChallenge.challengeID] as? CKRecord.Reference)?.recordID.recordName ?? ""
@@ -189,7 +189,7 @@ struct UserChallenge {
         earnedCoins = record[CKField.UserChallenge.earnedCoins] as? Int ?? 0
         teamID = record[CKField.UserChallenge.teamID] as? String
     }
-    
+
     func toCKRecord() -> CKRecord {
         let record = CKRecord(recordType: CloudKitConfig.userChallengeRecordType)
         record[CKField.UserChallenge.userID] = userID
@@ -237,7 +237,7 @@ struct CloudKitLeaderboardEntry {
     let monthlyPoints: Int
     let challengesCompleted: Int
     let currentStreak: Int
-    
+
     init(from record: CKRecord) {
         userID = record[CKField.Leaderboard.userID] as? String ?? ""
         userName = record[CKField.Leaderboard.userName] as? String ?? "Anonymous"

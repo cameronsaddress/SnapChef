@@ -11,9 +11,9 @@ import Photos
 @MainActor
 class PhotoLibraryHelper {
     static let shared = PhotoLibraryHelper()
-    
+
     private init() {}
-    
+
     func requestPermissionAndSaveImage(_ image: UIImage, completion: @escaping (Bool, String?) -> Void) {
         // Ensure we're on the main thread
         guard Thread.isMainThread else {
@@ -22,13 +22,13 @@ class PhotoLibraryHelper {
             }
             return
         }
-        
+
         // Check if Photos framework is available
         guard NSClassFromString("PHPhotoLibrary") != nil else {
             completion(false, "Photo library not available")
             return
         }
-        
+
         // Use iOS 14+ API if available
         if #available(iOS 14.0, *) {
             PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
@@ -60,7 +60,7 @@ class PhotoLibraryHelper {
             }
         }
     }
-    
+
     private func performSave(_ image: UIImage, completion: @escaping (Bool, String?) -> Void) {
         PHPhotoLibrary.shared().performChanges({
             PHAssetChangeRequest.creationRequestForAsset(from: image)

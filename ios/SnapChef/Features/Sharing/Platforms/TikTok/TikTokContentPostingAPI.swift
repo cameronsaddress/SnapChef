@@ -55,7 +55,7 @@ public final class TikTokContentPostingAPI: ObservableObject {
     public var hasValidToken: Bool {
         return accessToken != nil && !accessToken!.isEmpty
     }
-    
+
     /// Ensures we have a valid access token, refreshing if necessary
     /// - Returns: Valid access token
     /// - Throws: TikTokAPIError if unable to get valid token
@@ -143,7 +143,7 @@ public final class TikTokContentPostingAPI: ObservableObject {
     }
 
     // MARK: - Direct Post API
-    
+
     /// Initialize Direct Post for video upload
     /// - Parameters:
     ///   - title: Post title (used for caption via post_info.title)
@@ -191,7 +191,7 @@ public final class TikTokContentPostingAPI: ObservableObject {
 
         return try await performAPIRequest(url: url, method: "POST", body: requestBody)
     }
-    
+
     /// Upload video file via chunks
     /// - Parameters:
     ///   - videoURL: Local video file URL

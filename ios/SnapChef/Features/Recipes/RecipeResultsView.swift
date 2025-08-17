@@ -4,7 +4,8 @@ struct RecipeResultsView: View {
     let recipes: [Recipe]
     let ingredients: [IngredientAPI]
     let capturedImage: UIImage?
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss)
+    var dismiss
     @EnvironmentObject var appState: AppState
     @State private var selectedRecipe: Recipe?
     @State private var showShareSheet = false
@@ -16,21 +17,21 @@ struct RecipeResultsView: View {
     @State private var activeSheet: ActiveSheet?
     @State private var savedRecipeIds: Set<UUID> = []
     @State private var showingExitConfirmation = false
-    
+
     // New states for branded share
     @State private var showBrandedShare = false
     @State private var shareContent: ShareContent?
     @State private var cloudKitPhotos: [UUID: (before: UIImage?, after: UIImage?)] = [:]
-    
+
     // Progressive authentication trigger
     @StateObject private var authTrigger = AuthPromptTrigger.shared
-    
+
     enum ActiveSheet: Identifiable {
         case recipeDetail(Recipe)
         case shareGenerator(Recipe)
         case fridgeInventory
         case brandedShare(Recipe)  // Add this for branded share
-        
+
         var id: String {
             switch self {
             case .recipeDetail(let recipe): return "detail_\(recipe.id)"
@@ -40,26 +41,26 @@ struct RecipeResultsView: View {
             }
         }
     }
-    
+
     init(recipes: [Recipe], ingredients: [IngredientAPI] = [], capturedImage: UIImage? = nil) {
         self.recipes = recipes
         self.ingredients = ingredients
         self.capturedImage = capturedImage
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 // Animated background
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 30) {
                         // Success header
                         SuccessHeaderView()
                             .staggeredFade(index: 0, isShowing: contentVisible)
-                        
+
                         // In Your Fridge card
                         if !ingredients.isEmpty {
                             FridgeInventoryCard(
@@ -70,7 +71,7 @@ struct RecipeResultsView: View {
                             )
                             .staggeredFade(index: 1, isShowing: contentVisible)
                         }
-                        
+
                         // Recipe cards
                         ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                             MagicalRecipeCard(
@@ -82,14 +83,14 @@ struct RecipeResultsView: View {
                                 },
                                 onShare: {
                                     print("🔴 SHARE BUTTON PRESSED for recipe: \(recipe.name) (ID: \(recipe.id))")
-                                    
+
                                     // Get photos from PhotoStorageManager first
                                     let storedPhotos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
-                                    
+
                                     // Use stored photos, fallback to CloudKit, then capturedImage
                                     let fridgePhoto = storedPhotos?.fridgePhoto ?? capturedImage
                                     let mealPhoto = storedPhotos?.mealPhoto
-                                    
+
                                     print("📸 RecipeResultsView: Preparing share for recipe \(recipe.id)")
                                     print("    - storedPhotos exists: \(storedPhotos != nil)")
                                     print("    - fridgePhoto from storage: \(storedPhotos?.fridgePhoto != nil)")
@@ -105,15 +106,15 @@ struct RecipeResultsView: View {
                                     }
                                     print("    - Final fridgePhoto: \(fridgePhoto != nil ? "✅" : "❌")")
                                     print("    - Final mealPhoto: \(mealPhoto != nil ? "✅" : "❌")")
-                                    
+
                                     // If we don't have a meal photo, try CloudKit
                                     if mealPhoto == nil {
                                         // Check CloudKit cache
                                         if let photos = cloudKitPhotos[recipe.id] {
                                             print("🟡 Creating ShareContent with CloudKit cached photos:")
-                                            print("    - beforeImage (fridge): \(fridgePhoto != nil ? "✅ \(fridgePhoto!.size)" : "❌")")
-                                            print("    - afterImage (meal from CloudKit): \(photos.after != nil ? "✅ \(photos.after!.size)" : "❌")")
-                                            
+                                            print("    - beforeImage (fridge): \(fridgePhoto != nil ? "✅ \(fridgePhoto.map { "\($0.size)" } ?? "unknown size")" : "❌")")
+                                            print("    - afterImage (meal from CloudKit): \(photos.after != nil ? "✅ \(photos.after.map { "\($0.size)" } ?? "unknown size")" : "❌")")
+
                                             shareContent = ShareContent(
                                                 type: .recipe(recipe),
                                                 beforeImage: fridgePhoto,
@@ -124,12 +125,12 @@ struct RecipeResultsView: View {
                                             // Fetch from CloudKit
                                             fetchCloudKitPhotosForRecipe(recipe) { beforePhoto, afterPhoto in
                                                 cloudKitPhotos[recipe.id] = (beforePhoto, afterPhoto)
-                                                
+
                                                 // Store in PhotoStorageManager if we got photos
                                                 if let afterPhoto = afterPhoto {
                                                     PhotoStorageManager.shared.storeMealPhoto(afterPhoto, for: recipe.id)
                                                 }
-                                                
+
                                                 shareContent = ShareContent(
                                                     type: .recipe(recipe),
                                                     beforeImage: fridgePhoto,
@@ -141,9 +142,9 @@ struct RecipeResultsView: View {
                                     } else {
                                         // We have both photos
                                         print("🟢 Creating ShareContent with local photos:")
-                                        print("    - beforeImage (fridge): \(fridgePhoto != nil ? "✅ \(fridgePhoto!.size)" : "❌")")
-                                        print("    - afterImage (meal): \(mealPhoto != nil ? "✅ \(mealPhoto!.size)" : "❌")")
-                                        
+                                        print("    - beforeImage (fridge): \(fridgePhoto != nil ? "✅ \(fridgePhoto.map { "\($0.size)" } ?? "unknown size")" : "❌")")
+                                        print("    - afterImage (meal): \(mealPhoto != nil ? "✅ \(mealPhoto.map { "\($0.size)" } ?? "unknown size")" : "❌")")
+
                                         shareContent = ShareContent(
                                             type: .recipe(recipe),
                                             beforeImage: fridgePhoto,
@@ -158,7 +159,7 @@ struct RecipeResultsView: View {
                             )
                             .staggeredFade(index: index + (ingredients.isEmpty ? 1 : 2), isShowing: contentVisible)
                         }
-                        
+
                         // Viral share prompt
                         ViralSharePrompt(action: {
                             if let firstRecipe = recipes.first {
@@ -191,7 +192,7 @@ struct RecipeResultsView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 100)
                 }
-                
+
                 // Confetti effect
                 if confettiTrigger {
                     ConfettiView()
@@ -201,7 +202,7 @@ struct RecipeResultsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { 
+                    Button(action: {
                         if savedRecipeIds.isEmpty && !recipes.isEmpty {
                             showingExitConfirmation = true
                         } else {
@@ -214,7 +215,7 @@ struct RecipeResultsView: View {
                             .background(Circle().fill(Color.black.opacity(0.2)))
                     }
                 }
-                
+
                 ToolbarItem(placement: .principal) {
                     Text("Your Recipes")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
@@ -230,16 +231,15 @@ struct RecipeResultsView: View {
             Task {
                 await fetchAllCloudKitPhotos()
             }
-            
+
             // Track recipe creation and check for first-time user authentication prompt
             if !recipes.isEmpty {
                 appState.trackAnonymousAction(.recipeCreated)
-                
+
                 // Check for progressive authentication trigger after first recipe success
                 if let anonymousProfile = appState.anonymousProfile,
                    anonymousProfile.recipesCreatedCount == 1,
                    !CloudKitAuthManager.shared.isAuthenticated {
-                    
                     // Show progressive auth prompt after 2 second delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                         AuthPromptTrigger.shared.onFirstRecipeSuccess()
@@ -264,7 +264,7 @@ struct RecipeResultsView: View {
                     ingredients: ingredients,
                     capturedImage: capturedImage
                 )
-            case .brandedShare(_):
+            case .brandedShare:
                 // This case is handled by the separate sheet below
                 EmptyView()
             }
@@ -279,7 +279,7 @@ struct RecipeResultsView: View {
         .sheet(isPresented: $showSocialShare) {
             if let recipe = selectedRecipe ?? recipes.first,
                let shareImage = generatedShareImage {
-                // TODO: SocialShareView was moved to archive
+                // Using ShareSheet instead of archived SocialShareView
                 ShareSheet(items: [
                     shareImage,
                     "Just turned my fridge into \(recipe.name)! 🔥"
@@ -306,28 +306,28 @@ struct RecipeResultsView: View {
                 .presentationDragIndicator(.visible)
         }
     }
-    
+
     private func saveRecipe(_ recipe: Recipe) {
         // Save the recipe with the captured image
         appState.addRecentRecipe(recipe)
         appState.saveRecipeWithPhotos(recipe, beforePhoto: capturedImage, afterPhoto: nil)
         savedRecipeIds.insert(recipe.id)
-        
+
         // Track streak activities
         Task {
             await StreakManager.shared.recordActivity(for: .recipeCreation)
-            
+
             // Check if recipe is healthy (under 500 calories)
             if recipe.nutrition.calories < 500 {
                 await StreakManager.shared.recordActivity(for: .healthyEating)
             }
         }
-        
+
         // Haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
     }
-    
+
     private func getAfterPhotoForRecipe(_ recipe: Recipe) -> UIImage? {
         // Check if we have a saved recipe with photos
         if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }) {
@@ -337,7 +337,7 @@ struct RecipeResultsView: View {
         // For now, return nil which will use a placeholder
         return nil
     }
-    
+
     private func fetchCloudKitPhotosForRecipe(_ recipe: Recipe, completion: @escaping (UIImage?, UIImage?) -> Void) {
         Task {
             do {
@@ -353,7 +353,7 @@ struct RecipeResultsView: View {
             }
         }
     }
-    
+
     private func fetchAllCloudKitPhotos() async {
         // Fetch photos for all recipes in parallel
         await withTaskGroup(of: (UUID, UIImage?, UIImage?).self) { group in
@@ -369,7 +369,7 @@ struct RecipeResultsView: View {
                     }
                 }
             }
-            
+
             // Collect results
             for await (recipeId, beforePhoto, afterPhoto) in group {
                 await MainActor.run {
@@ -384,7 +384,6 @@ struct RecipeResultsView: View {
 struct SuccessHeaderView: View {
     var body: some View {
         VStack(spacing: 20) {
-            
             Text("Recipe Magic Complete!")
                 .font(.system(size: 28, weight: .bold, design: .rounded))
                 .foregroundStyle(
@@ -409,14 +408,14 @@ struct MagicalRecipeCard: View {
     let onSelect: () -> Void
     let onShare: () -> Void
     let onSave: () -> Void
-    
+
     @State private var isHovered = false
     @State private var shimmerPhase: CGFloat = -1
     @State private var isLiked = false
     @State private var likeCount = 0
     @State private var isLoadingLike = false
     @StateObject private var cloudKitSync = CloudKitSyncService.shared
-    
+
     var body: some View {
         GlassmorphicCard(content: {
             VStack(alignment: .leading, spacing: 20) {
@@ -426,7 +425,7 @@ struct MagicalRecipeCard: View {
                     .foregroundColor(.white)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                
+
                 // Header with image
                 HStack(spacing: 20) {
                     // Recipe before/after photos
@@ -436,25 +435,25 @@ struct MagicalRecipeCard: View {
                         height: 100,
                         showLabels: true
                     )
-                    
+
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             TimeIndicator(minutes: recipe.prepTime + recipe.cookTime)
                             CalorieIndicator(calories: recipe.nutrition.calories)
                         }
-                        
+
                         DifficultyBadge(difficulty: recipe.difficulty)
-                        
+
                         Spacer()
                     }
-                    
+
                     Spacer()
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
                     onSelect()
                 }
-                
+
                 // Description
                 Text(recipe.description)
                     .font(.system(size: 16, weight: .medium))
@@ -464,7 +463,7 @@ struct MagicalRecipeCard: View {
                     .onTapGesture {
                         onSelect()
                     }
-                
+
                 // Action buttons
                 HStack(spacing: 12) {
                     // Like button with count
@@ -474,7 +473,7 @@ struct MagicalRecipeCard: View {
                         isLoading: isLoadingLike,
                         action: toggleLike
                     )
-                    
+
                     ActionButton(
                         title: isSaved ? "Saved" : "Save",
                         icon: isSaved ? "checkmark.circle.fill" : "bookmark.fill",
@@ -482,14 +481,14 @@ struct MagicalRecipeCard: View {
                         action: onSave
                     )
                     .disabled(isSaved)
-                    
+
                     ActionButton(
                         title: "Cook",
                         icon: "flame.fill",
                         color: Color(hex: "#f093fb"),
                         action: onSelect
                     )
-                    
+
                     ActionButton(
                         title: "Share",
                         icon: "square.and.arrow.up",
@@ -510,14 +509,14 @@ struct MagicalRecipeCard: View {
             await loadLikeStatus()
         }
     }
-    
+
     private func toggleLike() {
         guard !isLoadingLike else { return }
-        
+
         Task {
             isLoadingLike = true
             defer { isLoadingLike = false }
-            
+
             do {
                 if isLiked {
                     try await cloudKitSync.unlikeRecipe(recipe.id.uuidString)
@@ -539,7 +538,7 @@ struct MagicalRecipeCard: View {
             }
         }
     }
-    
+
     private func loadLikeStatus() async {
         do {
             isLiked = try await cloudKitSync.isRecipeLiked(recipe.id.uuidString)
@@ -553,7 +552,7 @@ struct MagicalRecipeCard: View {
 // MARK: - Time Indicator
 struct TimeIndicator: View {
     let minutes: Int
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "clock")
@@ -575,7 +574,7 @@ struct TimeIndicator: View {
 // MARK: - Calorie Indicator
 struct CalorieIndicator: View {
     let calories: Int
-    
+
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "flame")
@@ -597,7 +596,7 @@ struct CalorieIndicator: View {
 // MARK: - Difficulty Badge
 struct DifficultyBadge: View {
     let difficulty: Recipe.Difficulty
-    
+
     var difficultyColor: Color {
         switch difficulty {
         case .easy: return Color(hex: "#43e97b")
@@ -605,7 +604,7 @@ struct DifficultyBadge: View {
         case .hard: return Color(hex: "#ef5350")
         }
     }
-    
+
     var body: some View {
         Text(difficulty.rawValue.capitalized)
             .font(.system(size: 12, weight: .bold))
@@ -625,7 +624,7 @@ struct LikeButton: View {
     let likeCount: Int
     let isLoading: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
@@ -634,7 +633,7 @@ struct LikeButton: View {
                     .foregroundColor(isLiked ? Color(hex: "#ff6b6b") : .white)
                     .scaleEffect(isLiked ? 1.1 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isLiked)
-                
+
                 if likeCount > 0 {
                     Text("\(likeCount)")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -664,7 +663,7 @@ struct ActionButton: View {
     let icon: String
     let color: Color
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
@@ -688,18 +687,18 @@ struct ActionButton: View {
 struct ViralSharePrompt: View {
     let action: () -> Void
     @State private var glowAnimation = false
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Text("🎉 Amazing recipes!")
                 .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            
+
             Text("Share your culinary journey and inspire others")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
-            
+
             MagneticButton(
                 title: "Share & Earn Credits",
                 icon: "sparkles",
@@ -728,7 +727,7 @@ struct ViralSharePrompt: View {
 struct ShareFloatingButton: View {
     let action: () -> Void
     @State private var bounceAnimation = false
-    
+
     var body: some View {
         Button(action: action) {
             ZStack {
@@ -738,7 +737,7 @@ struct ShareFloatingButton: View {
                     .frame(width: 80, height: 80)
                     .scaleEffect(bounceAnimation ? 1.3 : 1)
                     .opacity(bounceAnimation ? 0 : 1)
-                
+
                 // Button
                 Circle()
                     .fill(
@@ -766,7 +765,7 @@ struct ShareFloatingButton: View {
                     withAnimation(.easeOut(duration: 1)) {
                         bounceAnimation = true
                     }
-                    
+
                     try? await Task.sleep(nanoseconds: 1_000_000_000)
                     bounceAnimation = false
                 }
@@ -778,9 +777,9 @@ struct ShareFloatingButton: View {
 // MARK: - Confetti View
 struct ConfettiView: View {
     @State private var confettiPieces: [ConfettiPiece] = []
-    
+
     var body: some View {
-        Canvas { context, size in
+        Canvas { context, _ in
             for piece in confettiPieces {
                 context.fill(
                     RoundedRectangle(cornerRadius: 2)
@@ -798,7 +797,7 @@ struct ConfettiView: View {
             createConfetti()
         }
     }
-    
+
     private func createConfetti() {
         let colors: [Color] = [
             Color(hex: "#667eea"),
@@ -808,7 +807,7 @@ struct ConfettiView: View {
             Color(hex: "#43e97b"),
             Color(hex: "#ffa726")
         ]
-        
+
         confettiPieces = (0..<100).map { _ in
             ConfettiPiece(
                 position: CGPoint(
@@ -823,16 +822,16 @@ struct ConfettiView: View {
                     width: CGFloat.random(in: 5...10),
                     height: CGFloat.random(in: 10...20)
                 ),
-                color: colors.randomElement()!,
+                color: colors.randomElement() ?? .blue,
                 rotation: CGFloat.random(in: 0...360)
             )
         }
-        
+
         var confettiTimer: Timer?
         confettiTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
             Task { @MainActor in
                 updateConfetti()
-                
+
                 if confettiPieces.isEmpty {
                     confettiTimer?.invalidate()
                     confettiTimer = nil
@@ -840,7 +839,7 @@ struct ConfettiView: View {
             }
         }
     }
-    
+
     private func updateConfetti() {
         confettiPieces = confettiPieces.compactMap { piece in
             var updated = piece
@@ -848,7 +847,7 @@ struct ConfettiView: View {
             updated.position.y += updated.velocity.dy * 0.016
             updated.velocity.dy += 500 * 0.016 // Gravity
             updated.rotation += 5
-            
+
             return updated.position.y < UIScreen.main.bounds.height + 50 ? updated : nil
         }
     }
@@ -866,10 +865,10 @@ struct ConfettiPiece {
 struct FridgeInventoryCard: View {
     let ingredientCount: Int
     let onTap: () -> Void
-    
+
     @State private var sparkleAnimation = false
     @State private var bounceAnimation = false
-    
+
     var body: some View {
         GlassmorphicCard(content: {
             VStack(spacing: 20) {
@@ -880,7 +879,7 @@ struct FridgeInventoryCard: View {
                     .lineLimit(1)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                
+
                 // Icon and content
                 HStack(spacing: 20) {
                     // Fridge icon with animation
@@ -899,12 +898,12 @@ struct FridgeInventoryCard: View {
                             )
                             .frame(width: 80, height: 80)
                             .scaleEffect(bounceAnimation ? 1.1 : 1)
-                        
+
                         // Fridge icon
                         Image(systemName: "refrigerator.fill")
                             .font(.system(size: 40, weight: .medium))
                             .foregroundColor(.white)
-                        
+
                         // Sparkles around
                         ForEach(0..<3) { index in
                             Image(systemName: "sparkle")
@@ -917,12 +916,12 @@ struct FridgeInventoryCard: View {
                                 .opacity(sparkleAnimation ? 1 : 0.6)
                         }
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 8) {
                         Text("\(ingredientCount) ingredients detected")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white.opacity(0.8))
-                        
+
                         HStack(spacing: 4) {
                             Image(systemName: "eye.fill")
                                 .font(.system(size: 14))
@@ -931,16 +930,16 @@ struct FridgeInventoryCard: View {
                         }
                         .foregroundColor(Color(hex: "#38f9d7"))
                     }
-                    
+
                     Spacer()
-                    
+
                     // Arrow indicator
                     Image(systemName: "chevron.right.circle.fill")
                         .font(.system(size: 30))
                         .foregroundColor(Color(hex: "#38f9d7"))
                         .scaleEffect(bounceAnimation ? 1.2 : 1)
                 }
-                
+
                 // Fun message
                 Text("🎉 We analyzed your fridge like magic!")
                     .font(.system(size: 16, weight: .medium, design: .rounded))
@@ -956,7 +955,7 @@ struct FridgeInventoryCard: View {
             withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
                 sparkleAnimation = true
             }
-            
+
             withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                 bounceAnimation = true
             }
@@ -968,13 +967,14 @@ struct FridgeInventoryCard: View {
 struct SimpleFridgeInventoryView: View {
     let ingredients: [IngredientAPI]
     let capturedImage: UIImage?
-    @Environment(\.dismiss) var dismiss
-    
+    @Environment(\.dismiss)
+    var dismiss
+
     var body: some View {
         ZStack {
             MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 20) {
                         // Header
@@ -991,13 +991,13 @@ struct SimpleFridgeInventoryView: View {
                                         endPoint: .bottomTrailing
                                     )
                                 )
-                            
+
                             Text("Found \(ingredients.count) ingredients!")
                                 .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
                         }
                         .padding(.top, 40)
-                        
+
                         // Ingredients list
                         ForEach(ingredients, id: \.name) { ingredient in
                             HStack {
@@ -1005,22 +1005,22 @@ struct SimpleFridgeInventoryView: View {
                                     Text(ingredient.name)
                                         .font(.system(size: 18, weight: .semibold))
                                         .foregroundColor(.white)
-                                    
+
                                     Text("\(ingredient.quantity) \(ingredient.unit)")
                                         .font(.system(size: 14))
                                         .foregroundColor(.white.opacity(0.8))
-                                    
+
                                     HStack(spacing: 12) {
                                         Label(ingredient.category, systemImage: "tag.fill")
                                             .font(.system(size: 12))
                                             .foregroundColor(Color(hex: "#38f9d7"))
-                                        
+
                                         Label(ingredient.freshness, systemImage: "leaf.fill")
                                             .font(.system(size: 12))
                                             .foregroundColor(freshnessColor(for: ingredient.freshness))
                                     }
                                 }
-                                
+
                                 Spacer()
                             }
                             .padding(20)
@@ -1037,7 +1037,7 @@ struct SimpleFridgeInventoryView: View {
                     }
                     .padding(.bottom, 40)
                 }
-            }
+        }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -1049,7 +1049,7 @@ struct SimpleFridgeInventoryView: View {
                 }
             }
     }
-    
+
     private func freshnessColor(for freshness: String) -> Color {
         switch freshness.lowercased() {
         case "fresh": return Color(hex: "#43e97b")

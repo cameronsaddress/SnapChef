@@ -7,16 +7,16 @@ struct StreakDetailView: View {
     @State private var showingPowerUpStore = false
     @State private var showingHistory = false
     @State private var showingInsuranceOptions = false
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // Header with multiplier
                 StreakHeaderView()
-                
+
                 // Streak selector
                 StreakTypeSelector(selectedType: $selectedStreak)
-                
+
                 // Selected streak details
                 if let streak = streakManager.currentStreaks[selectedStreak] {
                     StreakDetailCard(streak: streak, type: selectedStreak)
@@ -25,19 +25,19 @@ struct StreakDetailView: View {
                             removal: .move(edge: .leading).combined(with: .opacity)
                         ))
                 }
-                
+
                 // Quick actions
                 QuickActionsSection(
                     streakType: selectedStreak,
                     showingPowerUpStore: $showingPowerUpStore,
                     showingInsuranceOptions: $showingInsuranceOptions
                 )
-                
+
                 // Achievements
                 if !streakManager.unclaimedAchievements.isEmpty {
                     UnclaimedAchievementsSection()
                 }
-                
+
                 // History button
                 Button(action: { showingHistory = true }) {
                     Label("View Streak History", systemImage: "clock.arrow.circlepath")
@@ -68,13 +68,13 @@ struct StreakDetailView: View {
 /// Header showing global multiplier and stats
 struct StreakHeaderView: View {
     @StateObject private var streakManager = StreakManager.shared
-    
+
     var body: some View {
         VStack(spacing: 12) {
             Text("Global Multiplier")
                 .font(.headline)
                 .foregroundColor(.secondary)
-            
+
             Text(String(format: "%.2fx", streakManager.globalMultiplier))
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundStyle(
@@ -84,7 +84,7 @@ struct StreakHeaderView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-            
+
             Text("Earn more points and coins with active streaks!")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -103,7 +103,7 @@ struct StreakHeaderView: View {
 /// Horizontal selector for streak types
 struct StreakTypeSelector: View {
     @Binding var selectedType: StreakType
-    
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
@@ -111,7 +111,7 @@ struct StreakTypeSelector: View {
                     StreakTypeButton(
                         type: type,
                         isSelected: selectedType == type,
-                        action: { 
+                        action: {
                             withAnimation(.spring()) {
                                 selectedType = type
                             }
@@ -128,13 +128,13 @@ struct StreakTypeButton: View {
     let type: StreakType
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Text(type.icon)
                     .font(.system(size: 24))
-                
+
                 Text(type.displayName)
                     .font(.caption)
                     .lineLimit(1)
@@ -158,7 +158,7 @@ struct StreakDetailCard: View {
     let streak: StreakData
     let type: StreakType
     @State private var showingCalendar = false
-    
+
     var body: some View {
         VStack(spacing: 16) {
             // Current streak
@@ -166,7 +166,7 @@ struct StreakDetailCard: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Current Streak")
                         .font(.headline)
-                    
+
                     HStack(spacing: 4) {
                         Text("\(streak.currentStreak)")
                             .font(.system(size: 36, weight: .bold, design: .rounded))
@@ -174,7 +174,7 @@ struct StreakDetailCard: View {
                             .font(.title3)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     if streak.isActive {
                         Label("\(streak.hoursUntilBreak) hours left", systemImage: "clock")
                             .font(.caption)
@@ -185,15 +185,15 @@ struct StreakDetailCard: View {
                             .foregroundColor(.red)
                     }
                 }
-                
+
                 Spacer()
-                
+
                 // Visual indicator
                 ZStack {
                     Circle()
                         .stroke(Color.gray.opacity(0.2), lineWidth: 8)
                         .frame(width: 80, height: 80)
-                    
+
                     Circle()
                         .trim(from: 0, to: streak.progressToNextMilestone)
                         .stroke(
@@ -206,14 +206,14 @@ struct StreakDetailCard: View {
                         )
                         .frame(width: 80, height: 80)
                         .rotationEffect(.degrees(-90))
-                    
+
                     Text(type.icon)
                         .font(.system(size: 36))
                 }
             }
-            
+
             Divider()
-            
+
             // Stats grid
             LazyVGrid(columns: [
                 GridItem(.flexible()),
@@ -225,21 +225,21 @@ struct StreakDetailCard: View {
                     subtitle: "days",
                     color: .purple
                 )
-                
+
                 StreakStatCard(
                     title: "Total Active",
                     value: "\(streak.totalDaysActive)",
                     subtitle: "days",
                     color: .green
                 )
-                
+
                 StreakStatCard(
                     title: "Multiplier",
                     value: String(format: "%.2fx", streak.multiplier),
                     subtitle: "bonus",
                     color: .blue
                 )
-                
+
                 StreakStatCard(
                     title: "Freezes",
                     value: "\(streak.freezesRemaining)",
@@ -247,7 +247,7 @@ struct StreakDetailCard: View {
                     color: .cyan
                 )
             }
-            
+
             // Next milestone
             if let nextMilestone = streak.nextMilestone {
                 NextMilestoneCard(
@@ -255,7 +255,7 @@ struct StreakDetailCard: View {
                     currentStreak: streak.currentStreak
                 )
             }
-            
+
             // Calendar button
             Button(action: { showingCalendar = true }) {
                 Label("View Calendar", systemImage: "calendar")
@@ -282,18 +282,18 @@ struct StreakStatCard: View {
     let value: String
     let subtitle: String
     let color: Color
-    
+
     var body: some View {
         VStack(spacing: 4) {
             Text(title)
                 .font(.caption)
                 .foregroundColor(.secondary)
-            
+
             HStack(spacing: 2) {
                 Text(value)
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(color)
-                
+
                 Text(subtitle)
                     .font(.caption2)
                     .foregroundColor(.secondary)
@@ -309,22 +309,22 @@ struct StreakStatCard: View {
 struct NextMilestoneCard: View {
     let milestone: StreakMilestone
     let currentStreak: Int
-    
+
     private var daysToGo: Int {
         milestone.days - currentStreak
     }
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Next Milestone")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
+
                 HStack(spacing: 8) {
                     Text(milestone.badge)
                         .font(.title2)
-                    
+
                     VStack(alignment: .leading, spacing: 2) {
                         Text(milestone.title)
                             .font(.headline)
@@ -334,9 +334,9 @@ struct NextMilestoneCard: View {
                     }
                 }
             }
-            
+
             Spacer()
-            
+
             VStack(alignment: .trailing, spacing: 2) {
                 Text("+\(milestone.coins)")
                     .font(.headline)
@@ -364,13 +364,13 @@ struct QuickActionsSection: View {
     @Binding var showingPowerUpStore: Bool
     @Binding var showingInsuranceOptions: Bool
     @StateObject private var streakManager = StreakManager.shared
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Quick Actions")
                 .font(.headline)
                 .padding(.horizontal)
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     // Freeze button
@@ -386,7 +386,7 @@ struct QuickActionsSection: View {
                             }
                         )
                     }
-                    
+
                     // Insurance button
                     StreakActionButton(
                         icon: "🛡",
@@ -395,7 +395,7 @@ struct QuickActionsSection: View {
                         color: .green,
                         action: { showingInsuranceOptions = true }
                     )
-                    
+
                     // Power-ups button
                     StreakActionButton(
                         icon: "⚡",
@@ -417,17 +417,17 @@ struct StreakActionButton: View {
     let subtitle: String
     let color: Color
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Text(icon)
                     .font(.title2)
-                
+
                 Text(title)
                     .font(.caption)
                     .fontWeight(.semibold)
-                
+
                 Text(subtitle)
                     .font(.caption2)
                     .foregroundColor(.secondary)
@@ -447,13 +447,13 @@ struct StreakActionButton: View {
 /// Unclaimed achievements section
 struct UnclaimedAchievementsSection: View {
     @StateObject private var streakManager = StreakManager.shared
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Unclaimed Rewards")
                 .font(.headline)
                 .padding(.horizontal)
-            
+
             ForEach(streakManager.unclaimedAchievements) { achievement in
                 UnclaimedAchievementRow(achievement: achievement)
             }
@@ -465,12 +465,12 @@ struct UnclaimedAchievementRow: View {
     let achievement: StreakAchievement
     @StateObject private var streakManager = StreakManager.shared
     @State private var isClaimed = false
-    
+
     var body: some View {
         HStack {
             Text(achievement.milestoneBadge)
                 .font(.title2)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(achievement.milestoneTitle)
                     .font(.headline)
@@ -478,9 +478,9 @@ struct UnclaimedAchievementRow: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             if !isClaimed {
                 Button(action: {
                     withAnimation {

@@ -7,7 +7,7 @@ struct ChallengeProofSubmissionView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var cloudKitSync = CloudKitSyncService.shared
     @StateObject private var gamificationManager = GamificationManager.shared
-    
+
     @State private var selectedImage: UIImage?
     @State private var showImagePicker = false
     @State private var showCamera = false
@@ -16,13 +16,13 @@ struct ChallengeProofSubmissionView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var submissionSuccess = false
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 24) {
                         // Header
@@ -36,17 +36,17 @@ struct ChallengeProofSubmissionView: View {
                                         endPoint: .bottomTrailing
                                     )
                                 )
-                            
+
                             Text("Submit Your Proof")
                                 .font(.system(size: 28, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
-                            
+
                             Text(challenge.title)
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
                         }
                         .padding(.top, 20)
-                        
+
                         // Image Selection
                         VStack(spacing: 16) {
                             if let image = selectedImage {
@@ -61,7 +61,7 @@ struct ChallengeProofSubmissionView: View {
                                             .stroke(Color.white.opacity(0.3), lineWidth: 2)
                                     )
                                     .shadow(color: .black.opacity(0.3), radius: 10)
-                                
+
                                 Button(action: {
                                     withAnimation(.spring()) {
                                         selectedImage = nil
@@ -104,7 +104,7 @@ struct ChallengeProofSubmissionView: View {
                                         )
                                         .cornerRadius(12)
                                     }
-                                    
+
                                     Button(action: {
                                         showImagePicker = true
                                     }) {
@@ -128,13 +128,13 @@ struct ChallengeProofSubmissionView: View {
                             }
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Notes Section
                         VStack(alignment: .leading, spacing: 12) {
                             Label("Add Notes (Optional)", systemImage: "note.text")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
-                            
+
                             TextEditor(text: $notes)
                                 .frame(height: 100)
                                 .padding(8)
@@ -144,14 +144,14 @@ struct ChallengeProofSubmissionView: View {
                                 .scrollContentBackground(.hidden)
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Challenge Requirements Reminder
                         GlassmorphicCard {
                             VStack(alignment: .leading, spacing: 12) {
                                 Label("Challenge Requirements", systemImage: "checklist")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(.white)
-                                
+
                                 ForEach(challenge.requirements, id: \.self) { requirement in
                                     HStack {
                                         Image(systemName: "checkmark.circle")
@@ -167,7 +167,7 @@ struct ChallengeProofSubmissionView: View {
                             .padding(16)
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Submit Button
                         Button(action: submitProof) {
                             HStack {
@@ -201,7 +201,7 @@ struct ChallengeProofSubmissionView: View {
                         .padding(.horizontal, 20)
                         .disabled(selectedImage == nil || isSubmitting || submissionSuccess)
                         .opacity(selectedImage == nil ? 0.5 : 1.0)
-                        
+
                         Spacer(minLength: 40)
                     }
                 }
@@ -236,12 +236,12 @@ struct ChallengeProofSubmissionView: View {
             }
         }
     }
-    
+
     private func submitProof() {
         guard let image = selectedImage else { return }
-        
+
         isSubmitting = true
-        
+
         Task {
             do {
                 // Upload proof to CloudKit
@@ -250,15 +250,15 @@ struct ChallengeProofSubmissionView: View {
                     proofImage: image,
                     notes: notes.isEmpty ? nil : notes
                 )
-                
+
                 // Update progress
                 await MainActor.run {
                     gamificationManager.updateChallengeProgress(challenge.id, progress: 1.0)
-                    
+
                     // Haptic feedback
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.success)
-                    
+
                     isSubmitting = false
                     submissionSuccess = true
                 }
@@ -277,7 +277,7 @@ struct ChallengeProofSubmissionView: View {
 struct CameraImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
     @Environment(\.dismiss) var dismiss
-    
+
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.delegate = context.coordinator
@@ -285,21 +285,21 @@ struct CameraImagePicker: UIViewControllerRepresentable {
         picker.allowsEditing = true
         return picker
     }
-    
+
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let parent: CameraImagePicker
-        
+
         init(_ parent: CameraImagePicker) {
             self.parent = parent
         }
-        
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             if let editedImage = info[.editedImage] as? UIImage {
                 parent.image = editedImage
             } else if let originalImage = info[.originalImage] as? UIImage {
@@ -307,7 +307,7 @@ struct CameraImagePicker: UIViewControllerRepresentable {
             }
             parent.dismiss()
         }
-        
+
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.dismiss()
         }
@@ -318,35 +318,35 @@ struct CameraImagePicker: UIViewControllerRepresentable {
 struct ProofImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
     @Environment(\.dismiss) var dismiss
-    
+
     func makeUIViewController(context: Context) -> PHPickerViewController {
         var config = PHPickerConfiguration()
         config.filter = .images
         config.selectionLimit = 1
-        
+
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = context.coordinator
         return picker
     }
-    
+
     func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     class Coordinator: NSObject, PHPickerViewControllerDelegate {
         let parent: ProofImagePicker
-        
+
         init(_ parent: ProofImagePicker) {
             self.parent = parent
         }
-        
+
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
             parent.dismiss()
-            
+
             guard let provider = results.first?.itemProvider else { return }
-            
+
             if provider.canLoadObject(ofClass: UIImage.self) {
                 provider.loadObject(ofClass: UIImage.self) { image, _ in
                     if let uiImage = image as? UIImage {

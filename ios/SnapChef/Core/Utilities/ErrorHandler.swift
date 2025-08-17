@@ -10,7 +10,7 @@ enum SnapChefError: LocalizedError {
     case invalidInput(String)
     case subscriptionError(String)
     case unknown(String)
-    
+
     var errorDescription: String? {
         switch self {
         case .networkError(let message):
@@ -31,7 +31,7 @@ enum SnapChefError: LocalizedError {
             return message
         }
     }
-    
+
     var userFriendlyMessage: String {
         switch self {
         case .networkError:
@@ -52,7 +52,7 @@ enum SnapChefError: LocalizedError {
             return "Something went wrong. Please try again."
         }
     }
-    
+
     var actionTitle: String {
         switch self {
         case .networkError:
@@ -73,7 +73,7 @@ enum SnapChefError: LocalizedError {
             return "OK"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .networkError:
@@ -100,7 +100,7 @@ enum SnapChefError: LocalizedError {
 struct ErrorAlertModifier: ViewModifier {
     @Binding var error: SnapChefError?
     let onAction: (() -> Void)?
-    
+
     func body(content: Content) -> some View {
         content
             .alert("Oops!", isPresented: .constant(error != nil), presenting: error) { error in
@@ -108,7 +108,7 @@ struct ErrorAlertModifier: ViewModifier {
                     handleAction(for: error)
                     self.error = nil
                 }
-                
+
                 if error.actionTitle != "OK" {
                     Button("Cancel", role: .cancel) {
                         self.error = nil
@@ -118,7 +118,7 @@ struct ErrorAlertModifier: ViewModifier {
                 Text(error.userFriendlyMessage)
             }
     }
-    
+
     private func handleAction(for error: SnapChefError) {
         switch error {
         case .cameraError:
@@ -148,9 +148,9 @@ struct ErrorBannerView: View {
     let error: SnapChefError
     let onDismiss: () -> Void
     let onAction: (() -> Void)?
-    
+
     @State private var isVisible = false
-    
+
     var body: some View {
         VStack {
             if isVisible {
@@ -158,20 +158,20 @@ struct ErrorBannerView: View {
                     Image(systemName: error.icon)
                         .font(.system(size: 24, weight: .medium))
                         .foregroundColor(.white)
-                    
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Error")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
-                        
+
                         Text(error.userFriendlyMessage)
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white.opacity(0.9))
                             .lineLimit(2)
                     }
-                    
+
                     Spacer()
-                    
+
                     if let onAction = onAction {
                         Button(action: onAction) {
                             Text(error.actionTitle)
@@ -185,7 +185,7 @@ struct ErrorBannerView: View {
                                 )
                         }
                     }
-                    
+
                     Button(action: {
                         withAnimation(.easeOut(duration: 0.3)) {
                             isVisible = false
@@ -225,7 +225,7 @@ struct ErrorBannerView: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                 isVisible = true
             }
-            
+
             // Auto dismiss after 5 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 if isVisible {
@@ -245,12 +245,12 @@ struct ErrorBannerView: View {
 struct LoadingOverlay: View {
     let message: String
     @State private var rotation = 0.0
-    
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.5)
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 20) {
                 ZStack {
                     Circle()
@@ -268,12 +268,12 @@ struct LoadingOverlay: View {
                         )
                         .frame(width: 60, height: 60)
                         .rotationEffect(.degrees(rotation))
-                    
+
                     Image(systemName: "sparkles")
                         .font(.system(size: 30, weight: .medium))
                         .foregroundColor(.white)
                 }
-                
+
                 Text(message)
                     .font(.system(size: 18, weight: .medium))
                     .foregroundColor(.white)
@@ -298,7 +298,7 @@ struct SuccessToast: View {
     let message: String
     @State private var isVisible = false
     let onDismiss: () -> Void
-    
+
     var body: some View {
         VStack {
             if isVisible {
@@ -306,11 +306,11 @@ struct SuccessToast: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 24, weight: .medium))
                         .foregroundColor(Color(hex: "#43e97b"))
-                    
+
                     Text(message)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
-                    
+
                     Spacer()
                 }
                 .padding()
@@ -334,7 +334,7 @@ struct SuccessToast: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                 isVisible = true
             }
-            
+
             // Auto dismiss after 3 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 withAnimation(.easeOut(duration: 0.3)) {

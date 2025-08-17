@@ -10,7 +10,7 @@ final class CloudKitAuthManager: ObservableObject {
         let instance = CloudKitAuthManager()
         return instance
     }()
-    
+
     @Published var isAuthenticated = false
     @Published var currentUser: CloudKitUser?
     @Published var isLoading = false
@@ -18,19 +18,19 @@ final class CloudKitAuthManager: ObservableObject {
     @Published var showUsernameSelection = false
     @Published var showError = false
     @Published var errorMessage = ""
-    
+
     // Auth completion callback
     var authCompletionHandler: (() -> Void)?
-    
+
     private let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
     private let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
-    
+
     private init() {
         checkAuthStatus()
     }
-    
+
     // MARK: - Check Current Auth Status
-    
+
     func checkAuthStatus() {
         Task {
             // Check if we have a stored user ID
@@ -39,40 +39,40 @@ final class CloudKitAuthManager: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Sign In Methods
-    
+
     func signInWithApple(authorization: ASAuthorization) async throws {
         guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
             throw CloudKitAuthError.invalidCredential
         }
-        
+
         isLoading = true
         defer { isLoading = false }
-        
+
         let userID = appleIDCredential.user
         let email = appleIDCredential.email
         let fullName = appleIDCredential.fullName
-        
+
         // Check if user exists in CloudKit
         let recordID = CKRecord.ID(recordName: userID)
-        
+
         do {
             // Try to fetch existing user
             let existingRecord = try await database.record(for: recordID)
-            
+
             // Update last login
             existingRecord[CKField.User.lastLoginAt] = Date()
             try await database.save(existingRecord)
-            
+
             // Convert to user object
             self.currentUser = CloudKitUser(from: existingRecord)
             self.isAuthenticated = true
-            
+
             // Store user ID (use both keys for compatibility)
             UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
             UserDefaults.standard.set(userID, forKey: "currentUserID")
-            
+
             // Check if user has a username set
             if self.currentUser?.username == nil || self.currentUser?.username?.isEmpty == true {
                 // Show username selection for users without username
@@ -80,18 +80,17 @@ final class CloudKitAuthManager: ObservableObject {
             } else {
                 // User has username, close auth sheet and call completion handler
                 self.showAuthSheet = false
-                
+
                 // Call completion handler if set (e.g., to join challenge after auth)
                 if let handler = authCompletionHandler {
                     handler()
                     authCompletionHandler = nil
                 }
             }
-            
         } catch {
             // User doesn't exist, create new
             let newRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: recordID)
-            
+
             // Set initial values
             newRecord[CKField.User.authProvider] = "apple"
             newRecord[CKField.User.email] = email ?? ""
@@ -111,23 +110,23 @@ final class CloudKitAuthManager: ObservableObject {
             newRecord[CKField.User.showOnLeaderboard] = Int64(1)
             newRecord[CKField.User.isVerified] = Int64(0)
             newRecord[CKField.User.subscriptionTier] = "free"
-            
+
             // Save new user
             try await database.save(newRecord)
-            
+
             // Convert to user object
             self.currentUser = CloudKitUser(from: newRecord)
             self.isAuthenticated = true
-            
+
             // Store user ID (use both keys for compatibility)
             UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
             UserDefaults.standard.set(userID, forKey: "currentUserID")
-            
+
             // Show username selection for new users
             self.showUsernameSelection = true
         }
     }
-    
+
     func signInWithFacebook(userID: String, email: String?, name: String?, profileImageURL: String?) async throws {
         // Use Facebook user ID with prefix to ensure uniqueness
         let cloudKitUserID = "facebook_\(userID)"
@@ -139,7 +138,7 @@ final class CloudKitAuthManager: ObservableObject {
             profileImageURL: profileImageURL
         )
     }
-    
+
     private func signInWithProvider(
         userID: String,
         provider: String,
@@ -149,28 +148,28 @@ final class CloudKitAuthManager: ObservableObject {
     ) async {
         isLoading = true
         defer { isLoading = false }
-        
+
         let recordID = CKRecord.ID(recordName: userID)
-        
+
         do {
             // Try to fetch existing user
             let existingRecord = try await database.record(for: recordID)
-            
+
             // Update last login
             existingRecord[CKField.User.lastLoginAt] = Date()
             if let profileImageURL = profileImageURL {
                 existingRecord[CKField.User.profileImageURL] = profileImageURL
             }
             try await database.save(existingRecord)
-            
+
             // Convert to user object
             self.currentUser = CloudKitUser(from: existingRecord)
             self.isAuthenticated = true
-            
+
             // Store user ID (use both keys for compatibility)
             UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
             UserDefaults.standard.set(userID, forKey: "currentUserID")
-            
+
             // Check if user has a username set
             if self.currentUser?.username == nil || self.currentUser?.username?.isEmpty == true {
                 // Show username selection for users without username
@@ -178,18 +177,17 @@ final class CloudKitAuthManager: ObservableObject {
             } else {
                 // User has username, close auth sheet and call completion handler
                 self.showAuthSheet = false
-                
+
                 // Call completion handler if set (e.g., to join challenge after auth)
                 if let handler = authCompletionHandler {
                     handler()
                     authCompletionHandler = nil
                 }
             }
-            
         } catch {
             // Create new user
             let newRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: recordID)
-            
+
             // Set initial values
             newRecord[CKField.User.authProvider] = provider
             newRecord[CKField.User.email] = email ?? ""
@@ -210,15 +208,15 @@ final class CloudKitAuthManager: ObservableObject {
             newRecord[CKField.User.showOnLeaderboard] = Int64(1)
             newRecord[CKField.User.isVerified] = Int64(0)
             newRecord[CKField.User.subscriptionTier] = "free"
-            
+
             // Save new user
             do {
                 try await database.save(newRecord)
-                
+
                 // Convert to user object
                 self.currentUser = CloudKitUser(from: newRecord)
                 self.isAuthenticated = true
-                
+
                 // Store user ID
                 UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
             } catch {
@@ -227,11 +225,11 @@ final class CloudKitAuthManager: ObservableObject {
                 self.showError = true
             }
         }
-        
+
         // Only close auth sheet if we have a username
         if let username = currentUser?.username, !username.isEmpty {
             self.showAuthSheet = false
-            
+
             // Call completion handler if set (e.g., to join challenge after auth)
             if let handler = authCompletionHandler {
                 handler()
@@ -242,13 +240,13 @@ final class CloudKitAuthManager: ObservableObject {
             self.showUsernameSelection = true
         }
     }
-    
+
     // MARK: - Username Management
-    
+
     func checkUsernameAvailability(_ username: String) async throws -> Bool {
         let predicate = NSPredicate(format: "%K == %@", CKField.User.username, username.lowercased())
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
-        
+
         do {
             let results = try await database.records(matching: query)
             return results.matchResults.isEmpty
@@ -256,54 +254,54 @@ final class CloudKitAuthManager: ObservableObject {
             throw CloudKitAuthError.networkError
         }
     }
-    
+
     func setUsername(_ username: String) async throws {
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID else {
             throw CloudKitAuthError.notAuthenticated
         }
-        
+
         // Check availability first
         let isAvailable = try await checkUsernameAvailability(username)
         guard isAvailable else {
             throw CloudKitAuthError.usernameUnavailable
         }
-        
+
         // Fetch current record
         let record = try await database.record(for: CKRecord.ID(recordName: recordID))
-        
+
         // Update username
         record[CKField.User.username] = username.lowercased()
-        
+
         // Save
         try await database.save(record)
-        
+
         // Update local user
         self.currentUser?.username = username
-        
+
         // Close username selection
         self.showUsernameSelection = false
-        
+
         // Now close the auth sheet since we have a username
         self.showAuthSheet = false
-        
+
         // Call completion handler if set (e.g., to join challenge after auth)
         if let handler = authCompletionHandler {
             handler()
             authCompletionHandler = nil
         }
     }
-    
+
     // MARK: - User Stats Updates
-    
+
     func updateUserStats(_ updates: UserStatUpdates) async throws {
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID else {
             throw CloudKitAuthError.notAuthenticated
         }
-        
+
         let record = try await database.record(for: CKRecord.ID(recordName: recordID))
-        
+
         // Apply updates
         if let totalPoints = updates.totalPoints {
             record[CKField.User.totalPoints] = Int64(totalPoints)
@@ -326,12 +324,12 @@ final class CloudKitAuthManager: ObservableObject {
         if let followingCount = updates.followingCount {
             record[CKField.User.followingCount] = Int64(followingCount)
         }
-        
+
         record[CKField.User.lastActiveAt] = Date()
-        
+
         // Save
         try await database.save(record)
-        
+
         // Update local user
         if let totalPoints = updates.totalPoints {
             self.currentUser?.totalPoints = totalPoints
@@ -355,9 +353,9 @@ final class CloudKitAuthManager: ObservableObject {
             self.currentUser?.followingCount = followingCount
         }
     }
-    
+
     // MARK: - Feature Access
-    
+
     func isAuthRequiredFor(feature: AuthRequiredFeature) -> Bool {
         switch feature {
         case .challenges, .leaderboard, .socialSharing, .teams, .streaks, .premiumFeatures:
@@ -366,50 +364,50 @@ final class CloudKitAuthManager: ObservableObject {
             return false
         }
     }
-    
+
     func promptAuthForFeature(_ feature: AuthRequiredFeature) {
         if isAuthRequiredFor(feature: feature) {
             showAuthSheet = true
         }
     }
-    
+
     // MARK: - Sign Out
-    
+
     func signOut() {
         currentUser = nil
         isAuthenticated = false
         UserDefaults.standard.removeObject(forKey: "currentUserRecordID")
     }
-    
+
     // MARK: - Social Methods
-    
+
     func followUser(_ userID: String) async throws {
         guard let currentUserID = currentUser?.recordID,
               let currentUserName = currentUser?.displayName else {
             throw CloudKitAuthError.notAuthenticated
         }
-        
+
         // Check if already following
         let isFollowing = try await isFollowing(userID)
         if isFollowing {
             return // Already following
         }
-        
+
         // Create follow record
         let follow = CKRecord(recordType: CloudKitConfig.followRecordType)
         follow[CKField.Follow.followerID] = currentUserID
         follow[CKField.Follow.followingID] = userID
         follow[CKField.Follow.followedAt] = Date()
         follow[CKField.Follow.isActive] = Int64(1)
-        
+
         try await database.save(follow)
-        
+
         // Update counts
         await updateSocialCounts()
-        
+
         // Update followed user's follower count
         await updateUserFollowerCount(userID, increment: true)
-        
+
         // Create activity for the followed user
         try await CloudKitSyncService.shared.createActivity(
             type: "follow",
@@ -418,21 +416,21 @@ final class CloudKitAuthManager: ObservableObject {
             targetUserID: userID
         )
     }
-    
+
     func unfollowUser(_ userID: String) async throws {
         guard let currentUserID = currentUser?.recordID else {
             throw CloudKitAuthError.notAuthenticated
         }
-        
+
         // Find the follow record
         let predicate = NSPredicate(format: "%K == %@ AND %K == %@ AND %K == %d",
                                   CKField.Follow.followerID, currentUserID,
                                   CKField.Follow.followingID, userID,
                                   CKField.Follow.isActive, 1)
         let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
-        
+
         let results = try await database.records(matching: query)
-        
+
         // Soft delete the follow record
         for (_, result) in results.matchResults {
             if case .success(let record) = result {
@@ -440,52 +438,52 @@ final class CloudKitAuthManager: ObservableObject {
                 try await database.save(record)
             }
         }
-        
+
         // Update counts
         await updateSocialCounts()
-        
+
         // Update unfollowed user's follower count
         await updateUserFollowerCount(userID, increment: false)
     }
-    
+
     func isFollowing(_ userID: String) async throws -> Bool {
         guard let currentUserID = currentUser?.recordID else {
             throw CloudKitAuthError.notAuthenticated
         }
-        
+
         let predicate = NSPredicate(format: "%K == %@ AND %K == %@ AND %K == %d",
                                   CKField.Follow.followerID, currentUserID,
                                   CKField.Follow.followingID, userID,
                                   CKField.Follow.isActive, 1)
         let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
-        
+
         let results = try await database.records(matching: query)
         return !results.matchResults.isEmpty
     }
-    
+
     func updateRecipeCounts() async {
         guard let currentUserID = currentUser?.recordID else { return }
-        
+
         do {
             // Count user's created recipes
             let createdPredicate = NSPredicate(format: "ownerID == %@", currentUserID)
             let createdQuery = CKQuery(recordType: "Recipe", predicate: createdPredicate)
             let createdResults = try await database.records(matching: createdQuery)
             let recipesCreated = createdResults.matchResults.count
-            
+
             // Count user's shared recipes (public recipes)
             let sharedPredicate = NSPredicate(format: "ownerID == %@ AND isPublic == 1", currentUserID)
             let sharedQuery = CKQuery(recordType: "Recipe", predicate: sharedPredicate)
             let sharedResults = try await database.records(matching: sharedQuery)
             let recipesShared = sharedResults.matchResults.count
-            
+
             // Update user record in CloudKit
             let updates = UserStatUpdates(
                 recipesShared: recipesShared,
                 recipesCreated: recipesCreated
             )
             try await updateUserStats(updates)
-            
+
             // Update local currentUser object immediately for UI refresh
             await MainActor.run {
                 self.currentUser?.recipesShared = recipesShared
@@ -495,10 +493,10 @@ final class CloudKitAuthManager: ObservableObject {
             print("Failed to update recipe counts: \(error)")
         }
     }
-    
+
     func updateSocialCounts() async {
         guard let currentUserID = currentUser?.recordID else { return }
-        
+
         do {
             // Count followers
             let followersPredicate = NSPredicate(format: "%K == %@ AND %K == %d",
@@ -507,7 +505,7 @@ final class CloudKitAuthManager: ObservableObject {
             let followersQuery = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: followersPredicate)
             let followerResults = try await database.records(matching: followersQuery)
             let followerCount = followerResults.matchResults.count
-            
+
             // Count following
             let followingPredicate = NSPredicate(format: "%K == %@ AND %K == %d",
                                                CKField.Follow.followerID, currentUserID,
@@ -515,14 +513,14 @@ final class CloudKitAuthManager: ObservableObject {
             let followingQuery = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: followingPredicate)
             let followingResults = try await database.records(matching: followingQuery)
             let followingCount = followingResults.matchResults.count
-            
+
             // Update user record in CloudKit
             let updates = UserStatUpdates(
                 followerCount: followerCount,
                 followingCount: followingCount
             )
             try await updateUserStats(updates)
-            
+
             // Update local currentUser object immediately for UI refresh
             await MainActor.run {
                 self.currentUser?.followerCount = followerCount
@@ -532,7 +530,7 @@ final class CloudKitAuthManager: ObservableObject {
             print("Failed to update social counts: \(error)")
         }
     }
-    
+
     private func updateUserFollowerCount(_ userID: String, increment: Bool) async {
         do {
             let record = try await database.record(for: CKRecord.ID(recordName: userID))
@@ -544,15 +542,15 @@ final class CloudKitAuthManager: ObservableObject {
             print("Failed to update follower count for user \(userID): \(error)")
         }
     }
-    
+
     // MARK: - Private Helpers
-    
+
     private func loadUser(recordID: String) async {
         do {
             let record = try await database.record(for: CKRecord.ID(recordName: recordID))
             self.currentUser = CloudKitUser(from: record)
             self.isAuthenticated = true
-            
+
             // Update last active
             record[CKField.User.lastActiveAt] = Date()
             try await database.save(record)
@@ -562,25 +560,25 @@ final class CloudKitAuthManager: ObservableObject {
             self.isAuthenticated = false
         }
     }
-    
+
     /// Public method to refresh the current user's data from CloudKit
     func refreshCurrentUser() async {
         guard let userID = currentUser?.recordID else { return }
         await loadUser(recordID: userID)
     }
-    
+
     // MARK: - User Discovery Methods
-    
+
     func searchUsers(query: String) async throws -> [CloudKitUser] {
         let predicate = NSPredicate(format: "%K BEGINSWITH %@ OR %K CONTAINS %@",
                                   CKField.User.username, query.lowercased(),
                                   CKField.User.displayName, query)
         let ckQuery = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         ckQuery.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
-        
+
         let results = try await database.records(matching: ckQuery)
         var users: [CloudKitUser] = []
-        
+
         for (_, result) in results.matchResults {
             if case .success(let record) = result {
                 if let user = parseUserRecord(record) {
@@ -588,21 +586,21 @@ final class CloudKitAuthManager: ObservableObject {
                 }
             }
         }
-        
+
         return users
     }
-    
+
     func getSuggestedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
         // Get users with high follower count that current user isn't following
         let predicate = NSPredicate(format: "%K > %d", CKField.User.followerCount, 100)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
-        
+
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = limit
-        
+
         var users: [CloudKitUser] = []
-        
+
         operation.recordMatchedBlock = { _, result in
             if case .success(let record) = result {
                 if let user = self.parseUserRecord(record) {
@@ -610,9 +608,9 @@ final class CloudKitAuthManager: ObservableObject {
                 }
             }
         }
-        
+
         database.add(operation)
-        
+
         // Filter out users already being followed
         if let currentUserID = currentUser?.recordID {
             let followedUsers = await getFollowingIDs(currentUserID)
@@ -623,22 +621,22 @@ final class CloudKitAuthManager: ObservableObject {
                 return true
             }
         }
-        
+
         return users
     }
-    
+
     func getTrendingUsers(limit: Int = 20) async throws -> [CloudKitUser] {
         // Get users who have been active recently
         let oneWeekAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
         let predicate = NSPredicate(format: "%K > %@", CKField.User.lastActiveAt, oneWeekAgo as NSDate)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.recipesShared, ascending: false)]
-        
+
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = limit
-        
+
         var users: [CloudKitUser] = []
-        
+
         operation.recordMatchedBlock = { _, result in
             if case .success(let record) = result {
                 if let user = self.parseUserRecord(record) {
@@ -646,21 +644,21 @@ final class CloudKitAuthManager: ObservableObject {
                 }
             }
         }
-        
+
         database.add(operation)
         return users
     }
-    
+
     func getVerifiedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
         let predicate = NSPredicate(format: "%K == %d", CKField.User.isVerified, 1)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
-        
+
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = limit
-        
+
         var users: [CloudKitUser] = []
-        
+
         operation.recordMatchedBlock = { _, result in
             if case .success(let record) = result {
                 if let user = self.parseUserRecord(record) {
@@ -668,35 +666,35 @@ final class CloudKitAuthManager: ObservableObject {
                 }
             }
         }
-        
+
         database.add(operation)
         return users
     }
-    
+
     private func getFollowingIDs(_ userID: String) async -> Set<String> {
         let predicate = NSPredicate(format: "%K == %@ AND %K == %d",
                                   CKField.Follow.followerID, userID,
                                   CKField.Follow.isActive, 1)
         let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
-        
+
         do {
             let results = try await database.records(matching: query)
             var followingIDs = Set<String>()
-            
+
             for (_, result) in results.matchResults {
                 if case .success(let record) = result,
                    let followingID = record[CKField.Follow.followingID] as? String {
                     followingIDs.insert(followingID)
                 }
             }
-            
+
             return followingIDs
         } catch {
             print("Failed to get following IDs: \(error)")
             return []
         }
     }
-    
+
     private func parseUserRecord(_ record: CKRecord) -> CloudKitUser? {
         return CloudKitUser(from: record)
     }
@@ -727,7 +725,7 @@ struct CloudKitUser: Identifiable {
     let subscriptionTier: String
     let createdAt: Date
     let lastLoginAt: Date
-    
+
     init(from record: CKRecord) {
         self.recordID = record.recordID.recordName
         self.username = record[CKField.User.username] as? String
@@ -774,7 +772,7 @@ enum CloudKitAuthError: LocalizedError {
     case notAuthenticated
     case usernameUnavailable
     case unknown
-    
+
     var errorDescription: String? {
         switch self {
         case .invalidCredential:

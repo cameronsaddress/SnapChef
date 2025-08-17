@@ -3,9 +3,9 @@ import Foundation
 @MainActor
 class ProfanityFilter {
     static let shared = ProfanityFilter()
-    
+
     private let profanityList: Set<String>
-    
+
     private init() {
         // Basic profanity list - expand as needed
         // Using a basic list for demonstration - in production, use a comprehensive filter service
@@ -26,22 +26,22 @@ class ProfanityFilter {
             "kill", "murder", "rape", "suicide", "death"
         ])
     }
-    
+
     func containsProfanity(_ text: String) -> Bool {
         let lowercased = text.lowercased()
-        
+
         // Check exact matches
         if profanityList.contains(lowercased) {
             return true
         }
-        
+
         // Check if any profanity is contained within the text
         for word in profanityList {
             if lowercased.contains(word) {
                 return true
             }
         }
-        
+
         // Check for leetspeak variations
         let leetVariations = text
             .lowercased()
@@ -54,19 +54,19 @@ class ProfanityFilter {
             .replacingOccurrences(of: "@", with: "a")
             .replacingOccurrences(of: "$", with: "s")
             .replacingOccurrences(of: "!", with: "i")
-        
+
         for word in profanityList {
             if leetVariations.contains(word) {
                 return true
             }
         }
-        
+
         return false
     }
-    
+
     func cleanText(_ text: String) -> String {
         var cleaned = text
-        
+
         for word in profanityList {
             let pattern = "\\b\(NSRegularExpression.escapedPattern(for: word))\\b"
             if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
@@ -79,7 +79,7 @@ class ProfanityFilter {
                 )
             }
         }
-        
+
         return cleaned
     }
 }

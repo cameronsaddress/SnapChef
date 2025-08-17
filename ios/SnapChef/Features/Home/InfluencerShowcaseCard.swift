@@ -5,7 +5,7 @@ struct InfluencerHeaderView: View {
     let influencer: InfluencerRecipe
     @Binding var sparkleAnimation: Bool
     @State private var showingUserProfile = false
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Profile picture
@@ -23,7 +23,7 @@ struct InfluencerHeaderView: View {
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                 )
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Button(action: {
                     showingUserProfile = true
@@ -32,21 +32,21 @@ struct InfluencerHeaderView: View {
                         Text(influencer.influencerName)
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.white)
-                        
+
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 14))
                             .foregroundColor(Color(hex: "#4facfe"))
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
-                
+
                 Text(influencer.followerCount + " followers")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.7))
             }
-            
+
             Spacer()
-            
+
             // Sparkle animation
             SparkleAnimationView(sparkleAnimation: $sparkleAnimation)
         }
@@ -63,7 +63,7 @@ struct InfluencerHeaderView: View {
 
 struct SparkleAnimationView: View {
     @Binding var sparkleAnimation: Bool
-    
+
     var body: some View {
         ZStack {
             ForEach(0..<3) { index in
@@ -89,7 +89,7 @@ struct SparkleAnimationView: View {
 struct BeforeAfterSliderView: View {
     let influencer: InfluencerRecipe
     @State private var imageOffset: CGFloat = 0
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -128,7 +128,7 @@ struct BeforeAfterSliderView: View {
                                 .padding(.bottom, 8)
                         }
                     )
-                    
+
                     // After photo
                     Group {
                         if let uiImage = UIImage(named: influencer.afterImageName) {
@@ -163,7 +163,7 @@ struct BeforeAfterSliderView: View {
                         }
                     )
                 }
-                
+
                 // Sliding divider
                 SliderHandleView(imageOffset: $imageOffset, geometry: geometry)
             }
@@ -175,10 +175,10 @@ struct BeforeAfterSliderView: View {
         }
         .frame(height: 200)
     }
-    
+
     private func animateSlider(geometry: GeometryProxy) {
         withAnimation(.easeInOut(duration: 2).delay(0.5)) {
-            imageOffset = -geometry.size.width/4
+            imageOffset = -geometry.size.width / 4
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             withAnimation(.easeInOut(duration: 2)) {
@@ -191,7 +191,7 @@ struct BeforeAfterSliderView: View {
 struct SliderHandleView: View {
     @Binding var imageOffset: CGFloat
     let geometry: GeometryProxy
-    
+
     var body: some View {
         Rectangle()
             .fill(Color.white)
@@ -217,14 +217,14 @@ struct SliderHandleView: View {
 struct RecipeStatsView: View {
     let influencer: InfluencerRecipe
     let onTap: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 12) {
             Text(influencer.recipe.recipe.name)
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(.white)
                 .multilineTextAlignment(.center)
-            
+
             HStack(spacing: 20) {
                 // Likes
                 HStack(spacing: 4) {
@@ -235,7 +235,7 @@ struct RecipeStatsView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                 }
-                
+
                 // Shares
                 HStack(spacing: 4) {
                     Image(systemName: "square.and.arrow.up")
@@ -245,7 +245,7 @@ struct RecipeStatsView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                 }
-                
+
                 // Time
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
@@ -256,13 +256,13 @@ struct RecipeStatsView: View {
                         .foregroundColor(.white.opacity(0.8))
                 }
             }
-            
+
             // CTA button
             CTAButton(onTap: onTap)
         }
         .padding(20)
     }
-    
+
     private func formatNumber(_ number: Int) -> String {
         if number >= 1_000_000 {
             return String(format: "%.1fM", Double(number) / 1_000_000)
@@ -275,7 +275,7 @@ struct RecipeStatsView: View {
 
 struct CTAButton: View {
     let onTap: () -> Void
-    
+
     var body: some View {
         Button(action: onTap) {
             HStack {
@@ -306,15 +306,15 @@ struct CTAButton: View {
 struct InfluencerShowcaseCard: View {
     let influencer: InfluencerRecipe
     let onTap: () -> Void
-    
+
     @State private var imageOffset: CGFloat = 0
     @State private var sparkleAnimation = false
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Header with influencer info
             InfluencerHeaderView(influencer: influencer, sparkleAnimation: $sparkleAnimation)
-            
+
             // Quote
             Text("\"\(influencer.quote)\"")
                 .font(.system(size: 16, weight: .medium, design: .rounded))
@@ -322,10 +322,10 @@ struct InfluencerShowcaseCard: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
-            
+
             // Before/After showcase
             BeforeAfterSliderView(influencer: influencer)
-            
+
             // Recipe name and stats
             RecipeStatsView(influencer: influencer, onTap: onTap)
         }
@@ -368,7 +368,7 @@ struct CardBackgroundView: View {
     ZStack {
         MagicalBackground()
             .ignoresSafeArea()
-        
+
         InfluencerShowcaseCard(
             influencer: InfluencerRecipe.mockInfluencers[0],
             onTap: {}

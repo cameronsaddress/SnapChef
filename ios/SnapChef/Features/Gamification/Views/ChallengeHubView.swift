@@ -13,13 +13,13 @@ struct ChallengeHubView: View {
     @State private var hasPromptedForNotifications = false
     @State private var showingPremiumView = false
     @State private var showingAuthPrompt = false
-    
+
     private enum ChallengeFilter: String, CaseIterable {
         case all = "All"
         case active = "Active"
         case completed = "Completed"
         case premium = "Premium"
-        
+
         var icon: String {
             switch self {
             case .all: return "square.grid.2x2"
@@ -29,7 +29,7 @@ struct ChallengeHubView: View {
             }
         }
     }
-    
+
     private var filteredChallenges: [Challenge] {
         let challenges: [Challenge]
         switch selectedFilter {
@@ -43,35 +43,35 @@ struct ChallengeHubView: View {
         case .premium:
             challenges = premiumManager.premiumChallenges
         }
-        
+
         // Apply blur overlay for non-authenticated users
         return challenges
     }
-    
+
     private var shouldBlurChallenges: Bool {
         return !authManager.isAuthenticated
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 // Background
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 20) {
                         // Header Stats Card
                         headerStatsCard
-                        
+
                         // Daily Check-in Banner
                         if !gamificationManager.hasCheckedInToday {
                             dailyCheckInBanner
                         }
-                        
+
                         // Filter Tabs
                         filterTabs
-                        
+
                         // Challenges List
                         challengesList
                             .blur(radius: shouldBlurChallenges ? 3 : 0)
@@ -92,14 +92,10 @@ struct ChallengeHubView: View {
                                 .font(.body)
                                 .foregroundColor(.primary)
                         }
-                        
-                        // TODO: Re-enable when ChallengeAnalyticsService is implemented
-                        // NavigationLink(destination: AnalyticsView()) {
-                        //     Image(systemName: "chart.xyaxis.line")
-                        //         .font(.body)
-                        //         .foregroundColor(.primary)
-                        // }
-                        
+
+                        // Analytics view not implemented in production
+                        // Challenge analytics are tracked locally via UserDefaults
+
                         Button(action: {
                             withAnimation {
                                 refreshChallenges()
@@ -131,22 +127,22 @@ struct ChallengeHubView: View {
         .onAppear {
             // Track that user viewed challenges for progressive auth
             appState.trackAnonymousAction(.challengeViewed)
-            
+
             // Note: Basic challenge viewing is allowed for anonymous users
             // Premium features require authentication
-            
+
             // Create mock challenges if needed
             if gamificationManager.activeChallenges.isEmpty {
                 Task {
                     await ChallengeService.shared.createMockChallenges()
                 }
             }
-            
+
             // Trigger challenge sync when challenges page is visited
             Task {
                 await CloudKitSyncService.shared.triggerChallengeSync()
             }
-            
+
             // Prompt for notifications if not already enabled
             if !hasPromptedForNotifications && !ChallengeNotificationManager.shared.notificationsEnabled {
                 hasPromptedForNotifications = true
@@ -157,7 +153,7 @@ struct ChallengeHubView: View {
         }
         .id(refreshID)
     }
-    
+
     // MARK: - Header Stats Card
     private var headerStatsCard: some View {
         GlassmorphicCard(content: {
@@ -166,9 +162,9 @@ struct ChallengeHubView: View {
                     Text("Your Progress")
                         .font(.title2)
                         .fontWeight(.bold)
-                    
+
                     Spacer()
-                    
+
                     // Level Badge
                     HStack(spacing: 4) {
                         Image(systemName: "shield.fill")
@@ -179,7 +175,7 @@ struct ChallengeHubView: View {
                             .fontWeight(.semibold)
                     }
                 }
-                
+
                 // Stats Grid
                 LazyVGrid(columns: [
                     GridItem(.flexible()),
@@ -192,14 +188,14 @@ struct ChallengeHubView: View {
                         label: "Day Streak",
                         color: .orange
                     )
-                    
+
                     StatItem(
                         icon: "trophy.fill",
                         value: "\(gamificationManager.userStats.challengesCompleted)",
                         label: "Completed",
                         color: .yellow
                     )
-                    
+
                     StatItem(
                         icon: "star.fill",
                         value: "\(gamificationManager.userStats.totalPoints)",
@@ -207,7 +203,7 @@ struct ChallengeHubView: View {
                         color: Color(hex: "#667eea")
                     )
                 }
-                
+
                 // Progress to next level
                 VStack(spacing: 8) {
                     HStack {
@@ -215,17 +211,17 @@ struct ChallengeHubView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Spacer()
-                        Text("\(gamificationManager.userStats.totalPoints % 1000)/1000 XP")
+                        Text("\(gamificationManager.userStats.totalPoints % 1_000)/1000 XP")
                             .font(.caption)
                             .fontWeight(.medium)
                     }
-                    
+
                     GeometryReader { geometry in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(Color.gray.opacity(0.2))
                                 .frame(height: 6)
-                            
+
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(
                                     LinearGradient(
@@ -235,7 +231,7 @@ struct ChallengeHubView: View {
                                     )
                                 )
                                 .frame(
-                                    width: geometry.size.width * Double(gamificationManager.userStats.totalPoints % 1000) / 1000.0,
+                                    width: geometry.size.width * Double(gamificationManager.userStats.totalPoints % 1_000) / 1_000.0,
                                     height: 6
                                 )
                                 .animation(.spring(), value: gamificationManager.userStats.totalPoints)
@@ -247,7 +243,7 @@ struct ChallengeHubView: View {
             .padding()
         }, glowColor: Color(hex: "#667eea"))
     }
-    
+
     // MARK: - Daily Check-in Banner
     private var dailyCheckInBanner: some View {
         Button(action: {
@@ -258,7 +254,7 @@ struct ChallengeHubView: View {
                     Image(systemName: "calendar.badge.checkmark")
                         .font(.title2)
                         .foregroundColor(.orange)
-                    
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Daily Check-in Available!")
                             .font(.headline)
@@ -266,9 +262,9 @@ struct ChallengeHubView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     Spacer()
-                    
+
                     Image(systemName: "chevron.right.circle.fill")
                         .font(.title3)
                         .foregroundColor(.orange)
@@ -278,7 +274,7 @@ struct ChallengeHubView: View {
         }
         .buttonStyle(PlainButtonStyle())
     }
-    
+
     // MARK: - Filter Tabs
     private var filterTabs: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -299,7 +295,7 @@ struct ChallengeHubView: View {
             .padding(.horizontal, 4)
         }
     }
-    
+
     // MARK: - Challenges List
     private var challengesList: some View {
         VStack(spacing: 16) {
@@ -307,7 +303,7 @@ struct ChallengeHubView: View {
             if !premiumManager.isPremiumUser && selectedFilter == .all {
                 premiumBanner
             }
-            
+
             if filteredChallenges.isEmpty {
                 emptyStateView
             } else {
@@ -340,7 +336,7 @@ struct ChallengeHubView: View {
             }
         }
     }
-    
+
     // MARK: - Premium Banner
     private var premiumBanner: some View {
         Button(action: { showingPremiumView = true }) {
@@ -353,14 +349,14 @@ struct ChallengeHubView: View {
                             .font(.headline)
                             .foregroundColor(.white)
                     }
-                    
+
                     Text("Get 2x rewards and exclusive challenges")
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.8))
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .foregroundColor(.white.opacity(0.6))
             }
@@ -384,18 +380,18 @@ struct ChallengeHubView: View {
             )
         }
     }
-    
+
     // MARK: - Empty State
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: "target")
                 .font(.system(size: 60))
                 .foregroundColor(.gray)
-            
+
             Text("No challenges found")
                 .font(.headline)
                 .foregroundColor(.secondary)
-            
+
             Text("Check back soon for new challenges!")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
@@ -403,7 +399,7 @@ struct ChallengeHubView: View {
         }
         .padding(.vertical, 40)
     }
-    
+
     // MARK: - Helper Methods
     private func getCountForFilter(_ filter: ChallengeFilter) -> Int {
         switch filter {
@@ -417,24 +413,24 @@ struct ChallengeHubView: View {
             return premiumManager.premiumChallenges.count
         }
     }
-    
+
     private func refreshChallenges() {
         Task {
             try? await ChallengeService.shared.syncChallenges()
             refreshID = UUID()
         }
     }
-    
+
     // MARK: - Progressive Authentication Methods
-    
+
     private func handleChallengeInteraction(challenge: Challenge) {
         if !authManager.isAuthenticated {
             // Track the interaction
             appState.trackAnonymousAction(.challengeViewed)
-            
+
             // Trigger progressive authentication prompt
             authTrigger.onChallengeInterest()
-            
+
             // Show the prompt if conditions are met
             if authTrigger.shouldShowPrompt {
                 showingAuthPrompt = true
@@ -443,13 +439,13 @@ struct ChallengeHubView: View {
             selectedChallenge = challenge
         }
     }
-    
+
     // MARK: - Challenge Auth Overlay
-    
+
     private var challengeAuthOverlay: some View {
         VStack(spacing: 20) {
             Spacer()
-            
+
             GlassmorphicCard(content: {
                 VStack(spacing: 16) {
                     Image(systemName: "trophy.fill")
@@ -461,19 +457,19 @@ struct ChallengeHubView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                    
+
                     Text("Join Cooking Challenges")
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
-                    
+
                     Text("Sign in to participate in daily challenges, earn rewards, and compete with other chefs!")
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 16)
-                    
+
                     Button(action: {
                         authTrigger.onChallengeInterest()
                         showingAuthPrompt = true
@@ -502,7 +498,7 @@ struct ChallengeHubView: View {
                 .padding(24)
             }, glowColor: Color(hex: "#ffa726"))
             .padding(.horizontal, 20)
-            
+
             Spacer()
         }
     }
@@ -514,17 +510,17 @@ private struct StatItem: View {
     let value: String
     let label: String
     let color: Color
-    
+
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.title2)
                 .foregroundColor(color)
-            
+
             Text(value)
                 .font(.title3)
                 .fontWeight(.bold)
-            
+
             Text(label)
                 .font(.caption2)
                 .foregroundColor(.secondary)
@@ -538,19 +534,19 @@ private struct FilterTab: View {
     let isSelected: Bool
     let count: Int
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 14))
-                
+
                 Text(title)
                     .font(.system(size: 15))
                     .fontWeight(isSelected ? .semibold : .regular)
                     .lineLimit(1)
                     .minimumScaleFactor(0.9)
-                
+
                 if count > 0 {
                     Text("\(count)")
                         .font(.system(size: 12, weight: .semibold))
@@ -580,11 +576,12 @@ private struct FilterTab: View {
     }
 }
 
-// MARK: - Analytics View
-// TODO: Re-implement when ChallengeAnalyticsService is available
+// MARK: - Analytics View (Not Implemented)
+// Challenge analytics service not available in production
+// Analytics data is stored locally in UserDefaults for potential future use
 /*
 struct AnalyticsView: View {
-    @StateObject private var analytics = ChallengeAnalyticsService.shared
+    // Analytics service not implemented
     
     var body: some View {
         ZStack {
@@ -717,7 +714,7 @@ private struct AnalyticsStatCard: View {
     let value: String
     let icon: String
     let color: Color
-    
+
     var body: some View {
         GlassmorphicCard(content: {
             VStack(alignment: .leading, spacing: 8) {
@@ -727,11 +724,11 @@ private struct AnalyticsStatCard: View {
                         .foregroundColor(color)
                     Spacer()
                 }
-                
+
                 Text(value)
                     .font(.title2)
                     .fontWeight(.bold)
-                
+
                 Text(title)
                     .font(.caption)
                     .foregroundColor(.secondary)

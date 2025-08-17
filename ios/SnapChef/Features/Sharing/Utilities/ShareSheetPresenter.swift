@@ -12,9 +12,9 @@ import UIKit
 class ShareSheetPresenter {
     static let shared = ShareSheetPresenter()
     private weak var currentActivityController: UIActivityViewController?
-    
+
     private init() {}
-    
+
     func present(items: [Any], from sourceView: UIView? = nil) {
         // Dismiss any existing activity controller first
         if let current = currentActivityController {
@@ -25,18 +25,18 @@ class ShareSheetPresenter {
             presentNew(items: items, from: sourceView)
         }
     }
-    
+
     private func presentNew(items: [Any], from sourceView: UIView?) {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let rootViewController = windowScene.windows.first?.rootViewController else {
             return
         }
-        
+
         let activityViewController = UIActivityViewController(
             activityItems: items,
             applicationActivities: nil
         )
-        
+
         // Configure for iPad
         if let popover = activityViewController.popoverPresentationController {
             if let sourceView = sourceView {
@@ -52,19 +52,19 @@ class ShareSheetPresenter {
                 )
             }
         }
-        
+
         currentActivityController = activityViewController
-        
+
         // Find the topmost presented view controller
         var topController = rootViewController
         while let presented = topController.presentedViewController {
             topController = presented
         }
-        
+
         // Present from the topmost controller
         topController.present(activityViewController, animated: true)
     }
-    
+
     func dismiss() {
         currentActivityController?.dismiss(animated: true)
         currentActivityController = nil
@@ -75,15 +75,15 @@ class ShareSheetPresenter {
 struct SystemShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     @Binding var isPresented: Bool
-    
+
     func makeUIViewController(context: Context) -> UIViewController {
         UIViewController()
     }
-    
+
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
         if isPresented {
             ShareSheetPresenter.shared.present(items: items, from: uiViewController.view)
-            
+
             // Reset the binding after a delay to avoid re-presentation
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isPresented = false

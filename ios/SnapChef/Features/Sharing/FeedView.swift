@@ -6,12 +6,12 @@ struct FeedView: View {
     @State private var showingDiscoverUsers = false
     @State private var selectedFilter: ActivityFilter = .all
     @State private var isRefreshing = false
-    
+
     enum ActivityFilter: String, CaseIterable {
         case all = "All"
         case following = "Following"
         case mentions = "Mentions"
-        
+
         var icon: String {
             switch self {
             case .all: return "square.grid.2x2"
@@ -20,25 +20,25 @@ struct FeedView: View {
             }
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // Social Stats Header
                     socialStatsHeader
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
                         .padding(.bottom, 16)
-                    
+
                     // Filter Pills
                     filterPills
                         .padding(.horizontal, 20)
                         .padding(.bottom, 16)
-                    
+
                     // Activity Feed Content
                     ActivityFeedView()
                         .environmentObject(appState)
@@ -82,7 +82,7 @@ struct FeedView: View {
             }
         }
     }
-    
+
     private func refreshUserStats() async {
         isRefreshing = true
         // Update social counts (followers/following)
@@ -93,7 +93,7 @@ struct FeedView: View {
         await cloudKitAuth.refreshCurrentUser()
         isRefreshing = false
     }
-    
+
     private var socialStatsHeader: some View {
         VStack(spacing: 16) {
             // User Info Row
@@ -115,28 +115,28 @@ struct FeedView: View {
                                 .foregroundColor(.white)
                         )
                 }
-                
+
                 // Stats
                 HStack(spacing: 24) {
                     socialStatItem(
                         count: cloudKitAuth.currentUser?.followerCount ?? 0,
                         label: "Followers"
                     )
-                    
+
                     socialStatItem(
                         count: cloudKitAuth.currentUser?.followingCount ?? 0,
                         label: "Following"
                     )
-                    
+
                     socialStatItem(
                         count: cloudKitAuth.currentUser?.recipesShared ?? 0,
                         label: "Recipes"
                     )
                 }
-                
+
                 Spacer()
             }
-            
+
             // Discover Button
             Button(action: {
                 showingDiscoverUsers = true
@@ -180,19 +180,19 @@ struct FeedView: View {
                 )
         )
     }
-    
+
     private func socialStatItem(count: Int, label: String) -> some View {
         VStack(spacing: 4) {
             Text("\(count)")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(.white)
-            
+
             Text(label)
                 .font(.system(size: 12))
                 .foregroundColor(.white.opacity(0.7))
         }
     }
-    
+
     private var filterPills: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
@@ -202,7 +202,7 @@ struct FeedView: View {
             }
         }
     }
-    
+
     private func filterPill(_ filter: ActivityFilter) -> some View {
         Button(action: {
             withAnimation(.spring(response: 0.3)) {

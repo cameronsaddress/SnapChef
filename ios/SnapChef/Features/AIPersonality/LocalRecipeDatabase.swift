@@ -2,16 +2,16 @@ import Foundation
 
 struct LocalRecipeDatabase {
     static let shared = LocalRecipeDatabase()
-    
+
     private init() {}
-    
+
     // Helper function to create ingredients from strings
     private func createIngredients(from items: [String]) -> [Ingredient] {
         return items.map { item in
             Ingredient(id: UUID(), name: item, quantity: "", unit: nil, isAvailable: true)
         }
     }
-    
+
     // Default nutrition values
     private let defaultNutrition = Nutrition(
         calories: 350,
@@ -22,7 +22,7 @@ struct LocalRecipeDatabase {
         sugar: 8,
         sodium: 480
     )
-    
+
     // MARK: - Italian Recipes
     var italianRecipes: [Recipe] {
         [
@@ -60,7 +60,7 @@ struct LocalRecipeDatabase {
         )
         ]
     }
-    
+
     // MARK: - Mexican Recipes
     var mexicanRecipes: [Recipe] {
         [
@@ -98,7 +98,7 @@ struct LocalRecipeDatabase {
         )
         ]
     }
-    
+
     // MARK: - Chinese Recipes
     var chineseRecipes: [Recipe] {
         [
@@ -136,7 +136,7 @@ struct LocalRecipeDatabase {
         )
         ]
     }
-    
+
     // MARK: - Japanese Recipes
     var japaneseRecipes: [Recipe] {
         [
@@ -174,7 +174,7 @@ struct LocalRecipeDatabase {
         )
         ]
     }
-    
+
     // MARK: - Thai Recipes
     var thaiRecipes: [Recipe] {
         [
@@ -212,7 +212,7 @@ struct LocalRecipeDatabase {
         )
         ]
     }
-    
+
     // MARK: - Indian Recipes
     var indianRecipes: [Recipe] {
         [
@@ -250,7 +250,7 @@ struct LocalRecipeDatabase {
         )
         ]
     }
-    
+
     // MARK: - French Recipes
     var frenchRecipes: [Recipe] {
         [
@@ -288,7 +288,7 @@ struct LocalRecipeDatabase {
         )
         ]
     }
-    
+
     // MARK: - American Recipes
     var americanRecipes: [Recipe] {
         [
@@ -326,7 +326,7 @@ struct LocalRecipeDatabase {
         )
         ]
     }
-    
+
     func getRandomRecipe(for cuisine: String) -> Recipe? {
         let cleanCuisine = cuisine.replacingOccurrences(of: " 🍝", with: "")
             .replacingOccurrences(of: " 🌮", with: "")
@@ -337,9 +337,9 @@ struct LocalRecipeDatabase {
             .replacingOccurrences(of: " 🥐", with: "")
             .replacingOccurrences(of: " 🍔", with: "")
             .lowercased()
-        
+
         let recipes: [Recipe]
-        
+
         switch cleanCuisine {
         case "italian":
             recipes = italianRecipes
@@ -359,12 +359,12 @@ struct LocalRecipeDatabase {
             recipes = americanRecipes
         default:
             // If cuisine not found, return a random recipe from all cuisines
-            let allRecipes = italianRecipes + mexicanRecipes + chineseRecipes + 
-                           japaneseRecipes + thaiRecipes + indianRecipes + 
+            let allRecipes = italianRecipes + mexicanRecipes + chineseRecipes +
+                           japaneseRecipes + thaiRecipes + indianRecipes +
                            frenchRecipes + americanRecipes
             recipes = allRecipes
         }
-        
+
         return recipes.randomElement()
     }
 }

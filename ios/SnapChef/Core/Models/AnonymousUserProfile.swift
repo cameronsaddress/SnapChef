@@ -11,7 +11,6 @@ import Foundation
 /// Model for tracking anonymous user behavior and authentication state
 /// Uses device-based identification with secure Keychain persistence
 struct AnonymousUserProfile: Codable, Sendable {
-
     // MARK: - Core Identification
 
     /// Unique device identifier for anonymous user tracking
@@ -174,7 +173,6 @@ struct AnonymousUserProfile: Codable, Sendable {
 // MARK: - Analytics Extensions
 
 extension AnonymousUserProfile {
-
     /// Engagement score for determining optimal authentication timing
     var engagementScore: Double {
         let recipeWeight = 3.0

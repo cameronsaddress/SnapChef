@@ -57,7 +57,7 @@ public enum ViralTemplate: String, Sendable {
 
 // Rendering + brand config
 public struct RenderConfig: Sendable {
-    public var size = CGSize(width: 1080, height: 1920)
+    public var size = CGSize(width: 1_080, height: 1_920)
     public var fps: Int32 = 30
     public var safeInsets = UIEdgeInsets(top: 180, left: 72, bottom: 220, right: 72)
     public var maxDuration = CMTime(seconds: 15, preferredTimescale: 600)
@@ -73,7 +73,7 @@ public struct RenderConfig: Sendable {
 
     // Ken Burns limits - subtle 5-8% zoom for natural movement
     public var maxKenBurnsScale: CGFloat = 1.08 // 8% subtle zoom
-    
+
     // Premium effects settings - enhanced parallax for more panning
     public var breatheIntensity: CGFloat = 0.02 // 2% pulse for breathe effect
     public var parallaxIntensity: CGFloat = 0.12 // 12% enhanced parallax movement
@@ -83,17 +83,17 @@ public struct RenderConfig: Sendable {
 
     // Beat handling
     public var fallbackBPM: Double = 80
-    
+
     // Screen scale for high-res displays
     public var contentsScale: CGFloat = 2.0
-    
+
     // SPEED OPTIMIZATION: Performance tuning flags
     public var enableMetalAcceleration = true
     public var enableParallelProcessing = true
     public var enableCaching = true
-    public var maxCacheSize = 100 * 1024 * 1024 // 100MB cache
+    public var maxCacheSize = 100 * 1_024 * 1_024 // 100MB cache
     public var reduceEffectsForSpeed = false // Emergency speed mode
-    
+
     public init() { /* uses the default property values above */ }
 }
 
@@ -107,27 +107,40 @@ public struct RenderProgress: Sendable {
     }
 }
 
-// SPEED OPTIMIZED Export controls
+// OPTIMIZED Export controls with enhanced memory management
 public enum ExportSettings {
-    // CRITICAL SPEED FIX: Use medium quality for all operations to achieve sub-10s rendering
-    public static let videoPreset = AVAssetExportPresetHighestQuality // Medium quality for speed
-    public static let draftPreset = AVAssetExportPresetHighestQuality // Low quality for intermediate steps
-    public static let finalPreset = AVAssetExportPresetHighestQuality // Medium quality even for final
+    // CRITICAL SPEED FIX: Use optimized presets for different scenarios
+    public static let videoPreset = AVAssetExportPresetHighestQuality
+    public static let draftPreset = AVAssetExportPresetMediumQuality // Faster for intermediate steps
+    public static let finalPreset = AVAssetExportPresetHighestQuality
+    public static let emergencyPreset = AVAssetExportPresetLowQuality // Emergency fallback
+
+    // ENHANCED MEMORY LIMITS: More aggressive memory management
+    public static let maxMemoryUsage: UInt64 = 300 * 1_024 * 1_024 // Reduced to 300MB
+    public static let warningMemoryUsage: UInt64 = 250 * 1_024 * 1_024 // Warning at 250MB
+    public static let criticalMemoryUsage: UInt64 = 280 * 1_024 * 1_024 // Critical at 280MB
     
-    public static let maxMemoryUsage: UInt64 = 400 * 1024 * 1024 // Reduced to 400MB
     public static let maxRenderTime: Double = 8.0 // Target under 8s total
     public static let pixelFormat = kCVPixelFormatType_32BGRA
-    public static let maxFileSize: Int64 = 100 * 1024 * 1024  // Reduced to 25MB for speed
-    public static let targetFileSize: Int64 = 80 * 1024 * 1024  // Target 20MB for speed
+    public static let maxFileSize: Int64 = 80 * 1_024 * 1_024  // 80MB max file size
+    public static let targetFileSize: Int64 = 50 * 1_024 * 1_024  // Target 50MB
+
+    // OPTIMIZED BITRATES: Balanced quality and speed
+    public static let draftBitRate = 6_000_000 // 6 Mbps for drafts
+    public static let finalBitRate = 10_000_000 // 10 Mbps for final
+    public static let fastBitRate = 4_000_000 // 4 Mbps for ultra-fast processing
+    public static let emergencyBitRate = 2_000_000 // 2 Mbps for emergency mode
+
+    // ENHANCED PROCESSING LIMITS: Memory-conscious settings
+    public static let maxConcurrentSegments = 1 // Single segment to minimize memory
+    public static let cacheLimit = 3 // Very limited cache to save memory
+    public static let maxFrameProcessingBatch = 30 // Process frames in smaller batches
+    public static let memoryCleanupInterval = 20 // Cleanup every 20 frames
     
-    // CRITICAL SPEED FIX: Much lower bitrates for faster processing
-    public static let draftBitRate = 8_000_000 // 1.5 Mbps for drafts
-    public static let finalBitRate = 12_000_000 // 3 Mbps for final (reduced from 8)
-    public static let fastBitRate = 6_000_000 // 1 Mbps for ultra-fast processing
-    
-    // Parallel processing limits - increased for better performance
-    public static let maxConcurrentSegments = 2 // Reduced to avoid memory pressure
-    public static let cacheLimit = 5 // Reduced cache to save memory
+    // EMERGENCY MODE SETTINGS: Ultra-conservative for low memory devices
+    public static let emergencyMaxMemory: UInt64 = 200 * 1_024 * 1_024 // 200MB emergency limit
+    public static let emergencyFrameBatch = 10 // Even smaller batches in emergency
+    public static let emergencyCleanupInterval = 5 // More frequent cleanup
 }
 
 // MARK: - RenderPlan + specs shared across renderer/planner/overlays
@@ -180,18 +193,18 @@ public enum FilterSpec: Sendable, Hashable {
     case vibrance(CGFloat)
     case saturation(CGFloat)
     case contrast(CGFloat)
-    
+
     // PREMIUM COLOR GRADES
     case premiumColorGrade(style: ColorGradeStyle)
     case foodEnhancer(intensity: CGFloat)
     case viralPop(warmth: CGFloat, punch: CGFloat)
-    
+
     // DRAMATIC EFFECTS
     case chromaticAberration(intensity: CGFloat)
     case lightLeak(position: CGPoint, intensity: CGFloat)
     case filmGrain(intensity: CGFloat)
     case vignette(intensity: CGFloat)
-    
+
     // MOTION EFFECTS (applied during render)
     case breatheEffect(intensity: CGFloat, bpm: Double)
     case parallaxMove(direction: CGVector, intensity: CGFloat)
@@ -231,7 +244,7 @@ public enum FilterSpecBridge {
                 guard let f = CIFilter(name: "CIColorControls") else { break }
                 f.setValue(c, forKey: kCIInputContrastKey)
                 filters.append(f)
-                
+
             // PREMIUM COLOR GRADES
             case .premiumColorGrade(let style):
                 filters.append(contentsOf: createColorGradeFilters(style: style))
@@ -239,7 +252,7 @@ public enum FilterSpecBridge {
                 filters.append(contentsOf: createFoodEnhancementFilters(intensity: intensity))
             case .viralPop(let warmth, let punch):
                 filters.append(contentsOf: createViralPopFilters(warmth: warmth, punch: punch))
-                
+
             // DRAMATIC EFFECTS
             case .chromaticAberration(let intensity):
                 filters.append(createChromaticAberrationFilter(intensity: intensity))
@@ -249,7 +262,7 @@ public enum FilterSpecBridge {
                 filters.append(createFilmGrainFilter(intensity: intensity))
             case .vignette(let intensity):
                 filters.append(createVignetteFilter(intensity: intensity))
-                
+
             // Motion effects are handled in StillWriter during render
             case .breatheEffect, .parallaxMove, .velocityRamp:
                 break // These are applied during frame-by-frame rendering
@@ -257,75 +270,75 @@ public enum FilterSpecBridge {
         }
         return filters
     }
-    
+
     // MARK: - PREMIUM FILTER FACTORIES
-    
+
     private static func createColorGradeFilters(style: ColorGradeStyle) -> [CIFilter] {
         var filters: [CIFilter] = []
-        
+
         switch style {
         case .warm:
             // Golden hour warmth
             guard let temp = CIFilter(name: "CITemperatureAndTint") else { break }
-            temp.setValue(CIVector(x: 2000, y: 50), forKey: "inputNeutral") // Warm + slight magenta
+            temp.setValue(CIVector(x: 2_000, y: 50), forKey: "inputNeutral") // Warm + slight magenta
             filters.append(temp)
-            
+
             guard let curves = CIFilter(name: "CIColorCurves") else { break }
             // Lift shadows, add warmth to highlights
             curves.setValue(CIVector(x: 0, y: 0.05, z: 0.95, w: 1.0), forKey: "inputCurvesDomain")
             filters.append(curves)
-            
+
         case .cinematic:
             // Teal shadows, orange highlights - Hollywood look
             let colorBalance = CIFilter(name: "CIColorCrossPolynomial")!
             // This creates the classic teal & orange look
             filters.append(colorBalance)
-            
+
             let contrast = CIFilter(name: "CIColorControls")!
             contrast.setValue(1.15, forKey: kCIInputContrastKey)
             contrast.setValue(0.95, forKey: kCIInputSaturationKey)
             filters.append(contrast)
-            
+
         case .vibrant:
             // Instagram-ready pop
             let vibrance = CIFilter(name: "CIVibrance")!
             vibrance.setValue(0.4, forKey: "inputAmount")
             filters.append(vibrance)
-            
+
             let saturation = CIFilter(name: "CIColorControls")!
             saturation.setValue(1.2, forKey: kCIInputSaturationKey)
             saturation.setValue(1.1, forKey: kCIInputContrastKey)
             filters.append(saturation)
-            
+
         case .moody:
             // Dark, dramatic contrast
             let exposure = CIFilter(name: "CIExposureAdjust")!
             exposure.setValue(-0.3, forKey: kCIInputEVKey)
             filters.append(exposure)
-            
+
             let contrast = CIFilter(name: "CIColorControls")!
             contrast.setValue(1.3, forKey: kCIInputContrastKey)
             contrast.setValue(0.85, forKey: kCIInputBrightnessKey)
             filters.append(contrast)
-            
+
         case .fresh:
             // Clean, bright food styling
             let exposure = CIFilter(name: "CIExposureAdjust")!
             exposure.setValue(0.2, forKey: kCIInputEVKey)
             filters.append(exposure)
-            
+
             let highlights = CIFilter(name: "CIHighlightShadowAdjust")!
             highlights.setValue(0.8, forKey: "inputHighlightAmount")
             highlights.setValue(1.2, forKey: "inputShadowAmount")
             filters.append(highlights)
-            
+
         case .natural:
             // Natural, clean colors without any tint - FIXES GREEN TINT ISSUE
             // Only apply minimal adjustments to maintain natural color balance
             let whiteBalance = CIFilter(name: "CITemperatureAndTint")!
-            whiteBalance.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral") // Neutral daylight temperature
+            whiteBalance.setValue(CIVector(x: 6_500, y: 0), forKey: "inputNeutral") // Neutral daylight temperature
             filters.append(whiteBalance)
-            
+
             // Slight contrast boost for clarity without color shifts
             let contrast = CIFilter(name: "CIColorControls")!
             contrast.setValue(1.05, forKey: kCIInputContrastKey) // Very subtle contrast
@@ -333,48 +346,48 @@ public enum FilterSpecBridge {
             contrast.setValue(0.0, forKey: kCIInputBrightnessKey) // No brightness adjustment
             filters.append(contrast)
         }
-        
+
         return filters
     }
-    
+
     private static func createFoodEnhancementFilters(intensity: CGFloat) -> [CIFilter] {
         var filters: [CIFilter] = []
-        
+
         // Enhance food colors specifically
         let vibrance = CIFilter(name: "CIVibrance")!
         vibrance.setValue(intensity * 0.6, forKey: "inputAmount")
         filters.append(vibrance)
-        
+
         // Boost reds and oranges (common food colors)
         let selective = CIFilter(name: "CIColorControls")!
         selective.setValue(1.0 + intensity * 0.3, forKey: kCIInputSaturationKey)
         filters.append(selective)
-        
+
         // Add slight warmth
         let temp = CIFilter(name: "CITemperatureAndTint")!
         temp.setValue(CIVector(x: 500 * intensity, y: 0), forKey: "inputNeutral")
         filters.append(temp)
-        
+
         return filters
     }
-    
+
     private static func createViralPopFilters(warmth: CGFloat, punch: CGFloat) -> [CIFilter] {
         var filters: [CIFilter] = []
-        
+
         // Temperature adjustment for warmth
         let temp = CIFilter(name: "CITemperatureAndTint")!
-        temp.setValue(CIVector(x: warmth * 1000, y: 0), forKey: "inputNeutral")
+        temp.setValue(CIVector(x: warmth * 1_000, y: 0), forKey: "inputNeutral")
         filters.append(temp)
-        
+
         // Punch up the contrast and saturation
         let controls = CIFilter(name: "CIColorControls")!
         controls.setValue(1.0 + punch * 0.4, forKey: kCIInputContrastKey)
         controls.setValue(1.0 + punch * 0.3, forKey: kCIInputSaturationKey)
         filters.append(controls)
-        
+
         return filters
     }
-    
+
     private static func createChromaticAberrationFilter(intensity: CGFloat) -> CIFilter {
         // Custom RGB channel separation for transition effects
         let convolution = CIFilter(name: "CIConvolution3X3")!
@@ -387,26 +400,26 @@ public enum FilterSpecBridge {
         convolution.setValue(weights, forKey: "inputWeights")
         return convolution
     }
-    
+
     private static func createLightLeakFilter(position: CGPoint, intensity: CGFloat) -> CIFilter {
         // Create a custom composite filter that generates a radial gradient and composites it
         let composite = CIFilter(name: "CIAdditionCompositing")!
-        
+
         // Store the gradient parameters in the filter's userInfo for later use
         // Note: This approach requires the caller to handle the gradient generation
         // since CIRadialGradient is a generator filter
         composite.setValue(["lightLeakPosition": position, "lightLeakIntensity": intensity], forKey: "userInfo")
-        
+
         return composite
     }
-    
+
     private static func createFilmGrainFilter(intensity: CGFloat) -> CIFilter {
         // Use a multiply composite filter with stored parameters for film grain
         let composite = CIFilter(name: "CIMultiplyCompositing")!
         composite.setValue(["filmGrainIntensity": intensity], forKey: "userInfo")
         return composite
     }
-    
+
     private static func createVignetteFilter(intensity: CGFloat) -> CIFilter {
         let vignette = CIFilter(name: "CIVignette")!
         vignette.setValue(intensity, forKey: "inputIntensity")

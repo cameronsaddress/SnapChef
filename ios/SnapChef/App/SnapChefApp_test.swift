@@ -1,6 +1,6 @@
 import SwiftUI
 
-//@main
+// @main
 struct SnapChefApp_Test: App {
     var body: some Scene {
         WindowGroup {

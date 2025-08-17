@@ -6,16 +6,16 @@ struct FavoritesView: View {
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @State private var cloudKitFavorites: [Recipe] = []
     @State private var isLoadingCloudKit = false
-    
+
     var favoriteRecipes: [Recipe] {
         // Get favorited recipes from local state
         let localFavorites = appState.allRecipes.filter { recipe in
             appState.isFavorited(recipe.id)
         }
-        
+
         // Combine with CloudKit favorites
         var allFavorites = localFavorites + cloudKitFavorites
-        
+
         // Remove duplicates
         var seenIds = Set<UUID>()
         allFavorites = allFavorites.filter { recipe in
@@ -25,26 +25,26 @@ struct FavoritesView: View {
             seenIds.insert(recipe.id)
             return true
         }
-        
+
         return allFavorites
     }
-    
+
     var body: some View {
         ZStack {
             MagicalBackground()
                 .ignoresSafeArea()
-            
+
             if favoriteRecipes.isEmpty && !isLoadingCloudKit {
                 VStack(spacing: 20) {
                     Image(systemName: "heart.slash")
                         .font(.system(size: 60))
                         .foregroundColor(.white.opacity(0.5))
-                    
+
                     Text("No Favorites Yet")
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
-                    
+
                     Text("Tap the heart on any recipe to save it here")
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.8))
@@ -68,7 +68,7 @@ struct FavoritesView: View {
                                     .fill(Color.white.opacity(0.1))
                             )
                         }
-                        
+
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                             ForEach(favoriteRecipes) { recipe in
                                 RecipeGridCard(recipe: recipe)
@@ -89,11 +89,11 @@ struct FavoritesView: View {
             }
         }
     }
-    
+
     private func loadCloudKitFavorites() {
         guard !isLoadingCloudKit else { return }
         isLoadingCloudKit = true
-        
+
         Task {
             do {
                 let favorites = try await cloudKitRecipeManager.getUserFavoritedRecipes()

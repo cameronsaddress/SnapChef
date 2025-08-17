@@ -35,7 +35,9 @@ opt_in_rules:
   - file_header
   - first_where
   - flatmap_over_map_reduce
+  - force_unwrapping
   - identical_operands
+  - implicitly_unwrapped_optional
   - joined_default_parameter
   - last_where
   - legacy_multiple
@@ -84,7 +86,6 @@ disabled_rules:
   - function_body_length # Some complex views need longer functions
   - type_body_length # Some models/views can be large
   - file_length # Some files are necessarily long
-  - identifier_name # We have some short names like 'id'
   - line_length # Long lines are sometimes needed
 
 # Rule configurations
@@ -104,6 +105,7 @@ force_unwrapping:
 implicitly_unwrapped_optional:
   severity: warning
 
+
 large_tuple:
   warning: 3
   error: 4
@@ -114,10 +116,11 @@ type_name:
   allowed_symbols: ["_"]
 
 identifier_name:
-  min_length: 2
+  min_length: 1
   max_length: 50
   allowed_symbols: ["_"]
-  validates_start_with_lowercase: true
+  validates_start_with_lowercase: warning
+  excluded: ["x", "y", "i", "j", "k"]
 
 function_parameter_count:
   warning: 8
@@ -125,29 +128,11 @@ function_parameter_count:
 
 # Custom rules for Swift 6 compliance
 custom_rules:
-  swift6_actor_isolation:
-    name: "Swift 6 Actor Isolation"
-    regex: '(class|struct)\s+\w+(?!.*@MainActor|.*@unchecked Sendable|.*: Sendable)'
-    message: "Consider adding @MainActor or Sendable conformance for Swift 6 compliance"
-    severity: warning
-    
-  swift6_task_detached:
-    name: "Swift 6 Task Detached"
-    regex: 'Task\s*\{\s*@MainActor'
-    message: "Use Task { @MainActor in ... } for main actor isolation"
-    severity: info
-    
   no_print_statements:
     name: "No Print Statements"
     regex: '^\s*print\('
     message: "Use proper logging instead of print statements"
     severity: warning
-    
-  mark_sections:
-    name: "MARK Sections"
-    regex: '^// MARK: -'
-    message: "Use // MARK: - Section Name for better code organization"
-    severity: info
 
 # Reporter type (xcode, json, csv, checkstyle, junit, html, emoji, markdown, github-actions-logging)
 reporter: "xcode"

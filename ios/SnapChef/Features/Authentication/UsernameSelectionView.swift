@@ -3,23 +3,23 @@ import SwiftUI
 struct UsernameSelectionView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var username = ""
     @State private var isChecking = false
     @State private var isAvailable = false
     @State private var hasChecked = false
     @State private var suggestions: [String] = []
-    
+
     var isValid: Bool {
         username.count >= 3 && username.count <= 20 && username.range(of: "^[a-zA-Z0-9_]+$", options: .regularExpression) != nil
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 32) {
                     // Header
                     VStack(spacing: 16) {
@@ -32,23 +32,23 @@ struct UsernameSelectionView: View {
                                     endPoint: .bottomTrailing
                                 )
                             )
-                        
+
                         Text("Choose Your Username")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                        
+
                         Text("This is how other chefs will know you")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.8))
                     }
                     .padding(.top, 40)
-                    
+
                     // Username Input
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Image(systemName: "at")
                                 .foregroundColor(.white.opacity(0.6))
-                            
+
                             TextField("username", text: $username)
                                 .textContentType(.username)
                                 .autocapitalization(.none)
@@ -58,7 +58,7 @@ struct UsernameSelectionView: View {
                                     hasChecked = false
                                     checkUsernameAvailability()
                                 }
-                            
+
                             if isChecking {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -80,7 +80,7 @@ struct UsernameSelectionView: View {
                                         )
                                 )
                         )
-                        
+
                         // Validation message
                         if !username.isEmpty {
                             if !isValid {
@@ -99,14 +99,14 @@ struct UsernameSelectionView: View {
                         }
                     }
                     .padding(.horizontal, 24)
-                    
+
                     // Suggestions
                     if !suggestions.isEmpty && !isAvailable {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Try these:")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.6))
-                            
+
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(suggestions, id: \.self) { suggestion in
@@ -133,9 +133,9 @@ struct UsernameSelectionView: View {
                         }
                         .padding(.horizontal, 24)
                     }
-                    
+
                     Spacer()
-                    
+
                     // Continue Button
                     Button(action: saveUsername) {
                         Text("Continue")
@@ -157,22 +157,22 @@ struct UsernameSelectionView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
     }
-    
+
     private func checkUsernameAvailability() {
         guard isValid else { return }
-        
+
         isChecking = true
-        
+
         // Simulate API call
         Task {
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            
+
             // In real app, check with backend
             let takenUsernames = ["chef", "master", "cooking", "snapchef", "admin"]
             isAvailable = !takenUsernames.contains(username.lowercased())
             hasChecked = true
             isChecking = false
-            
+
             if !isAvailable {
                 // Generate suggestions
                 suggestions = [
@@ -184,7 +184,7 @@ struct UsernameSelectionView: View {
             }
         }
     }
-    
+
     private func saveUsername() {
         // In real app, update user profile with username
         dismiss()

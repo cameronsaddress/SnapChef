@@ -10,23 +10,23 @@ struct ChallengeDetailView: View {
     @State private var joinSuccess = false
     @StateObject private var gamificationManager = GamificationManager.shared
     @StateObject private var authManager = CloudKitAuthManager.shared
-    
+
     // Get the actual challenge from GamificationManager if it exists
     private var displayChallenge: Challenge {
-        if let activeChallenge = gamificationManager.activeChallenges.first(where: { 
-            $0.id == challenge.id || $0.title == challenge.title 
+        if let activeChallenge = gamificationManager.activeChallenges.first(where: {
+            $0.id == challenge.id || $0.title == challenge.title
         }) {
             return activeChallenge
         }
         return challenge
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 30) {
                         // Title and description
@@ -35,18 +35,18 @@ struct ChallengeDetailView: View {
                                 .font(.system(size: 32, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
                                 .multilineTextAlignment(.center)
-                            
+
                             Text(displayChallenge.description)
                                 .font(.system(size: 18, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
                                 .multilineTextAlignment(.center)
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Join button or Progress at the top
                         if !displayChallenge.isCompleted {
                             let isAlreadyJoined = displayChallenge.isJoined || gamificationManager.isChallengeJoined(displayChallenge.id)
-                            
+
                             if isAlreadyJoined {
                                 // Show progress card
                                 ProgressCard(challenge: displayChallenge)
@@ -62,15 +62,15 @@ struct ChallengeDetailView: View {
                                 .disabled(isJoining || joinSuccess)
                             }
                         }
-                        
+
                         // Requirements
                         RequirementsCard(challenge: displayChallenge)
                             .padding(.horizontal, 20)
-                        
+
                         // Rewards
                         RewardsCard(challenge: displayChallenge)
                             .padding(.horizontal, 20)
-                        
+
                         // Leaderboard preview
                         MiniLeaderboardCard(challenge: displayChallenge)
                             .padding(.horizontal, 20)
@@ -92,7 +92,7 @@ struct ChallengeDetailView: View {
             CloudKitAuthView(requiredFor: .challenges)
         }
     }
-    
+
     private func joinChallenge() {
         // Check if authentication is required
         let authManager = CloudKitAuthManager.shared
@@ -104,13 +104,13 @@ struct ChallengeDetailView: View {
             authManager.promptAuthForFeature(.challenges)
             return
         }
-        
+
         isJoining = true
-        
+
         // Haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
-        
+
         // Simulate join
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             isJoining = false
@@ -123,7 +123,7 @@ struct ChallengeDetailView: View {
 // MARK: - Challenge Icon View
 struct ChallengeIconView: View {
     let type: ChallengeType
-    
+
     var body: some View {
         ZStack {
             // Glow
@@ -141,7 +141,7 @@ struct ChallengeIconView: View {
                 )
                 .frame(width: 240, height: 240)
                 .blur(radius: 20)
-            
+
             // Background
             Circle()
                 .fill(
@@ -156,7 +156,7 @@ struct ChallengeIconView: View {
                 )
                 .frame(width: 140, height: 140)
                 .shadow(color: type.color.opacity(0.5), radius: 20)
-            
+
             // Icon
             Image(systemName: type.icon)
                 .font(.system(size: 50, weight: .medium))
@@ -168,14 +168,14 @@ struct ChallengeIconView: View {
 // MARK: - Requirements Card
 struct RequirementsCard: View {
     let challenge: Challenge
-    
+
     var body: some View {
         GlassmorphicCard {
             VStack(alignment: .leading, spacing: 16) {
                 Label("Requirements", systemImage: "checklist")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.white)
-                
+
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 12) {
                         Image(systemName: "checkmark.circle")
@@ -185,7 +185,7 @@ struct RequirementsCard: View {
                             .foregroundColor(.white.opacity(0.8))
                     }
                 }
-                
+
                 // Time remaining
                 HStack {
                     Image(systemName: "clock")
@@ -204,14 +204,14 @@ struct RequirementsCard: View {
 // MARK: - Rewards Card
 struct RewardsCard: View {
     let challenge: Challenge
-    
+
     var body: some View {
         GlassmorphicCard {
             VStack(spacing: 20) {
                 Label("Rewards", systemImage: "gift")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.white)
-                
+
                 HStack(spacing: 40) {
                     // Points
                     VStack(spacing: 8) {
@@ -222,7 +222,7 @@ struct RewardsCard: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white.opacity(0.6))
                     }
-                    
+
                     // Coins
                     VStack(spacing: 8) {
                         HStack(spacing: 4) {
@@ -250,7 +250,7 @@ struct MiniLeaderboardCard: View {
     let challenge: Challenge
     @State private var leaderboardEntries: [LeaderboardEntry] = []
     @State private var isLoading = true
-    
+
     var body: some View {
         GlassmorphicCard {
             VStack(spacing: 16) {
@@ -258,14 +258,14 @@ struct MiniLeaderboardCard: View {
                     Label("Leaderboard", systemImage: "trophy")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(.white)
-                    
+
                     Spacer()
-                    
+
                     Text("\(challenge.participants) chefs")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.6))
                 }
-                
+
                 // Leaderboard entries
                 if isLoading {
                     ProgressView()
@@ -284,7 +284,7 @@ struct MiniLeaderboardCard: View {
                                     .font(.system(size: 16, weight: .bold, design: .rounded))
                                     .foregroundColor(rankColor(index + 1))
                                     .frame(width: 30)
-                                
+
                                 // Profile image placeholder
                                 Circle()
                                     .fill(Color.white.opacity(0.2))
@@ -294,14 +294,14 @@ struct MiniLeaderboardCard: View {
                                             .font(.system(size: 14, weight: .bold))
                                             .foregroundColor(.white)
                                     )
-                                
+
                                 Text(entry.username)
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(.white.opacity(0.8))
                                     .lineLimit(1)
-                                
+
                                 Spacer()
-                                
+
                                 Text("\(entry.points) pts")
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundColor(Color(hex: "#f093fb"))
@@ -317,7 +317,7 @@ struct MiniLeaderboardCard: View {
             loadLeaderboard()
         }
     }
-    
+
     private func loadLeaderboard() {
         Task {
             // For now, use mock data or fetch from CloudKit
@@ -330,17 +330,17 @@ struct MiniLeaderboardCard: View {
             }
         }
     }
-    
+
     private func fetchLeaderboardEntries() async -> [LeaderboardEntry] {
         // For now, return mock data
-        // TODO: Implement proper CloudKit query
+        // CloudKit leaderboard query not implemented - using mock data
         return [
-            LeaderboardEntry(rank: 1, username: "ChefMaster", avatar: "👨‍🍳", points: 1250, level: 12, country: "USA", isCurrentUser: false),
+            LeaderboardEntry(rank: 1, username: "ChefMaster", avatar: "👨‍🍳", points: 1_250, level: 12, country: "USA", isCurrentUser: false),
             LeaderboardEntry(rank: 2, username: "CookieQueen", avatar: "👩‍🍳", points: 980, level: 10, country: "UK", isCurrentUser: false),
             LeaderboardEntry(rank: 3, username: "PastaKing", avatar: "🍝", points: 875, level: 9, country: "Italy", isCurrentUser: false)
         ]
     }
-    
+
     private func rankColor(_ rank: Int) -> Color {
         switch rank {
         case 1: return Color(hex: "#ffd700")
@@ -355,25 +355,25 @@ struct MiniLeaderboardCard: View {
 struct ProgressCard: View {
     let challenge: Challenge
     @State private var showProofSubmission = false
-    
+
     private var progressPercentage: Int {
         Int(challenge.currentProgress * 100)
     }
-    
+
     var body: some View {
         GlassmorphicCard {
             VStack(spacing: 20) {
                 Label("Your Progress", systemImage: "chart.line.uptrend.xyaxis")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.white)
-                
+
                 // Progress Circle
                 ZStack {
                     // Background circle
                     Circle()
                         .stroke(Color.white.opacity(0.2), lineWidth: 12)
                         .frame(width: 120, height: 120)
-                    
+
                     // Progress circle
                     Circle()
                         .trim(from: 0, to: challenge.currentProgress)
@@ -391,7 +391,7 @@ struct ProgressCard: View {
                         .frame(width: 120, height: 120)
                         .rotationEffect(.degrees(-90))
                         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: challenge.currentProgress)
-                    
+
                     // Progress text
                     VStack(spacing: 4) {
                         Text("\(progressPercentage)%")
@@ -402,7 +402,7 @@ struct ProgressCard: View {
                             .foregroundColor(.white.opacity(0.7))
                     }
                 }
-                
+
                 // Status
                 HStack(spacing: 16) {
                     VStack(spacing: 4) {
@@ -413,11 +413,11 @@ struct ProgressCard: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(Color(hex: "#4facfe"))
                     }
-                    
+
                     Divider()
                         .frame(height: 30)
                         .background(Color.white.opacity(0.2))
-                    
+
                     VStack(spacing: 4) {
                         Text("Time Left")
                             .font(.system(size: 12, weight: .medium))
@@ -427,7 +427,7 @@ struct ProgressCard: View {
                             .foregroundColor(.white)
                     }
                 }
-                
+
                 // Requirements checklist
                 if !challenge.requirements.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
@@ -445,7 +445,7 @@ struct ProgressCard: View {
                     }
                     .padding(.top, 8)
                 }
-                
+
                 // Submit Proof Button
                 Button(action: {
                     showProofSubmission = true

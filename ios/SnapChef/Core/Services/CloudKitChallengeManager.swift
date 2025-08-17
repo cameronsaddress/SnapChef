@@ -6,15 +6,15 @@ import SwiftUI
 @MainActor
 class CloudKitChallengeManager: ObservableObject {
     static let shared = CloudKitChallengeManager()
-    
+
     private let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
     private let publicDB: CKDatabase
     private let privateDB: CKDatabase
-    
+
     @Published var activeChallenges: [Challenge] = []
     @Published var userChallenges: [CloudKitUserChallenge] = []
     @Published var teams: [CloudKitTeam] = []
-    
+
     private init() {
         self.publicDB = container.publicCloudDatabase
         self.privateDB = container.privateCloudDatabase
@@ -22,13 +22,13 @@ class CloudKitChallengeManager: ObservableObject {
             await syncChallenges()
         }
     }
-    
+
     // MARK: - Challenge Management
-    
+
     /// Upload a challenge to CloudKit
     func uploadChallenge(_ challenge: Challenge) async throws -> String {
         let record = CKRecord(recordType: "Challenge", recordID: CKRecord.ID(recordName: challenge.id))
-        
+
         record["id"] = challenge.id
         record["title"] = challenge.title
         record["description"] = challenge.description
@@ -49,20 +49,20 @@ class CloudKitChallengeManager: ObservableObject {
         record["teamBased"] = 0  // Team challenges handled separately
         record["minTeamSize"] = Int64(1)
         record["maxTeamSize"] = Int64(5)
-        
+
         let savedRecord = try await publicDB.save(record)
         return savedRecord.recordID.recordName
     }
-    
+
     /// Sync all active challenges from CloudKit
     func syncChallenges() async {
         do {
             let predicate = NSPredicate(format: "isActive == 1")
             let query = CKQuery(recordType: "Challenge", predicate: predicate)
             query.sortDescriptors = [NSSortDescriptor(key: "endDate", ascending: true)]
-            
+
             let (matchResults, _) = try await publicDB.records(matching: query)
-            
+
             var challenges: [Challenge] = []
             for (_, result) in matchResults {
                 if let record = try? result.get(),
@@ -70,25 +70,25 @@ class CloudKitChallengeManager: ObservableObject {
                     challenges.append(challenge)
                 }
             }
-            
+
             await MainActor.run {
                 self.activeChallenges = challenges
             }
-            
+
             print("✅ Synced \(challenges.count) active challenges from CloudKit")
         } catch {
             print("❌ Failed to sync challenges: \(error)")
         }
     }
-    
+
     // MARK: - User Challenge Progress
-    
+
     /// Track user's challenge progress
     func updateUserProgress(challengeID: String, progress: Double) async throws {
         guard let userID = getCurrentUserID() else { return }
-        
+
         let recordID = CKRecord.ID(recordName: "\(userID)_\(challengeID)")
-        
+
         let record: CKRecord
         do {
             record = try await privateDB.record(for: recordID)
@@ -100,36 +100,36 @@ class CloudKitChallengeManager: ObservableObject {
             record["status"] = "in_progress"
             record["startedAt"] = Date()
         }
-        
+
         record["progress"] = progress
-        
+
         if progress >= 1.0 {
             record["status"] = "completed"
             record["completedAt"] = Date()
-            
+
             // Award points and coins
             if let challenge = activeChallenges.first(where: { $0.id == challengeID }) {
                 record["earnedPoints"] = Int64(challenge.points)
                 record["earnedCoins"] = Int64(challenge.coins)
-                
+
                 // Update challenge completion count
                 await incrementChallengeCompletions(challengeID)
             }
         }
-        
+
         _ = try await privateDB.save(record)
         print("✅ Updated progress for challenge \(challengeID): \(progress * 100)%")
     }
-    
+
     /// Get user's challenge progress
     func getUserChallengeProgress() async throws -> [CloudKitUserChallenge] {
         guard let userID = getCurrentUserID() else { return [] }
-        
+
         let predicate = NSPredicate(format: "userID == %@", userID)
         let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
-        
+
         let (matchResults, _) = try await privateDB.records(matching: query)
-        
+
         var userChallenges: [CloudKitUserChallenge] = []
         for (_, result) in matchResults {
             if let record = try? result.get() {
@@ -146,23 +146,23 @@ class CloudKitChallengeManager: ObservableObject {
                 userChallenges.append(userChallenge)
             }
         }
-        
+
         await MainActor.run {
             self.userChallenges = userChallenges
         }
-        
+
         return userChallenges
     }
-    
+
     // MARK: - Team Management
-    
+
     /// Create a new team
     func createTeam(name: String, description: String, challengeID: String) async throws -> CloudKitTeam {
         guard let userID = getCurrentUserID() else { throw CloudKitTeamError.notAuthenticated }
-        
+
         let teamID = UUID().uuidString
         let record = CKRecord(recordType: "Team", recordID: CKRecord.ID(recordName: teamID))
-        
+
         record["id"] = teamID
         record["name"] = name
         record["description"] = description
@@ -174,9 +174,9 @@ class CloudKitChallengeManager: ObservableObject {
         record["inviteCode"] = generateInviteCode()
         record["isPublic"] = 1
         record["maxMembers"] = Int64(5)
-        
+
         let savedRecord = try await publicDB.save(record)
-        
+
         let team = CloudKitTeam(
             id: teamID,
             name: name,
@@ -190,45 +190,45 @@ class CloudKitChallengeManager: ObservableObject {
             isPublic: true,
             maxMembers: 5
         )
-        
+
         await MainActor.run {
             self.teams.append(team)
         }
-        
+
         return team
     }
-    
+
     /// Join a team
     func joinTeam(inviteCode: String) async throws -> CloudKitTeam {
         guard let userID = getCurrentUserID() else { throw CloudKitTeamError.notAuthenticated }
-        
+
         let predicate = NSPredicate(format: "inviteCode == %@", inviteCode)
         let query = CKQuery(recordType: "Team", predicate: predicate)
-        
+
         let (matchResults, _) = try await publicDB.records(matching: query)
-        
+
         guard let record = try? matchResults.first?.1.get() else {
             throw CloudKitTeamError.invalidInviteCode
         }
-        
+
         var memberIDs = (record["memberIDs"] as? [String]) ?? []
         let maxMembers = Int(record["maxMembers"] as? Int64 ?? 5)
-        
+
         guard !memberIDs.contains(userID) else {
             throw CloudKitTeamError.alreadyMember
         }
-        
+
         guard memberIDs.count < maxMembers else {
             throw CloudKitTeamError.teamFull
         }
-        
+
         memberIDs.append(userID)
         record["memberIDs"] = memberIDs
-        
+
         _ = try await publicDB.save(record)
-        
+
         let team = parseTeamFromRecord(record)
-        
+
         await MainActor.run {
             if let index = self.teams.firstIndex(where: { $0.id == team.id }) {
                 self.teams[index] = team
@@ -236,48 +236,48 @@ class CloudKitChallengeManager: ObservableObject {
                 self.teams.append(team)
             }
         }
-        
+
         return team
     }
-    
+
     /// Update team points
     func updateTeamPoints(teamID: String, additionalPoints: Int) async throws {
         let recordID = CKRecord.ID(recordName: teamID)
         let record = try await publicDB.record(for: recordID)
-        
+
         let currentPoints = Int(record["totalPoints"] as? Int64 ?? 0)
         record["totalPoints"] = Int64(currentPoints + additionalPoints)
-        
+
         _ = try await publicDB.save(record)
-        
+
         // Send notification to team members
         await notifyTeamMembers(teamID: teamID, message: "Your team earned \(additionalPoints) points!")
     }
-    
+
     /// Get team leaderboard
     func getTeamLeaderboard(challengeID: String) async throws -> [CloudKitTeam] {
         let predicate = NSPredicate(format: "challengeID == %@", CKRecord.Reference(recordID: CKRecord.ID(recordName: challengeID), action: .none))
         let query = CKQuery(recordType: "Team", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "totalPoints", ascending: false)]
-        
+
         let (matchResults, _) = try await publicDB.records(matching: query, resultsLimit: 100)
-        
+
         var teams: [CloudKitTeam] = []
         for (_, result) in matchResults {
             if let record = try? result.get() {
                 teams.append(parseTeamFromRecord(record))
             }
         }
-        
+
         return teams
     }
-    
+
     // MARK: - Awards and Metrics
-    
+
     /// Track achievement earned
     func trackAchievement(type: String, name: String, description: String) async throws {
         guard let userID = getCurrentUserID() else { return }
-        
+
         let record = CKRecord(recordType: "Achievement")
         record["id"] = UUID().uuidString
         record["userID"] = userID
@@ -286,18 +286,18 @@ class CloudKitChallengeManager: ObservableObject {
         record["description"] = description
         record["earnedAt"] = Date()
         record["rarity"] = calculateRarity(type: type)
-        
+
         _ = try await privateDB.save(record)
         print("✅ Achievement tracked: \(name)")
     }
-    
+
     /// Update leaderboard
     func updateLeaderboard(points: Int) async throws {
         guard let userID = getCurrentUserID(),
               let userName = CloudKitAuthManager.shared.currentUser?.displayName else { return }
-        
+
         let recordID = CKRecord.ID(recordName: "leaderboard_\(userID)")
-        
+
         let record: CKRecord
         do {
             record = try await publicDB.record(for: recordID)
@@ -306,37 +306,37 @@ class CloudKitChallengeManager: ObservableObject {
             record["userID"] = userID
             record["userName"] = userName
         }
-        
+
         let currentPoints = Int(record["totalPoints"] as? Int64 ?? 0)
         record["totalPoints"] = Int64(currentPoints + points)
         record["lastUpdated"] = Date()
-        
+
         // Update weekly/monthly points
         let weeklyPoints = Int(record["weeklyPoints"] as? Int64 ?? 0)
         record["weeklyPoints"] = Int64(weeklyPoints + points)
-        
+
         let monthlyPoints = Int(record["monthlyPoints"] as? Int64 ?? 0)
         record["monthlyPoints"] = Int64(monthlyPoints + points)
-        
+
         _ = try await publicDB.save(record)
         print("✅ Leaderboard updated with \(points) points")
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func getCurrentUserID() -> String? {
         return UserDefaults.standard.string(forKey: "currentUserID")
     }
-    
+
     private func parseChallengeFromRecord(_ record: CKRecord) -> Challenge? {
         guard let id = record["id"] as? String,
               let title = record["title"] as? String,
               let description = record["description"] as? String else {
             return nil
         }
-        
+
         let requirements: [String] = (try? JSONDecoder().decode([String].self, from: Data(base64Encoded: record["requirements"] as? String ?? "") ?? Data())) ?? []
-        
+
         return Challenge(
             id: id,
             title: title,
@@ -359,7 +359,7 @@ class CloudKitChallengeManager: ObservableObject {
             isPremium: record["isPremium"] as? Int64 == 1
         )
     }
-    
+
     private func parseTeamFromRecord(_ record: CKRecord) -> CloudKitTeam {
         return CloudKitTeam(
             id: record["id"] as? String ?? "",
@@ -375,12 +375,12 @@ class CloudKitChallengeManager: ObservableObject {
             maxMembers: Int(record["maxMembers"] as? Int64 ?? 5)
         )
     }
-    
+
     private func generateInviteCode() -> String {
         let letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        return String((0..<6).map{ _ in letters.randomElement()! })
+        return String((0..<6).map { _ in letters.randomElement()! })
     }
-    
+
     private func calculateRarity(type: String) -> String {
         switch type {
         case "first_recipe", "first_challenge":
@@ -395,7 +395,7 @@ class CloudKitChallengeManager: ObservableObject {
             return "common"
         }
     }
-    
+
     private func incrementChallengeCompletions(_ challengeID: String) async {
         do {
             let recordID = CKRecord.ID(recordName: challengeID)
@@ -407,7 +407,7 @@ class CloudKitChallengeManager: ObservableObject {
             print("Failed to increment challenge completions: \(error)")
         }
     }
-    
+
     private func notifyTeamMembers(teamID: String, message: String) async {
         // Implementation for team notifications
         // This would integrate with push notifications
@@ -447,7 +447,7 @@ enum CloudKitTeamError: LocalizedError {
     case invalidInviteCode
     case alreadyMember
     case teamFull
-    
+
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:

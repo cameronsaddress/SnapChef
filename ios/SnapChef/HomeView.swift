@@ -1,5 +1,12 @@
 import SwiftUI
 
+struct DisplayChallenge {
+    let emoji: String
+    let challenge: Challenge
+    let participants: String
+    let color: Color
+}
+
 struct HomeView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
@@ -11,27 +18,29 @@ struct HomeView: View {
     @State private var showingUpgrade = false
     @StateObject private var fallingFoodManager = FallingFoodManager()
     @State private var buttonShake = false
-    
+
     var body: some View {
         ZStack {
             // Full screen animated background
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 // Falling food emojis (behind all elements except background)
-                ForEach(fallingFoodManager.emojis) { emoji in
-                    Text(emoji.emoji)
-                        .font(.system(size: 30))
-                        .opacity(0.5)  // 50% translucent
-                        .position(x: emoji.position.x, y: emoji.position.y)
+                if deviceManager.shouldShowParticles {
+                    ForEach(fallingFoodManager.emojis.prefix(deviceManager.recommendedParticleCount)) { emoji in
+                        Text(emoji.emoji)
+                            .font(.system(size: 30))
+                            .opacity(0.5)  // 50% translucent
+                            .position(x: emoji.position.x, y: emoji.position.y)
+                    }
                 }
-                
+
                 ScrollView {
                     VStack(spacing: 30) {
                         // Animated Logo
                         VStack(spacing: 16) {
                             SnapchefLogo()
-                            
+
                             Text("AI-powered recipes\nfrom what you already have")
                                 .font(.system(size: 18, weight: .medium, design: .rounded))
                                 .foregroundColor(.white.opacity(0.9))
@@ -39,13 +48,13 @@ struct HomeView: View {
                                 .padding(.horizontal, 40)
                         }
                         .padding(.top, 30)
-                        
+
                         // Main CTA Section with prominent spacing
                         VStack(spacing: 0) {
                             // Equal spacing above button
                             Spacer()
                                 .frame(height: 50)
-                            
+
                             MagneticButton(
                                 title: "Snap Your Fridge",
                                 icon: "camera.fill",
@@ -64,31 +73,31 @@ struct HomeView: View {
                                         }
                                 }
                             )
-                            
+
                             // Equal spacing below button
                             Spacer()
                                 .frame(height: 50)
                         }
-                        
+
                         // Celebrity Kitchens Carousel
                         InfluencerCarousel()
                             .padding(.top, 10)
-                        
+
                         // Streak Summary
                         StreakSummaryCard()
                             .padding(.horizontal, 20)
                             .padding(.top, 20)
-                        
+
                         // Food Preferences Card
                         FoodPreferencesCard()
                             .padding(.horizontal, 30)
                             .padding(.top, 20)
-                        
+
                         // Viral Section (Today's Challenges)
                         ViralChallengeSection()
                             .padding(.top, 20)
                             .padding(.bottom, 20)
-                        
+
                         // Mystery Meal Button
                         MysteryMealButton(
                             isAnimating: $mysteryMealAnimation,
@@ -99,12 +108,12 @@ struct HomeView: View {
                         )
                         .padding(.horizontal, 30)
                         .padding(.bottom, 40)
-                        
+
                         // Recent Recipes
                         if !appState.recentRecipes.isEmpty {
                             EnhancedRecipesSection(recipes: appState.recentRecipes)
                         }
-                        
+
                         // Free uses indicator at bottom
                         if !deviceManager.hasUnlimitedAccess {
                             Button(action: { showingUpgrade = true }) {
@@ -119,7 +128,7 @@ struct HomeView: View {
                     .padding(.bottom, 100)
                 }
                 .scrollContentBackground(.hidden)
-                
+
                 // Floating Action Button
                 VStack {
                     Spacer()
@@ -131,7 +140,7 @@ struct HomeView: View {
                         .padding(30)
                     }
                 }
-            }
+        }
         .navigationBarHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .particleExplosion(trigger: $particleTrigger)
@@ -140,21 +149,32 @@ struct HomeView: View {
             Task {
                 await cloudKitDataManager.trackScreenView("Home")
             }
-            
-            // Simple fade in for mystery meal animation
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation(.easeInOut(duration: 0.6)) {
-                    mysteryMealAnimation = true
+
+            // Simple fade in for mystery meal animation (only if animations enabled)
+            if deviceManager.animationsEnabled {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.easeInOut(duration: deviceManager.recommendedAnimationDuration * 2)) {
+                        mysteryMealAnimation = true
+                    }
+                }
+            } else {
+                mysteryMealAnimation = true
+            }
+
+            // Start button shake after 3 seconds (only if continuous animations enabled)
+            if deviceManager.shouldUseContinuousAnimations {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    startButtonShake()
                 }
             }
-            
-            // Start button shake after 3 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                startButtonShake()
+
+            // Start falling food animation (only if particles enabled)
+            if deviceManager.shouldShowParticles {
+                fallingFoodManager.startFallingFood()
             }
-            
-            // Start falling food animation
-            fallingFoodManager.startFallingFood()
+        }
+        .onDisappear {
+            fallingFoodManager.cleanup()
         }
         .fullScreenCover(isPresented: $showingCamera) {
             CameraView()
@@ -167,35 +187,39 @@ struct HomeView: View {
                 .environmentObject(deviceManager)
         }
     }
-    
+
     private func startButtonShake() {
+        // Only shake if continuous animations are enabled
+        guard deviceManager.shouldUseContinuousAnimations else { return }
+        
         // Subtle shake effect
         withAnimation(.default) {
             buttonShake = true
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             buttonShake = false
-            
-            // Repeat every 8-12 seconds
+
+            // Repeat every 8-12 seconds (only if still enabled)
             DispatchQueue.main.asyncAfter(deadline: .now() + Double.random(in: 8...12)) {
-                startButtonShake()
+                if deviceManager.shouldUseContinuousAnimations {
+                    startButtonShake()
+                }
             }
         }
     }
-    
+
     private func updateButtonFrames(_ frame: CGRect) {
         fallingFoodManager.updateButtonFrames([frame])
     }
 }
-
 
 // MARK: - Free Uses Indicator Enhanced
 struct FreeUsesIndicatorEnhanced: View {
     let remaining: Int
     @State private var pulseScale: CGFloat = 1
     @State private var showGlow = false
-    
+
     var body: some View {
         GlassmorphicCard(content: {
             HStack(spacing: 12) {
@@ -214,24 +238,24 @@ struct FreeUsesIndicatorEnhanced: View {
                         )
                         .frame(width: 40, height: 40)
                         .scaleEffect(pulseScale)
-                    
+
                     Image(systemName: "sparkles")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.white)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(remaining) free snaps remaining")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
-                    
+
                     Text("Upgrade for unlimited magic")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white.opacity(0.6))
@@ -260,7 +284,6 @@ struct FreeUsesIndicatorEnhanced: View {
     }
 }
 
-
 // MARK: - Viral Challenge Section
 struct ViralChallengeSection: View {
     @State private var currentChallenge = 0
@@ -269,7 +292,7 @@ struct ViralChallengeSection: View {
     @State private var autoTimer: Timer?
     @State private var sparkleAnimation = false
     @StateObject private var challengeDatabase = ChallengeDatabase.shared
-    
+
     // Colors for challenges based on type/category
     let challengeColors = [
         Color(hex: "#f093fb"),
@@ -278,11 +301,11 @@ struct ViralChallengeSection: View {
         Color(hex: "#ffa726"),
         Color(hex: "#f5576c")
     ]
-    
-    var displayChallenges: [(emoji: String, challenge: Challenge, participants: String, color: Color)] {
+
+    var displayChallenges: [DisplayChallenge] {
         // Get first 5 active challenges from ChallengeDatabase
         let activeChallenges = Array(challengeDatabase.activeChallenges.prefix(5))
-        
+
         // If we have active challenges, use them
         if !activeChallenges.isEmpty {
             return activeChallenges.enumerated().map { index, challenge in
@@ -290,11 +313,11 @@ struct ViralChallengeSection: View {
                 let emoji = challengeDatabase.getEmojiForChallenge(challenge)
                 let participantCount = "\(challenge.participants) chefs"
                 let color = challengeColors[index % challengeColors.count]
-                
-                return (emoji, challenge, participantCount, color)
+
+                return DisplayChallenge(emoji: emoji, challenge: challenge, participants: participantCount, color: color)
             }
         }
-        
+
         // Fallback to mock data if no CloudKit challenges
         let mockData = [
             ("🌮", "Taco Tuesday", "Transform leftovers into tacos", "2.3K chefs", 500, Color(hex: "#f093fb")),
@@ -303,16 +326,13 @@ struct ViralChallengeSection: View {
             ("🍜", "Ramen Remix", "Upgrade instant ramen to gourmet", "3.1K chefs", 600, Color(hex: "#ffa726")),
             ("🥘", "One-Pot Wonder", "Create magic in a single pot", "1.2K chefs", 400, Color(hex: "#f5576c"))
         ]
-        
+
         return mockData.enumerated().map { index, data in
             // Determine difficulty based on points
             let difficulty: DifficultyLevel = {
-                if data.4 <= 300 { return .easy }
-                else if data.4 <= 450 { return .medium }
-                else if data.4 <= 600 { return .hard }
-                else { return .expert }
+                if data.4 <= 300 { return .easy } else if data.4 <= 450 { return .medium } else if data.4 <= 600 { return .hard } else { return .expert }
             }()
-            
+
             // Set end time based on difficulty with some variation
             let baseHours: Double = {
                 switch difficulty {
@@ -323,11 +343,11 @@ struct ViralChallengeSection: View {
                 case .master: return 168 // 1 week
                 }
             }()
-            
+
             // Add variation to prevent same countdown times
             let variation = Double.random(in: -2...2) // +/- 2 hours variation
             let hoursOffset = baseHours + variation + Double(index * 3) // Additional offset per challenge
-            
+
             let challenge = Challenge(
                 id: "home-\(data.1.replacingOccurrences(of: " ", with: "-").lowercased())",
                 title: data.1,
@@ -336,15 +356,15 @@ struct ViralChallengeSection: View {
                 difficulty: difficulty,
                 points: data.4,
                 coins: data.4 / 10,
-                endDate: Date().addingTimeInterval(TimeInterval(hoursOffset * 3600)),
+                endDate: Date().addingTimeInterval(TimeInterval(hoursOffset * 3_600)),
                 requirements: ["Create a \(data.1.lowercased()) dish and share it"],
                 currentProgress: 0,
                 participants: Int.random(in: 100...500)
             )
-            return (data.0, challenge, data.3, data.5)
+            return DisplayChallenge(emoji: data.0, challenge: challenge, participants: data.3, color: data.5)
         }
     }
-    
+
     private func getEmojiForChallenge(_ challenge: Challenge) -> String? {
         // Map of challenge titles to emojis from ChallengeSeeder
         let emojiMap: [String: String] = [
@@ -407,10 +427,10 @@ struct ViralChallengeSection: View {
             "Carnival at Home": "🎪",
             "Around the World": "🌍"
         ]
-        
+
         return emojiMap[challenge.title]
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -419,14 +439,14 @@ struct ViralChallengeSection: View {
                     Text("Today's Challenge")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
-                    
+
                     Text("Join thousands of home chefs")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
-                
+
                 Spacer()
-                
+
                 // Live indicator
                 HStack(spacing: 6) {
                     Circle()
@@ -439,7 +459,7 @@ struct ViralChallengeSection: View {
                                 .opacity(sparkleAnimation ? 0 : 1)
                                 .animation(.easeOut(duration: 1.5).repeatForever(autoreverses: false), value: sparkleAnimation)
                         )
-                    
+
                     Text("LIVE")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.white)
@@ -453,7 +473,7 @@ struct ViralChallengeSection: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
-            
+
             // Carousel
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 20) {
@@ -491,7 +511,7 @@ struct ViralChallengeSection: View {
             ChallengeDetailView(challenge: challenge)
         }
     }
-    
+
     private func startAutoScroll() {
         autoTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { _ in
             Task { @MainActor in
@@ -501,7 +521,7 @@ struct ViralChallengeSection: View {
             }
         }
     }
-    
+
     private func stopAutoScroll() {
         autoTimer?.invalidate()
         autoTimer = nil
@@ -517,20 +537,20 @@ struct EnhancedChallengeCard: View {
     let color: Color
     let actualChallenge: Challenge?
     let action: () -> Void
-    
+
     @State private var isPressed = false
     @State private var particleAnimation = false
     @State private var timeRemaining = ""
     @StateObject private var gamificationManager = GamificationManager.shared
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    
+
     // Fallback challenge if none provided
     private var challenge: Challenge? {
         // Use the actual challenge if provided
         if let actualChallenge = actualChallenge {
             return actualChallenge
         }
-        
+
         // Otherwise create a mock challenge with proper end date
         return Challenge(
             title: title,
@@ -542,7 +562,7 @@ struct EnhancedChallengeCard: View {
             requirements: ["Complete the challenge"]
         )
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Main content
@@ -563,11 +583,11 @@ struct EnhancedChallengeCard: View {
                         .scaleEffect(particleAnimation ? 1.2 : 1)
                         .opacity(particleAnimation ? 0.5 : 0.8)
                         .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: particleAnimation)
-                    
+
                     VStack(spacing: 8) {
                         Text(emoji)
                             .font(.system(size: 60))
-                        
+
                         HStack(spacing: 4) {
                             Image(systemName: "star.fill")
                                 .font(.system(size: 14))
@@ -584,18 +604,18 @@ struct EnhancedChallengeCard: View {
                         )
                     }
                 }
-                
+
                 // Challenge info
                 VStack(spacing: 12) {
                     Text(title)
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
-                    
+
                     Text(description)
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(.white.opacity(0.9))
                         .multilineTextAlignment(.center)
-                    
+
                     // Participants
                     HStack(spacing: 8) {
                         // Profile stack
@@ -619,19 +639,19 @@ struct EnhancedChallengeCard: View {
                             }
                         }
                         .frame(width: 80, height: 30, alignment: .leading)
-                        
+
                         Text(participants + " joining")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.white.opacity(0.8))
                     }
                 }
-                
+
                 // Timer countdown
                 VStack(spacing: 8) {
                     Text("Ends in")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
-                    
+
                     Text(timeRemaining)
                         .font(.system(size: 24, weight: .bold, design: .monospaced))
                         .foregroundColor(.white)
@@ -642,7 +662,7 @@ struct EnhancedChallengeCard: View {
                     RoundedRectangle(cornerRadius: 16)
                         .fill(Color.black.opacity(0.2))
                 )
-                
+
                 // CTA Button
                 Button(action: action) {
                     HStack {
@@ -658,15 +678,15 @@ struct EnhancedChallengeCard: View {
                         RoundedRectangle(cornerRadius: 16)
                             .fill(
                                 LinearGradient(
-                                    colors: gamificationManager.isChallengeJoinedByTitle(title) ? 
-                                           [Color.green, Color.green.opacity(0.8)] : 
+                                    colors: gamificationManager.isChallengeJoinedByTitle(title) ?
+                                           [Color.green, Color.green.opacity(0.8)] :
                                            [color, color.opacity(0.8)],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
                             )
                     )
-                    .shadow(color: gamificationManager.isChallengeJoinedByTitle(title) ? 
+                    .shadow(color: gamificationManager.isChallengeJoinedByTitle(title) ?
                             Color.green.opacity(0.5) : color.opacity(0.5), radius: 15, y: 5)
                 }
                 .scaleEffect(isPressed ? 0.95 : 1)
@@ -714,7 +734,7 @@ struct EnhancedChallengeCard: View {
             updateTimeRemaining()
         }
     }
-    
+
     private func updateTimeRemaining() {
         // Use actualChallenge if available, otherwise use fallback
         let challengeToUse = actualChallenge ?? challenge
@@ -722,20 +742,20 @@ struct EnhancedChallengeCard: View {
             timeRemaining = "00:00:00"
             return
         }
-        
+
         let now = Date()
         let endDate = challenge.endDate
-        
+
         if now >= endDate {
             timeRemaining = "Ended"
             return
         }
-        
+
         let timeInterval = endDate.timeIntervalSince(now)
-        let totalHours = Int(timeInterval) / 3600
-        let minutes = (Int(timeInterval) % 3600) / 60
+        let totalHours = Int(timeInterval) / 3_600
+        let minutes = (Int(timeInterval) % 3_600) / 60
         let seconds = Int(timeInterval) % 60
-        
+
         // Always show in HH:MM:SS format, even for days
         // If more than 99 hours, show 99:59:59 as max
         let displayHours = min(totalHours, 99)
@@ -746,7 +766,7 @@ struct EnhancedChallengeCard: View {
 struct TimeUnit: View {
     let value: String
     let unit: String
-    
+
     var body: some View {
         VStack(spacing: 4) {
             Text(value)
@@ -762,16 +782,16 @@ struct TimeUnit: View {
 // MARK: - Enhanced Recipes Section
 struct EnhancedRecipesSection: View {
     let recipes: [Recipe]
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
                 Text("Recent Magic")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                
+
                 Spacer()
-                
+
                 Button(action: {}) {
                     Text("See All")
                         .font(.system(size: 16, weight: .semibold))
@@ -779,7 +799,7 @@ struct EnhancedRecipesSection: View {
                 }
             }
             .padding(.horizontal, 20)
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 20) {
                     ForEach(recipes) { recipe in
@@ -795,7 +815,7 @@ struct EnhancedRecipesSection: View {
 struct EnhancedRecipeCard: View {
     let recipe: Recipe
     @State private var isPressed = false
-    
+
     var body: some View {
         GlassmorphicCard(content: {
             VStack(alignment: .leading, spacing: 12) {
@@ -816,20 +836,20 @@ struct EnhancedRecipeCard: View {
                         Text(recipe.difficulty.emoji)
                             .font(.system(size: 40))
                     )
-                
+
                 Text(recipe.name)
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                     .lineLimit(2)
                     .frame(height: 48, alignment: .topLeading)
-                
+
                 HStack {
                     Label("\(recipe.cookTime)m", systemImage: "clock")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
-                    
+
                     Spacer()
-                    
+
                     Label("\(recipe.nutrition.calories)", systemImage: "flame")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
@@ -844,7 +864,7 @@ struct EnhancedRecipeCard: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isPressed = false
             }
-            
+
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.impactOccurred()
         }
@@ -857,7 +877,7 @@ struct MysteryMealButton: View {
     let action: () -> Void
     @State private var diceRotation = 0.0
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
@@ -878,13 +898,13 @@ struct MysteryMealButton: View {
                         )
                         .frame(width: 60, height: 60)
                         .scaleEffect(isAnimating ? 1.2 : 1)
-                    
+
                     Text("🎲")
                         .font(.system(size: 36))
                         .rotationEffect(.degrees(diceRotation))
                         .scaleEffect(isAnimating ? 1.1 : 1)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Mystery Meal")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
@@ -898,14 +918,14 @@ struct MysteryMealButton: View {
                                 endPoint: .trailing
                             )
                         )
-                    
+
                     Text("Surprise me!")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                 }
-                
+
                 Spacer()
-                
+
                 // Arrow
                 Image(systemName: "arrow.right")
                     .font(.system(size: 20, weight: .semibold))
@@ -957,12 +977,12 @@ struct MysteryMealButton: View {
 // MARK: - Shake Effect
 struct ShakeEffect: AnimatableModifier {
     var shakeNumber: CGFloat = 0
-    
+
     nonisolated var animatableData: CGFloat {
         get { shakeNumber }
         set { shakeNumber = newValue }
     }
-    
+
     func body(content: Content) -> some View {
         content
             .offset(x: sin(shakeNumber * .pi * 2) * 5)
@@ -978,7 +998,9 @@ final class FallingFoodManager: ObservableObject {
     private var displayLink: CADisplayLink?
     private var lastDropTime: TimeInterval = 0
     private var nextDropDelay: TimeInterval = 0
-    
+    private var maxParticles: Int = 15
+    private var isRunning: Bool = false
+
     struct FallingFoodEmoji: Identifiable {
         let id = UUID()
         var position: CGPoint
@@ -986,23 +1008,28 @@ final class FallingFoodManager: ObservableObject {
         let emoji: String
         var hasBouncedOffButton = false
     }
-    
+
     func updateButtonFrames(_ frames: [CGRect]) {
         buttonFrames = frames
     }
-    
-    func startFallingFood() {
+
+    func startFallingFood(maxCount: Int = 15) {
+        guard !isRunning else { return }
+        
+        isRunning = true
+        maxParticles = maxCount
+        
         // Use CADisplayLink for smooth animation that doesn't pause during scrolling
         displayLink = CADisplayLink(target: self, selector: #selector(updateAnimation))
         displayLink?.add(to: .current, forMode: .common) // .common mode ensures it runs during scrolling
-        
+
         // Set initial drop delay
-        nextDropDelay = Double.random(in: 0.5...3)
+        nextDropDelay = Double.random(in: 1.0...4.0) // Longer delays for better performance
     }
-    
+
     @objc private func updateAnimation() {
         updatePhysics()
-        
+
         // Handle emoji dropping
         let currentTime = CACurrentMediaTime()
         if currentTime - lastDropTime >= nextDropDelay {
@@ -1011,21 +1038,26 @@ final class FallingFoodManager: ObservableObject {
             nextDropDelay = Double.random(in: 0.5...3)
         }
     }
-    
+
     func cleanup() {
+        isRunning = false
         displayLink?.invalidate()
         displayLink = nil
+        emojis.removeAll()
     }
-    
+
     private func dropEmoji() {
+        // Limit total number of emojis for performance
+        guard emojis.count < maxParticles else { return }
+        
         let screenWidth = UIScreen.main.bounds.width
-        
+
         // Always drop only 1 emoji
-        let x = CGFloat.random(in: 50...screenWidth - 50)
-        
+        let xPosition = CGFloat.random(in: 50...screenWidth - 50)
+
         let emoji = FallingFoodEmoji(
             position: CGPoint(
-                x: x,
+                x: xPosition,
                 y: CGFloat.random(in: -50 ... -30) // Slight variation in start height
             ),
             velocity: CGVector(
@@ -1035,54 +1067,54 @@ final class FallingFoodManager: ObservableObject {
             emoji: foodEmojis.randomElement() ?? "🍕",
             hasBouncedOffButton: false
         )
-        
+
         emojis.append(emoji)
     }
-    
+
     private func updatePhysics() {
         let deltaTime = 0.016
         let gravity: Double = 400
         let screenHeight = UIScreen.main.bounds.height
         let bounceDamping: Double = 0.5
-        
-        for i in emojis.indices {
+
+        for index in emojis.indices {
             // Apply gravity
-            emojis[i].velocity.dy += gravity * deltaTime
-            
+            emojis[index].velocity.dy += gravity * deltaTime
+
             // Update position
-            emojis[i].position.x += emojis[i].velocity.dx * deltaTime
-            emojis[i].position.y += emojis[i].velocity.dy * deltaTime
-            
+            emojis[index].position.x += emojis[index].velocity.dx * deltaTime
+            emojis[index].position.y += emojis[index].velocity.dy * deltaTime
+
             // Check collision with buttons (only if hasn't bounced yet)
-            if !emojis[i].hasBouncedOffButton {
+            if !emojis[index].hasBouncedOffButton {
                 for buttonFrame in buttonFrames {
-                    if isCollidingWithButton(emoji: emojis[i], buttonFrame: buttonFrame) {
+                    if isCollidingWithButton(emoji: emojis[index], buttonFrame: buttonFrame) {
                         // Bounce off button
-                        emojis[i].velocity.dy = -abs(emojis[i].velocity.dy) * bounceDamping
-                        emojis[i].velocity.dx += CGFloat.random(in: -40...40)
-                        
+                        emojis[index].velocity.dy = -abs(emojis[index].velocity.dy) * bounceDamping
+                        emojis[index].velocity.dx += CGFloat.random(in: -40...40)
+
                         // Move emoji to top of button
-                        emojis[i].position.y = buttonFrame.minY - 15
-                        
+                        emojis[index].position.y = buttonFrame.minY - 15
+
                         // Mark as having bounced
-                        emojis[i].hasBouncedOffButton = true
+                        emojis[index].hasBouncedOffButton = true
                         break
                     }
                 }
             }
         }
-        
+
         // Remove emojis that have fallen off screen
         emojis.removeAll { emoji in
             emoji.position.y > screenHeight + 50
         }
     }
-    
+
     private func isCollidingWithButton(emoji: FallingFoodEmoji, buttonFrame: CGRect) -> Bool {
         // Check if emoji is within horizontal bounds of button
         let emojiLeft = emoji.position.x - 15
         let emojiRight = emoji.position.x + 15
-        
+
         if emojiLeft < buttonFrame.maxX && emojiRight > buttonFrame.minX {
             // Check if emoji bottom is touching button top
             let emojiBottom = emoji.position.y + 15

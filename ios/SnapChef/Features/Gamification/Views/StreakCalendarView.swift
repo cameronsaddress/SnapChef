@@ -7,29 +7,29 @@ struct StreakCalendarView: View {
     @StateObject private var streakManager = StreakManager.shared
     @State private var selectedMonth = Date()
     @Environment(\.dismiss) var dismiss
-    
+
     private var streak: StreakData? {
         streakManager.currentStreaks[streakType]
     }
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
                 // Month selector
                 MonthSelector(selectedMonth: $selectedMonth)
                     .padding()
-                
+
                 // Calendar grid
                 CalendarGrid(
                     month: selectedMonth,
                     streakType: streakType,
                     streak: streak
                 )
-                
+
                 // Legend
                 CalendarLegend()
                     .padding()
-                
+
                 Spacer()
             }
             .navigationTitle("\(streakType.displayName) Calendar")
@@ -48,7 +48,7 @@ struct StreakCalendarView: View {
 struct MonthSelector: View {
     @Binding var selectedMonth: Date
     private let calendar = Calendar.current
-    
+
     var body: some View {
         HStack {
             Button(action: previousMonth) {
@@ -56,15 +56,15 @@ struct MonthSelector: View {
                     .font(.title3)
                     .foregroundColor(.blue)
             }
-            
+
             Spacer()
-            
+
             Text(monthYearString)
                 .font(.title2)
                 .fontWeight(.semibold)
-            
+
             Spacer()
-            
+
             Button(action: nextMonth) {
                 Image(systemName: "chevron.right")
                     .font(.title3)
@@ -73,19 +73,19 @@ struct MonthSelector: View {
             .disabled(calendar.isDate(selectedMonth, equalTo: Date(), toGranularity: .month))
         }
     }
-    
+
     private var monthYearString: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM yyyy"
         return formatter.string(from: selectedMonth)
     }
-    
+
     private func previousMonth() {
         withAnimation {
             selectedMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) ?? selectedMonth
         }
     }
-    
+
     private func nextMonth() {
         withAnimation {
             selectedMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) ?? selectedMonth
@@ -97,11 +97,11 @@ struct CalendarGrid: View {
     let month: Date
     let streakType: StreakType
     let streak: StreakData?
-    
+
     private let calendar = Calendar.current
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 7)
     private let weekdays = ["S", "M", "T", "W", "T", "F", "S"]
-    
+
     var body: some View {
         VStack(spacing: 8) {
             // Weekday headers
@@ -115,7 +115,7 @@ struct CalendarGrid: View {
                 }
             }
             .padding(.horizontal)
-            
+
             // Days grid
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(getDaysInMonth(), id: \.self) { date in
@@ -134,26 +134,26 @@ struct CalendarGrid: View {
             .padding(.horizontal)
         }
     }
-    
+
     private func getDaysInMonth() -> [Date?] {
         guard let monthRange = calendar.range(of: .day, in: .month, for: month),
               let firstOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: month))
         else { return [] }
-        
+
         let firstWeekday = calendar.component(.weekday, from: firstOfMonth) - 1
         var days: [Date?] = Array(repeating: nil, count: firstWeekday)
-        
+
         for day in monthRange {
             if let date = calendar.date(byAdding: .day, value: day - 1, to: firstOfMonth) {
                 days.append(date)
             }
         }
-        
+
         // Fill remaining days to complete the grid
         while days.count % 7 != 0 {
             days.append(nil)
         }
-        
+
         return days
     }
 }
@@ -162,22 +162,22 @@ struct DayCell: View {
     let date: Date
     let streakType: StreakType
     let streak: StreakData?
-    
+
     private let calendar = Calendar.current
-    
+
     private var dayStatus: DayStatus {
         guard let streak = streak else { return .inactive }
-        
+
         // Check if date is in the future
         if date > Date() {
             return .future
         }
-        
+
         // Check if date is today
         if calendar.isDateInToday(date) {
             return streak.isActive && calendar.isDateInToday(streak.lastActivityDate) ? .completed : .today
         }
-        
+
         // Check if date is within streak period
         if date >= streak.streakStartDate && date <= streak.lastActivityDate {
             // Check if this day was completed
@@ -186,17 +186,17 @@ struct DayCell: View {
                 return .completed
             }
         }
-        
+
         return .inactive
     }
-    
+
     private enum DayStatus {
         case completed
         case today
         case missed
         case future
         case inactive
-        
+
         var backgroundColor: Color {
             switch self {
             case .completed:
@@ -209,7 +209,7 @@ struct DayCell: View {
                 return Color(UIColor.tertiarySystemBackground)
             }
         }
-        
+
         var textColor: Color {
             switch self {
             case .completed, .today:
@@ -222,7 +222,7 @@ struct DayCell: View {
                 return .primary
             }
         }
-        
+
         var icon: String? {
             switch self {
             case .completed:
@@ -236,18 +236,18 @@ struct DayCell: View {
             }
         }
     }
-    
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8)
                 .fill(dayStatus.backgroundColor)
                 .frame(height: 40)
-            
+
             VStack(spacing: 2) {
                 Text("\(calendar.component(.day, from: date))")
                     .font(.system(size: 14, weight: dayStatus == .today ? .bold : .regular))
                     .foregroundColor(dayStatus.textColor)
-                
+
                 if let icon = dayStatus.icon {
                     Image(systemName: icon)
                         .font(.system(size: 8))
@@ -273,7 +273,7 @@ struct CalendarLegend: View {
 struct LegendItem: View {
     let color: Color
     let label: String
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Circle()
@@ -291,7 +291,7 @@ struct LegendItem: View {
 struct StreakHistoryView: View {
     @StateObject private var streakManager = StreakManager.shared
     @Environment(\.dismiss) var dismiss
-    
+
     var body: some View {
         NavigationView {
             List {
@@ -314,7 +314,7 @@ struct StreakHistoryView: View {
             }
         }
     }
-    
+
     private var groupedHistory: [StreakType: [StreakHistory]] {
         Dictionary(grouping: streakManager.streakHistory, by: { $0.type })
     }
@@ -322,7 +322,7 @@ struct StreakHistoryView: View {
 
 struct StreakHistoryRow: View {
     let history: StreakHistory
-    
+
     private var dateRangeString: String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -330,34 +330,34 @@ struct StreakHistoryRow: View {
         let end = formatter.string(from: history.endDate)
         return "\(start) - \(end)"
     }
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("\(history.streakLength) days")
                         .font(.headline)
-                    
+
                     if history.wasRestored {
                         Label("Restored", systemImage: "arrow.uturn.backward")
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
                 }
-                
+
                 Text(dateRangeString)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
+
                 if let reason = history.breakReason {
                     Text(reason.displayText)
                         .font(.caption2)
                         .foregroundColor(.red)
                 }
             }
-            
+
             Spacer()
-            
+
             Text("🔥")
                 .font(.title2)
                 .opacity(history.wasRestored ? 1 : 0.3)
@@ -372,7 +372,7 @@ struct StreakInsuranceView: View {
     @StateObject private var streakManager = StreakManager.shared
     @Environment(\.dismiss) var dismiss
     @State private var isPurchasing = false
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
@@ -380,11 +380,11 @@ struct StreakInsuranceView: View {
                 VStack(spacing: 12) {
                     Text("🛡")
                         .font(.system(size: 60))
-                    
+
                     Text("Streak Insurance")
                         .font(.title)
                         .fontWeight(.bold)
-                    
+
                     Text("Protect your \(streakType.displayName) streak from accidental breaks")
                         .font(.body)
                         .foregroundColor(.secondary)
@@ -392,7 +392,7 @@ struct StreakInsuranceView: View {
                         .padding(.horizontal)
                 }
                 .padding(.top)
-                
+
                 // Benefits
                 VStack(alignment: .leading, spacing: 12) {
                     InsuranceBenefitRow(icon: "checkmark.shield", text: "Auto-restore streak if broken")
@@ -404,9 +404,9 @@ struct StreakInsuranceView: View {
                 .background(Color(UIColor.secondarySystemBackground))
                 .cornerRadius(16)
                 .padding(.horizontal)
-                
+
                 Spacer()
-                
+
                 // Purchase button
                 Button(action: purchaseInsurance) {
                     HStack {
@@ -428,7 +428,7 @@ struct StreakInsuranceView: View {
                 }
                 .padding(.horizontal)
                 .disabled(isPurchasing || !ChefCoinsManager.shared.canAfford(200))
-                
+
                 if !ChefCoinsManager.shared.canAfford(200) {
                     Text("Not enough Chef Coins")
                         .font(.caption)
@@ -445,10 +445,10 @@ struct StreakInsuranceView: View {
             }
         }
     }
-    
+
     private func purchaseInsurance() {
         isPurchasing = true
-        
+
         if streakManager.purchaseInsurance(for: streakType) {
             let generator = UIImpactFeedbackGenerator(style: .heavy)
             generator.impactOccurred()
@@ -464,17 +464,17 @@ struct StreakInsuranceView: View {
 struct InsuranceBenefitRow: View {
     let icon: String
     let text: String
-    
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.title3)
                 .foregroundColor(.green)
                 .frame(width: 30)
-            
+
             Text(text)
                 .font(.body)
-            
+
             Spacer()
         }
     }
@@ -485,7 +485,7 @@ struct StreakPowerUpStore: View {
     let streakType: StreakType
     @StateObject private var streakManager = StreakManager.shared
     @Environment(\.dismiss) var dismiss
-    
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -514,32 +514,32 @@ struct PowerUpCard: View {
     let streakType: StreakType
     @StateObject private var streakManager = StreakManager.shared
     @State private var isPurchasing = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(powerUp.icon)
                     .font(.title)
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(powerUp.name)
                         .font(.headline)
-                    
+
                     Text(powerUp.description)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
             }
-            
+
             HStack {
                 Label("\(powerUp.costInCoins) coins", systemImage: "bitcoinsign.circle.fill")
                     .font(.callout)
                     .foregroundColor(.yellow)
-                
+
                 Spacer()
-                
+
                 Button(action: { purchasePowerUp(powerUp) }) {
                     if isPurchasing {
                         ProgressView()
@@ -562,10 +562,10 @@ struct PowerUpCard: View {
         .background(Color(UIColor.secondarySystemBackground))
         .cornerRadius(12)
     }
-    
+
     private func purchasePowerUp(_ powerUp: StreakPowerUp) {
         isPurchasing = true
-        
+
         if streakManager.activatePowerUp(powerUp, for: streakType) {
             let generator = UIImpactFeedbackGenerator(style: .heavy)
             generator.impactOccurred()

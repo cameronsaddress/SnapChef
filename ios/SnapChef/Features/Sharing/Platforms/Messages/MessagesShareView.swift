@@ -22,7 +22,7 @@ struct MessagesShareView: View {
     @State private var autoRotateEnabled = true
     @State private var showingMessageComposer = false
     @State private var errorMessage: String?
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -36,7 +36,7 @@ struct MessagesShareView: View {
                     endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 24) {
                         // Header
@@ -48,27 +48,27 @@ struct MessagesShareView: View {
                                     .font(.system(size: 24, weight: .bold, design: .rounded))
                             }
                             .foregroundColor(.white)
-                            
+
                             Text("Send an interactive recipe card")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
                         }
                         .padding(.top, 20)
-                        
+
                         // Rotating Card Preview
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("Interactive Card")
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundColor(.white)
-                                
+
                                 Spacer()
-                                
+
                                 Toggle("Auto-rotate", isOn: $autoRotateEnabled)
                                     .toggleStyle(SwitchToggleStyle(tint: .white))
                                     .scaleEffect(0.8)
                             }
-                            
+
                             RotatingCardView(
                                 content: content,
                                 showingFront: $showingFront,
@@ -80,7 +80,7 @@ struct MessagesShareView: View {
                                     showingFront.toggle()
                                 }
                             }
-                            
+
                             Text("Tap card to flip • Recipients can interact with it")
                                 .font(.system(size: 12))
                                 .foregroundColor(.white.opacity(0.6))
@@ -88,13 +88,13 @@ struct MessagesShareView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Card Style Selection
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Card Style")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
-                            
+
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(MessageCardStyle.allCases, id: \.self) { style in
@@ -110,13 +110,13 @@ struct MessagesShareView: View {
                             }
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Message Text
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Message")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
-                            
+
                             TextEditor(text: $messageText)
                                 .frame(height: 100)
                                 .padding(12)
@@ -131,7 +131,7 @@ struct MessagesShareView: View {
                                 }
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Features List
                         VStack(spacing: 12) {
                             MessageFeatureRow(
@@ -139,19 +139,19 @@ struct MessagesShareView: View {
                                 title: "3D Effect",
                                 subtitle: "Interactive rotating card"
                             )
-                            
+
                             MessageFeatureRow(
                                 icon: "camera.on.rectangle",
                                 title: "Before & After",
                                 subtitle: "Shows ingredient transformation"
                             )
-                            
+
                             MessageFeatureRow(
                                 icon: "hand.tap",
                                 title: "Interactive",
                                 subtitle: "Recipients can tap to explore"
                             )
-                            
+
                             MessageFeatureRow(
                                 icon: "sparkles",
                                 title: "Animated",
@@ -159,14 +159,14 @@ struct MessagesShareView: View {
                             )
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Send Button
                         Button(action: sendMessage) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 12)
                                     .fill(Color.white)
                                     .frame(height: 56)
-                                
+
                                 if isGenerating {
                                     HStack(spacing: 12) {
                                         ProgressView()
@@ -220,26 +220,26 @@ struct MessagesShareView: View {
             }
         }
     }
-    
+
     private func generateMessageText() -> String {
         guard case .recipe(let recipe) = content.type else {
             return "Check out what I made with SnapChef! 🍳"
         }
-        
+
         return """
         Look what I made! 🎉
-        
+
         \(recipe.name)
-        
+
         Tap the card to see the before & after transformation!
-        
+
         Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
         """
     }
-    
+
     private func sendMessage() {
         isGenerating = true
-        
+
         Task {
             do {
                 // Generate the card image
@@ -247,11 +247,11 @@ struct MessagesShareView: View {
                     for: content,
                     style: selectedCardStyle
                 )
-                
+
                 await MainActor.run {
                     generatedCard = card
                     isGenerating = false
-                    
+
                     // Check if Messages is available
                     if MFMessageComposeViewController.canSendText() {
                         showingMessageComposer = true
@@ -269,11 +269,11 @@ struct MessagesShareView: View {
             }
         }
     }
-    
+
     private func saveImageToPhotoLibrary(_ image: UIImage) {
         // Check current authorization status first
         let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-        
+
         switch status {
         case .authorized, .limited:
             // Already have permission, save the image
@@ -290,7 +290,7 @@ struct MessagesShareView: View {
                     }
                 }
             }
-            
+
         case .notDetermined:
             // Need to request permission
             PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
@@ -312,10 +312,10 @@ struct MessagesShareView: View {
                     }
                 }
             }
-            
+
         case .denied, .restricted:
             errorMessage = "Photo library access denied. Please enable in Settings > Privacy > Photos."
-            
+
         @unknown default:
             errorMessage = "Unable to access photo library."
         }
@@ -328,7 +328,7 @@ enum MessageCardStyle: String, CaseIterable {
     case flip = "Flip"
     case stack = "Stack"
     case carousel = "Carousel"
-    
+
     var icon: String {
         switch self {
         case .rotating: return "rotate.3d"
@@ -337,7 +337,7 @@ enum MessageCardStyle: String, CaseIterable {
         case .carousel: return "rectangle.stack"
         }
     }
-    
+
     var description: String {
         switch self {
         case .rotating:
@@ -358,7 +358,7 @@ struct RotatingCardView: View {
     @Binding var showingFront: Bool
     let autoRotate: Bool
     @State private var rotation: Double = 0
-    
+
     var body: some View {
         ZStack {
             // Back card (After photo)
@@ -372,7 +372,7 @@ struct RotatingCardView: View {
                 .degrees(showingFront ? 180 : 0),
                 axis: (x: 0, y: 1, z: 0)
             )
-            
+
             // Front card (Before photo)
             CardSide(
                 content: content,
@@ -415,14 +415,14 @@ struct CardSide: View {
     let content: ShareContent
     let isFront: Bool
     let rotation: Double
-    
+
     var body: some View {
         ZStack {
             // Card background
             RoundedRectangle(cornerRadius: 20)
                 .fill(
                     LinearGradient(
-                        colors: isFront ? 
+                        colors: isFront ?
                             [Color(hex: "#667eea"), Color(hex: "#764ba2")] :
                             [Color(hex: "#43e97b"), Color(hex: "#38f9d7")],
                         startPoint: .topLeading,
@@ -430,14 +430,14 @@ struct CardSide: View {
                     )
                 )
                 .shadow(radius: 20)
-            
+
             VStack(spacing: 20) {
                 // Title
                 Text(isFront ? "BEFORE" : "AFTER")
                     .font(.system(size: 14, weight: .bold))
                     .tracking(2)
                     .foregroundColor(.white.opacity(0.8))
-                
+
                 if case .recipe(let recipe) = content.type {
                     // Recipe name
                     Text(recipe.name)
@@ -445,7 +445,7 @@ struct CardSide: View {
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
-                    
+
                     // Image placeholder
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.white.opacity(0.2))
@@ -456,7 +456,7 @@ struct CardSide: View {
                                 .foregroundColor(.white.opacity(0.5))
                         )
                         .padding(.horizontal, 20)
-                    
+
                     // Stats
                     if !isFront {
                         HStack(spacing: 30) {
@@ -466,14 +466,14 @@ struct CardSide: View {
                                 Text("\(recipe.prepTime + recipe.cookTime)m")
                                     .font(.system(size: 14, weight: .semibold))
                             }
-                            
+
                             VStack(spacing: 4) {
                                 Image(systemName: "flame")
                                     .font(.system(size: 20))
                                 Text("\(recipe.nutrition.calories)")
                                     .font(.system(size: 14, weight: .semibold))
                             }
-                            
+
                             VStack(spacing: 4) {
                                 Image(systemName: "person.2")
                                     .font(.system(size: 20))
@@ -484,7 +484,7 @@ struct CardSide: View {
                         .foregroundColor(.white)
                     }
                 }
-                
+
                 // Instruction
                 Text(isFront ? "Tap to see the magic ✨" : "Made with SnapChef 🍳")
                     .font(.system(size: 12))
@@ -500,18 +500,18 @@ struct MessageStyleCard: View {
     let style: MessageCardStyle
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Image(systemName: style.icon)
                     .font(.system(size: 24))
                     .foregroundColor(isSelected ? Color(hex: "#007AFF") : .white)
-                
+
                 Text(style.rawValue)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(isSelected ? Color(hex: "#007AFF") : .white)
-                
+
                 Text(style.description)
                     .font(.system(size: 10))
                     .foregroundColor((isSelected ? Color(hex: "#007AFF") : .white).opacity(0.7))
@@ -531,24 +531,24 @@ struct MessageFeatureRow: View {
     let icon: String
     let title: String
     let subtitle: String
-    
+
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 24))
                 .foregroundColor(.white)
                 .frame(width: 40)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
-                
+
                 Text(subtitle)
                     .font(.system(size: 12))
                     .foregroundColor(.white.opacity(0.7))
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, 16)
@@ -563,33 +563,33 @@ struct MessageComposerWrapper: UIViewControllerRepresentable {
     let messageText: String
     let image: UIImage?
     let onDismiss: () -> Void
-    
+
     func makeUIViewController(context: Context) -> MFMessageComposeViewController {
         let controller = MFMessageComposeViewController()
         controller.messageComposeDelegate = context.coordinator
         controller.body = messageText
-        
+
         if let image = image,
            let imageData = image.pngData() {
             controller.addAttachmentData(imageData, typeIdentifier: "public.png", filename: "recipe_card.png")
         }
-        
+
         return controller
     }
-    
+
     func updateUIViewController(_ uiViewController: MFMessageComposeViewController, context: Context) {}
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     class Coordinator: NSObject, MFMessageComposeViewControllerDelegate {
         let parent: MessageComposerWrapper
-        
+
         init(_ parent: MessageComposerWrapper) {
             self.parent = parent
         }
-        
+
         func messageComposeViewController(_ controller: MFMessageComposeViewController, didFinishWith result: MessageComposeResult) {
             DispatchQueue.main.async { [parent] in
                 parent.onDismiss()

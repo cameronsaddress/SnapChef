@@ -16,40 +16,40 @@ struct TikTokShareViewEnhanced: View {
     @State private var showingAfterPhotoCapture = false
     @State private var afterPhoto: UIImage?
     @State private var beforePhoto: UIImage?
-    
+
     // Template selection
     @State private var selectedTemplate: TikTokTemplate = .beforeAfterReveal
-    
+
     // Audio selection
     @State private var selectedAudio: TrendingAudio?
     @State private var showAudioPicker = false
-    
+
     // Hashtag selection
     @State private var selectedHashtags: Set<String> = []
     @State private var customHashtag = ""
-    
+
     // Video generation
     @State private var isGenerating = false
     @State private var generatedVideoURL: URL?
     @State private var showingVideoPreview = false
     @State private var errorMessage: String?
     @State private var generationProgress: Double = 0
-    
+
     // Quick share options
     @State private var showQuickShareOptions = false
     @State private var selectedQuickShare: QuickShareOption = .createVideo
-    
+
     enum QuickShareOption: String, CaseIterable {
         case createVideo = "Create Video"
         case quickPost = "Quick Post"
-        
+
         var icon: String {
             switch self {
             case .createVideo: return "video.fill"
             case .quickPost: return "paperplane.fill"
             }
         }
-        
+
         var description: String {
             switch self {
             case .createVideo: return "Full video creation with effects"
@@ -57,7 +57,7 @@ struct TikTokShareViewEnhanced: View {
             }
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -71,7 +71,7 @@ struct TikTokShareViewEnhanced: View {
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
-                
+
                 if !showQuickShareOptions {
                     mainContentView
                 } else {
@@ -87,7 +87,7 @@ struct TikTokShareViewEnhanced: View {
                     .foregroundColor(.white)
                     .font(.system(size: 16, weight: .medium))
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if generatedVideoURL != nil {
                         Button("Share") {
@@ -135,9 +135,9 @@ struct TikTokShareViewEnhanced: View {
             }
         }
     }
-    
+
     // MARK: - Quick Share Options View
-    
+
     private var quickShareOptionsView: some View {
         VStack(spacing: 32) {
             // Header
@@ -145,17 +145,17 @@ struct TikTokShareViewEnhanced: View {
                 Image(systemName: "music.note")
                     .font(.system(size: 48, weight: .bold))
                     .foregroundColor(Color(hex: "#FF0050"))
-                
+
                 Text("Share to TikTok")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundColor(.white)
-                
+
                 Text("Choose how you want to share")
                     .font(.system(size: 16))
                     .foregroundColor(.gray)
             }
             .padding(.top, 60)
-            
+
             // Options
             VStack(spacing: 20) {
                 ForEach(QuickShareOption.allCases, id: \.self) { option in
@@ -164,7 +164,7 @@ struct TikTokShareViewEnhanced: View {
                         withAnimation(.spring()) {
                             showQuickShareOptions = false
                         }
-                        
+
                         if option == .quickPost {
                             performQuickShare()
                         }
@@ -174,19 +174,19 @@ struct TikTokShareViewEnhanced: View {
                                 .font(.system(size: 28))
                                 .foregroundColor(Color(hex: "#00F2EA"))
                                 .frame(width: 60)
-                            
+
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(option.rawValue)
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundColor(.white)
-                                
+
                                 Text(option.description)
                                     .font(.system(size: 14))
                                     .foregroundColor(.gray)
                             }
-                            
+
                             Spacer()
-                            
+
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 16))
                                 .foregroundColor(.gray)
@@ -205,57 +205,57 @@ struct TikTokShareViewEnhanced: View {
                 }
             }
             .padding(.horizontal, 24)
-            
+
             Spacer()
         }
     }
-    
+
     // MARK: - Main Content View
-    
+
     private var mainContentView: some View {
         ScrollView {
             VStack(spacing: 28) {
                 // Header
                 headerSection
-                
+
                 // Template Selection
                 templateSection
-                
+
                 // Preview
                 previewSection
-                
+
                 // Audio Selection
                 audioSection
-                
+
                 // Hashtag Selection
                 hashtagSection
-                
+
                 // Tips for Virality
                 viralTipsSection
-                
+
                 // Generate Button
                 generateButton
             }
             .padding(.bottom, 40)
         }
     }
-    
+
     private var headerSection: some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: "music.note")
                     .font(.system(size: 32, weight: .bold))
                     .foregroundColor(Color(hex: "#FF0050"))
-                
+
                 Text("TikTok Video Generator")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
             }
-            
+
             Text("Create a viral cooking video")
                 .font(.system(size: 16))
                 .foregroundColor(.gray)
-            
+
             // Status message
             if !videoGenerator.statusMessage.isEmpty {
                 Text(videoGenerator.statusMessage)
@@ -271,14 +271,14 @@ struct TikTokShareViewEnhanced: View {
         }
         .padding(.top, 20)
     }
-    
+
     private var templateSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Choose a template")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 20)
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(TikTokTemplate.allCases, id: \.self) { template in
@@ -298,13 +298,13 @@ struct TikTokShareViewEnhanced: View {
             }
         }
     }
-    
+
     private var previewSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Preview")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(.white)
-            
+
             TemplatePreviewEnhanced(
                 template: selectedTemplate,
                 content: content
@@ -313,23 +313,23 @@ struct TikTokShareViewEnhanced: View {
         }
         .padding(.horizontal, 20)
     }
-    
+
     private var audioSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Trending Sounds")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.white)
-                
+
                 Spacer()
-                
+
                 Button(action: { showAudioPicker.toggle() }) {
                     Text("Browse All")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(Color(hex: "#00F2EA"))
                 }
             }
-            
+
             VStack(spacing: 12) {
                 ForEach(TrendingAudio.suggestions.prefix(3), id: \.id) { audio in
                     TrendingAudioRowEnhanced(
@@ -342,13 +342,13 @@ struct TikTokShareViewEnhanced: View {
                     )
                 }
             }
-            
+
             // Viral tip
             HStack(spacing: 8) {
                 Image(systemName: "lightbulb.fill")
                     .font(.system(size: 14))
                     .foregroundColor(.yellow)
-                
+
                 Text("Using trending sounds increases views by 120%")
                     .font(.system(size: 12))
                     .foregroundColor(.gray)
@@ -362,13 +362,13 @@ struct TikTokShareViewEnhanced: View {
         }
         .padding(.horizontal, 20)
     }
-    
+
     private var hashtagSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Hashtags")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(.white)
-            
+
             // Recommended hashtags
             FlowLayout(spacing: 8) {
                 ForEach(recommendedHashtags, id: \.self) { hashtag in
@@ -386,7 +386,7 @@ struct TikTokShareViewEnhanced: View {
                     )
                 }
             }
-            
+
             // Custom hashtag input
             HStack {
                 TextField("Add custom hashtag", text: $customHashtag)
@@ -398,7 +398,7 @@ struct TikTokShareViewEnhanced: View {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.white.opacity(0.1))
                     )
-                
+
                 Button(action: addCustomHashtag) {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 24))
@@ -406,7 +406,7 @@ struct TikTokShareViewEnhanced: View {
                 }
                 .disabled(customHashtag.isEmpty)
             }
-            
+
             // Selected count
             Text("\(selectedHashtags.count)/30 hashtags selected")
                 .font(.system(size: 12))
@@ -414,13 +414,13 @@ struct TikTokShareViewEnhanced: View {
         }
         .padding(.horizontal, 20)
     }
-    
+
     private var viralTipsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("🚀 Viral Tips")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
-            
+
             VStack(alignment: .leading, spacing: 10) {
                 ViralTipRow(icon: "clock", text: "Post between 6-10am or 7-11pm")
                 ViralTipRow(icon: "hand.thumbsup", text: "Hook viewers in first 3 seconds")
@@ -435,7 +435,7 @@ struct TikTokShareViewEnhanced: View {
         )
         .padding(.horizontal, 20)
     }
-    
+
     private var generateButton: some View {
         Button(action: generateVideo) {
             ZStack {
@@ -451,24 +451,24 @@ struct TikTokShareViewEnhanced: View {
                         )
                     )
                     .frame(height: 60)
-                
+
                 if isGenerating {
                     HStack(spacing: 12) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             .scaleEffect(0.8)
-                        
+
                         Text("Generating... \(Int(generationProgress * 100))%")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.white)
-                        
+
                         // Progress bar
                         GeometryReader { geometry in
                             ZStack(alignment: .leading) {
                                 RoundedRectangle(cornerRadius: 4)
                                     .fill(Color.white.opacity(0.3))
                                     .frame(height: 4)
-                                
+
                                 RoundedRectangle(cornerRadius: 4)
                                     .fill(Color.white)
                                     .frame(width: geometry.size.width * generationProgress, height: 4)
@@ -480,7 +480,7 @@ struct TikTokShareViewEnhanced: View {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles")
                             .font(.system(size: 20))
-                        
+
                         Text("Generate TikTok Video")
                             .font(.system(size: 18, weight: .bold))
                     }
@@ -493,9 +493,9 @@ struct TikTokShareViewEnhanced: View {
         .animation(.spring(), value: isGenerating)
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private var recommendedHashtags: [String] {
         var hashtags = [
             "FridgeChallenge",
@@ -511,40 +511,40 @@ struct TikTokShareViewEnhanced: View {
             "EasyRecipe",
             "FYP"
         ]
-        
+
         if case .recipe(let recipe) = content.type {
             // Only add difficulty-specific hashtag if it's not already in the list
             let difficultyTag = "\(recipe.difficulty.rawValue.capitalized)Recipe"
             if !hashtags.contains(difficultyTag) {
                 hashtags.append(difficultyTag)
             }
-            
+
             if recipe.prepTime + recipe.cookTime <= 30 {
                 hashtags.append("30MinuteMeals")
             }
         }
-        
+
         return hashtags
     }
-    
+
     private func setupDefaultHashtags() {
         // Auto-select high-performing hashtags
         selectedHashtags = Set(["FridgeChallenge", "SnapChef", "FoodTok", "FYP"])
     }
-    
+
     private func addCustomHashtag() {
         let cleaned = customHashtag
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "#", with: "")
             .replacingOccurrences(of: " ", with: "")
-        
+
         if !cleaned.isEmpty && selectedHashtags.count < 30 {
             selectedHashtags.insert(cleaned)
             customHashtag = ""
             HapticFeedback.success()
         }
     }
-    
+
     private func generateVideo() {
         // For before/after template, fetch both photos from CloudKit if needed
         if selectedTemplate == .beforeAfterReveal {
@@ -553,13 +553,13 @@ struct TikTokShareViewEnhanced: View {
                     do {
                         print("🎬 TikTok: Fetching photos from CloudKit for recipe '\(recipe.name)' (ID: \(recipe.id.uuidString))")
                         let photos = try await CloudKitRecipeManager.shared.fetchRecipePhotos(for: recipe.id.uuidString)
-                        
+
                         // Update before photo if we don't have it
                         if content.beforeImage == nil, let cloudBeforePhoto = photos.before {
                             print("🎬 TikTok: Using BEFORE (fridge) photo from CloudKit")
                             beforePhoto = cloudBeforePhoto
                         }
-                        
+
                         // Check after photo
                         if content.afterImage == nil && afterPhoto == nil {
                             if let cloudAfterPhoto = photos.after {
@@ -586,18 +586,18 @@ struct TikTokShareViewEnhanced: View {
             }
             return
         }
-        
+
         startVideoGeneration()
     }
-    
+
     private func startVideoGeneration() {
         isGenerating = true
         generationProgress = 0
-        
+
         // Create updated content with photos from CloudKit or state if available
         let finalBeforePhoto = beforePhoto ?? content.beforeImage
         let finalAfterPhoto = afterPhoto ?? content.afterImage
-        
+
         print("🎬 TikTok: Starting video generation with:")
         print("    - Before (fridge) photo: \(finalBeforePhoto != nil ? "✓ Available" : "✗ Missing")")
         if let photo = finalBeforePhoto {
@@ -609,13 +609,13 @@ struct TikTokShareViewEnhanced: View {
             print("      Size: \(photo.size), Has CGImage: \(photo.cgImage != nil)")
             print("      Photo object: \(photo)")
         }
-        
+
         let updatedContent = ShareContent(
             type: content.type,
             beforeImage: finalBeforePhoto,
             afterImage: finalAfterPhoto
         )
-        
+
         Task {
             do {
                 let videoURL = try await videoGenerator.generateVideo(
@@ -629,7 +629,7 @@ struct TikTokShareViewEnhanced: View {
                         }
                     }
                 )
-                
+
                 await MainActor.run {
                     generatedVideoURL = videoURL
                     isGenerating = false
@@ -645,50 +645,50 @@ struct TikTokShareViewEnhanced: View {
             }
         }
     }
-    
+
     private func performQuickShare() {
         // Quick share implementation - create image and copy caption
         isGenerating = true
-        
+
         Task {
             do {
                 // Generate a share card image
                 let shareImage = await generateQuickShareCard()
-                
+
                 // Save image to photo library
                 try await saveImageToPhotoLibrary(shareImage)
-                
+
                 // Prepare caption text
                 var captionText = ""
                 if case .recipe(let recipe) = content.type {
                     captionText = """
                     🍳 FRIDGE TO FEAST CHALLENGE!
-                    
+
                     I just turned random fridge items into \(recipe.name)!
                     ⏱ Ready in \(recipe.prepTime + recipe.cookTime) minutes
-                    
+
                     \(selectedHashtags.map { "#\($0)" }.joined(separator: " "))
-                    
+
                     Made with @snapchef 🍳
                     Download: snapchef.app
                     """
                 } else {
                     captionText = """
                     🍳 I just turned my fridge into an amazing recipe with @snapchef!
-                    
+
                     \(selectedHashtags.map { "#\($0)" }.joined(separator: " "))
-                    
+
                     Download SnapChef: snapchef.app
                     """
                 }
-                
+
                 // Copy to clipboard
                 await MainActor.run {
                     UIPasteboard.general.string = captionText
-                    
+
                     // Show success message
                     videoGenerator.statusMessage = "Image saved! Caption copied! Opening TikTok..."
-                    
+
                     // Small delay for user to see the message
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         // Try different TikTok URL schemes for better deep linking
@@ -704,7 +704,7 @@ struct TikTokShareViewEnhanced: View {
                             "snssdk1233://",        // Fallback to main app
                             "tiktok://"            // Final fallback
                         ]
-                        
+
                         var opened = false
                         for scheme in tiktokSchemes {
                             if let url = URL(string: scheme),
@@ -714,14 +714,14 @@ struct TikTokShareViewEnhanced: View {
                                 break
                             }
                         }
-                        
+
                         // Fallback to web if app not found
                         if !opened {
                             if let webURL = URL(string: "https://www.tiktok.com/upload") {
                                 UIApplication.shared.open(webURL)
                             }
                         }
-                        
+
                         self.dismiss()
                     }
                 }
@@ -733,12 +733,12 @@ struct TikTokShareViewEnhanced: View {
             }
         }
     }
-    
+
     @MainActor
     private func generateQuickShareCard() async -> UIImage {
         // Create a visually appealing share card
-        let size = CGSize(width: 1080, height: 1920) // TikTok aspect ratio
-        
+        let size = CGSize(width: 1_080, height: 1_920) // TikTok aspect ratio
+
         return UIGraphicsImageRenderer(size: size).image { context in
             // Background gradient
             let gradient = CAGradientLayer()
@@ -749,30 +749,30 @@ struct TikTokShareViewEnhanced: View {
             ]
             gradient.startPoint = CGPoint(x: 0, y: 0)
             gradient.endPoint = CGPoint(x: 1, y: 1)
-            
+
             if let gradientImage = gradient.toImage(of: size) {
                 gradientImage.draw(at: .zero)
             }
-            
+
             // Add content based on type
             if case .recipe(let recipe) = content.type {
                 // Add recipe photo if available
                 if let beforeImage = content.beforeImage ?? beforePhoto {
                     let photoRect = CGRect(x: 90, y: 200, width: 900, height: 600)
-                    
+
                     // Draw photo with rounded corners
                     let path = UIBezierPath(roundedRect: photoRect, cornerRadius: 30)
                     context.cgContext.addPath(path.cgPath)
                     context.cgContext.clip()
                     beforeImage.draw(in: photoRect)
                     context.cgContext.resetClip()
-                    
+
                     // Add shadow overlay for text visibility
                     let shadowPath = UIBezierPath(roundedRect: photoRect, cornerRadius: 30)
                     UIColor.black.withAlphaComponent(0.3).setFill()
                     shadowPath.fill(with: .normal, alpha: 0.3)
                 }
-                
+
                 // Add SnapChef logo/branding
                 let snapChefText = "SnapChef"
                 let snapChefAttributes: [NSAttributedString.Key: Any] = [
@@ -787,7 +787,7 @@ struct TikTokShareViewEnhanced: View {
                     height: snapChefSize.height
                 )
                 snapChefText.draw(in: snapChefRect, withAttributes: snapChefAttributes)
-                
+
                 // Add recipe name
                 let recipeAttributes: [NSAttributedString.Key: Any] = [
                     .font: UIFont.systemFont(ofSize: 64, weight: .bold),
@@ -795,7 +795,7 @@ struct TikTokShareViewEnhanced: View {
                 ]
                 let recipeRect = CGRect(x: 90, y: 900, width: 900, height: 200)
                 recipe.name.draw(in: recipeRect, withAttributes: recipeAttributes)
-                
+
                 // Add recipe details
                 let detailsText = """
                 ⏱ \(recipe.prepTime + recipe.cookTime) minutes
@@ -806,9 +806,9 @@ struct TikTokShareViewEnhanced: View {
                     .font: UIFont.systemFont(ofSize: 48, weight: .medium),
                     .foregroundColor: UIColor.white.withAlphaComponent(0.9)
                 ]
-                let detailsRect = CGRect(x: 90, y: 1100, width: 900, height: 300)
+                let detailsRect = CGRect(x: 90, y: 1_100, width: 900, height: 300)
                 detailsText.draw(in: detailsRect, withAttributes: detailsAttributes)
-                
+
                 // Add call to action
                 let ctaText = "Turn your fridge into magic!"
                 let ctaAttributes: [NSAttributedString.Key: Any] = [
@@ -818,12 +818,12 @@ struct TikTokShareViewEnhanced: View {
                 let ctaSize = ctaText.size(withAttributes: ctaAttributes)
                 let ctaRect = CGRect(
                     x: (size.width - ctaSize.width) / 2,
-                    y: 1500,
+                    y: 1_500,
                     width: ctaSize.width,
                     height: ctaSize.height
                 )
                 ctaText.draw(in: ctaRect, withAttributes: ctaAttributes)
-                
+
                 // Add website
                 let websiteText = "snapchef.app"
                 let websiteAttributes: [NSAttributedString.Key: Any] = [
@@ -833,7 +833,7 @@ struct TikTokShareViewEnhanced: View {
                 let websiteSize = websiteText.size(withAttributes: websiteAttributes)
                 let websiteRect = CGRect(
                     x: (size.width - websiteSize.width) / 2,
-                    y: 1700,
+                    y: 1_700,
                     width: websiteSize.width,
                     height: websiteSize.height
                 )
@@ -841,7 +841,7 @@ struct TikTokShareViewEnhanced: View {
             }
         }
     }
-    
+
     private func saveImageToPhotoLibrary(_ image: UIImage) async throws {
         return try await withCheckedThrowingContinuation { continuation in
             // Use SafePhotoSaver which doesn't use PHPhotoLibrary directly
@@ -859,10 +859,10 @@ struct TikTokShareViewEnhanced: View {
             }
         }
     }
-    
+
     private func shareToTikTok() {
         guard let videoURL = generatedVideoURL else { return }
-        
+
         // Use SDK manager for sharing
         Task {
             do {
@@ -870,28 +870,28 @@ struct TikTokShareViewEnhanced: View {
                 await MainActor.run {
                     videoGenerator.statusMessage = "Saving video and preparing TikTok..."
                 }
-                
+
                 // Prepare caption
                 var caption = ""
                 if case .recipe(let recipe) = content.type {
                     caption = TikTokSDKManager().generateTikTokCaption(for: recipe)
                 }
-                
+
                 // Create share content
                 let shareContent = SDKShareContent(
                     type: .video(videoURL),
                     caption: caption,
                     hashtags: Array(selectedHashtags)
                 )
-                
+
                 // Share via SDK manager
                 try await SocialSDKManager.shared.share(to: .tiktok, content: shareContent)
-                
+
                 await MainActor.run {
                     // Show success message
                     videoGenerator.statusMessage = "✅ Video saved! Caption copied! Opening TikTok..."
                     HapticFeedback.success()
-                    
+
                     // Dismiss after a short delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                         dismiss()
@@ -913,7 +913,7 @@ struct TemplateCardEnhanced: View {
     let template: TikTokTemplate
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
@@ -927,12 +927,12 @@ struct TemplateCardEnhanced: View {
                             )
                         )
                         .frame(width: 110, height: 160)
-                    
+
                     VStack(spacing: 8) {
                         Image(systemName: template.icon)
                             .font(.system(size: 36, weight: .bold))
                             .foregroundColor(.white)
-                        
+
                         // Viral indicator
                         if template == .beforeAfterReveal {
                             Label("HOT", systemImage: "flame.fill")
@@ -966,7 +966,7 @@ struct TemplateCardEnhanced: View {
                 )
                 .scaleEffect(isSelected ? 1.05 : 1.0)
                 .animation(.spring(response: 0.3), value: isSelected)
-                
+
                 Text(template.name)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(isSelected ? .white : .gray)
@@ -983,15 +983,15 @@ struct TemplatePreviewEnhanced: View {
     let template: TikTokTemplate
     let content: ShareContent
     @State private var isPlaying = false
-    
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.black)
-            
+
             // Template-specific preview
             template.previewContent(content)
-            
+
             // Play button overlay
             if !isPlaying {
                 Button(action: { isPlaying.toggle() }) {
@@ -999,19 +999,19 @@ struct TemplatePreviewEnhanced: View {
                         Circle()
                             .fill(Color.white.opacity(0.3))
                             .frame(width: 80, height: 80)
-                        
+
                         Image(systemName: "play.fill")
                             .font(.system(size: 32))
                             .foregroundColor(.white)
                     }
                 }
             }
-            
+
             // TikTok UI overlay
             VStack {
                 HStack {
                     Spacer()
-                    
+
                     // Right side actions
                     VStack(spacing: 20) {
                         TikTokActionButton(icon: "heart.fill", count: "234K")
@@ -1021,22 +1021,22 @@ struct TemplatePreviewEnhanced: View {
                     }
                     .padding(.trailing, 12)
                 }
-                
+
                 Spacer()
-                
+
                 // Bottom info
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("@snapchef")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
-                        
+
                         Text(template.description)
                             .font(.system(size: 14))
                             .foregroundColor(.white.opacity(0.9))
                             .lineLimit(2)
                     }
-                    
+
                     Spacer()
                 }
                 .padding(.horizontal, 12)
@@ -1050,13 +1050,13 @@ struct TemplatePreviewEnhanced: View {
 struct TikTokActionButton: View {
     let icon: String
     let count: String
-    
+
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 28))
                 .foregroundColor(.white)
-            
+
             Text(count)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.white)
@@ -1068,7 +1068,7 @@ struct TrendingAudioRowEnhanced: View {
     let audio: TrendingAudio
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
@@ -1088,34 +1088,34 @@ struct TrendingAudioRowEnhanced: View {
                                 )
                         )
                         .frame(width: 44, height: 44)
-                    
+
                     Image(systemName: isSelected ? "music.note" : "music.note")
                         .font(.system(size: 20, weight: .medium))
                         .foregroundColor(.white)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(audio.name)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
-                    
+
                     Text(audio.artist)
                         .font(.system(size: 13))
                         .foregroundColor(.gray)
                 }
-                
+
                 Spacer()
-                
+
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(audio.useCount)K")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white)
-                    
+
                     Text("uses")
                         .font(.system(size: 11))
                         .foregroundColor(.gray)
                 }
-                
+
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 20))
@@ -1143,14 +1143,14 @@ struct HashtagChipEnhanced: View {
     let hashtag: String
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Text("#")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundColor(isSelected ? .black : Color(hex: "#00F2EA"))
-                
+
                 Text(hashtag)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(isSelected ? .black : .white)
@@ -1182,18 +1182,18 @@ struct HashtagChipEnhanced: View {
 struct ViralTipRow: View {
     let icon: String
     let text: String
-    
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16))
                 .foregroundColor(Color(hex: "#00F2EA"))
                 .frame(width: 24)
-            
+
             Text(text)
                 .font(.system(size: 14))
                 .foregroundColor(.white.opacity(0.9))
-            
+
             Spacer()
         }
     }
@@ -1204,18 +1204,18 @@ struct TikTokVideoPreviewView: View {
     let onShare: () -> Void
     @State private var player: AVPlayer?
     @Environment(\.dismiss) var dismiss
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.black.ignoresSafeArea()
-                
+
                 VideoPlayer(player: player)
                     .ignoresSafeArea()
-                
+
                 VStack {
                     Spacer()
-                    
+
                     // Action buttons
                     HStack(spacing: 20) {
                         Button(action: {
@@ -1232,7 +1232,7 @@ struct TikTokVideoPreviewView: View {
                                         .fill(Color.white.opacity(0.2))
                                 )
                         }
-                        
+
                         Button(action: onShare) {
                             Label("Share to TikTok", systemImage: "paperplane.fill")
                                 .font(.system(size: 16, weight: .bold))
@@ -1275,11 +1275,11 @@ struct HapticFeedback {
     static func selection() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
-    
+
     static func success() {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
-    
+
     static func error() {
         UINotificationFeedbackGenerator().notificationOccurred(.error)
     }
@@ -1301,12 +1301,12 @@ extension CAGradientLayer {
     func toImage(of size: CGSize) -> UIImage? {
         UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
         defer { UIGraphicsEndImageContext() }
-        
+
         guard let context = UIGraphicsGetCurrentContext() else { return nil }
-        
+
         self.frame = CGRect(origin: .zero, size: size)
         self.render(in: context)
-        
+
         return UIGraphicsGetImageFromCurrentImageContext()
     }
 }

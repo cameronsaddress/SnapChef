@@ -4,7 +4,7 @@ struct FoodPreferencesView: View {
     @Environment(\.dismiss) var dismiss
     @State private var selectedCuisines: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? [])
     @State private var showSaveAnimation = false
-    
+
     let cuisineTypes = [
         ("Breakfast", "🥞"),
         ("Desserts", "🍰"),
@@ -21,31 +21,31 @@ struct FoodPreferencesView: View {
         ("Gluten Free", "🌾"),
         ("Vegan", "🌱")
     ]
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 // Background
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 24) {
                         // Header
                         VStack(spacing: 12) {
                             Text("🍳")
                                 .font(.system(size: 60))
-                            
+
                             Text("What's Your Flavor?")
                                 .font(.system(size: 32, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
-                            
+
                             Text("Select cuisines you love and we'll craft recipes just for you!")
                                 .font(.system(size: 18))
                                 .foregroundColor(.white.opacity(0.8))
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 40)
-                            
+
                             if !selectedCuisines.isEmpty {
                                 Text("\(selectedCuisines.count) selected")
                                     .font(.system(size: 16, weight: .semibold))
@@ -59,7 +59,7 @@ struct FoodPreferencesView: View {
                             }
                         }
                         .padding(.top, 20)
-                        
+
                         // Cuisine Grid
                         LazyVGrid(columns: [
                             GridItem(.flexible(), spacing: 16),
@@ -83,20 +83,20 @@ struct FoodPreferencesView: View {
                             }
                         }
                         .padding(.horizontal, 20)
-                        
+
                         Spacer(minLength: 100)
                     }
                 }
-                
+
                 // Bottom Save Button
                 VStack {
                     Spacer()
-                    
+
                     Button(action: savePreferences) {
                         HStack {
                             Text("Save My Tastes")
                                 .font(.system(size: 20, weight: .semibold))
-                            
+
                             Image(systemName: showSaveAnimation ? "checkmark.circle.fill" : "arrow.right.circle.fill")
                                 .font(.system(size: 24))
                                 .scaleEffect(showSaveAnimation ? 1.2 : 1.0)
@@ -135,7 +135,7 @@ struct FoodPreferencesView: View {
                     }
                     .foregroundColor(.white.opacity(0.8))
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Select All") {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -152,20 +152,20 @@ struct FoodPreferencesView: View {
             }
         }
     }
-    
+
     private func savePreferences() {
         // Save to UserDefaults
         UserDefaults.standard.set(Array(selectedCuisines), forKey: "SelectedFoodPreferences")
-        
+
         // Show save animation
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             showSaveAnimation = true
         }
-        
+
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
-        
+
         // Dismiss after a short delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             dismiss()
@@ -178,16 +178,16 @@ struct CuisineCard: View {
     let emoji: String
     let isSelected: Bool
     let action: () -> Void
-    
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 12) {
                 Text(emoji)
                     .font(.system(size: 40))
                     .scaleEffect(isSelected ? 1.2 : 1)
-                
+
                 Text(name)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(isSelected ? .white : .white.opacity(0.8))

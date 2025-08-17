@@ -5,18 +5,18 @@ struct AchievementGalleryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedCategory: AchievementCategory = .all
     @State private var selectedBadge: GameBadge?
-    
+
     // New states for branded share
     @State private var showBrandedShare = false
     @State private var shareContent: ShareContent?
-    
+
     private enum AchievementCategory: String, CaseIterable {
         case all = "All"
         case recipes = "Recipes"
         case challenges = "Challenges"
         case social = "Social"
         case special = "Special"
-        
+
         var icon: String {
             switch self {
             case .all: return "star.fill"
@@ -27,12 +27,12 @@ struct AchievementGalleryView: View {
             }
         }
     }
-    
+
     private var filteredBadges: [GameBadge] {
         // For now, just return all badges since category isn't implemented
         return gamificationManager.userStats.badges
     }
-    
+
     private var allPossibleBadges: [GameBadge] {
         // This would normally come from a data source
         // For now, return mock badges to show progress
@@ -49,26 +49,26 @@ struct AchievementGalleryView: View {
             GameBadge(name: "Perfectionist", icon: "checkmark.seal.fill", description: "5 perfect recipes", rarity: .epic, unlockedDate: Date())
         ]
     }
-    
+
     private var unlockedBadgeIds: Set<UUID> {
         Set(gamificationManager.userStats.badges.map { $0.id })
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 // Background
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 24) {
                         // Stats Overview
                         statsOverview
-                        
+
                         // Category Filter
                         categoryFilter
-                        
+
                         // Badges Grid
                         badgesGrid
                     }
@@ -95,7 +95,7 @@ struct AchievementGalleryView: View {
             }
         }
     }
-    
+
     // MARK: - Stats Overview
     private var statsOverview: some View {
         GlassmorphicCard(content: {
@@ -104,11 +104,11 @@ struct AchievementGalleryView: View {
                     Text("Collection Progress")
                         .font(.title2)
                         .fontWeight(.bold)
-                    
+
                     Spacer()
-                    
+
                     // Share button
-                    Button(action: { 
+                    Button(action: {
                         // Use branded share popup for achievements
                         let achievementText = "🏆 I've unlocked \(gamificationManager.userStats.badges.count) achievements on SnapChef!"
                         shareContent = ShareContent(
@@ -123,7 +123,7 @@ struct AchievementGalleryView: View {
                             .foregroundColor(.primary)
                     }
                 }
-                
+
                 // Progress stats
                 HStack(spacing: 30) {
                     VStack(spacing: 8) {
@@ -134,7 +134,7 @@ struct AchievementGalleryView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     VStack(spacing: 8) {
                         Text("\(allPossibleBadges.count)")
                             .font(.system(size: 36, weight: .bold, design: .rounded))
@@ -143,7 +143,7 @@ struct AchievementGalleryView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     VStack(spacing: 8) {
                         let percentage = allPossibleBadges.isEmpty ? 0 : Int(Double(gamificationManager.userStats.badges.count) / Double(allPossibleBadges.count) * 100)
                         Text("\(percentage)%")
@@ -154,14 +154,14 @@ struct AchievementGalleryView: View {
                             .foregroundColor(.secondary)
                     }
                 }
-                
+
                 // Progress bar
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.gray.opacity(0.2))
                             .frame(height: 12)
-                        
+
                         RoundedRectangle(cornerRadius: 8)
                             .fill(
                                 LinearGradient(
@@ -182,7 +182,7 @@ struct AchievementGalleryView: View {
             .padding()
         }, glowColor: Color(hex: "#f093fb"))
     }
-    
+
     // MARK: - Category Filter
     private var categoryFilter: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -202,7 +202,7 @@ struct AchievementGalleryView: View {
             }
         }
     }
-    
+
     // MARK: - Badges Grid
     private var badgesGrid: some View {
         LazyVGrid(columns: [
@@ -224,7 +224,7 @@ struct AchievementGalleryView: View {
             }
         }
     }
-    
+
     // MARK: - Helper Methods
     private func getCountForCategory(_ category: AchievementCategory) -> Int {
         // Since badges don't have categories yet, just return total count for all
@@ -237,9 +237,9 @@ private struct BadgeCell: View {
     let badge: GameBadge
     let isUnlocked: Bool
     let onTap: () -> Void
-    
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 8) {
@@ -248,7 +248,7 @@ private struct BadgeCell: View {
                     Circle()
                         .fill(isUnlocked ? badge.rarity.color.opacity(0.2) : Color.gray.opacity(0.1))
                         .frame(width: 80, height: 80)
-                    
+
                     if isUnlocked {
                         // Glow effect
                         Circle()
@@ -257,11 +257,11 @@ private struct BadgeCell: View {
                             .blur(radius: 4)
                             .opacity(0.6)
                     }
-                    
+
                     Image(systemName: badge.icon)
                         .font(.system(size: 36))
                         .foregroundColor(isUnlocked ? badge.rarity.color : .gray.opacity(0.3))
-                    
+
                     if !isUnlocked {
                         Image(systemName: "lock.fill")
                             .font(.caption)
@@ -269,7 +269,7 @@ private struct BadgeCell: View {
                             .offset(x: 25, y: -25)
                     }
                 }
-                
+
                 // Badge name
                 Text(badge.name)
                     .font(.caption2)
@@ -297,17 +297,17 @@ private struct CategoryChip: View {
     let isSelected: Bool
     let count: Int
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.caption)
-                
+
                 Text(title)
                     .font(.subheadline)
                     .fontWeight(isSelected ? .semibold : .regular)
-                
+
                 if count > 0 {
                     Text("\(count)")
                         .font(.caption2)
@@ -339,26 +339,26 @@ private struct BadgeDetailView: View {
     @Binding var shareContent: ShareContent?
     @Environment(\.dismiss) private var dismiss
     @State private var rotationAngle: Double = 0
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 24) {
                     // Badge display
                     ZStack {
                         Circle()
                             .fill(badge.rarity.color.opacity(0.2))
                             .frame(width: 160, height: 160)
-                        
+
                         Circle()
                             .stroke(badge.rarity.color, lineWidth: 3)
                             .frame(width: 168, height: 168)
                             .blur(radius: 8)
                             .opacity(0.6)
-                        
+
                         Image(systemName: badge.icon)
                             .font(.system(size: 80))
                             .foregroundColor(badge.rarity.color)
@@ -372,19 +372,19 @@ private struct BadgeDetailView: View {
                             rotationAngle = 360
                         }
                     }
-                    
+
                     // Badge info
                     VStack(spacing: 16) {
                         Text(badge.name)
                             .font(.title)
                             .fontWeight(.bold)
-                        
+
                         Text(badge.description)
                             .font(.body)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
-                        
+
                         // Unlock date
                         HStack {
                             Image(systemName: "calendar")
@@ -393,7 +393,7 @@ private struct BadgeDetailView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         // Rarity indicator
                         HStack(spacing: 4) {
                             let starCount = rarityToStars(badge.rarity)
@@ -409,7 +409,7 @@ private struct BadgeDetailView: View {
                             }
                         }
                     }
-                    
+
                     // Share button for individual badge
                     Button(action: {
                         let achievementText = "🎯 Just unlocked the \(badge.name) badge on SnapChef!"
@@ -444,7 +444,7 @@ private struct BadgeDetailView: View {
                         )
                     }
                     .padding(.horizontal)
-                    
+
                     Spacer()
                 }
                 .padding()
@@ -460,7 +460,7 @@ private struct BadgeDetailView: View {
             }
         }
     }
-    
+
     // MARK: - Helper Functions
     private func rarityToStars(_ rarity: BadgeRarity) -> Int {
         switch rarity {
@@ -471,7 +471,6 @@ private struct BadgeDetailView: View {
         }
     }
 }
-
 
 // MARK: - Preview
 struct AchievementGalleryView_Previews: PreviewProvider {

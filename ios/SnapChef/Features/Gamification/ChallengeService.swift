@@ -5,18 +5,17 @@ import CloudKit
 /// ChallengeService handles CloudKit synchronization for challenge-related operations
 @MainActor
 class ChallengeService {
-    
     // MARK: - Properties
     static let shared = ChallengeService()
-    
+
     private let cloudKitManager = CloudKitChallengeManager.shared
     private let gamificationManager = GamificationManager.shared
     private var cancellables = Set<AnyCancellable>()
-    
+
     // Disabled API properties since we're using CloudKit
     private let baseURL = "https://api.snapchef.com/v1" // Not used - keeping for compatibility
     private let session = URLSession.shared // Not used - keeping for compatibility
-    
+
     // API Endpoints
     private enum Endpoint: String {
         case challenges = "/challenges"
@@ -27,61 +26,61 @@ class ChallengeService {
         case communityProgress = "/challenges/community"
         case rewards = "/challenges/rewards"
     }
-    
+
     // MARK: - Initialization
     private init() {}
-    
+
     // MARK: - Challenge Operations
-    
+
     /// Fetch all available challenges
     func fetchChallenges() async throws -> [ChallengeDTO] {
         // Return empty array since we're using local challenges from ChallengeGenerator
         // This prevents network errors when trying to reach non-existent API
         return []
     }
-    
+
     /// Fetch user's active challenges
     func fetchUserChallenges(userId: String) async throws -> [UserChallengeDTO] {
         // Return empty array since we're using local challenges
         // User challenges are managed locally through GamificationManager
         return []
     }
-    
+
     /// Join a challenge using CloudKit
     func joinChallenge(challengeId: String, userId: String) async throws -> JoinChallengeResponse {
         // Find the challenge in active challenges
         guard let challenge = gamificationManager.activeChallenges.first(where: { $0.id == challengeId }) else {
             throw ChallengeServiceError.joinFailed
         }
-        
+
         // Join challenge locally
         gamificationManager.joinChallenge(challenge)
-        
+
         // Update CloudKit progress
         try await cloudKitManager.updateUserProgress(challengeID: challengeId, progress: 0.0)
-        
+
         return JoinChallengeResponse(
             success: true,
             message: "Successfully joined challenge",
             participantId: "\(userId)_\(challengeId)"
         )
     }
-    
+
     /// Update challenge progress using CloudKit
     func updateProgress(progressUpdate: ProgressUpdateRequest) async throws -> ProgressUpdateResponse {
         // Update local progress
         gamificationManager.updateChallengeProgress(progressUpdate.challengeId, progress: progressUpdate.progress)
-        
+
         // Update CloudKit progress
         try await cloudKitManager.updateUserProgress(challengeID: progressUpdate.challengeId, progress: progressUpdate.progress)
-        
+
         // Find challenge to get reward points
         let challenge = gamificationManager.activeChallenges.first(where: { $0.id == progressUpdate.challengeId })
-        
+
         // Check for milestone rewards
         let milestone = progressUpdate.progress >= 1.0 ? 100 : Int(progressUpdate.progress * 100)
         let reward = progressUpdate.progress >= 1.0 ? challenge?.points ?? 0 : 0
-        
+
         return ProgressUpdateResponse(
             success: true,
             currentProgress: progressUpdate.progress,
@@ -89,21 +88,21 @@ class ChallengeService {
             reward: reward
         )
     }
-    
+
     /// Fetch challenge leaderboard from CloudKit
     func fetchLeaderboard(challengeId: String, limit: Int = 100) async throws -> [LeaderboardEntryDTO] {
         // For now, return empty array since leaderboard isn't fully implemented in CloudKit
         // This would need to query CloudKit for all user progress on this challenge
         return []
     }
-    
+
     /// Fetch community challenge progress from CloudKit
     func fetchCommunityProgress(challengeId: String) async throws -> CommunityProgressDTO {
         // Find challenge to get participant count
         let challenge = gamificationManager.activeChallenges.first(where: { $0.id == challengeId })
-        let totalProgress = Int.random(in: 50000...80000)
-        let targetProgress = 100000
-        
+        let totalProgress = Int.random(in: 50_000...80_000)
+        let targetProgress = 100_000
+
         return CommunityProgressDTO(
             challengeId: challengeId,
             totalProgress: totalProgress,
@@ -112,19 +111,19 @@ class ChallengeService {
             topContributors: []
         )
     }
-    
+
     /// Claim challenge rewards using CloudKit
     func claimRewards(challengeId: String, userId: String) async throws -> ClaimRewardsResponse {
         guard let challenge = gamificationManager.activeChallenges.first(where: { $0.id == challengeId }) else {
             throw ChallengeServiceError.claimFailed
         }
-        
+
         // Mark challenge as completed locally
         gamificationManager.completeChallenge(challengeId: challengeId)
-        
+
         // Update CloudKit with completion
         try await cloudKitManager.updateUserProgress(challengeID: challengeId, progress: 1.0)
-        
+
         return ClaimRewardsResponse(
             success: true,
             pointsAwarded: challenge.points,
@@ -132,36 +131,36 @@ class ChallengeService {
             unlockableAwarded: nil
         )
     }
-    
+
     // MARK: - Sync Operations
-    
+
     /// Sync local challenges with CloudKit
     func syncChallenges() async throws {
         // First, upload any local challenges that aren't in CloudKit yet
         await uploadLocalChallenges()
-        
+
         // Then, fetch all challenges from CloudKit
         await cloudKitManager.syncChallenges()
-        
+
         // Update local challenges with CloudKit data
         for cloudKitChallenge in cloudKitManager.activeChallenges {
             gamificationManager.saveChallenge(cloudKitChallenge)
         }
-        
+
         // Sync user progress if authenticated
         if let userID = UserDefaults.standard.string(forKey: "currentUserID") {
             await syncUserProgress(userID: userID)
         }
     }
-    
+
     /// Upload local challenges to CloudKit
     private func uploadLocalChallenges() async {
         let localChallenges = gamificationManager.activeChallenges
-        
+
         for challenge in localChallenges {
             // Check if challenge exists in CloudKit already
             let exists = cloudKitManager.activeChallenges.contains { $0.id == challenge.id }
-            
+
             if !exists {
                 do {
                     _ = try await cloudKitManager.uploadChallenge(challenge)
@@ -186,12 +185,12 @@ class ChallengeService {
             }
         }
     }
-    
+
     /// Sync user's challenge progress with CloudKit
     private func syncUserProgress(userID: String) async {
         // Get user's joined challenges (those with isJoined = true)
         let joinedChallenges = gamificationManager.activeChallenges.filter { $0.isJoined }
-        
+
         for challenge in joinedChallenges {
             // Get progress from the challenge itself
             let progress = challenge.currentProgress
@@ -202,7 +201,7 @@ class ChallengeService {
             }
         }
     }
-    
+
     /// Start real-time sync with CloudKit
     func startRealtimeSync() {
         // Sync with CloudKit every 5 minutes
@@ -216,19 +215,19 @@ class ChallengeService {
             }
             .store(in: &cancellables)
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func addAuthenticationHeaders(to request: inout URLRequest) {
         // Add authentication token
         if let token = UserDefaults.standard.string(forKey: "authToken") {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        
+
         // Add API key
         request.setValue("YOUR_API_KEY", forHTTPHeaderField: "X-API-Key")
     }
-    
+
     private func getUserId() -> String {
         return UserDefaults.standard.string(forKey: "userId") ?? "default-user"
     }
@@ -250,7 +249,7 @@ struct ChallengeDTO: Codable {
     let endDate: Date
     let participantCount: Int
     let isActive: Bool
-    
+
     func toChallenge() -> Challenge {
         Challenge(
             id: id,
@@ -348,7 +347,7 @@ enum ChallengeServiceError: LocalizedError {
     case claimFailed
     case networkError(Error)
     case decodingError(Error)
-    
+
     var errorDescription: String? {
         switch self {
         case .invalidResponse:
@@ -384,7 +383,7 @@ extension ChallengeService {
                 rewardTitle: "Morning Chef",
                 rewardUnlockable: nil,
                 startDate: Date(),
-                endDate: Date().addingTimeInterval(86400),
+                endDate: Date().addingTimeInterval(86_400),
                 participantCount: 567,
                 isActive: true
             ),
@@ -399,18 +398,18 @@ extension ChallengeService {
                 rewardTitle: "Fitness Chef",
                 rewardUnlockable: "Protein recipe pack",
                 startDate: Date(),
-                endDate: Date().addingTimeInterval(604800),
-                participantCount: 2345,
+                endDate: Date().addingTimeInterval(604_800),
+                participantCount: 2_345,
                 isActive: true
             )
         ]
-        
+
         // Save mock challenges locally and upload to CloudKit
         let gamificationManager = GamificationManager.shared
         for dto in mockChallenges {
             let challenge = dto.toChallenge()
             gamificationManager.saveChallenge(challenge)
-            
+
             // Upload to CloudKit
             do {
                 _ = try await cloudKitManager.uploadChallenge(challenge)

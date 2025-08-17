@@ -13,11 +13,11 @@ struct CameraView: View {
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @Environment(\.dismiss) var dismiss
     @Binding var selectedTab: Int
-    
+
     init(selectedTab: Binding<Int>? = nil) {
         self._selectedTab = selectedTab ?? .constant(0)
     }
-    
+
     @State private var isProcessing = false
     @State private var showingResults = false
     @State private var generatedRecipes: [Recipe] = []
@@ -31,17 +31,17 @@ struct CameraView: View {
     @State private var showingUpgrade = false
     @State private var showConfetti = false
     @State private var showWelcomeMessage = false
-    
+
     // Two-step capture flow state
     enum CaptureMode {
         case fridge
         case pantry
     }
-    
+
     @State private var captureMode: CaptureMode = .fridge
     @State private var fridgePhoto: UIImage?
     @State private var showPantryStep = false
-    
+
     // User preferences for API
     @State private var selectedFoodType: String?
     @State private var selectedDifficulty: String?
@@ -50,14 +50,14 @@ struct CameraView: View {
     @State private var selectedMealType: String?
     @State private var selectedCookingTime: String?
     @State private var numberOfRecipes: Int = 5
-    
+
     // Error handling
     @State private var currentError: SnapChefError?
     @State private var showSuccess = false
     @State private var successMessage = ""
     @State private var showPremiumPrompt = false
     @State private var premiumPromptReason: PremiumUpgradePrompt.UpgradeReason = .dailyLimitReached
-    
+
     var flashIcon: String {
         switch cameraModel.flashMode {
         case .off:
@@ -70,7 +70,7 @@ struct CameraView: View {
             return "bolt.slash.fill"
         }
     }
-    
+
     var body: some View {
         ZStack {
             // Camera preview (bottom layer)
@@ -85,13 +85,13 @@ struct CameraView: View {
                     .ignoresSafeArea()
                     .overlay(Color.black.opacity(0.3))
             }
-            
+
             // Scanning overlay
             if !isProcessing && !showingPreview {
                 ScanningOverlay(scanLineOffset: $scanLineOffset)
                     .ignoresSafeArea()
             }
-            
+
             // UI overlay
             if !showingPreview {
                 VStack {
@@ -101,11 +101,11 @@ struct CameraView: View {
                         if userLifecycleManager.currentPhase == .honeymoon {
                             HoneymoonBanner()
                         }
-                        
+
                         // Top controls with usage counter
                         HStack {
                             // Close button
-                            Button(action: { 
+                            Button(action: {
                                 // Try dismiss first (for modal presentation)
                                 dismiss()
                                 // Also set tab to 0 (for tab presentation)
@@ -113,16 +113,16 @@ struct CameraView: View {
                             }) {
                                 ZStack {
                                     BlurredCircle()
-                                    
+
                                     Image(systemName: "xmark")
                                         .font(.system(size: 18, weight: .semibold))
                                         .foregroundColor(.white)
                                 }
                                 .frame(width: 44, height: 44)
                             }
-                            
+
                             Spacer()
-                            
+
                             // Usage counter - only show when user has limits (not unlimited)
                             if !subscriptionManager.isPremium {
                                 let dailyLimits = userLifecycleManager.getDailyLimits()
@@ -140,18 +140,18 @@ struct CameraView: View {
                                     }
                                 }
                             }
-                            
+
                             Spacer()
-                            
+
                             // AI Assistant
                             AIAssistantIndicator()
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 60)
                     }
-                    
+
                     Spacer()
-                    
+
                     // Instructions
                     CameraControlsEnhanced(
                         cameraModel: cameraModel,
@@ -161,7 +161,7 @@ struct CameraView: View {
                         captureMode: captureMode,
                         fridgePhoto: fridgePhoto
                     )
-                    
+
                     // Bottom controls with capture button and test button
                     VStack(spacing: 20) {
                         // Capture button
@@ -170,7 +170,7 @@ struct CameraView: View {
                             isDisabled: isProcessing || !cameraModel.isSessionReady,
                             triggerAnimation: $captureAnimation
                         )
-                        
+
                         // TEMPORARY TEST BUTTON
                         Button(action: {
                             processTestImage()
@@ -199,12 +199,12 @@ struct CameraView: View {
                     .padding(.bottom, 50)
                 }
             }
-            
+
             // Processing overlay
             if isProcessing {
                 MagicalProcessingOverlay(capturedImage: capturedImage)
             }
-            
+
             // Captured image preview
             if showingPreview, let image = capturedImage {
                 CapturedImageView(
@@ -230,7 +230,7 @@ struct CameraView: View {
                 )
                 .transition(.opacity.combined(with: .scale(scale: 1.1)))
             }
-            
+
             // Welcome message
             if showWelcomeMessage {
                 VStack {
@@ -255,12 +255,12 @@ struct CameraView: View {
         }
         .onAppear {
             startScanAnimation()
-            
+
             // Track screen view
             Task {
                 await cloudKitDataManager.trackScreenView("Camera")
             }
-            
+
             // Check if this is the first time
             let hasSeenCamera = UserDefaults.standard.bool(forKey: "hasSeenCameraView")
             if !hasSeenCamera {
@@ -268,7 +268,7 @@ struct CameraView: View {
                 showConfetti = true
                 showWelcomeMessage = true
                 UserDefaults.standard.set(true, forKey: "hasSeenCameraView")
-                
+
                 // Hide message after 2 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                     withAnimation(.easeOut(duration: 0.5)) {
@@ -276,7 +276,7 @@ struct CameraView: View {
                     }
                 }
             }
-            
+
             // Request permission and setup camera with delay
             Task {
                 // Small delay to ensure view is fully loaded
@@ -385,68 +385,68 @@ struct CameraView: View {
             }
         )
     }
-    
+
     private func startScanAnimation() {
         withAnimation(.linear(duration: 2).repeatForever(autoreverses: true)) {
             scanLineOffset = 200
         }
-        
+
         withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
             glowIntensity = 0.8
         }
     }
-    
+
     private func capturePhoto() {
         // Trigger capture animation
         captureAnimation = true
-        
+
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .heavy)
         generator.impactOccurred()
-        
+
         cameraModel.capturePhoto { image in
             capturedImage = image
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 showingPreview = true
             }
-            
+
             // Track daily snap streak
             Task {
                 await StreakManager.shared.recordActivity(for: .dailySnap)
             }
         }
     }
-    
+
     private func processImage(_ image: UIImage) {
         isProcessing = true
         capturedImage = image // Store the captured image
-        
+
         // Stop camera session to save resources while processing
         cameraModel.stopSession()
-        
+
         Task {
             // Check subscription status and usage limits
             if !subscriptionManager.isPremium {
                 if usageTracker.hasReachedRecipeLimit() {
                     isProcessing = false
-                    
+
                     // Record paywall shown and trigger it
                     if paywallTriggerManager.shouldShowPaywall(for: .recipeLimitReached) {
                         paywallTriggerManager.recordPaywallShown(context: .recipeLimitReached)
                         premiumPromptReason = .dailyLimitReached
                         showPremiumPrompt = true
                     }
-                    
+
                     cameraModel.requestCameraPermission()
                     return
                 }
             }
-            
+
             // No need to consume free uses - we track daily count in SubscriptionManager
-            
+
             // Generate session ID
             let sessionId = UUID().uuidString
-            
+
             // Track camera session start
             let sessionData = CameraSessionData(
                 sessionID: sessionId,
@@ -458,33 +458,33 @@ struct CameraView: View {
                 processingTime: 0
             )
             let startTime = Date()
-            
+
             // Get existing recipe names to avoid duplicates
             // Include both local recipes and CloudKit recipes
             var existingRecipeNames = appState.allRecipes.map { $0.name }
-            
+
             // Fetch CloudKit recipes to include them in duplicate prevention
             print("📱 Fetching CloudKit recipes for duplicate prevention...")
             do {
                 let cloudKitSavedRecipes = try await cloudKitRecipeManager.getUserSavedRecipes()
                 let cloudKitCreatedRecipes = try await cloudKitRecipeManager.getUserCreatedRecipes()
-                
+
                 // Add CloudKit recipe names to the list
                 let cloudKitRecipeNames = (cloudKitSavedRecipes + cloudKitCreatedRecipes).map { $0.name }
                 existingRecipeNames.append(contentsOf: cloudKitRecipeNames)
-                
+
                 // Remove duplicates
                 existingRecipeNames = Array(Set(existingRecipeNames))
-                
+
                 print("✅ Total recipes for duplicate prevention: \(existingRecipeNames.count) (Local: \(appState.allRecipes.count), CloudKit: \(cloudKitRecipeNames.count))")
             } catch {
                 print("⚠️ Failed to fetch CloudKit recipes for duplicate prevention: \(error)")
                 // Continue with just local recipes
             }
-            
+
             // Get food preferences from UserDefaults
             let foodPreferences = UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? []
-            
+
             // If user has food preferences but no specific food type selected, use preferences
             let effectiveFoodType: String? = if !foodPreferences.isEmpty && selectedFoodType == nil {
                 // Join preferences into a string for the foodType parameter
@@ -492,10 +492,10 @@ struct CameraView: View {
             } else {
                 selectedFoodType
             }
-            
+
             // Get selected LLM provider from UserDefaults (default to Gemini)
             let llmProvider = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini"
-            
+
             // Call the API
             SnapChefAPIManager.shared.sendImageForRecipeGeneration(
                 image: image,
@@ -518,11 +518,11 @@ struct CameraView: View {
                         let recipes = apiResponse.data.recipes.map { apiRecipe in
                             SnapChefAPIManager.shared.convertAPIRecipeToAppRecipe(apiRecipe)
                         }
-                        
+
                         // Update state
                         self.generatedRecipes = recipes
                         self.detectedIngredients = apiResponse.data.ingredients
-                        
+
                         // Store the fridge photo for all generated recipes
                         // IMPORTANT: Use 'image' parameter directly, not self.capturedImage which isn't set yet
                         print("📸 CameraView: Storing fridge photo in PhotoStorageManager for \(recipes.count) recipes")
@@ -530,7 +530,7 @@ struct CameraView: View {
                             image,  // Use the image parameter passed to processImage
                             for: recipes.map { $0.id }
                         )
-                        
+
                         // Track camera session completion
                         let processingTime = Date().timeIntervalSince(startTime)
                         let completedSession = CameraSessionData(
@@ -543,13 +543,13 @@ struct CameraView: View {
                             processingTime: processingTime
                         )
                         await cloudKitDataManager.trackCameraSession(completedSession)
-                        
+
                         // Track usage with UsageTracker for daily limits
                         self.usageTracker.trackRecipeGenerated()
-                        
+
                         // Track with UserLifecycleManager
                         self.userLifecycleManager.trackRecipeCreated()
-                        
+
                         // Track recipe generation
                         for recipe in recipes {
                             let generationData = RecipeGenerationData(
@@ -569,10 +569,10 @@ struct CameraView: View {
                             )
                             await cloudKitDataManager.trackRecipeGeneration(generationData)
                         }
-                        
+
                         // Track feature usage
                         await cloudKitDataManager.trackFeatureUse("recipe_generation")
-                        
+
                         // Check if paywall should be triggered after successful generation
                         if let suggestedContext = self.paywallTriggerManager.getSuggestedPaywallContext() {
                             if self.paywallTriggerManager.shouldShowPaywall(for: suggestedContext) {
@@ -582,7 +582,7 @@ struct CameraView: View {
                                 }
                             }
                         }
-                        
+
                         // Save recipes to CloudKit with the captured fridge photo
                         print("📸 Uploading \(recipes.count) recipes with the same fridge photo to CloudKit...")
                         for (index, recipe) in recipes.enumerated() {
@@ -590,7 +590,7 @@ struct CameraView: View {
                                 print("📸 Uploading recipe \(index + 1)/\(recipes.count): '\(recipe.name)'")
                                 let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: image)
                                 print("✅ Recipe \(index + 1)/\(recipes.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
-                                
+
                                 // Also add to user's saved recipes list
                                 try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
                                 print("✅ Recipe added to user's saved list")
@@ -599,15 +599,15 @@ struct CameraView: View {
                             }
                         }
                         print("✅ All \(recipes.count) recipes have been saved with the same fridge photo")
-                        
+
                         // Increment snaps taken counter
                         self.appState.incrementSnapsTaken()
-                        
+
                         // Increment daily recipe count if not premium
                         if !self.subscriptionManager.isPremium {
                             self.subscriptionManager.incrementDailyRecipeCount()
                         }
-                        
+
                         // Track challenge progress for recipe creation
                         for recipe in recipes {
                             // Post notification for recipe creation
@@ -615,11 +615,11 @@ struct CameraView: View {
                                 name: Notification.Name("RecipeCreated"),
                                 object: recipe
                             )
-                            
+
                             // Award coins based on recipe quality
                             let quality = self.determineRecipeQuality(recipe)
                             ChefCoinsManager.shared.awardRecipeCreationCoins(recipeQuality: quality)
-                            
+
                             // Track specific challenge actions
                             if recipe.nutrition.calories < 500 {
                                 ChallengeProgressTracker.shared.trackAction(.calorieTarget, metadata: [
@@ -627,14 +627,14 @@ struct CameraView: View {
                                     "recipeId": recipe.id
                                 ])
                             }
-                            
+
                             if recipe.nutrition.protein >= 20 {
                                 ChallengeProgressTracker.shared.trackAction(.proteinTarget, metadata: [
                                     "protein": recipe.nutrition.protein,
                                     "recipeId": recipe.id
                                 ])
                             }
-                            
+
                             // Track cuisine if available in tags
                             if let cuisineTag = recipe.tags.first(where: { tag in
                                 ["italian", "mexican", "chinese", "japanese", "thai", "indian", "french", "american"].contains(tag.lowercased())
@@ -644,7 +644,7 @@ struct CameraView: View {
                                     "recipeId": recipe.id
                                 ])
                             }
-                            
+
                             // Check for speed challenges
                             if recipe.prepTime + recipe.cookTime <= 30 {
                                 ChallengeProgressTracker.shared.trackAction(.timeCompleted, metadata: [
@@ -652,7 +652,7 @@ struct CameraView: View {
                                     "recipeId": recipe.id
                                 ])
                             }
-                            
+
                             // Track analytics for recipe creation
                             ChallengeAnalyticsService.shared.trackEvent(.milestoneReached, parameters: [
                                 "milestone": "recipe_created",
@@ -664,27 +664,27 @@ struct CameraView: View {
                                 "recipeId": recipe.id.uuidString
                             ])
                         }
-                        
+
                         // Don't auto-save recipes - user will choose which ones to save
                         // Store the captured image for later use
                         self.capturedImage = image
-                        
+
                         // Update UI on main thread
                         self.generatedRecipes = recipes
                         self.detectedIngredients = apiResponse.data.ingredients
                         self.resultsPreloaded = true
-                        
+
                         // Dismiss processing overlay first
                         self.isProcessing = false
-                        
+
                         // Small delay to ensure smooth transition
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             self.showingResults = true
                         }
-                        
+
                     case .failure(let error):
                         self.isProcessing = false
-                        
+
                         // Convert API errors to user-friendly errors
                         if case APIError.authenticationError = error {
                             self.currentError = .authenticationError("Authentication failed")
@@ -693,7 +693,7 @@ struct CameraView: View {
                         } else {
                             self.currentError = .unknown(error.localizedDescription)
                         }
-                        
+
                         // Restart camera session on error
                         self.cameraModel.requestCameraPermission()
                     }
@@ -701,35 +701,35 @@ struct CameraView: View {
             }
         }
     }
-    
+
     private func processBothImages(fridgeImage: UIImage, pantryImage: UIImage) {
         isProcessing = true
         capturedImage = fridgeImage // Store the fridge image as the primary image
-        
+
         // Stop camera session to save resources while processing
         cameraModel.stopSession()
-        
+
         Task {
             // Check subscription status and usage limits for dual images
             if !subscriptionManager.isPremium {
                 if usageTracker.hasReachedRecipeLimit() {
                     isProcessing = false
-                    
+
                     // Record paywall shown and trigger it
                     if paywallTriggerManager.shouldShowPaywall(for: .recipeLimitReached) {
                         paywallTriggerManager.recordPaywallShown(context: .recipeLimitReached)
                         premiumPromptReason = .dailyLimitReached
                         showPremiumPrompt = true
                     }
-                    
+
                     cameraModel.requestCameraPermission()
                     return
                 }
             }
-            
+
             // Generate session ID
             let sessionId = UUID().uuidString
-            
+
             // Track camera session start
             let sessionData = CameraSessionData(
                 sessionID: sessionId,
@@ -741,32 +741,32 @@ struct CameraView: View {
                 processingTime: 0
             )
             let startTime = Date()
-            
+
             // Get existing recipe names to avoid duplicates
             var existingRecipeNames = appState.allRecipes.map { $0.name }
-            
+
             // Fetch CloudKit recipes to include them in duplicate prevention
             print("📱 Fetching CloudKit recipes for duplicate prevention...")
             do {
                 let cloudKitSavedRecipes = try await cloudKitRecipeManager.getUserSavedRecipes()
                 let cloudKitCreatedRecipes = try await cloudKitRecipeManager.getUserCreatedRecipes()
-                
+
                 // Add CloudKit recipe names to the list
                 let cloudKitRecipeNames = (cloudKitSavedRecipes + cloudKitCreatedRecipes).map { $0.name }
                 existingRecipeNames.append(contentsOf: cloudKitRecipeNames)
-                
+
                 // Remove duplicates
                 existingRecipeNames = Array(Set(existingRecipeNames))
-                
+
                 print("✅ Total recipes for duplicate prevention: \(existingRecipeNames.count) (Local: \(appState.allRecipes.count), CloudKit: \(cloudKitRecipeNames.count))")
             } catch {
                 print("⚠️ Failed to fetch CloudKit recipes for duplicate prevention: \(error)")
                 // Continue with just local recipes
             }
-            
+
             // Get food preferences from UserDefaults
             let foodPreferences = UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? []
-            
+
             // If user has food preferences but no specific food type selected, use preferences
             let effectiveFoodType: String? = if !foodPreferences.isEmpty && selectedFoodType == nil {
                 // Join preferences into a string for the foodType parameter
@@ -774,10 +774,10 @@ struct CameraView: View {
             } else {
                 selectedFoodType
             }
-            
+
             // Get selected LLM provider from UserDefaults (default to Gemini)
             let llmProvider = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini"
-            
+
             // Call the new API function for both images
             SnapChefAPIManager.shared.sendBothImagesForRecipeGeneration(
                 fridgeImage: fridgeImage,
@@ -801,11 +801,11 @@ struct CameraView: View {
                         let recipes = apiResponse.data.recipes.map { apiRecipe in
                             SnapChefAPIManager.shared.convertAPIRecipeToAppRecipe(apiRecipe)
                         }
-                        
+
                         // Update state
                         self.generatedRecipes = recipes
                         self.detectedIngredients = apiResponse.data.ingredients
-                        
+
                         // Store both photos for all generated recipes
                         print("📸 CameraView: Storing fridge and pantry photos in PhotoStorageManager for \(recipes.count) recipes")
                         PhotoStorageManager.shared.storeFridgePhoto(
@@ -816,7 +816,7 @@ struct CameraView: View {
                             pantryImage,
                             for: recipes.map { $0.id }
                         )
-                        
+
                         // Track camera session completion
                         let processingTime = Date().timeIntervalSince(startTime)
                         let completedSession = CameraSessionData(
@@ -829,13 +829,13 @@ struct CameraView: View {
                             processingTime: processingTime
                         )
                         await cloudKitDataManager.trackCameraSession(completedSession)
-                        
+
                         // Track usage with UsageTracker for dual images
                         self.usageTracker.trackRecipeGenerated()
-                        
+
                         // Track with UserLifecycleManager
                         self.userLifecycleManager.trackRecipeCreated()
-                        
+
                         // Track recipe generation
                         for recipe in recipes {
                             let generationData = RecipeGenerationData(
@@ -855,10 +855,10 @@ struct CameraView: View {
                             )
                             await cloudKitDataManager.trackRecipeGeneration(generationData)
                         }
-                        
+
                         // Track feature usage
                         await cloudKitDataManager.trackFeatureUse("recipe_generation_with_pantry")
-                        
+
                         // Save recipes to CloudKit with the captured fridge photo
                         print("📸 Uploading \(recipes.count) recipes with fridge and pantry photos to CloudKit...")
                         for (index, recipe) in recipes.enumerated() {
@@ -866,7 +866,7 @@ struct CameraView: View {
                                 print("📸 Uploading recipe \(index + 1)/\(recipes.count): '\(recipe.name)'")
                                 let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: fridgeImage)
                                 print("✅ Recipe \(index + 1)/\(recipes.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
-                                
+
                                 // Also add to user's saved recipes list
                                 try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
                                 print("✅ Recipe added to user's saved list")
@@ -875,15 +875,15 @@ struct CameraView: View {
                             }
                         }
                         print("✅ All \(recipes.count) recipes have been saved with fridge and pantry photos")
-                        
+
                         // Increment snaps taken counter
                         self.appState.incrementSnapsTaken()
-                        
+
                         // Increment daily recipe count if not premium
                         if !self.subscriptionManager.isPremium {
                             self.subscriptionManager.incrementDailyRecipeCount()
                         }
-                        
+
                         // Track challenge progress for recipe creation
                         for recipe in recipes {
                             // Post notification for recipe creation
@@ -891,11 +891,11 @@ struct CameraView: View {
                                 name: Notification.Name("RecipeCreated"),
                                 object: recipe
                             )
-                            
+
                             // Award coins based on recipe quality
                             let quality = self.determineRecipeQuality(recipe)
                             ChefCoinsManager.shared.awardRecipeCreationCoins(recipeQuality: quality)
-                            
+
                             // Track specific challenge actions
                             if recipe.nutrition.calories < 500 {
                                 ChallengeProgressTracker.shared.trackAction(.calorieTarget, metadata: [
@@ -903,14 +903,14 @@ struct CameraView: View {
                                     "recipeId": recipe.id
                                 ])
                             }
-                            
+
                             if recipe.nutrition.protein >= 20 {
                                 ChallengeProgressTracker.shared.trackAction(.proteinTarget, metadata: [
                                     "protein": recipe.nutrition.protein,
                                     "recipeId": recipe.id
                                 ])
                             }
-                            
+
                             // Track cuisine if available in tags
                             if let cuisineTag = recipe.tags.first(where: { tag in
                                 ["italian", "mexican", "chinese", "japanese", "thai", "indian", "french", "american"].contains(tag.lowercased())
@@ -920,7 +920,7 @@ struct CameraView: View {
                                     "recipeId": recipe.id
                                 ])
                             }
-                            
+
                             // Check for speed challenges
                             if recipe.prepTime + recipe.cookTime <= 30 {
                                 ChallengeProgressTracker.shared.trackAction(.timeCompleted, metadata: [
@@ -928,7 +928,7 @@ struct CameraView: View {
                                     "recipeId": recipe.id
                                 ])
                             }
-                            
+
                             // Track analytics for recipe creation
                             ChallengeAnalyticsService.shared.trackEvent(.milestoneReached, parameters: [
                                 "milestone": "recipe_created_with_pantry",
@@ -940,26 +940,26 @@ struct CameraView: View {
                                 "recipeId": recipe.id.uuidString
                             ])
                         }
-                        
+
                         // Store the captured image for later use
                         self.capturedImage = fridgeImage
-                        
+
                         // Update UI on main thread
                         self.generatedRecipes = recipes
                         self.detectedIngredients = apiResponse.data.ingredients
                         self.resultsPreloaded = true
-                        
+
                         // Dismiss processing overlay first
                         self.isProcessing = false
-                        
+
                         // Small delay to ensure smooth transition
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             self.showingResults = true
                         }
-                        
+
                     case .failure(let error):
                         self.isProcessing = false
-                        
+
                         // Convert API errors to user-friendly errors
                         if case APIError.authenticationError = error {
                             self.currentError = .authenticationError("Authentication failed")
@@ -968,7 +968,7 @@ struct CameraView: View {
                         } else {
                             self.currentError = .unknown(error.localizedDescription)
                         }
-                        
+
                         // Restart camera session on error
                         self.cameraModel.requestCameraPermission()
                     }
@@ -976,30 +976,30 @@ struct CameraView: View {
             }
         }
     }
-    
+
     private func processTestImage() {
         // Load the test fridge image from bundle
         guard let testImage = UIImage(named: "fridge.jpg") else {
             print("Failed to load test fridge image")
             return
         }
-        
+
         // Increment snap counter for test button too
         appState.incrementSnapsTaken()
-        
+
         // Process it the same way as a captured photo
         processImage(testImage)
     }
-    
+
     private func resetCaptureFlow() {
         captureMode = .fridge
         fridgePhoto = nil
         showPantryStep = false
     }
-    
+
     private func determineRecipeQuality(_ recipe: Recipe) -> RecipeQuality {
         var score = 0
-        
+
         // Check nutrition balance
         let nutrition = recipe.nutrition
         if nutrition.calories > 0 && nutrition.calories < 800 {
@@ -1011,7 +1011,7 @@ struct CameraView: View {
         if nutrition.carbs > 0 && nutrition.carbs < 60 {
             score += 1
         }
-        
+
         // Check recipe completeness
         if recipe.ingredients.count >= 5 {
             score += 1
@@ -1022,7 +1022,7 @@ struct CameraView: View {
         if !recipe.tags.isEmpty {
             score += 1
         }
-        
+
         // Determine quality based on score
         switch score {
         case 0...2:
@@ -1045,25 +1045,25 @@ struct PantryStepOverlay: View {
     let onSkip: () -> Void
     let onContinue: () -> Void
     let onBack: () -> Void
-    
+
     @State private var pulseAnimation = false
-    
+
     var body: some View {
         ZStack {
             // Background overlay
             Color.black.opacity(0.8)
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 30) {
                 Spacer()
-                
+
                 // Fridge photo preview
                 if let fridgeImage = fridgePhoto {
                     VStack(spacing: 16) {
                         Text("Great shot! 📸")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
-                        
+
                         Image(uiImage: fridgeImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -1076,21 +1076,21 @@ struct PantryStepOverlay: View {
                             .shadow(color: Color.black.opacity(0.3), radius: 10)
                     }
                 }
-                
+
                 // Main message
                 VStack(spacing: 12) {
                     Text("Got a pantry too? 🥫")
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
-                    
+
                     Text("Add your pantry for even better recipes!")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal, 40)
-                
+
                 // Action buttons
                 VStack(spacing: 16) {
                     // Continue button (primary)
@@ -1115,7 +1115,7 @@ struct PantryStepOverlay: View {
                         .shadow(color: Color.orange.opacity(0.3), radius: 8, y: 4)
                         .scaleEffect(pulseAnimation ? 1.05 : 1.0)
                     }
-                    
+
                     // Skip button (secondary)
                     Button(action: onSkip) {
                         HStack(spacing: 8) {
@@ -1130,7 +1130,7 @@ struct PantryStepOverlay: View {
                                 .stroke(Color.white.opacity(0.3), lineWidth: 1)
                         )
                     }
-                    
+
                     // Back button (tertiary)
                     Button(action: onBack) {
                         HStack(spacing: 8) {
@@ -1142,7 +1142,7 @@ struct PantryStepOverlay: View {
                         .foregroundColor(.white.opacity(0.6))
                     }
                 }
-                
+
                 Spacer()
             }
         }
@@ -1157,26 +1157,26 @@ struct PantryStepOverlay: View {
 // MARK: - Camera Top Bar
 struct CameraTopBar: View {
     let onClose: () -> Void
-    
+
     var body: some View {
         HStack {
             // Close button
             Button(action: { onClose() }) {
                 ZStack {
                     BlurredCircle()
-                    
+
                     Image(systemName: "xmark")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.white)
                 }
                 .frame(width: 44, height: 44)
             }
-            
+
             Spacer()
-            
+
             // AI Assistant
             AIAssistantIndicator()
-            
+
             Spacer()
         }
         .padding(.horizontal, 20)
@@ -1198,7 +1198,7 @@ struct BlurredCircle: View {
 // MARK: - AI Assistant Indicator
 struct AIAssistantIndicator: View {
     @State private var isAnimating = false
-    
+
     var body: some View {
         HStack(spacing: 8) {
             // Animated dots
@@ -1216,7 +1216,7 @@ struct AIAssistantIndicator: View {
                         )
                 }
             }
-            
+
             Text("AI Ready")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
@@ -1241,7 +1241,7 @@ struct AIAssistantIndicator: View {
 struct ScanningOverlay: View {
     @Binding var scanLineOffset: CGFloat
     @State private var cornerAnimation = false
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -1264,7 +1264,7 @@ struct ScanningOverlay: View {
                         .scaleEffect(cornerAnimation ? 1.1 : 1)
                         .opacity(cornerAnimation ? 0.8 : 1)
                 }
-                
+
                 // Scanning line
                 Rectangle()
                     .fill(
@@ -1283,7 +1283,7 @@ struct ScanningOverlay: View {
                     .frame(height: 2)
                     .blur(radius: 1)
                     .offset(y: scanLineOffset)
-                
+
                 // Center focus
                 Image(systemName: "viewfinder")
                     .font(.system(size: 200, weight: .ultraLight))
@@ -1296,7 +1296,7 @@ struct ScanningOverlay: View {
             }
         }
     }
-    
+
     private func cornerPosition(for index: Int, in size: CGSize) -> CGPoint {
         let padding: CGFloat = 60
         switch index {
@@ -1311,11 +1311,11 @@ struct ScanningOverlay: View {
 
 struct CornerBracket: Shape {
     let corner: Int
-    
+
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let length: CGFloat = 20
-        
+
         switch corner {
         case 0: // Top left
             path.move(to: CGPoint(x: 0, y: length))
@@ -1336,7 +1336,7 @@ struct CornerBracket: Shape {
         default:
             break
         }
-        
+
         return path
     }
 }
@@ -1349,7 +1349,7 @@ struct CameraControlsEnhanced: View {
     @Binding var captureAnimation: Bool
     let captureMode: CameraView.CaptureMode
     let fridgePhoto: UIImage?
-    
+
     var body: some View {
         // Instructions based on capture mode
         if !isProcessing {
@@ -1360,7 +1360,7 @@ struct CameraControlsEnhanced: View {
                         Text("Step 2 of 2")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.white.opacity(0.8))
-                        
+
                         // Progress dots
                         HStack(spacing: 4) {
                             Circle()
@@ -1372,7 +1372,7 @@ struct CameraControlsEnhanced: View {
                         }
                     }
                 }
-                
+
                 // Main instruction text
                 Text(instructionText)
                     .font(.system(size: 20, weight: .medium, design: .rounded))
@@ -1396,7 +1396,7 @@ struct CameraControlsEnhanced: View {
                                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
                         )
                     )
-                
+
                 // Fridge photo thumbnail for pantry mode
                 if captureMode == .pantry, let fridgeImage = fridgePhoto {
                     HStack(spacing: 8) {
@@ -1409,7 +1409,7 @@ struct CameraControlsEnhanced: View {
                                 RoundedRectangle(cornerRadius: 8)
                                     .stroke(Color.white.opacity(0.3), lineWidth: 1)
                             )
-                        
+
                         Text("Fridge photo captured ✓")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white.opacity(0.8))
@@ -1425,12 +1425,12 @@ struct CameraControlsEnhanced: View {
             .padding(.bottom, 30)
         }
     }
-    
+
     private var instructionText: String {
         if !cameraModel.isSessionReady {
             return "Initializing camera..."
         }
-        
+
         switch captureMode {
         case .fridge:
             return "Point at your fridge"
@@ -1444,10 +1444,10 @@ struct CaptureButtonEnhanced: View {
     let action: () -> Void
     let isDisabled: Bool
     @Binding var triggerAnimation: Bool
-    
+
     @State private var isPressed = false
     @State private var ringScale: CGFloat = 1
-    
+
     var body: some View {
         Button(action: action) {
             ZStack {
@@ -1467,7 +1467,7 @@ struct CaptureButtonEnhanced: View {
                     .frame(width: 90, height: 90)
                     .scaleEffect(ringScale)
                     .opacity(triggerAnimation ? 0 : 1)
-                
+
                 // Inner circle
                 Circle()
                     .fill(
@@ -1483,7 +1483,7 @@ struct CaptureButtonEnhanced: View {
                     .frame(width: 75, height: 75)
                     .scaleEffect(isPressed ? 0.9 : 1)
                     .shadow(color: Color.black.opacity(0.2), radius: 5, y: 3)
-                
+
                 // Center icon
                 Image(systemName: "camera.fill")
                     .font(.system(size: 32, weight: .medium))
@@ -1500,7 +1500,7 @@ struct CaptureButtonEnhanced: View {
                 withAnimation(.easeOut(duration: 0.6)) {
                     ringScale = 1.5
                 }
-                
+
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     triggerAnimation = false
                     ringScale = 1

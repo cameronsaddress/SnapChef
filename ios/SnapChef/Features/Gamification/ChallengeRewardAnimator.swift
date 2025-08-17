@@ -9,7 +9,7 @@ enum RewardAnimationType {
     case fireworks
     case levelUp
     case achievement
-    
+
     var particleImageName: String {
         switch self {
         case .confetti: return "confetti"
@@ -20,7 +20,7 @@ enum RewardAnimationType {
         case .achievement: return "medal.fill"
         }
     }
-    
+
     var particleColors: [Color] {
         switch self {
         case .confetti:
@@ -44,10 +44,10 @@ enum RewardAnimationType {
 class ConfettiScene: SKScene {
     var animationType: RewardAnimationType = .confetti
     var emitterNode: SKEmitterNode?
-    
+
     override func didMove(to view: SKView) {
         backgroundColor = .clear
-        
+
         // Create emitter based on animation type
         emitterNode = createEmitter(for: animationType)
         if let emitterNode = emitterNode {
@@ -55,10 +55,10 @@ class ConfettiScene: SKScene {
             addChild(emitterNode)
         }
     }
-    
+
     private func createEmitter(for type: RewardAnimationType) -> SKEmitterNode {
         let emitter = SKEmitterNode()
-        
+
         switch type {
         case .confetti:
             configureConfettiEmitter(emitter)
@@ -73,10 +73,10 @@ class ConfettiScene: SKScene {
         case .achievement:
             configureAchievementEmitter(emitter)
         }
-        
+
         return emitter
     }
-    
+
     private func configureConfettiEmitter(_ emitter: SKEmitterNode) {
         emitter.particleTexture = SKTexture(imageNamed: "confetti_particle")
         emitter.particleBirthRate = 100
@@ -101,7 +101,7 @@ class ConfettiScene: SKScene {
         emitter.particleColorSequence = createColorSequence()
         emitter.particleBlendMode = .alpha
     }
-    
+
     private func configureCoinEmitter(_ emitter: SKEmitterNode) {
         emitter.particleTexture = SKTexture(systemImageName: "dollarsign.circle.fill")
         emitter.particleBirthRate = 30
@@ -124,7 +124,7 @@ class ConfettiScene: SKScene {
         emitter.particleBlendMode = .add
         emitter.yAcceleration = -500
     }
-    
+
     private func configureStarEmitter(_ emitter: SKEmitterNode) {
         emitter.particleTexture = SKTexture(systemImageName: "star.fill")
         emitter.particleBirthRate = 50
@@ -147,7 +147,7 @@ class ConfettiScene: SKScene {
         emitter.particleColorBlendFactor = 1
         emitter.particleBlendMode = .add
     }
-    
+
     private func configureFireworksEmitter(_ emitter: SKEmitterNode) {
         emitter.particleTexture = SKTexture(systemImageName: "sparkles")
         emitter.particleBirthRate = 200
@@ -169,7 +169,7 @@ class ConfettiScene: SKScene {
         emitter.particleBlendMode = .add
         emitter.targetNode = self
     }
-    
+
     private func configureLevelUpEmitter(_ emitter: SKEmitterNode) {
         emitter.particleTexture = SKTexture(systemImageName: "arrow.up.circle.fill")
         emitter.particleBirthRate = 20
@@ -191,7 +191,7 @@ class ConfettiScene: SKScene {
         emitter.particleBlendMode = .add
         emitter.yAcceleration = 100
     }
-    
+
     private func configureAchievementEmitter(_ emitter: SKEmitterNode) {
         emitter.particleTexture = SKTexture(systemImageName: "medal.fill")
         emitter.particleBirthRate = 15
@@ -215,62 +215,62 @@ class ConfettiScene: SKScene {
         emitter.particleColorBlendFactor = 1
         emitter.particleBlendMode = .add
     }
-    
+
     private func createColorSequence() -> SKKeyframeSequence {
         let colors: [SKColor] = [
             SKColor.red, SKColor.blue, SKColor.green,
             SKColor.yellow, SKColor.purple, SKColor.orange
         ]
-        
+
         do {
             let keyframeSequence = SKKeyframeSequence(
                 keyframeValues: colors,
                 times: [0, 0.2, 0.4, 0.6, 0.8, 1.0]
             )
-            
+
             let data = try NSKeyedArchiver.archivedData(
                 withRootObject: keyframeSequence,
                 requiringSecureCoding: false
             )
-            
+
             let colorKeyframes = try NSKeyedUnarchiver.unarchivedObject(
                 ofClasses: [SKKeyframeSequence.self, SKColor.self, NSNumber.self, NSArray.self],
                 from: data
             ) as? SKKeyframeSequence
-            
+
             return colorKeyframes ?? SKKeyframeSequence(keyframeValues: [SKColor.white], times: [0])
         } catch {
             return SKKeyframeSequence(keyframeValues: [SKColor.white], times: [0])
         }
     }
-    
+
     private func createFireworkColorSequence() -> SKKeyframeSequence {
         let colors: [SKColor] = [
             SKColor.red, SKColor.white, SKColor.blue
         ]
-        
+
         do {
             let keyframeSequence = SKKeyframeSequence(
                 keyframeValues: colors,
                 times: [0, 0.5, 1.0]
             )
-            
+
             let data = try NSKeyedArchiver.archivedData(
                 withRootObject: keyframeSequence,
                 requiringSecureCoding: false
             )
-            
+
             let colorKeyframes = try NSKeyedUnarchiver.unarchivedObject(
                 ofClasses: [SKKeyframeSequence.self, SKColor.self, NSNumber.self, NSArray.self],
                 from: data
             ) as? SKKeyframeSequence
-            
+
             return colorKeyframes ?? SKKeyframeSequence(keyframeValues: [SKColor.white], times: [0])
         } catch {
             return SKKeyframeSequence(keyframeValues: [SKColor.white], times: [0])
         }
     }
-    
+
     func stopEmitting() {
         emitterNode?.particleBirthRate = 0
     }
@@ -291,7 +291,7 @@ struct RewardAnimationView: View {
     let duration: Double
     @State private var scene: ConfettiScene?
     @State private var isAnimating = false
-    
+
     var body: some View {
         ZStack {
             if let scene = scene {
@@ -299,7 +299,7 @@ struct RewardAnimationView: View {
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
             }
-            
+
             if animationType == .levelUp {
                 LevelUpAnimationOverlay()
                     .opacity(isAnimating ? 1 : 0)
@@ -312,7 +312,7 @@ struct RewardAnimationView: View {
             startAnimation()
         }
     }
-    
+
     private func setupScene() {
         let newScene = ConfettiScene()
         newScene.size = UIScreen.main.bounds.size
@@ -321,15 +321,15 @@ struct RewardAnimationView: View {
         newScene.animationType = animationType
         scene = newScene
     }
-    
+
     private func startAnimation() {
         isAnimating = true
-        
+
         // Stop emitting after duration
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
             scene?.stopEmitting()
         }
-        
+
         // Remove scene after particles fade
         DispatchQueue.main.asyncAfter(deadline: .now() + duration + 4) {
             scene = nil
@@ -340,7 +340,7 @@ struct RewardAnimationView: View {
 // MARK: - Level Up Animation Overlay
 struct LevelUpAnimationOverlay: View {
     @State private var rotationAngle: Double = 0
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "arrow.up.circle.fill")
@@ -354,7 +354,7 @@ struct LevelUpAnimationOverlay: View {
                 )
                 .rotationEffect(.degrees(rotationAngle))
                 .shadow(color: Color(hex: "#667eea").opacity(0.5), radius: 20)
-            
+
             Text("LEVEL UP!")
                 .font(.system(size: 40, weight: .black, design: .rounded))
                 .foregroundStyle(
@@ -382,15 +382,15 @@ final class ChallengeRewardAnimator: ObservableObject {
         let instance = ChallengeRewardAnimator()
         return instance
     }()
-    
+
     @Published var currentAnimation: RewardAnimationType?
     @Published var isAnimating = false
     @Published var rewardMessage: String?
     @Published var rewardValue: String?
     @Published var tier: RewardTier?
-    
+
     private init() {}
-    
+
     /// Trigger reward animation
     func playRewardAnimation(
         type: RewardAnimationType,
@@ -404,7 +404,7 @@ final class ChallengeRewardAnimator: ObservableObject {
         rewardValue = value
         self.tier = tier
         isAnimating = true
-        
+
         // Auto-hide after duration
         DispatchQueue.main.asyncAfter(deadline: .now() + duration + 2) {
             self.isAnimating = false
@@ -414,12 +414,12 @@ final class ChallengeRewardAnimator: ObservableObject {
             self.tier = nil
         }
     }
-    
+
     /// Play challenge completion animation
     func playChallengeCompletion(tier: RewardTier, coins: Int) {
         let animationType: RewardAnimationType
         let message: String
-        
+
         switch tier {
         case .bronze:
             animationType = .stars
@@ -431,7 +431,7 @@ final class ChallengeRewardAnimator: ObservableObject {
             animationType = .fireworks
             message = "Perfect Score!"
         }
-        
+
         playRewardAnimation(
             type: animationType,
             message: message,
@@ -439,7 +439,7 @@ final class ChallengeRewardAnimator: ObservableObject {
             tier: tier
         )
     }
-    
+
     /// Play level up animation
     func playLevelUp(newLevel: Int) {
         playRewardAnimation(
@@ -449,7 +449,7 @@ final class ChallengeRewardAnimator: ObservableObject {
             duration: 3.0
         )
     }
-    
+
     /// Play achievement animation
     func playAchievement(name: String) {
         playRewardAnimation(
@@ -464,19 +464,19 @@ final class ChallengeRewardAnimator: ObservableObject {
 // MARK: - Reward Animation Overlay
 struct RewardAnimationOverlay: View {
     @ObservedObject var animator = ChallengeRewardAnimator.shared
-    
+
     var body: some View {
         ZStack {
             if animator.isAnimating, let animationType = animator.currentAnimation {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
-                
+
                 RewardAnimationView(
                     animationType: animationType,
                     duration: 2.0
                 )
-                
+
                 if let message = animator.rewardMessage {
                     VStack(spacing: 16) {
                         if let tier = animator.tier {
@@ -485,12 +485,12 @@ struct RewardAnimationOverlay: View {
                                 .foregroundColor(tier.color)
                                 .shadow(color: tier.color.opacity(0.5), radius: 20)
                         }
-                        
+
                         Text(message)
                             .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .shadow(color: .black.opacity(0.5), radius: 10)
-                        
+
                         if let value = animator.rewardValue {
                             Text(value)
                                 .font(.system(size: 24, weight: .semibold, design: .rounded))

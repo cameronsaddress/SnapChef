@@ -5,7 +5,7 @@ import CloudKit
 struct UsernameSetupView: View {
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @Environment(\.dismiss) var dismiss
-    
+
     @State private var username = ""
     @State private var isCheckingUsername = false
     @State private var usernameStatus: UsernameStatus = .unchecked
@@ -15,11 +15,11 @@ struct UsernameSetupView: View {
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
-    
+
     // Animation states
     @State private var contentVisible = false
     @State private var buttonScale: CGFloat = 1.0
-    
+
     enum UsernameStatus {
         case unchecked
         case checking
@@ -27,7 +27,7 @@ struct UsernameSetupView: View {
         case taken
         case invalid
         case profanity
-        
+
         var color: Color {
             switch self {
             case .unchecked, .checking: return .gray
@@ -35,7 +35,7 @@ struct UsernameSetupView: View {
             case .taken, .invalid, .profanity: return .red
             }
         }
-        
+
         var message: String {
             switch self {
             case .unchecked: return ""
@@ -46,7 +46,7 @@ struct UsernameSetupView: View {
             case .profanity: return "Username contains inappropriate content"
             }
         }
-        
+
         var icon: String? {
             switch self {
             case .available: return "checkmark.circle.fill"
@@ -55,7 +55,7 @@ struct UsernameSetupView: View {
             }
         }
     }
-    
+
     var body: some View {
         ZStack {
             // Gradient background
@@ -68,7 +68,7 @@ struct UsernameSetupView: View {
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-            
+
             ScrollView {
                 VStack(spacing: 30) {
                     // Header
@@ -76,7 +76,7 @@ struct UsernameSetupView: View {
                         Text("Complete Your Profile")
                             .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
-                        
+
                         Text("Choose a unique username and profile photo")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.white.opacity(0.9))
@@ -85,7 +85,7 @@ struct UsernameSetupView: View {
                     .padding(.top, 40)
                     .opacity(contentVisible ? 1 : 0)
                     .offset(y: contentVisible ? 0 : 20)
-                    
+
                     // Profile Photo Section
                     VStack(spacing: 20) {
                         // Photo picker
@@ -94,7 +94,7 @@ struct UsernameSetupView: View {
                                 Circle()
                                     .fill(Color.white.opacity(0.2))
                                     .frame(width: 150, height: 150)
-                                
+
                                 if let selectedImage = selectedImage {
                                     Image(uiImage: selectedImage)
                                         .resizable()
@@ -115,7 +115,7 @@ struct UsernameSetupView: View {
                                             .foregroundColor(.white)
                                     }
                                 }
-                                
+
                                 // Edit overlay for existing photo
                                 if selectedImage != nil {
                                     Circle()
@@ -140,7 +140,7 @@ struct UsernameSetupView: View {
                     .opacity(contentVisible ? 1 : 0)
                     .offset(y: contentVisible ? 0 : 20)
                     .animation(.easeOut(duration: 0.6).delay(0.2), value: contentVisible)
-                    
+
                     // Username Input Section
                     VStack(spacing: 16) {
                         // Username field
@@ -155,7 +155,7 @@ struct UsernameSetupView: View {
                                     .onChange(of: username) { newValue in
                                         validateUsername(newValue)
                                     }
-                                
+
                                 if isCheckingUsername {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -173,7 +173,7 @@ struct UsernameSetupView: View {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(usernameStatus.color.opacity(0.5), lineWidth: 2)
                             )
-                            
+
                             // Status message
                             if !usernameStatus.message.isEmpty {
                                 HStack {
@@ -185,7 +185,7 @@ struct UsernameSetupView: View {
                                 .padding(.horizontal, 4)
                             }
                         }
-                        
+
                         // Username requirements
                         VStack(alignment: .leading, spacing: 4) {
                             Label("3-20 characters", systemImage: "textformat.123")
@@ -200,7 +200,7 @@ struct UsernameSetupView: View {
                     .opacity(contentVisible ? 1 : 0)
                     .offset(y: contentVisible ? 0 : 20)
                     .animation(.easeOut(duration: 0.6).delay(0.4), value: contentVisible)
-                    
+
                     // Continue Button
                     Button(action: saveProfile) {
                         HStack {
@@ -232,7 +232,7 @@ struct UsernameSetupView: View {
                     .opacity(contentVisible ? 1 : 0)
                     .offset(y: contentVisible ? 0 : 20)
                     .animation(.easeOut(duration: 0.6).delay(0.6), value: contentVisible)
-                    
+
                     // Skip for now (optional)
                     Button(action: skipSetup) {
                         Text("Skip for now")
@@ -242,7 +242,7 @@ struct UsernameSetupView: View {
                     }
                     .opacity(contentVisible ? 1 : 0)
                     .animation(.easeOut(duration: 0.6).delay(0.8), value: contentVisible)
-                    
+
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal)
@@ -268,45 +268,45 @@ struct UsernameSetupView: View {
             }
         }
     }
-    
+
     private var canContinue: Bool {
         usernameStatus == .available && !username.isEmpty
     }
-    
+
     private func validateUsername(_ username: String) {
         // Reset if empty
         guard !username.isEmpty else {
             usernameStatus = .unchecked
             return
         }
-        
+
         // Check format
         let usernameRegex = "^[a-zA-Z0-9_]{3,20}$"
         let usernamePredicate = NSPredicate(format: "SELF MATCHES %@", usernameRegex)
-        
+
         guard usernamePredicate.evaluate(with: username) else {
             usernameStatus = .invalid
             return
         }
-        
+
         // Check for profanity
         if ProfanityFilter.shared.containsProfanity(username) {
             usernameStatus = .profanity
             return
         }
-        
+
         // Check availability in CloudKit
         checkUsernameAvailability(username)
     }
-    
+
     private func checkUsernameAvailability(_ username: String) {
         isCheckingUsername = true
         usernameStatus = .checking
-        
+
         Task {
             do {
                 let isAvailable = try await cloudKitAuth.checkUsernameAvailability(username)
-                
+
                 await MainActor.run {
                     isCheckingUsername = false
                     usernameStatus = isAvailable ? .available : .taken
@@ -321,22 +321,22 @@ struct UsernameSetupView: View {
             }
         }
     }
-    
+
     private func saveProfile() {
         guard canContinue else { return }
-        
+
         isLoading = true
-        
+
         Task {
             do {
                 // Save username using CloudKitAuthManager
                 try await cloudKitAuth.setUsername(username)
-                
+
                 // Save profile image to CloudKit if provided
                 if let image = selectedImage {
                     try await CloudKitUserManager.shared.updateProfileImage(image)
                 }
-                
+
                 await MainActor.run {
                     cloudKitAuth.showUsernameSelection = false
                     dismiss()
@@ -350,11 +350,11 @@ struct UsernameSetupView: View {
             }
         }
     }
-    
+
     private func skipSetup() {
         // Generate a temporary username and save it
-        let tempUsername = "Chef\(Int.random(in: 10000...99999))"
-        
+        let tempUsername = "Chef\(Int.random(in: 10_000...99_999))"
+
         Task {
             do {
                 try await cloudKitAuth.setUsername(tempUsername)

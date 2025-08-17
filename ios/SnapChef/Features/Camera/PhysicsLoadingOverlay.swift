@@ -10,39 +10,38 @@ struct PhysicsFallingEmoji: Identifiable {
     var scale: CGFloat = 1.0
 }
 
-
 // MARK: - Physics Loading Overlay
 struct PhysicsLoadingOverlay: View {
     @State private var fallingEmojis: [PhysicsFallingEmoji] = []
     @State private var messageIndex = 0
     @State private var textOpacity = 0.0
     @State private var textScale: CGFloat = 0.8
-    
+
     let messages = [
         "Analyzing ingredients...",
         "Discovering recipes...",
         "Adding magic touches...",
         "Almost ready..."
     ]
-    
-    let foodEmojis = ["🍎", "🥕", "🍊", "🥦", "🍇", "🧀", "🥚", "🍞", "🥛", "🍗", 
+
+    let foodEmojis = ["🍎", "🥕", "🍊", "🥦", "🍇", "🧀", "🥚", "🍞", "🥛", "🍗",
                       "🍖", "🥗", "🍕", "🌮", "🍝", "🥘", "🍱", "🍜", "🧁", "🍪"]
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 // Dark overlay
                 Color.black.opacity(0.8)
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 50) {
                     Spacer()
-                    
+
                     // SnapChef logo in the center
                     SnapchefLogo()
                         .scaleEffect(textScale)
                         .opacity(textOpacity)
-                    
+
                     // Animated loading message
                     Text(messages[messageIndex])
                         .font(.system(size: 20, weight: .medium, design: .rounded))
@@ -52,10 +51,10 @@ struct PhysicsLoadingOverlay: View {
                             removal: .opacity.combined(with: .move(edge: .top))
                         ))
                         .id(messageIndex)
-                    
+
                     Spacer()
                 }
-                
+
                 // Falling emojis
                 ForEach(fallingEmojis) { emoji in
                     Text(emoji.emoji)
@@ -81,20 +80,20 @@ struct PhysicsLoadingOverlay: View {
             }
         }
     }
-    
+
     private func startAnimations(in size: CGSize) {
         // Animate text appearance
         withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
             textOpacity = 1.0
             textScale = 1.0
         }
-        
+
         // Initialize some falling emojis
         for _ in 0..<5 {
             addNewEmoji(in: size)
         }
     }
-    
+
     private func addNewEmoji(in size: CGSize) {
         let emoji = PhysicsFallingEmoji(
             emoji: foodEmojis.randomElement()!,
@@ -108,29 +107,28 @@ struct PhysicsLoadingOverlay: View {
             )
         )
         fallingEmojis.append(emoji)
-        
+
         // Remove old emojis that are off screen
         fallingEmojis.removeAll { $0.position.y > size.height + 100 }
     }
-    
+
     private func updatePhysics(in size: CGSize) {
         for index in fallingEmojis.indices {
             // Apply gravity (increased for better falling effect)
             fallingEmojis[index].velocity.dy += 0.8
-            
+
             // Update position
             fallingEmojis[index].position.x += fallingEmojis[index].velocity.dx
             fallingEmojis[index].position.y += fallingEmojis[index].velocity.dy
-            
+
             // Update rotation (removed - emojis should fall straight)
             // fallingEmojis[index].rotation += Double(fallingEmojis[index].velocity.dx) * 2
-            
-            
+
             // Bounce off walls
             if fallingEmojis[index].position.x < 20 || fallingEmojis[index].position.x > size.width - 20 {
                 fallingEmojis[index].velocity.dx = -fallingEmojis[index].velocity.dx * 0.8
             }
-            
+
             // Apply some damping
             fallingEmojis[index].velocity.dx *= 0.99
         }
@@ -141,12 +139,12 @@ struct PhysicsLoadingOverlay: View {
 struct EmojiFlickGameOverlay: View {
     let capturedImage: UIImage?
     @State private var progress: CGFloat = 0.0
-    
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.85)
                 .ignoresSafeArea()
-            
+
             VStack {
                 // AI Analyzing indicator with progress bar
                 ZStack {
@@ -156,7 +154,7 @@ struct EmojiFlickGameOverlay: View {
                             .fill(Color.white.opacity(0.1))
                             .frame(height: 4)
                             .position(x: geometry.size.width / 2, y: 30)
-                        
+
                         // Progress bar
                         Rectangle()
                             .fill(
@@ -174,22 +172,22 @@ struct EmojiFlickGameOverlay: View {
                             .position(x: (geometry.size.width * progress) / 2, y: 30)
                             .animation(.linear(duration: 0.5), value: progress)
                     }
-                    
+
                     // AI Analyzing indicator
                     AIAnalyzingIndicator()
                         .position(x: UIScreen.main.bounds.width / 2, y: 30)
                 }
                 .frame(height: 60)
                 .padding(.top, 50)
-                
+
                 Spacer()
-                
+
                 // Embed the emoji flick game
                 EmojiFlickGame(backgroundImage: capturedImage)
                     .frame(maxHeight: .infinity)
-                
+
                 Spacer()
-                
+
                 Text("Flick the falling ingredients!")
                     .font(.system(size: 16, weight: .medium, design: .rounded))
                     .foregroundColor(.white.opacity(0.8))
@@ -212,7 +210,7 @@ struct MagicalProcessingOverlay: View {
     let capturedImage: UIImage?
     @State private var useGameMode = true
     @State private var showAIProcessingView = true
-    
+
     var body: some View {
         if useGameMode {
             if showAIProcessingView {
@@ -236,19 +234,19 @@ struct OriginalProcessingOverlay: View {
     @State private var rotation: Double = 0
     @State private var scale: CGFloat = 0.8
     @State private var messageIndex = 0
-    
+
     let messages = [
         "Analyzing ingredients...",
         "Discovering recipes...",
         "Adding magic touches...",
         "Almost ready..."
     ]
-    
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.8)
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 40) {
                 ZStack {
                     ForEach(0..<3) { index in
@@ -271,13 +269,13 @@ struct OriginalProcessingOverlay: View {
                             )
                             .rotationEffect(.degrees(rotation + Double(index * 120)))
                     }
-                    
+
                     Image(systemName: "sparkles")
                         .font(.system(size: 40, weight: .medium))
                         .foregroundColor(.white)
                         .scaleEffect(scale)
                 }
-                
+
                 Text(messages[messageIndex])
                     .font(.system(size: 22, weight: .medium, design: .rounded))
                     .foregroundColor(.white)
@@ -292,11 +290,11 @@ struct OriginalProcessingOverlay: View {
             withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
                 rotation = 360
             }
-            
+
             withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
                 scale = 1.2
             }
-            
+
             Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
                 Task { @MainActor in
                     withAnimation {

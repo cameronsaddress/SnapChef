@@ -229,10 +229,10 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
 
         return tokens.accessToken
     }
-    
+
     /// Get current tokens (public accessor for TikTokShareView)
     /// - Returns: Current TikTok tokens if available
-    public func getCurrentTokens() -> TikTokTokens? {
+    func getCurrentTokens() -> TikTokTokens? {
         return getStoredTokens()
     }
 

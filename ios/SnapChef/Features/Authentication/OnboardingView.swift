@@ -4,7 +4,7 @@ struct OnboardingView: View {
     @EnvironmentObject var appState: AppState
     @State private var currentPage = 0
     @State private var showingFoodPreferences = false
-    
+
     let pages = [
         OnboardingPage(
             emoji: "📸",
@@ -22,12 +22,12 @@ struct OnboardingView: View {
             description: "Follow easy instructions and share your creations for rewards"
         )
     ]
-    
+
     var body: some View {
         ZStack {
             MagicalBackground()
                 .ignoresSafeArea()
-            
+
             VStack {
                 // Skip button
                 HStack {
@@ -39,7 +39,7 @@ struct OnboardingView: View {
                     .padding()
                 }
                 .padding(.top, 50)
-                
+
                 // Pages
                 TabView(selection: $currentPage) {
                     ForEach(0..<pages.count, id: \.self) { index in
@@ -48,7 +48,7 @@ struct OnboardingView: View {
                     }
                 }
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                
+
                 // Page indicators
                 HStack(spacing: 8) {
                     ForEach(0..<pages.count, id: \.self) { index in
@@ -59,7 +59,7 @@ struct OnboardingView: View {
                     }
                 }
                 .padding(.bottom, 20)
-                
+
                 // Continue button
                 Button(action: {
                     if currentPage < pages.count - 1 {
@@ -97,7 +97,7 @@ struct OnboardingView: View {
                 }
         }
     }
-    
+
     private func completeOnboarding() {
         appState.completeOnboarding()
     }
@@ -112,11 +112,11 @@ struct OnboardingPage {
 struct OnboardingPageView: View {
     let page: OnboardingPage
     @State private var isAnimating = false
-    
+
     var body: some View {
         VStack(spacing: 30) {
             Spacer()
-            
+
             Text(page.emoji)
                 .font(.system(size: 100))
                 .scaleEffect(isAnimating ? 1.0 : 0.9)
@@ -125,19 +125,19 @@ struct OnboardingPageView: View {
                         .repeatForever(autoreverses: true),
                     value: isAnimating
                 )
-            
+
             VStack(spacing: 16) {
                 Text(page.title)
                     .font(.system(size: 32, weight: .bold))
                     .foregroundColor(.white)
-                
+
                 Text(page.description)
                     .font(.system(size: 18))
                     .foregroundColor(.white.opacity(0.8))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
-            
+
             Spacer()
             Spacer()
         }

@@ -17,13 +17,13 @@ struct MysteryMealView: View {
     @State private var showingSaveAlert = false
     @State private var isSpinning = false
     @State private var scrollProxy: ScrollViewProxy?
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 if !isGenerating {
                     ScrollViewReader { proxy in
                         ScrollView {
@@ -31,12 +31,12 @@ struct MysteryMealView: View {
                             // Header
                             MysteryMealHeaderView()
                                 .padding(.top, 40)
-                            
+
                             // Fortune wheel
                             FortuneWheelView(rotation: $wheelRotation, onSpin: spinWheel)
                                 .frame(height: 300)
                                 .padding(.horizontal, 20)
-                            
+
                             // Selected cuisine label
                             if !selectedCuisine.isEmpty {
                                 Text("You got: \(selectedCuisine)")
@@ -44,7 +44,7 @@ struct MysteryMealView: View {
                                     .foregroundColor(.white)
                                     .transition(.opacity.combined(with: .scale))
                             }
-                            
+
                             // Spin button - only show if not spinning and no recipe selected
                             if !isSpinning && selectedRecipe == nil {
                                 SpinWheelButton(
@@ -53,7 +53,7 @@ struct MysteryMealView: View {
                                 )
                                 .padding(.horizontal, 40)
                             }
-                            
+
                             // Recipe card
                             if let recipe = selectedRecipe {
                                 VStack(spacing: 20) {
@@ -69,19 +69,19 @@ struct MysteryMealView: View {
                                 .padding(.horizontal, 20)
                                 .id("recipeCard")
                             }
-                            
+
                             Spacer(minLength: 40)
                         }
                         .onAppear {
                             scrollProxy = proxy
                         }
-                    }
+                        }
                     }
                 } else {
                     // Generating view
                     MysteryGeneratingView()
                 }
-                
+
                 // Close button
                 VStack {
                     HStack {
@@ -118,69 +118,69 @@ struct MysteryMealView: View {
             }
         }
     }
-    
+
     private func saveRecipe() {
         guard let recipe = selectedRecipe else { return }
-        
+
         // Check if user can save
         if !deviceManager.hasUnlimitedAccess && deviceManager.freeSavesRemaining <= 0 {
             showingSaveAlert = true
             return
         }
-        
+
         // Consume a free save if not subscribed
         if !deviceManager.hasUnlimitedAccess {
             Task {
                 await deviceManager.consumeFreeSave()
             }
         }
-        
+
         // Save the recipe
         appState.addRecentRecipe(recipe)
         appState.saveRecipeWithPhotos(recipe, beforePhoto: nil, afterPhoto: nil)
-        
+
         showingSaveAlert = true
     }
-    
+
     private func spinWheel() {
         // Reset state
         selectedRecipe = nil
         selectedCuisine = ""
         isSpinning = true
-        
+
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .heavy)
         generator.impactOccurred()
-        
+
         // Random spin parameters
         let minRotations = Double.random(in: 3...5)
         let randomEndAngle = Double.random(in: 0...360)
         let totalRotation = (minRotations * 360) + randomEndAngle
         let spinDuration = Double.random(in: 2.5...4.0)
-        
+
         // Spin animation with easing
         withAnimation(.easeOut(duration: spinDuration)) {
             wheelRotation += totalRotation
         }
-        
+
         // Determine selected cuisine after spin
         DispatchQueue.main.asyncAfter(deadline: .now() + spinDuration) {
             // Calculate which segment the wheel landed on
-            let cuisines = ["Italian 🍝", "Mexican 🌮", "Chinese 🥟", "Japanese 🍱", 
+            let cuisines = ["Italian 🍝", "Mexican 🌮", "Chinese 🥟", "Japanese 🍱",
                             "Thai 🍜", "Indian 🍛", "French 🥐", "American 🍔"]
             let segmentAngle = 360.0 / Double(cuisines.count)
-            
+
             // The triangle points to the right (0 degrees)
             // We need to find which segment is at the right side after rotation
             let normalizedAngle = wheelRotation.truncatingRemainder(dividingBy: 360)
             let adjustedAngle = normalizedAngle < 0 ? normalizedAngle + 360 : normalizedAngle
-            
+
             // Since the wheel rotates and triangle is fixed at right (0 degrees),
             // we need to find which segment is now at position 0
             let selectedIndex = Int(adjustedAngle / segmentAngle) % cuisines.count
-            
+
             selectedCuisine = cuisines[selectedIndex]
-            
+
             // Get a random recipe for the selected cuisine
             if let recipe = LocalRecipeDatabase.shared.getRandomRecipe(for: selectedCuisine) {
                 withAnimation {
@@ -188,7 +188,7 @@ struct MysteryMealView: View {
                     showConfetti = true
                     isSpinning = false
                 }
-                
+
                 // Scroll to recipe card after a short delay
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     withAnimation {
@@ -200,37 +200,37 @@ struct MysteryMealView: View {
             }
         }
     }
-    
+
     private func generateMysteryMeal() {
         isGenerating = true
         showConfetti = true
-        
+
         Task {
             // Simulate API call
             try await Task.sleep(nanoseconds: 4_000_000_000) // 4 seconds
-            
+
             // Generate mystery recipes based on surprise level
             let mockRecipes = generateSurpriseRecipes()
-            
+
             await MainActor.run {
                 generatedRecipes = mockRecipes
-                
+
                 // Save recipes to app state
                 for recipe in mockRecipes {
                     appState.addRecentRecipe(recipe)
                     appState.saveRecipeWithPhotos(recipe, beforePhoto: nil, afterPhoto: nil)
                 }
-                
+
                 showingResults = true
                 isGenerating = false
             }
         }
     }
-    
+
     private func generateSurpriseRecipes() -> [Recipe] {
         // This would call the API with special surprise parameters
         var recipes = MockDataProvider.shared.mockRecipeResponse().recipes ?? []
-        
+
         // Add surprise elements based on level
         switch surpriseLevel {
         case .mild:
@@ -314,7 +314,7 @@ struct MysteryMealView: View {
                 )
             }
         }
-        
+
         return recipes
     }
 }
@@ -322,7 +322,7 @@ struct MysteryMealView: View {
 // MARK: - Mystery Meal Header
 struct MysteryMealHeaderView: View {
     @State private var sparkleAnimation = false
-    
+
     var body: some View {
         VStack(spacing: 20) {
             // Animated icon
@@ -339,11 +339,11 @@ struct MysteryMealHeaderView: View {
                         .rotationEffect(.degrees(sparkleAnimation ? 360 : 0))
                         .opacity(sparkleAnimation ? 0.8 : 0.3)
                 }
-                
+
                 Text("🎰")
                     .font(.system(size: 80))
             }
-            
+
             Text("Mystery Meal Roulette")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundStyle(
@@ -356,7 +356,7 @@ struct MysteryMealHeaderView: View {
                         endPoint: .bottom
                     )
                 )
-            
+
             Text("Let fate decide your next culinary adventure!")
                 .font(.system(size: 18, weight: .medium))
                 .foregroundColor(.white.opacity(0.8))
@@ -375,9 +375,9 @@ struct MysteryMealHeaderView: View {
 struct FortuneWheelView: View {
     @Binding var rotation: Double
     let onSpin: () -> Void
-    let cuisines = ["Italian 🍝", "Mexican 🌮", "Chinese 🥟", "Japanese 🍱", 
+    let cuisines = ["Italian 🍝", "Mexican 🌮", "Chinese 🥟", "Japanese 🍱",
                     "Thai 🍜", "Indian 🍛", "French 🥐", "American 🍔"]
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -392,7 +392,7 @@ struct FortuneWheelView: View {
                             color: segmentColor(for: index)
                         )
                     }
-                    
+
                     // Center circle button
                     Button(action: onSpin) {
                         Circle()
@@ -419,7 +419,7 @@ struct FortuneWheelView: View {
                 }
                 .frame(width: geometry.size.width, height: geometry.size.width)
                 .rotationEffect(.degrees(rotation))
-                
+
                 // Stationary pointer on the right - positioned to slightly overlap
                 HStack {
                     Spacer()
@@ -433,7 +433,7 @@ struct FortuneWheelView: View {
             }
         }
     }
-    
+
     private func segmentColor(for index: Int) -> Color {
         let colors = [
             Color(hex: "#667eea"),
@@ -455,7 +455,7 @@ struct WheelSegment: View {
     let endAngle: Double
     let text: String
     let color: Color
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -463,7 +463,7 @@ struct WheelSegment: View {
                 Path { path in
                     let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
                     let radius = min(geometry.size.width, geometry.size.height) / 2
-                    
+
                     path.move(to: center)
                     path.addArc(
                         center: center,
@@ -479,7 +479,7 @@ struct WheelSegment: View {
                     Path { path in
                         let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
                         let radius = min(geometry.size.width, geometry.size.height) / 2
-                        
+
                         path.move(to: center)
                         path.addArc(
                             center: center,
@@ -492,13 +492,13 @@ struct WheelSegment: View {
                     }
                     .stroke(Color.white.opacity(0.3), lineWidth: 2)
                 )
-                
+
                 // Text - positioned at the middle of the segment
                 let midAngle = (startAngle + endAngle) / 2
                 let angleInRadians = (midAngle - 90) * .pi / 180
                 let xOffset = cos(angleInRadians) * geometry.size.width * 0.32
                 let yOffset = sin(angleInRadians) * geometry.size.height * 0.32
-                
+
                 Text(text)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
@@ -530,7 +530,7 @@ struct MysteryRecipeCard: View {
     let recipe: Recipe
     let onSave: () -> Void
     @State private var showingDetail = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
@@ -540,15 +540,15 @@ struct MysteryRecipeCard: View {
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                         .lineLimit(2)
-                    
+
                     Text(recipe.description)
                         .font(.system(size: 16))
                         .foregroundColor(.white.opacity(0.8))
                         .lineLimit(2)
                 }
-                
+
                 Spacer()
-                
+
                 // Save button
                 Button(action: onSave) {
                     Image(systemName: "bookmark.fill")
@@ -561,7 +561,7 @@ struct MysteryRecipeCard: View {
                         )
                 }
             }
-            
+
             // Recipe info
             HStack(spacing: 20) {
                 HStack(spacing: 4) {
@@ -579,19 +579,19 @@ struct MysteryRecipeCard: View {
             }
             .font(.system(size: 14, weight: .medium))
             .foregroundColor(.white.opacity(0.8))
-            
+
             // Ingredients preview
             VStack(alignment: .leading, spacing: 8) {
                 Text("Ingredients")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.white)
-                
+
                 Text(recipe.ingredients.prefix(3).map { $0.name }.joined(separator: ", ") + (recipe.ingredients.count > 3 ? "..." : ""))
                     .font(.system(size: 14))
                     .foregroundColor(.white.opacity(0.7))
                     .lineLimit(2)
             }
-            
+
             // View full recipe button
             Button(action: { showingDetail = true }) {
                 HStack {
@@ -638,7 +638,7 @@ struct MysteryRecipeCard: View {
 struct IngredientHintsCard: View {
     @Binding var selectedIngredients: [String]
     @State private var ingredientText = ""
-    
+
     var body: some View {
         GlassmorphicCard {
             VStack(alignment: .leading, spacing: 16) {
@@ -646,16 +646,16 @@ struct IngredientHintsCard: View {
                     Image(systemName: "lightbulb.fill")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(Color(hex: "#ffa726"))
-                    
+
                     Text("Ingredient Hints (Optional)")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                 }
-                
+
                 Text("Add ingredients you'd like to include")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.7))
-                
+
                 // Ingredient input
                 HStack {
                     TextField("e.g., chicken, tomatoes...", text: $ingredientText)
@@ -664,7 +664,7 @@ struct IngredientHintsCard: View {
                         .onSubmit {
                             addIngredient()
                         }
-                    
+
                     Button(action: addIngredient) {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 24))
@@ -681,7 +681,7 @@ struct IngredientHintsCard: View {
                                 .stroke(Color.white.opacity(0.3), lineWidth: 1)
                         )
                 )
-                
+
                 // Selected ingredients
                 if !selectedIngredients.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -701,7 +701,7 @@ struct IngredientHintsCard: View {
             .padding(20)
         }
     }
-    
+
     private func addIngredient() {
         guard !ingredientText.isEmpty else { return }
         selectedIngredients.append(ingredientText)
@@ -713,13 +713,13 @@ struct IngredientHintsCard: View {
 struct IngredientChip: View {
     let ingredient: String
     let onRemove: () -> Void
-    
+
     var body: some View {
         HStack(spacing: 8) {
             Text(ingredient)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white)
-            
+
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 16))
@@ -742,13 +742,13 @@ struct IngredientChip: View {
 // MARK: - Surprise Level Selector
 struct SurpriseLevelSelector: View {
     @Binding var selectedLevel: SurpriseRecipeSettings.WildnessLevel
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Choose Your Adventure Level")
                 .font(.system(size: 18, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            
+
             HStack(spacing: 12) {
                 ForEach(SurpriseRecipeSettings.WildnessLevel.allCases, id: \.self) { level in
                     SurpriseLevelButton(
@@ -767,7 +767,7 @@ struct SurpriseLevelButton: View {
     let level: SurpriseRecipeSettings.WildnessLevel
     let isSelected: Bool
     let action: () -> Void
-    
+
     var emoji: String {
         switch level {
         case .mild: return "😊"
@@ -776,13 +776,13 @@ struct SurpriseLevelButton: View {
         case .insane: return "🤯"
         }
     }
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Text(emoji)
                     .font(.system(size: 30))
-                
+
                 Text(level.rawValue.split(separator: " ").first ?? "")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(isSelected ? .white : .white.opacity(0.7))
@@ -815,13 +815,13 @@ struct SpinWheelButton: View {
     let action: () -> Void
     let isSpinning: Bool
     @State private var pulseAnimation = false
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
                 Image(systemName: "dice")
                     .font(.system(size: 24, weight: .semibold))
-                
+
                 Text(isSpinning ? "Spinning..." : "Spin the Wheel!")
                     .font(.system(size: 20, weight: .bold, design: .rounded))
             }
@@ -860,7 +860,7 @@ struct SpinWheelButton: View {
 struct MysteryGeneratingView: View {
     @State private var chefRotation = 0.0
     @State private var messageIndex = 0
-    
+
     let messages = [
         "Consulting the culinary cosmos...",
         "Mixing unexpected flavors...",
@@ -868,7 +868,7 @@ struct MysteryGeneratingView: View {
         "Channeling your inner chef...",
         "Creating something magical..."
     ]
-    
+
     var body: some View {
         VStack(spacing: 40) {
             // Animated chef hat
@@ -893,12 +893,12 @@ struct MysteryGeneratingView: View {
                         )
                         .rotationEffect(.degrees(chefRotation + Double(index * 60)))
                 }
-                
+
                 Text("👨‍🍳")
                     .font(.system(size: 60))
                     .rotationEffect(.degrees(-chefRotation / 2))
             }
-            
+
             // Messages
             Text(messages[messageIndex])
                 .font(.system(size: 24, weight: .medium, design: .rounded))
@@ -913,7 +913,7 @@ struct MysteryGeneratingView: View {
             withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
                 chefRotation = 360
             }
-            
+
             Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
                 Task { @MainActor in
                     withAnimation {

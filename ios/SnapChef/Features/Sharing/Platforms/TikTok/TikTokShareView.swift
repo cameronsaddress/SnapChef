@@ -7,7 +7,7 @@ import UIKit
 enum PostingMethod: String, CaseIterable {
     case shareKit = "shareKit"
     case directPost = "directPost"
-    
+
     var title: String {
         switch self {
         case .shareKit:
@@ -16,7 +16,7 @@ enum PostingMethod: String, CaseIterable {
             return "Direct Post"
         }
     }
-    
+
     var description: String {
         switch self {
         case .shareKit:
@@ -25,7 +25,7 @@ enum PostingMethod: String, CaseIterable {
             return "Posts directly with auto-filled caption"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .shareKit:
@@ -66,35 +66,35 @@ struct TikTokShareView: View {
         NavigationStack {
             ZStack {
                 LinearGradient(colors: [.black, .black.opacity(0.9)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 24) {
                         header
-                        
+
                         if isGenerating {
                             premiumProgressIndicator
                         } else if showSuccess {
                             successState
                         } else {
                             postingMethodSelector
-                            
+
                             if postingMethod == .directPost {
                                 tikTokAuthStatus
                             }
-                            
+
                             hashtagChips
-                            
+
                             if postingMethod == .directPost && showDirectPostPreview {
                                 captionPreview
                             }
                         }
-                        
+
                         generateButton
                             .padding(.horizontal, 20)
                             .padding(.bottom, 40)
                     }
                 }
-                
+
                 // Confetti overlay
                 if showConfetti {
                     ConfettiView()
@@ -105,7 +105,7 @@ struct TikTokShareView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { 
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { dismiss() }) {
                         HStack(spacing: 4) {
                             Image(systemName: "chevron.left")
@@ -121,16 +121,16 @@ struct TikTokShareView: View {
         .onAppear {
             // Check token status when view appears
             checkTokenStatus()
-            
+
             // Start button shake animation after a delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 startButtonShake()
             }
         }
-        .alert("Error", isPresented: .constant(error != nil && currentTikTokError == nil)) { 
-            Button("OK") { error = nil } 
-        } message: { 
-            Text(error ?? "") 
+        .alert("Error", isPresented: .constant(error != nil && currentTikTokError == nil)) {
+            Button("OK") { error = nil }
+        } message: {
+            Text(error ?? "")
         }
         .alert("Video Generation Issue", isPresented: $showRetryAlert) {
             if let tikTokError = currentTikTokError, tikTokError.isRetryable {
@@ -196,18 +196,18 @@ struct TikTokShareView: View {
                 Text("Select Hashtags")
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                
+
                 Text("Choose hashtags for your TikTok video • \(selectedHashtags.count)/5 selected")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.7))
             }
-            
+
             // Hashtag grid with selectable chips
             VStack(alignment: .leading, spacing: 12) {
                 let rows = optimizedTags.chunked(into: 3)
-                ForEach(Array(rows.enumerated()), id: \.offset) { rowIndex, row in
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                     HStack(spacing: 8) {
-                        ForEach(Array(row.enumerated()), id: \.offset) { tagIndex, tag in
+                        ForEach(Array(row.enumerated()), id: \.offset) { _, tag in
                             SelectableHashtagChip(
                                 hashtag: tag,
                                 isSelected: selectedHashtags.contains(tag)
@@ -219,7 +219,7 @@ struct TikTokShareView: View {
                     }
                 }
             }
-            
+
             // Selection actions
             HStack(spacing: 12) {
                 Button("Select All") {
@@ -229,7 +229,7 @@ struct TikTokShareView: View {
                 }
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.cyan)
-                
+
                 Button("Clear All") {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         selectedHashtags.removeAll()
@@ -237,9 +237,9 @@ struct TikTokShareView: View {
                 }
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.pink)
-                
+
                 Spacer()
-                
+
                 Text("\(selectedHashtags.count)/5")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.white.opacity(0.8))
@@ -277,15 +277,15 @@ struct TikTokShareView: View {
             }
         }
     }
-    
+
     // MARK: - Posting Method Selector
-    
+
     private var postingMethodSelector: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Sharing Method")
                 .font(.system(size: 22, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            
+
             HStack(spacing: 12) {
                 ForEach(PostingMethod.allCases, id: \.self) { method in
                     PostingMethodCard(
@@ -295,7 +295,7 @@ struct TikTokShareView: View {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             postingMethod = method
                         }
-                        
+
                         // Haptic feedback
                         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                         impactFeedback.impactOccurred()
@@ -324,9 +324,9 @@ struct TikTokShareView: View {
                 )
         )
     }
-    
+
     // MARK: - TikTok Authentication Status
-    
+
     private var tikTokAuthStatus: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
@@ -334,13 +334,13 @@ struct TikTokShareView: View {
                 Image(systemName: authStatus.icon)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(authStatus.color)
-                
+
                 Text("TikTok Authentication")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
-                
+
                 Spacer()
-                
+
                 Text(authStatus.statusText)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(authStatus.color)
@@ -349,13 +349,13 @@ struct TikTokShareView: View {
                     .background(authStatus.color.opacity(0.2))
                     .cornerRadius(8)
             }
-            
+
             if !contentAPI.hasValidToken || isTokenExpired() {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(getAuthPromptText())
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
-                    
+
                     Button(getAuthButtonText()) {
                         Task {
                             await reauthenticateUser()
@@ -390,17 +390,17 @@ struct TikTokShareView: View {
                 )
         )
     }
-    
+
     // MARK: - Caption Preview
-    
+
     private var captionPreview: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Caption Preview")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundColor(.white)
-            
+
             let caption = buildCaptionPreview()
-            
+
             ScrollView {
                 Text(caption)
                     .font(.system(size: 14, weight: .medium))
@@ -414,15 +414,15 @@ struct TikTokShareView: View {
                     )
             }
             .frame(maxHeight: 120)
-            
+
             HStack {
                 Text("\(caption.count)/2200 characters")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.6))
-                
+
                 Spacer()
-                
-                if caption.count > 2200 {
+
+                if caption.count > 2_200 {
                     Text("Too long")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.red)
@@ -441,7 +441,7 @@ struct TikTokShareView: View {
         )
         .transition(.opacity.combined(with: .scale))
     }
-    
+
     private func buildCaptionPreview() -> String {
         let title: String
         switch content.type {
@@ -456,14 +456,14 @@ struct TikTokShareView: View {
         case .teamInvite(let teamName, _):
             title = "🏆 Join my cooking team: \(teamName)"
         }
-        
+
         return contentAPI.buildCaption(
             text: title,
             hashtags: selectedHashtags,
             appLink: "apps.apple.com/snapchef"
         )
     }
-    
+
     /// Generate smart hashtag selection based on recipe and current trends
     private func generateSmartHashtags() -> [String] {
         guard case .recipe(let recipe) = content.type else {
@@ -473,7 +473,7 @@ struct TikTokShareView: View {
                 .compactMap { $0.hasPrefix("#") ? String($0.dropFirst()) : nil }
                 .prefix(15))
         }
-        
+
         // Create ViralRecipe from recipe data
         let viralRecipe = ViralRecipe(
             title: recipe.name,
@@ -484,7 +484,7 @@ struct TikTokShareView: View {
             calories: recipe.nutrition.calories,
             ingredients: recipe.ingredients.map { $0.name }
         )
-        
+
         // Generate recipe-specific hashtags
         return Array(HashtagOptimizer.generateRecipeSpecificHashtags(recipe: viralRecipe)
             .components(separatedBy: " ")
@@ -509,37 +509,37 @@ struct TikTokShareView: View {
                             )
                         )
                         .frame(width: 44, height: 44)
-                    
+
                     Image(systemName: "music.note")
                         .font(.system(size: 22, weight: .bold))
                         .foregroundColor(.white)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text("TikTok Video Generator")
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
-                    
+
                     Text("Select hashtags, generate video, then auto-share to TikTok")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
-                
+
                 Spacer()
-                
+
                 // Usage counter for videos
                 UsageCounterView.videos(
                     current: usageTracker.dailyVideoCount,
                     limit: usageTracker.dailyVideoLimit
                 )
             }
-            
+
             // Progress indicator
             HStack(spacing: 16) {
                 StepIndicator(number: "1", title: "Generate", isCompleted: showSuccess, isActive: !showSuccess)
-                
+
                 ConnectorLine(isCompleted: showSuccess)
-                
+
                 StepIndicator(number: "2", title: "Share", isCompleted: false, isActive: showSuccess)
             }
             .padding(.top, 8)
@@ -548,7 +548,7 @@ struct TikTokShareView: View {
         .padding(.top, 20)
         .padding(.bottom, 16)
     }
-    
+
     private func getProgressText() -> String {
         let phase = engine.currentProgress.phase.rawValue.capitalized
         if phase.contains("Rendering") {
@@ -559,7 +559,7 @@ struct TikTokShareView: View {
             return phase
         }
     }
-    
+
     private func isPhaseComplete(current: RenderPhase, target: RenderPhase) -> Bool {
         let phases: [RenderPhase] = [.preparingAssets, .planning, .renderingFrames, .compositing, .addingOverlays, .encoding, .finalizing, .complete]
         guard let currentIndex = phases.firstIndex(of: current),
@@ -568,14 +568,14 @@ struct TikTokShareView: View {
         }
         return currentIndex > targetIndex
     }
-    
+
     // MARK: - Premium UI Components
-    
+
     private var premiumProgressIndicator: some View {
         VStack(spacing: 25) {
             // Animated SnapChef logo
             AnimatedSnapChefLogo()
-            
+
             // Progress phases with emojis
             VStack(spacing: 15) {
                 let currentPhase = engine.currentProgress.phase
@@ -588,32 +588,32 @@ struct TikTokShareView: View {
                     (.encoding, "📦", "Encoding for TikTok"),
                     (.finalizing, "🚀", "Finalizing masterpiece")
                 ]
-                
-                ForEach(Array(phases.enumerated()), id: \.offset) { index, phase in
+
+                ForEach(Array(phases.enumerated()), id: \.offset) { _, phase in
                     let (phaseType, emoji, description) = phase
                     let isActive = currentPhase == phaseType
                     let isComplete = isPhaseComplete(current: currentPhase, target: phaseType)
-                    
+
                     HStack(spacing: 15) {
                         Text(emoji)
                             .font(.title2)
                             .scaleEffect(isActive ? 1.3 : 1.0)
                             .animation(.spring(response: 0.5, dampingFraction: 0.6).repeatForever(autoreverses: true), value: isActive)
-                        
+
                         VStack(alignment: .leading, spacing: 2) {
                             Text(description)
                                 .font(.headline)
                                 .foregroundColor(isComplete ? .green : isActive ? .white : .gray)
-                            
+
                             if isActive {
                                 ProgressView(value: engine.currentProgress.progress)
                                     .progressViewStyle(LinearProgressViewStyle(tint: .cyan))
                                     .scaleEffect(y: 0.8)
                             }
                         }
-                        
+
                         Spacer()
-                        
+
                         if isComplete {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
@@ -644,7 +644,7 @@ struct TikTokShareView: View {
                 )
         )
     }
-    
+
     private var successState: some View {
         VStack(spacing: 20) {
             // Success animation
@@ -654,13 +654,13 @@ struct TikTokShareView: View {
                     .foregroundColor(.green)
                     .scaleEffect(showSuccess ? 1.0 : 0.3)
                     .animation(.spring(response: 0.6, dampingFraction: 0.6), value: showSuccess)
-                
+
                 Text("Video Created Successfully!")
                     .font(.title2.bold())
                     .foregroundColor(.white)
                     .opacity(showSuccess ? 1.0 : 0.0)
                     .animation(.easeInOut(duration: 0.5).delay(0.3), value: showSuccess)
-                
+
                 Text("Your viral TikTok video is ready to go!")
                     .font(.subheadline)
                     .foregroundColor(.gray)
@@ -682,43 +682,43 @@ struct TikTokShareView: View {
                 return
             }
         }
-        
+
         Task {
             await performGeneration()
         }
     }
-    
+
     private func performGeneration() async {
         guard let inputs = content.toRenderInputs() else { return }
         let (recipe, media) = inputs
-        
+
         await MainActor.run {
             // Track video generation for usage limits
             usageTracker.trackVideoGenerated()
             UserLifecycleManager.shared.trackVideoShared()
-            
+
             // Haptic feedback
             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.prepare()
             impactFeedback.impactOccurred()
-            
+
             isGenerating = true
         }
-        
+
         do {
             let url = try await engine.render(template: template, recipe: recipe, media: media) { _ in }
             self.videoURL = url
-            
+
             // Success haptic feedback
             await MainActor.run {
                 let successFeedback = UINotificationFeedbackGenerator()
                 successFeedback.notificationOccurred(.success)
-                
+
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                     showSuccess = true
                     showConfetti = true
                 }
-                
+
                 // Hide confetti after 3 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                     withAnimation(.easeOut(duration: 0.5)) {
@@ -726,29 +726,29 @@ struct TikTokShareView: View {
                     }
                 }
             }
-            
+
             // Track video generation for progressive authentication
             await MainActor.run {
                 appState.trackAnonymousAction(.videoGenerated)
-                
+
                 // If user is not authenticated, trigger progressive auth prompt
                 if !CloudKitAuthManager.shared.isAuthenticated {
                     AuthPromptTrigger.shared.onViralContentCreated()
                 }
             }
-            
+
             // Share based on selected posting method
             if postingMethod == .shareKit {
                 await shareToTikTokAutomatically(url: url)
             } else {
                 await postDirectlyToTikTok(url: url)
             }
-        } catch { 
+        } catch {
                 await MainActor.run {
                     // Error haptic feedback
                     let errorFeedback = UINotificationFeedbackGenerator()
                     errorFeedback.notificationOccurred(.error)
-                    
+
                     // Handle TikTokExportError specifically
                     if let tikTokError = error as? TikTokExportError {
                         self.currentTikTokError = tikTokError
@@ -769,7 +769,7 @@ struct TikTokShareView: View {
                 }
         }
     }
-    
+
     @MainActor
     private func shareToTikTokAutomatically(url: URL) async {
         // Request photo permission first
@@ -778,7 +778,7 @@ struct TikTokShareView: View {
                 continuation.resume(returning: granted)
             }
         }
-        
+
         guard hasPermission else {
             self.currentTikTokError = TikTokExportError.photoAccessDenied
             self.showRetryAlert = true
@@ -790,24 +790,24 @@ struct TikTokShareView: View {
             self.isGenerating = false
             return
         }
-        
+
         // Save video to Photos
         let saveResult = await withCheckedContinuation { continuation in
             ViralVideoExporter.saveToPhotos(videoURL: url) { result in
                 continuation.resume(returning: result)
             }
         }
-        
+
         switch saveResult {
         case .success(let identifier):
             // Share to TikTok with viral caption generation and selected hashtags
             let caption: String
             let selectedHashtagsString = selectedHashtags.isEmpty ? "" : "\n\n" + selectedHashtags.map { "#\($0)" }.joined(separator: " ")
-            
+
             // Debug logging for hashtag verification
             print("🏷️ Selected hashtags: \(selectedHashtags)")
             print("🏷️ Hashtags string: \(selectedHashtagsString)")
-            
+
             if case .recipe(let recipe) = content.type {
                 let viralRecipe = ViralRecipe(
                     title: recipe.name,
@@ -833,37 +833,37 @@ struct TikTokShareView: View {
                 caption = captionWithoutHashtags + selectedHashtagsString + "\n\nDownload: apps.apple.com/snapchef"
                 print("📋 Final caption being sent (non-recipe): \(caption)")
             }
-            
+
             let shareResult = await withCheckedContinuation { continuation in
                 ViralVideoExporter.shareToTikTok(localIdentifiers: [identifier], caption: caption) { result in
                     continuation.resume(returning: result)
                 }
             }
-            
+
             switch shareResult {
             case .success:
                 // Success - TikTok app should now be open
                 self.isGenerating = false
-                
+
                 // Auto-dismiss both TikTokShareView and parent share view
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     // Dismiss TikTokShareView
                     dismiss()
-                    
+
                     // Also dismiss the parent BrandedSharePopup
                     NotificationCenter.default.post(
                         name: Notification.Name("DismissSharePopup"),
                         object: nil
                     )
                 }
-                
+
             case .failure(let error):
                 // Handle TikTok sharing errors with user-friendly messages
                 self.currentTikTokError = error
                 self.showRetryAlert = true
                 self.isGenerating = false
             }
-            
+
         case .failure(let error):
             // Handle TikTokExportError specifically for better UX
             self.currentTikTokError = error
@@ -878,9 +878,9 @@ struct TikTokShareView: View {
             self.isGenerating = false
         }
     }
-    
+
     // MARK: - UI Components
-    
+
     private var generateButton: some View {
         Button(action: generate) {
             ZStack {
@@ -902,7 +902,7 @@ struct TikTokShareView: View {
                         radius: 15,
                         y: 8
                     )
-                
+
                 if isGenerating {
                     HStack(spacing: 12) {
                         PulsingProgressView()
@@ -930,7 +930,7 @@ struct TikTokShareView: View {
                                     .font(.system(size: 18, weight: .bold))
                             }
                             .foregroundColor(.white)
-                            
+
                             Text("Upgrade to Premium for unlimited")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.7))
@@ -942,7 +942,7 @@ struct TikTokShareView: View {
                                     .font(.system(size: 18, weight: .bold))
                             }
                             .foregroundColor(.white)
-                            
+
                             if selectedHashtags.isEmpty {
                                 Text("(Select hashtags first)")
                                     .font(.system(size: 12, weight: .medium))
@@ -964,9 +964,9 @@ struct TikTokShareView: View {
         .animation(.easeInOut(duration: 0.15), value: isGenerating)
         .modifier(ShakeEffect(shakeNumber: buttonShake ? 2 : 0))
     }
-    
+
     // MARK: - Direct Post Method
-    
+
     @MainActor
     private func postDirectlyToTikTok(url: URL) async {
         do {
@@ -977,7 +977,7 @@ struct TikTokShareView: View {
                 isGenerating = false
                 return
             }
-            
+
             // Build caption from content and selected hashtags
             let title: String
             switch content.type {
@@ -992,63 +992,62 @@ struct TikTokShareView: View {
             case .teamInvite(let teamName, _):
                 title = "🏆 Join my cooking team: \(teamName)"
             }
-            
+
             // Upload with progress tracking
             let publishId = try await contentAPI.uploadWithShareContent(
                 content: content,
                 videoURL: url
-            ) { progress in
+            ) { _ in
                 // Update UI with upload progress
             }
-            
+
             // Check status periodically
             var attempts = 0
             let maxAttempts = 10
-            
+
             while attempts < maxAttempts {
                 let status = try await contentAPI.checkPublishStatus(publishId: publishId)
-                
+
                 switch status.data.status {
                 case "SENT_TO_USER_INBOX":
                     // Success!
                     await MainActor.run {
                         let successFeedback = UINotificationFeedbackGenerator()
                         successFeedback.notificationOccurred(.success)
-                        
+
                         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                             showSuccess = true
                             showConfetti = true
                         }
-                        
+
                         // Hide confetti after 3 seconds
                         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                             withAnimation(.easeOut(duration: 0.5)) {
                                 showConfetti = false
                             }
                         }
-                        
+
                         isGenerating = false
                     }
                     return
-                    
+
                 case "FAILED":
                     throw TikTokAPIError.uploadFailed(status.data.fail_reason ?? "Upload failed")
-                    
+
                 default:
                     // Still processing, wait and retry
                     try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
                     attempts += 1
                 }
             }
-            
+
             // Timeout
             throw TikTokAPIError.uploadFailed("Upload timeout - please check your TikTok app")
-            
         } catch {
             await MainActor.run {
                 let errorFeedback = UINotificationFeedbackGenerator()
                 errorFeedback.notificationOccurred(.error)
-                
+
                 // Check for token expiration errors specifically
                 if let apiError = error as? TikTokAPIError, case .unauthorized(let message) = apiError {
                     // Token has expired during operation
@@ -1072,24 +1071,24 @@ struct TikTokShareView: View {
             }
         }
     }
-    
+
     // MARK: - Helper Functions
-    
+
     private func startButtonShake() {
         withAnimation(.default) {
             buttonShake = true
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             buttonShake = false
-            
+
             // Repeat every 8-12 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + Double.random(in: 8...12)) {
                 startButtonShake()
             }
         }
     }
-    
+
     private func toggleHashtagSelection(_ hashtag: String) {
         withAnimation(.easeInOut(duration: 0.2)) {
             if let index = selectedHashtags.firstIndex(of: hashtag) {
@@ -1104,14 +1103,14 @@ struct TikTokShareView: View {
                 selectedHashtags.append(hashtag)
             }
         }
-        
+
         // Haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
     }
-    
+
     // MARK: - Token Management Helper Methods
-    
+
     private func checkTokenStatus() {
         // Check token when view appears and update UI accordingly
         Task {
@@ -1123,20 +1122,20 @@ struct TikTokShareView: View {
             }
         }
     }
-    
+
     private func isTokenExpired() -> Bool {
         return !contentAPI.hasValidToken
     }
-    
+
     private func checkValidToken() async -> Bool {
         // Use TikTokAuthManager to check token validity
         return TikTokAuthManager.shared.isAuthenticatedUser()
     }
-    
+
     private func reauthenticateUser() async {
         do {
-            let _ = try await TikTokAuthManager.shared.authenticate()
-            
+            _ = try await TikTokAuthManager.shared.authenticate()
+
             // Update contentAPI with new token
             await MainActor.run {
                 if let tokens = TikTokAuthManager.shared.getCurrentTokens() {
@@ -1149,7 +1148,7 @@ struct TikTokShareView: View {
             }
         }
     }
-    
+
     private func getAuthenticationStatus() -> (icon: String, color: Color, statusText: String) {
         if contentAPI.hasValidToken && !isTokenExpired() {
             return ("checkmark.circle.fill", .green, "Connected")
@@ -1159,7 +1158,7 @@ struct TikTokShareView: View {
             return ("person.circle", .gray, "Not Connected")
         }
     }
-    
+
     private func getAuthPromptText() -> String {
         if isTokenExpired() {
             return "Your TikTok session has expired. Sign in again to continue."
@@ -1167,7 +1166,7 @@ struct TikTokShareView: View {
             return "Sign in to TikTok to enable direct posting"
         }
     }
-    
+
     private func getAuthButtonText() -> String {
         if isTokenExpired() {
             return "Sign In Again"
@@ -1175,7 +1174,7 @@ struct TikTokShareView: View {
             return "Sign in with TikTok"
         }
     }
-    
+
     private func getUserFriendlyErrorMessage(_ error: Error) -> String {
         if let apiError = error as? TikTokAPIError {
             switch apiError {
@@ -1205,14 +1204,14 @@ struct SelectableHashtagChip: View {
     let isSelected: Bool
     let action: () -> Void
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Text("#\(hashtag)")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(isSelected ? .black : .white)
-                
+
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 12, weight: .bold))
@@ -1232,7 +1231,7 @@ struct SelectableHashtagChip: View {
                             endPoint: .bottomTrailing
                         ) :
                         LinearGradient(
-                            colors: isPressed ? 
+                            colors: isPressed ?
                                 [Color.white.opacity(0.2), Color.white.opacity(0.15)] :
                                 [Color.white.opacity(0.12), Color.white.opacity(0.08)],
                             startPoint: .topLeading,
@@ -1264,7 +1263,7 @@ struct StepIndicator: View {
     let title: String
     let isCompleted: Bool
     let isActive: Bool
-    
+
     var body: some View {
         HStack(spacing: 8) {
             ZStack {
@@ -1289,7 +1288,7 @@ struct StepIndicator: View {
                         )
                     )
                     .frame(width: 28, height: 28)
-                
+
                 if isCompleted {
                     Image(systemName: "checkmark")
                         .font(.system(size: 14, weight: .bold))
@@ -1300,7 +1299,7 @@ struct StepIndicator: View {
                         .foregroundColor(.white)
                 }
             }
-            
+
             Text(title)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white.opacity(isActive ? 1.0 : 0.6))
@@ -1310,7 +1309,7 @@ struct StepIndicator: View {
 
 struct ConnectorLine: View {
     let isCompleted: Bool
-    
+
     var body: some View {
         Rectangle()
             .fill(isCompleted ? Color.green : Color.white.opacity(0.3))
@@ -1318,7 +1317,6 @@ struct ConnectorLine: View {
             .frame(maxWidth: .infinity)
     }
 }
-
 
 // Array extension for chunking
 extension Array {
@@ -1334,13 +1332,13 @@ struct Wrap<Data: RandomAccessCollection, Content: View>: View where Data.Elemen
     let data: Data
     let spacing: CGFloat
     let content: (Data.Element) -> Content
-    
+
     init(_ d: Data, spacing: CGFloat = 8, @ViewBuilder content: @escaping (Data.Element) -> Content) {
         data = d
         self.spacing = spacing
         self.content = content
     }
-    
+
     var body: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: spacing)], spacing: spacing) {
             ForEach(Array(data), id: \.self) { item in
@@ -1356,7 +1354,7 @@ struct Wrap<Data: RandomAccessCollection, Content: View>: View where Data.Elemen
 struct AnimatedSnapChefLogo: View {
     @State private var animate = false
     @State private var gradientOffset = 0.0
-    
+
     var body: some View {
         Text("SNAPCHEF!")
             .font(.system(size: 32, weight: .heavy, design: .rounded))
@@ -1385,7 +1383,7 @@ struct AnimatedSnapChefLogo: View {
 
 struct PulsingProgressView: View {
     @State private var isAnimating = false
-    
+
     var body: some View {
         Circle()
             .trim(from: 0, to: 0.7)
@@ -1415,7 +1413,7 @@ struct PostingMethodCard: View {
     let isSelected: Bool
     let action: () -> Void
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 12) {
@@ -1436,18 +1434,18 @@ struct PostingMethodCard: View {
                             )
                         )
                         .frame(width: 50, height: 50)
-                    
+
                     Image(systemName: method.icon)
                         .font(.system(size: 22, weight: .bold))
                         .foregroundColor(isSelected ? .white : .white.opacity(0.7))
                 }
-                
+
                 // Title
                 Text(method.title)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(isSelected ? .white : .white.opacity(0.8))
                     .multilineTextAlignment(.center)
-                
+
                 // Description
                 Text(method.description)
                     .font(.system(size: 12, weight: .medium))

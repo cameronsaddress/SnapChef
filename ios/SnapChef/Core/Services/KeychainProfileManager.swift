@@ -13,7 +13,6 @@ import Security
 /// Handles persistence, encryption, and migration of user data
 @MainActor
 final class KeychainProfileManager: @unchecked Sendable {
-
     // MARK: - Singleton
 
     static let shared = KeychainProfileManager()
@@ -169,7 +168,6 @@ final class KeychainProfileManager: @unchecked Sendable {
 // MARK: - Profile Management Extensions
 
 extension KeychainProfileManager {
-
     /// Creates a new anonymous profile if none exists
     /// - Returns: New or existing profile
     func getOrCreateProfile() -> AnonymousUserProfile {
@@ -228,7 +226,6 @@ extension KeychainProfileManager {
 // MARK: - Analytics Extensions
 
 extension KeychainProfileManager {
-
     /// Gets analytics data from the stored profile
     /// - Returns: Dictionary with analytics metrics
     func getAnalyticsData() -> [String: Any] {
@@ -276,7 +273,6 @@ extension KeychainProfileManager {
 
 #if DEBUG
 extension KeychainProfileManager {
-
     /// Prints detailed profile information for debugging
     func debugPrintProfile() {
         guard let profile = loadProfile() else {

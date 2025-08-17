@@ -13,14 +13,14 @@ import AuthenticationServices
 /// Integrates with AuthPromptTrigger for context-aware messaging
 struct ProgressiveAuthPrompt: View {
     // MARK: - Environment & Dependencies
-    
+
     @Environment(\.dismiss) private var dismiss
     @StateObject private var authTrigger = AuthPromptTrigger.shared
     @StateObject private var authManager = CloudKitAuthManager.shared
     @StateObject private var tikTokAuthManager = TikTokAuthManager.shared
-    
+
     // MARK: - State
-    
+
     @State private var dragOffset: CGFloat = 0
     @State private var isVisible = false
     @State private var isAnimating = false
@@ -29,19 +29,19 @@ struct ProgressiveAuthPrompt: View {
     @State private var showSuccess = false
     @State private var isLoading = false
     @State private var errorMessage: String?
-    
+
     // MARK: - Constants
-    
+
     private let cardHeight: CGFloat = 420
     private let dismissThreshold: CGFloat = 150
     private let snapBackThreshold: CGFloat = 50
-    
+
     // MARK: - Computed Properties
-    
+
     private var currentContext: AuthPromptTrigger.TriggerContext {
         authTrigger.currentContext ?? .firstRecipeSuccess
     }
-    
+
     private var contextIcon: String {
         switch currentContext {
         case .firstRecipeSuccess: return "heart.fill"
@@ -54,28 +54,28 @@ struct ProgressiveAuthPrompt: View {
         case .returningUser: return "hand.wave.fill"
         }
     }
-    
+
     private var contextGradient: [Color] {
         switch currentContext {
-        case .firstRecipeSuccess: 
+        case .firstRecipeSuccess:
             return [Color(hex: "#f093fb"), Color(hex: "#f5576c")]
-        case .viralContentCreated: 
+        case .viralContentCreated:
             return [Color(hex: "#ff6b35"), Color(hex: "#ff1493")]
-        case .dailyLimitReached: 
+        case .dailyLimitReached:
             return [Color(hex: "#667eea"), Color(hex: "#764ba2")]
-        case .socialFeatureExplored: 
+        case .socialFeatureExplored:
             return [Color(hex: "#43e97b"), Color(hex: "#38f9d7")]
-        case .challengeInterest: 
+        case .challengeInterest:
             return [Color(hex: "#ffa726"), Color(hex: "#ff7043")]
-        case .shareAttempt: 
+        case .shareAttempt:
             return [Color(hex: "#4facfe"), Color(hex: "#00f2fe")]
-        case .weeklyHighEngagement: 
+        case .weeklyHighEngagement:
             return [Color(hex: "#f093fb"), Color(hex: "#f5576c")]
-        case .returningUser: 
+        case .returningUser:
             return [Color(hex: "#667eea"), Color(hex: "#764ba2")]
         }
     }
-    
+
     private var benefits: [(icon: String, title: String)] {
         switch currentContext {
         case .firstRecipeSuccess:
@@ -128,9 +128,9 @@ struct ProgressiveAuthPrompt: View {
             ]
         }
     }
-    
+
     // MARK: - Body
-    
+
     var body: some View {
         ZStack {
             // Background overlay
@@ -140,11 +140,11 @@ struct ProgressiveAuthPrompt: View {
                 .onTapGesture {
                     dismissPrompt()
                 }
-            
+
             // Main card
             VStack(spacing: 0) {
                 Spacer()
-                
+
                 GlassmorphicCard(content: {
                     VStack(spacing: 0) {
                         // Drag handle
@@ -153,7 +153,7 @@ struct ProgressiveAuthPrompt: View {
                             .frame(width: 40, height: 6)
                             .padding(.top, 12)
                             .padding(.bottom, 20)
-                        
+
                         // Header section
                         VStack(spacing: 16) {
                             // Context icon with animation
@@ -169,12 +169,12 @@ struct ProgressiveAuthPrompt: View {
                                     .frame(width: 80, height: 80)
                                     .scaleEffect(isAnimating ? 1.1 : 1.0)
                                     .shadow(color: contextGradient.first?.opacity(0.5) ?? .clear, radius: 20)
-                                
+
                                 Image(systemName: contextIcon)
                                     .font(.system(size: 32, weight: .bold))
                                     .foregroundColor(.white)
                                     .rotationEffect(.degrees(isAnimating ? 360 : 0))
-                                
+
                                 // Particle burst effect
                                 Circle()
                                     .stroke(Color.white.opacity(0.6), lineWidth: 2)
@@ -182,7 +182,7 @@ struct ProgressiveAuthPrompt: View {
                                     .scaleEffect(particleScale)
                                     .opacity(particleScale > 0 ? 0 : 1)
                             }
-                            
+
                             // Title and message
                             VStack(spacing: 8) {
                                 Text(currentContext.title)
@@ -190,7 +190,7 @@ struct ProgressiveAuthPrompt: View {
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
                                     .multilineTextAlignment(.center)
-                                
+
                                 Text(currentContext.message)
                                     .font(.subheadline)
                                     .foregroundColor(.white.opacity(0.8))
@@ -200,7 +200,7 @@ struct ProgressiveAuthPrompt: View {
                             }
                         }
                         .padding(.bottom, 24)
-                        
+
                         // Benefits section
                         VStack(spacing: 12) {
                             ForEach(Array(benefits.enumerated()), id: \.offset) { index, benefit in
@@ -215,13 +215,13 @@ struct ProgressiveAuthPrompt: View {
                                             )
                                         )
                                         .frame(width: 24)
-                                    
+
                                     Text(benefit.title)
                                         .font(.system(size: 16, weight: .medium))
                                         .foregroundColor(.white.opacity(0.9))
-                                    
+
                                     Spacer()
-                                    
+
                                     Image(systemName: "checkmark.circle.fill")
                                         .font(.system(size: 16))
                                         .foregroundColor(contextGradient.first ?? .blue)
@@ -233,7 +233,7 @@ struct ProgressiveAuthPrompt: View {
                             }
                         }
                         .padding(.bottom, 32)
-                        
+
                         // Sign in buttons
                         VStack(spacing: 12) {
                             // Sign in with Apple
@@ -250,7 +250,7 @@ struct ProgressiveAuthPrompt: View {
                             .frame(height: 50)
                             .cornerRadius(25)
                             .disabled(isLoading)
-                            
+
                             // Sign in with TikTok
                             Button(action: {
                                 handleTikTokSignIn()
@@ -264,7 +264,7 @@ struct ProgressiveAuthPrompt: View {
                                         Image(systemName: "music.note")
                                             .font(.title2)
                                     }
-                                    
+
                                     Text(isLoading ? "Signing in..." : "Continue with TikTok")
                                         .font(.headline)
                                         .fontWeight(.semibold)
@@ -285,7 +285,7 @@ struct ProgressiveAuthPrompt: View {
                         }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 20)
-                        
+
                         // Action buttons
                         HStack(spacing: 16) {
                             // Maybe Later
@@ -303,7 +303,7 @@ struct ProgressiveAuthPrompt: View {
                                             .stroke(Color.white.opacity(0.3), lineWidth: 1)
                                     )
                             }
-                            
+
                             // Don't Ask Again
                             Button(action: {
                                 authTrigger.recordPromptAction("never", for: currentContext)
@@ -317,7 +317,7 @@ struct ProgressiveAuthPrompt: View {
                             }
                         }
                         .padding(.bottom, 20)
-                        
+
                         // Error message
                         if let errorMessage = errorMessage {
                             Text(errorMessage)
@@ -355,29 +355,29 @@ struct ProgressiveAuthPrompt: View {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                 isVisible = true
             }
-            
+
             // Trigger animations
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
                     isAnimating = true
                 }
-                
+
                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                     shimmerPhase = 1.0
                 }
             }
-            
+
             // Trigger particle effect
             triggerParticleEffect()
         }
     }
-    
+
     // MARK: - Action Handlers
-    
+
     private func handleSignInWithApple(_ result: Result<ASAuthorization, Error>) {
         isLoading = true
         errorMessage = nil
-        
+
         Task {
             do {
                 switch result {
@@ -399,11 +399,11 @@ struct ProgressiveAuthPrompt: View {
             }
         }
     }
-    
+
     private func handleTikTokSignIn() {
         isLoading = true
         errorMessage = nil
-        
+
         Task {
             do {
                 // TikTok authentication using the shared manager
@@ -421,57 +421,57 @@ struct ProgressiveAuthPrompt: View {
             }
         }
     }
-    
+
     private func showSuccessAndDismiss() {
         isLoading = false
         showSuccess = true
-        
+
         // Trigger success haptic
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
-        
+
         // Show success animation
         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
             particleScale = 3
         }
-        
+
         // Dismiss after success animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             dismissPrompt()
         }
     }
-    
+
     private func dismissPrompt() {
         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
             isVisible = false
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             dismiss()
         }
     }
-    
+
     private func triggerParticleEffect() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             withAnimation(.easeOut(duration: 1.2)) {
                 particleScale = 2.5
             }
-            
+
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                 particleScale = 0
             }
         }
     }
-    
+
     private func triggerErrorFeedback() {
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.error)
-        
+
         // Shake animation
         withAnimation(.easeInOut(duration: 0.1).repeatCount(3, autoreverses: true)) {
             dragOffset = 10
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 dragOffset = 0
@@ -486,7 +486,7 @@ struct ProgressiveAuthPrompt: View {
     ZStack {
         MagicalBackground()
             .ignoresSafeArea()
-        
+
         ProgressiveAuthPrompt()
     }
 }
@@ -501,7 +501,7 @@ extension ProgressiveAuthPrompt {
                 AuthPromptTrigger.shared.triggerPrompt(for: .firstRecipeSuccess)
             }
     }
-    
+
     /// Show prompt for viral content
     static func showForViralContent() -> some View {
         ProgressiveAuthPrompt()
@@ -509,7 +509,7 @@ extension ProgressiveAuthPrompt {
                 AuthPromptTrigger.shared.triggerPrompt(for: .viralContentCreated)
             }
     }
-    
+
     /// Show prompt for social features
     static func showForSocial() -> some View {
         ProgressiveAuthPrompt()
@@ -517,7 +517,7 @@ extension ProgressiveAuthPrompt {
                 AuthPromptTrigger.shared.triggerPrompt(for: .socialFeatureExplored)
             }
     }
-    
+
     /// Show prompt for challenges
     static func showForChallenges() -> some View {
         ProgressiveAuthPrompt()

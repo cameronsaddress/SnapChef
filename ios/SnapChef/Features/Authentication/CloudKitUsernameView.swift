@@ -3,7 +3,7 @@ import SwiftUI
 struct CloudKitUsernameView: View {
     @StateObject private var authManager = CloudKitAuthManager.shared
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var username = ""
     @State private var isChecking = false
     @State private var isAvailable = false
@@ -11,17 +11,17 @@ struct CloudKitUsernameView: View {
     @State private var suggestions: [String] = []
     @State private var showError = false
     @State private var errorMessage = ""
-    
+
     var isValid: Bool {
         username.count >= 3 && username.count <= 20 && username.range(of: "^[a-zA-Z0-9_]+$", options: .regularExpression) != nil
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 32) {
                     // Header
                     VStack(spacing: 16) {
@@ -34,23 +34,23 @@ struct CloudKitUsernameView: View {
                                     endPoint: .bottomTrailing
                                 )
                             )
-                        
+
                         Text("Choose Your Username")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                        
+
                         Text("This is how other chefs will know you")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.8))
                     }
                     .padding(.top, 40)
-                    
+
                     // Username Input
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Image(systemName: "at")
                                 .foregroundColor(.white.opacity(0.6))
-                            
+
                             TextField("username", text: $username)
                                 .textContentType(.username)
                                 .autocapitalization(.none)
@@ -62,7 +62,7 @@ struct CloudKitUsernameView: View {
                                         checkUsernameAvailability()
                                     }
                                 }
-                            
+
                             if isChecking {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -84,7 +84,7 @@ struct CloudKitUsernameView: View {
                                         )
                                 )
                         )
-                        
+
                         // Validation message
                         if !username.isEmpty {
                             if !isValid {
@@ -103,14 +103,14 @@ struct CloudKitUsernameView: View {
                         }
                     }
                     .padding(.horizontal, 24)
-                    
+
                     // Suggestions
                     if !suggestions.isEmpty && !isAvailable {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Try these:")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.6))
-                            
+
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(suggestions, id: \.self) { suggestion in
@@ -137,9 +137,9 @@ struct CloudKitUsernameView: View {
                         }
                         .padding(.horizontal, 24)
                     }
-                    
+
                     Spacer()
-                    
+
                     // Continue Button
                     Button(action: saveUsername) {
                         Text("Continue")
@@ -167,17 +167,17 @@ struct CloudKitUsernameView: View {
             Text(errorMessage)
         }
     }
-    
+
     private func checkUsernameAvailability() {
         guard isValid else { return }
-        
+
         isChecking = true
-        
+
         Task {
             do {
                 isAvailable = try await authManager.checkUsernameAvailability(username)
                 hasChecked = true
-                
+
                 if !isAvailable {
                     // Generate suggestions based on current username
                     suggestions = [
@@ -194,11 +194,11 @@ struct CloudKitUsernameView: View {
                 errorMessage = error.localizedDescription
                 showError = true
             }
-            
+
             isChecking = false
         }
     }
-    
+
     private func saveUsername() {
         Task {
             do {

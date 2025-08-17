@@ -15,7 +15,7 @@ struct ActivityItem: Identifiable {
     let recipeImage: UIImage?
     let timestamp: Date
     let isRead: Bool
-    
+
     enum ActivityType {
         case follow
         case recipeShared
@@ -23,7 +23,7 @@ struct ActivityItem: Identifiable {
         case recipeComment
         case challengeCompleted
         case badgeEarned
-        
+
         var icon: String {
             switch self {
             case .follow: return "person.badge.plus"
@@ -34,7 +34,7 @@ struct ActivityItem: Identifiable {
             case .badgeEarned: return "medal.fill"
             }
         }
-        
+
         var color: Color {
             switch self {
             case .follow: return Color(hex: "#667eea")
@@ -46,15 +46,15 @@ struct ActivityItem: Identifiable {
             }
         }
     }
-    
+
     var activityText: AttributedString {
         var text = AttributedString()
-        
+
         // User name (bold)
         var userName = AttributedString(self.userName)
         userName.font = .system(size: 16, weight: .semibold)
         text += userName
-        
+
         // Activity description
         switch type {
         case .follow:
@@ -85,7 +85,7 @@ struct ActivityItem: Identifiable {
         case .badgeEarned:
             text += AttributedString(" earned a new badge!")
         }
-        
+
         return text
     }
 }
@@ -96,13 +96,13 @@ struct ActivityFeedView: View {
     @State private var selectedFilter: ActivityFilter = .all
     @State private var showingRecipeDetail = false
     @State private var selectedRecipeID: String?
-    
+
     enum ActivityFilter: String, CaseIterable {
         case all = "All"
         case social = "Social"
         case recipes = "Recipes"
         case challenges = "Challenges"
-        
+
         var icon: String {
             switch self {
             case .all: return "sparkles"
@@ -112,13 +112,13 @@ struct ActivityFeedView: View {
             }
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // Filter Pills
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -139,7 +139,7 @@ struct ActivityFeedView: View {
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 16)
-                    
+
                     // Activity List
                     if feedManager.isLoading && feedManager.activities.isEmpty {
                         Spacer()
@@ -158,7 +158,7 @@ struct ActivityFeedView: View {
                                             handleActivityTap(activity)
                                         }
                                 }
-                                
+
                                 if feedManager.hasMore {
                                     ProgressView()
                                         .tint(.white)
@@ -186,7 +186,7 @@ struct ActivityFeedView: View {
             await feedManager.loadInitialActivities()
         }
     }
-    
+
     private var filteredActivities: [ActivityItem] {
         switch selectedFilter {
         case .all:
@@ -203,7 +203,7 @@ struct ActivityFeedView: View {
             }
         }
     }
-    
+
     private func handleActivityTap(_ activity: ActivityItem) {
         switch activity.type {
         case .recipeShared, .recipeLiked, .recipeComment:
@@ -227,7 +227,7 @@ struct ActivityFeedView: View {
 // MARK: - Activity Item View
 struct ActivityItemView: View {
     let activity: ActivityItem
-    
+
     var body: some View {
         HStack(spacing: 16) {
             // User Photo or Activity Icon
@@ -248,7 +248,7 @@ struct ActivityItemView: View {
                                 .foregroundColor(.white)
                         )
                 }
-                
+
                 // Activity Type Icon
                 Circle()
                     .fill(activity.type.color)
@@ -260,22 +260,22 @@ struct ActivityItemView: View {
                     )
                     .offset(x: 18, y: 18)
             }
-            
+
             VStack(alignment: .leading, spacing: 6) {
                 // Activity Text
                 Text(activity.activityText)
                     .font(.system(size: 16))
                     .foregroundColor(.white)
                     .lineLimit(2)
-                
+
                 // Timestamp
                 Text(formatTimestamp(activity.timestamp))
                     .font(.system(size: 14))
                     .foregroundColor(.white.opacity(0.6))
             }
-            
+
             Spacer()
-            
+
             // Recipe Image (if applicable)
             if let recipeImage = activity.recipeImage {
                 Image(uiImage: recipeImage)
@@ -295,7 +295,7 @@ struct ActivityItemView: View {
                 )
         )
     }
-    
+
     private func formatTimestamp(_ date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
@@ -309,7 +309,7 @@ struct FilterPill: View {
     let icon: String
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
@@ -334,20 +334,20 @@ struct EmptyActivityView: View {
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
-            
+
             Image(systemName: "bell.slash")
                 .font(.system(size: 60))
                 .foregroundColor(.white.opacity(0.3))
-            
+
             Text("No activity yet")
                 .font(.system(size: 24, weight: .bold))
                 .foregroundColor(.white)
-            
+
             Text("Follow other chefs and share recipes\nto see activity here")
                 .font(.system(size: 16))
                 .foregroundColor(.white.opacity(0.6))
                 .multilineTextAlignment(.center)
-            
+
             Spacer()
         }
         .padding()
@@ -360,37 +360,37 @@ class ActivityFeedManager: ObservableObject {
     @Published var activities: [ActivityItem] = []
     @Published var isLoading = false
     @Published var hasMore = true
-    
+
     private let cloudKitSync = CloudKitSyncService.shared
     private var lastFetchedRecord: CKRecord?
-    
+
     func loadInitialActivities() async {
         isLoading = true
         activities = []
         lastFetchedRecord = nil
-        
+
         // For now, load mock data
-        // TODO: Implement CloudKit query for real activity data
+        // CloudKit activity data integration not implemented - using mock data
         activities = generateMockActivities()
         hasMore = false
-        
+
         isLoading = false
     }
-    
+
     func loadMore() async {
         guard hasMore && !isLoading else { return }
-        
+
         isLoading = true
-        
-        // TODO: Implement pagination with CloudKit
-        
+
+        // CloudKit pagination not implemented - using mock data for demo
+
         isLoading = false
     }
-    
+
     func refresh() async {
         await loadInitialActivities()
     }
-    
+
     private func generateMockActivities() -> [ActivityItem] {
         [
             ActivityItem(
@@ -404,7 +404,7 @@ class ActivityFeedManager: ObservableObject {
                 recipeID: nil,
                 recipeName: nil,
                 recipeImage: nil,
-                timestamp: Date().addingTimeInterval(-3600),
+                timestamp: Date().addingTimeInterval(-3_600),
                 isRead: false
             ),
             ActivityItem(
@@ -418,7 +418,7 @@ class ActivityFeedManager: ObservableObject {
                 recipeID: "recipe1",
                 recipeName: "Perfect Pancakes",
                 recipeImage: nil,
-                timestamp: Date().addingTimeInterval(-7200),
+                timestamp: Date().addingTimeInterval(-7_200),
                 isRead: true
             ),
             ActivityItem(
@@ -432,7 +432,7 @@ class ActivityFeedManager: ObservableObject {
                 recipeID: "recipe2",
                 recipeName: "Spicy Tacos",
                 recipeImage: nil,
-                timestamp: Date().addingTimeInterval(-10800),
+                timestamp: Date().addingTimeInterval(-10_800),
                 isRead: true
             ),
             ActivityItem(
@@ -446,7 +446,7 @@ class ActivityFeedManager: ObservableObject {
                 recipeID: nil,
                 recipeName: "30-Minute Meals",
                 recipeImage: nil,
-                timestamp: Date().addingTimeInterval(-14400),
+                timestamp: Date().addingTimeInterval(-14_400),
                 isRead: true
             )
         ]

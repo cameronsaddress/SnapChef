@@ -6,10 +6,10 @@ struct InfluencerCarousel: View {
     @State private var timer: Timer?
     @State private var dragOffset: CGFloat = 0
     @State private var isDragging = false
-    
+
     let influencers = InfluencerRecipe.mockInfluencers
     let autoScrollInterval: TimeInterval = 5.0
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Section header
@@ -18,14 +18,14 @@ struct InfluencerCarousel: View {
                     Text("Celebrity Kitchens")
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
-                    
+
                     Text("See what your favorite stars are cooking")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
-                
+
                 Spacer()
-                
+
                 // Page indicators
                 HStack(spacing: 8) {
                     ForEach(0..<influencers.count, id: \.self) { index in
@@ -38,7 +38,7 @@ struct InfluencerCarousel: View {
                 }
             }
             .padding(.horizontal, 20)
-            
+
             // Carousel
             GeometryReader { geometry in
                 HStack(spacing: 20) {
@@ -63,7 +63,7 @@ struct InfluencerCarousel: View {
                             // Only respond to clearly horizontal swipes
                             let horizontalAmount = abs(value.translation.width)
                             let verticalAmount = abs(value.translation.height)
-                            
+
                             // Only process if horizontal movement is significantly greater
                             if horizontalAmount > verticalAmount * 2 {
                                 isDragging = true
@@ -75,11 +75,11 @@ struct InfluencerCarousel: View {
                             // Only process clearly horizontal swipes
                             let horizontalAmount = abs(value.translation.width)
                             let verticalAmount = abs(value.translation.height)
-                            
+
                             if horizontalAmount > verticalAmount * 2 {
                                 isDragging = false
                                 let threshold: CGFloat = 50
-                                
+
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                     if value.translation.width > threshold && currentIndex > 0 {
                                         currentIndex -= 1
@@ -88,7 +88,7 @@ struct InfluencerCarousel: View {
                                     }
                                     dragOffset = 0
                                 }
-                                
+
                                 startAutoScroll()
                             } else {
                                 // Reset if it wasn't a valid horizontal swipe
@@ -112,7 +112,7 @@ struct InfluencerCarousel: View {
             InfluencerDetailView(influencer: influencer)
         }
     }
-    
+
     private func startAutoScroll() {
         stopAutoScroll()
         timer = Timer.scheduledTimer(withTimeInterval: autoScrollInterval, repeats: true) { _ in
@@ -125,7 +125,7 @@ struct InfluencerCarousel: View {
             }
         }
     }
-    
+
     private func stopAutoScroll() {
         timer?.invalidate()
         timer = nil
@@ -136,7 +136,7 @@ struct InfluencerCarousel: View {
     ZStack {
         MagicalBackground()
             .ignoresSafeArea()
-        
+
         InfluencerCarousel()
     }
 }

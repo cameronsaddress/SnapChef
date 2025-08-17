@@ -4,11 +4,11 @@ import SwiftUI
 struct GlassmorphicCard<Content: View>: View {
     let content: () -> Content
     var cornerRadius: CGFloat = 20
-    var glowColor: Color = Color(hex: "#4facfe")
-    
+    var glowColor = Color(hex: "#4facfe")
+
     @State private var isPressed = false
     @State private var shimmerPhase: CGFloat = -1
-    
+
     var body: some View {
         content()
             .background(
@@ -19,7 +19,7 @@ struct GlassmorphicCard<Content: View>: View {
                         .blur(radius: 20)
                         .offset(y: 10)
                         .scaleEffect(isPressed ? 0.95 : 1.0)
-                    
+
                     // Glass effect
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .fill(.ultraThinMaterial)
@@ -51,7 +51,7 @@ struct GlassmorphicCard<Content: View>: View {
                                     lineWidth: 1
                                 )
                         )
-                    
+
                     // Shimmer effect
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .fill(
@@ -78,11 +78,11 @@ struct MagneticButton: View {
     let title: String
     let icon: String?
     let action: () -> Void
-    
+
     @State private var offset: CGSize = .zero
     @State private var isPressed = false
     @State private var particleScale: CGFloat = 0
-    
+
     var body: some View {
         Button(action: {
             impact(.medium)
@@ -94,7 +94,7 @@ struct MagneticButton: View {
                     Image(systemName: icon)
                         .font(.system(size: 20, weight: .semibold))
                 }
-                
+
                 Text(title)
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
             }
@@ -112,7 +112,7 @@ struct MagneticButton: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    
+
                     // Particle burst
                     Circle()
                         .fill(Color.white.opacity(0.3))
@@ -139,7 +139,7 @@ struct MagneticButton: View {
                     let translation = value.translation
                     let distance = sqrt(pow(translation.width, 2) + pow(translation.height, 2))
                     let maxDistance: CGFloat = 30
-                    
+
                     if distance < maxDistance {
                         offset = CGSize(
                             width: translation.width * 0.5,
@@ -154,14 +154,14 @@ struct MagneticButton: View {
                 }
         )
     }
-    
+
     private func triggerParticles() {
         particleScale = 0
         withAnimation(.easeOut(duration: 0.6)) {
             particleScale = 3
         }
     }
-    
+
     private func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
         let generator = UIImpactFeedbackGenerator(style: style)
         generator.prepare()
@@ -174,17 +174,17 @@ struct FloatingActionButton: View {
     let icon: String
     let badge: String?
     let action: () -> Void
-    
+
     @State private var rotation: Double = 0
     @State private var scale: CGFloat = 1
     @State private var showRipple = false
-    
+
     init(icon: String, badge: String? = nil, action: @escaping () -> Void) {
         self.icon = icon
         self.badge = badge
         self.action = action
     }
-    
+
     var body: some View {
         Button(action: {
             triggerAnimation()
@@ -196,7 +196,7 @@ struct FloatingActionButton: View {
                     .stroke(Color.white.opacity(0.3), lineWidth: 2)
                     .scaleEffect(showRipple ? 2.5 : 1)
                     .opacity(showRipple ? 0 : 1)
-                
+
                 // Button background
                 Circle()
                     .fill(
@@ -210,13 +210,13 @@ struct FloatingActionButton: View {
                         )
                     )
                     .shadow(color: Color(hex: "#f093fb").opacity(0.5), radius: 15, y: 8)
-                
+
                 // Icon
                 Image(systemName: icon)
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(.white)
                     .rotationEffect(.degrees(rotation))
-                
+
                 // Badge
                 if let badge = badge {
                     VStack {
@@ -245,26 +245,26 @@ struct FloatingActionButton: View {
         }
         .buttonStyle(PlainButtonStyle())
     }
-    
+
     private func triggerAnimation() {
         // Haptic
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
-        
+
         // Scale animation
         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
             scale = 0.9
         }
-        
+
         withAnimation(.spring(response: 0.3, dampingFraction: 0.6).delay(0.1)) {
             scale = 1.0
         }
-        
+
         // Rotation animation
         withAnimation(.easeInOut(duration: 0.5)) {
             rotation += 360
         }
-        
+
         // Ripple animation
         showRipple = true
         withAnimation(.easeOut(duration: 0.6)) {
@@ -277,15 +277,15 @@ struct FloatingActionButton: View {
 struct NeumorphicToggle: View {
     @Binding var isOn: Bool
     let label: String
-    
+
     var body: some View {
         HStack {
             Text(label)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white.opacity(0.9))
-            
+
             Spacer()
-            
+
             ZStack {
                 // Track
                 Capsule()
@@ -295,7 +295,7 @@ struct NeumorphicToggle: View {
                         Capsule()
                             .stroke(Color.white.opacity(0.1), lineWidth: 1)
                     )
-                
+
                 // Thumb
                 Circle()
                     .fill(
@@ -320,7 +320,7 @@ struct NeumorphicToggle: View {
                 withAnimation {
                     isOn.toggle()
                 }
-                
+
                 let generator = UIImpactFeedbackGenerator(style: .light)
                 generator.impactOccurred()
             }
@@ -342,15 +342,15 @@ struct AnimatedProgressRing: View {
     let progress: Double
     let size: CGFloat
     let lineWidth: CGFloat = 8
-    
+
     @State private var animatedProgress: Double = 0
-    
+
     var body: some View {
         ZStack {
             // Background ring
             Circle()
                 .stroke(Color.white.opacity(0.1), lineWidth: lineWidth)
-            
+
             // Progress ring
             Circle()
                 .trim(from: 0, to: animatedProgress)
@@ -371,7 +371,7 @@ struct AnimatedProgressRing: View {
                 )
                 .rotationEffect(.degrees(-90))
                 .shadow(color: Color(hex: "#667eea").opacity(0.5), radius: 5)
-            
+
             // Center text
             Text("\(Int(animatedProgress * 100))%")
                 .font(.system(size: size / 4, weight: .bold, design: .rounded))
@@ -391,11 +391,10 @@ struct AnimatedProgressRing: View {
     }
 }
 
-
 #Preview {
     ZStack {
         Color.black.ignoresSafeArea()
-        
+
         VStack(spacing: 30) {
             GlassmorphicCard {
                 VStack {
@@ -407,13 +406,13 @@ struct AnimatedProgressRing: View {
                 }
                 .padding(30)
             }
-            
+
             MagneticButton(
                 title: "Get Started",
                 icon: "arrow.right",
                 action: {}
             )
-            
+
             FloatingActionButton(
                 icon: "camera.fill",
                 action: {}

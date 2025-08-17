@@ -13,30 +13,30 @@ struct RecipePhotoView: View {
     let width: CGFloat?
     let height: CGFloat
     let showLabels: Bool
-    
+
     @State private var beforePhoto: UIImage?
     @State private var afterPhoto: UIImage?
     @State private var isLoadingPhotos = true
     @State private var showingAfterPhotoCapture = false
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @EnvironmentObject var appState: AppState
-    
+
     init(recipe: Recipe, width: CGFloat? = nil, height: CGFloat = 100, showLabels: Bool = true) {
         self.recipe = recipe
         self.width = width
         self.height = height
         self.showLabels = showLabels
     }
-    
+
     // Computed properties to simplify complex conditionals
     private var storedPhotos: PhotoStorageManager.RecipePhotos? {
         PhotoStorageManager.shared.getPhotos(for: recipe.id)
     }
-    
+
     private var savedRecipe: SavedRecipe? {
         appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id })
     }
-    
+
     private var displayBeforePhoto: UIImage? {
         // OPTIMIZATION: Use PhotoStorageManager as primary source for instant display
         if let storedPhoto = storedPhotos?.fridgePhoto {
@@ -57,7 +57,7 @@ struct RecipePhotoView: View {
         // Fall back to CloudKit photo (slower, loaded asynchronously)
         return beforePhoto
     }
-    
+
     private var displayAfterPhoto: UIImage? {
         // OPTIMIZATION: Use PhotoStorageManager as primary source for instant display
         if let storedPhoto = storedPhotos?.mealPhoto {
@@ -71,17 +71,17 @@ struct RecipePhotoView: View {
         // Fall back to CloudKit photo (slower, loaded asynchronously)
         return afterPhoto
     }
-    
+
     private var halfWidth: CGFloat? {
         guard let width = width else { return nil }
         return width / 2
     }
-    
+
     var body: some View {
         ZStack {
             // Background gradient as fallback
             backgroundGradient
-            
+
             // Photo content
             HStack(spacing: 0) {
                 // Before (Fridge) Photo - Left Side
@@ -90,12 +90,12 @@ struct RecipePhotoView: View {
                     .clipped()
                     .overlay(photoOverlay)
                     .overlay(beforeLabel)
-                
+
                 // Divider line
                 Rectangle()
                     .fill(Color.white.opacity(0.3))
                     .frame(width: 1)
-                
+
                 // After (Meal) Photo - Right Side
                 Button(action: handleAfterPhotoTap) {
                     afterPhotoView
@@ -107,7 +107,7 @@ struct RecipePhotoView: View {
                 .buttonStyle(PlainButtonStyle())
             }
             .clipShape(RoundedRectangle(cornerRadius: 16))
-            
+
             // Loading indicator
             if isLoadingPhotos {
                 ProgressView()
@@ -140,9 +140,9 @@ struct RecipePhotoView: View {
             }
         }
     }
-    
+
     // MARK: - View Builders
-    
+
     private var backgroundGradient: some View {
         RoundedRectangle(cornerRadius: 16)
             .fill(
@@ -156,7 +156,7 @@ struct RecipePhotoView: View {
                 )
             )
     }
-    
+
     private var beforePhotoView: some View {
         Group {
             if let photo = displayBeforePhoto {
@@ -168,7 +168,7 @@ struct RecipePhotoView: View {
             }
         }
     }
-    
+
     private var beforePhotoPlaceholder: some View {
         VStack {
             Image(systemName: "refrigerator")
@@ -183,7 +183,7 @@ struct RecipePhotoView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.opacity(0.2))
     }
-    
+
     private var afterPhotoView: some View {
         Group {
             if let photo = displayAfterPhoto {
@@ -195,7 +195,7 @@ struct RecipePhotoView: View {
             }
         }
     }
-    
+
     private var afterPhotoPlaceholder: some View {
         VStack(spacing: 4) {
             Image(systemName: "camera.fill")
@@ -211,7 +211,7 @@ struct RecipePhotoView: View {
         .background(Color.white.opacity(0.1))
         .overlay(pulsingBorder)
     }
-    
+
     private var pulsingBorder: some View {
         RoundedRectangle(cornerRadius: 0)
             .stroke(Color.white.opacity(0.3), lineWidth: 1)
@@ -219,12 +219,12 @@ struct RecipePhotoView: View {
             .opacity(0.5)
             .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: UUID())
     }
-    
+
     private var photoOverlay: some View {
         Rectangle()
             .fill(Color.black.opacity(0.2))
     }
-    
+
     private var afterPhotoOverlay: some View {
         Group {
             if displayAfterPhoto != nil {
@@ -233,7 +233,7 @@ struct RecipePhotoView: View {
             }
         }
     }
-    
+
     private var beforeLabel: some View {
         Group {
             if showLabels && displayBeforePhoto != nil {
@@ -245,7 +245,7 @@ struct RecipePhotoView: View {
             }
         }
     }
-    
+
     private var afterLabel: some View {
         Group {
             if showLabels && displayAfterPhoto != nil {
@@ -257,7 +257,7 @@ struct RecipePhotoView: View {
             }
         }
     }
-    
+
     private func labelBadge(text: String) -> some View {
         Text(text)
             .font(.system(size: 9, weight: .bold))
@@ -269,22 +269,22 @@ struct RecipePhotoView: View {
                     .fill(Color.black.opacity(0.6))
             )
     }
-    
+
     // MARK: - Actions
-    
+
     private func handleAfterPhotoTap() {
         if displayAfterPhoto == nil {
             showingAfterPhotoCapture = true
         }
     }
-    
+
     private func loadPhotosFromCloudKit() {
         // OPTIMIZATION: Load photos in low priority background task
         Task(priority: .background) {
             do {
                 print("📸 RecipePhotoView: Loading photos from CloudKit for recipe \(recipe.id)")
                 let photos = try await cloudKitRecipeManager.fetchRecipePhotos(for: recipe.id.uuidString)
-                
+
                 await MainActor.run {
                     // Only update if we don't already have these photos locally
                     if photos.before != nil && self.displayBeforePhoto == nil {
@@ -293,7 +293,7 @@ struct RecipePhotoView: View {
                     if photos.after != nil && self.displayAfterPhoto == nil {
                         self.afterPhoto = photos.after
                     }
-                    
+
                     // Store CloudKit photos in PhotoStorageManager (single source of truth)
                     if photos.before != nil || photos.after != nil {
                         PhotoStorageManager.shared.storePhotos(
@@ -303,7 +303,7 @@ struct RecipePhotoView: View {
                         )
                         print("📸 RecipePhotoView: Stored CloudKit photos in PhotoStorageManager for recipe \(recipe.id)")
                     }
-                    
+
                     self.isLoadingPhotos = false
                 }
             } catch {
@@ -323,7 +323,7 @@ struct CompactRecipePhotoView: View {
     @State private var afterPhoto: UIImage?
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @EnvironmentObject var appState: AppState
-    
+
     var body: some View {
         RecipePhotoView(
             recipe: recipe,

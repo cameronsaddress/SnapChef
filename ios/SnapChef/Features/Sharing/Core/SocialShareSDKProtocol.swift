@@ -18,12 +18,12 @@ struct SDKShareContent {
         case link(URL)
         case multipleImages([UIImage])
     }
-    
+
     let type: ContentType
     let caption: String?
     let hashtags: [String]?
     let mentionedUsers: [String]?
-    
+
     init(type: ContentType, caption: String? = nil, hashtags: [String]? = nil, mentionedUsers: [String]? = nil) {
         self.type = type
         self.caption = caption
@@ -41,7 +41,7 @@ enum SDKPlatform: String, CaseIterable {
     case twitter = "X"
     case snapchat = "Snapchat"
     case messages = "Messages"
-    
+
     var iconName: String {
         switch self {
         case .tiktok: return "music.note"
@@ -52,7 +52,7 @@ enum SDKPlatform: String, CaseIterable {
         case .messages: return "message.fill"
         }
     }
-    
+
     var brandColor: String {
         switch self {
         case .tiktok: return "#000000"
@@ -75,7 +75,7 @@ enum SDKError: LocalizedError {
     case authenticationRequired
     case networkError
     case unknown(String)
-    
+
     var errorDescription: String? {
         switch self {
         case .notConfigured:
@@ -102,13 +102,13 @@ enum SDKError: LocalizedError {
 protocol SocialShareSDKProtocol {
     /// Check if the platform app is installed and available
     func isAvailable() -> Bool
-    
+
     /// Share content to the platform
     func share(content: SDKShareContent) async throws
-    
+
     /// Authenticate user with the platform (optional)
     func authenticate() async throws -> Bool
-    
+
     /// Get platform-specific configuration requirements
     func getConfigurationRequirements() -> [String: String]
 }
@@ -118,44 +118,44 @@ protocol SocialShareSDKProtocol {
 @MainActor
 final class SocialSDKManager {
     static let shared = SocialSDKManager()
-    
+
     private var sdks: [SDKPlatform: SocialShareSDKProtocol] = [:]
-    
+
     private init() {}
-    
+
     /// Register an SDK for a platform
     func register(platform: SDKPlatform, sdk: SocialShareSDKProtocol) {
         sdks[platform] = sdk
     }
-    
+
     /// Check if a platform is available
     func isAvailable(platform: SDKPlatform) -> Bool {
         guard let sdk = sdks[platform] else { return false }
         return sdk.isAvailable()
     }
-    
+
     /// Share content to a platform
     func share(to platform: SDKPlatform, content: SDKShareContent) async throws {
         guard let sdk = sdks[platform] else {
             throw SDKError.notConfigured
         }
-        
+
         guard sdk.isAvailable() else {
             throw SDKError.notInstalled
         }
-        
+
         try await sdk.share(content: content)
     }
-    
+
     /// Authenticate with a platform
     func authenticate(platform: SDKPlatform) async throws -> Bool {
         guard let sdk = sdks[platform] else {
             throw SDKError.notConfigured
         }
-        
+
         return try await sdk.authenticate()
     }
-    
+
     /// Get all available platforms
     func getAvailablePlatforms() -> [SDKPlatform] {
         return SDKPlatform.allCases.filter { isAvailable(platform: $0) }

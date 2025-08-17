@@ -16,26 +16,25 @@ import AVFoundation
 /// Orchestrates all polish features for viral video generation
 @MainActor
 public class ViralVideoPolishManager: ObservableObject {
-    
     // MARK: - Published Properties
     @Published public var currentState: PolishState = .idle
-    @Published public var progress: RenderProgress = RenderProgress(phase: .planning, progress: 0.0)
+    @Published public var progress = RenderProgress(phase: .planning, progress: 0.0)
     @Published public var isShowingProgressView = false
     @Published public var isShowingSuccessView = false
     @Published public var isShowingErrorView = false
     @Published public var currentError: Error?
-    
+
     // MARK: - Dependencies
     private let engine: ViralVideoEngine
     private let hapticManager = HapticFeedbackManager.shared
     private let errorRecovery = ErrorRecoveryManager.shared
     private let memoryOptimizer = MemoryOptimizer.shared
     private let performanceAnalyzer = PerformanceAnalyzer.shared
-    
+
     // MARK: - State Management
     private var cancellables = Set<AnyCancellable>()
     private var currentRenderTask: Task<URL, Error>?
-    
+
     public enum PolishState {
         case idle
         case preparing
@@ -45,26 +44,25 @@ public class ViralVideoPolishManager: ObservableObject {
         case success(url: URL)
         case error(Error)
     }
-    
+
     // MARK: - Initialization
-    
+
     public init(config: RenderConfig = RenderConfig()) {
         self.engine = ViralVideoEngine(config: config)
         setupBindings()
     }
-    
+
     // MARK: - Public Interface
-    
+
     /// Start viral video generation with full polish experience
     public func generateViralVideo(
         template: ViralTemplate,
         recipe: ViralRecipe,
         media: MediaBundle
     ) async throws -> URL {
-        
         // Start performance session
         performanceAnalyzer.startSession()
-        
+
         // Prepare UI state
         await MainActor.run {
             currentState = .preparing
@@ -73,20 +71,20 @@ public class ViralVideoPolishManager: ObservableObject {
             isShowingSuccessView = false
             currentError = nil
         }
-        
+
         // Prepare haptics
         hapticManager.prepareHaptics()
         hapticManager.selectionFeedback() // Start feedback
-        
+
         do {
             // Pre-warm caches for better performance
             await preWarmCaches(recipe: recipe, media: media)
-            
+
             // Update state
             await MainActor.run {
                 currentState = .rendering(template: template)
             }
-            
+
             // Execute render with error recovery
             let result = try await errorRecovery.executeWithRetry(
                 operation: {
@@ -102,67 +100,66 @@ public class ViralVideoPolishManager: ObservableObject {
                 operationId: "viral_render_\(template.rawValue)",
                 fallbackStrategy: .reduceQuality
             )
-            
+
             // Success state with haptic feedback
             await MainActor.run {
                 currentState = .success(url: result)
                 isShowingProgressView = false
                 isShowingSuccessView = true
             }
-            
+
             hapticManager.notification(.success)
-            
+
             // Complete performance session
             performanceAnalyzer.endSession()
-            
+
             return result
-            
         } catch {
             // Handle error with recovery options
             await handleRenderingError(error, template: template, recipe: recipe, media: media)
             throw error
         }
     }
-    
+
     /// Cancel current rendering operation
     public func cancelRendering() {
         currentRenderTask?.cancel()
         engine.cancelRender()
-        
+
         Task { @MainActor in
             currentState = .idle
             isShowingProgressView = false
             isShowingErrorView = false
             isShowingSuccessView = false
         }
-        
+
         hapticManager.impact(.light)
     }
-    
+
     /// Retry failed operation with recovery strategy
     public func retryWithRecovery() async {
         guard case .error(let error) = currentState else { return }
-        
+
         // Reset UI state
         await MainActor.run {
             isShowingErrorView = false
             currentError = nil
         }
-        
+
         // Implement retry logic based on error type
         // This would be called from the UI when user taps retry
         print("Retry with recovery requested for error: \(error)")
     }
-    
+
     // MARK: - Private Implementation
-    
+
     private func setupBindings() {
         // Monitor engine progress
         engine.$currentProgress
             .receive(on: DispatchQueue.main)
             .assign(to: \.progress, on: self)
             .store(in: &cancellables)
-        
+
         // Monitor memory warnings
         NotificationCenter.default.publisher(for: Notification.Name("ViralVideoMemoryPressure"))
             .receive(on: DispatchQueue.main)
@@ -173,43 +170,42 @@ public class ViralVideoPolishManager: ObservableObject {
             }
             .store(in: &cancellables)
     }
-    
+
     private func preWarmCaches(recipe: ViralRecipe, media: MediaBundle) async {
         await MainActor.run {
             currentState = .preparing
         }
-        
+
         // Pre-warm overlay cache
         let overlayFactory = OverlayFactory(config: engine.config)
         overlayFactory.preWarmCache(for: recipe, config: engine.config)
-        
+
         // Optimize images for processing
         _ = memoryOptimizer.optimizeImageForProcessing(media.beforeFridge, targetSize: engine.config.size)
         _ = memoryOptimizer.optimizeImageForProcessing(media.afterFridge, targetSize: engine.config.size)
         _ = memoryOptimizer.optimizeImageForProcessing(media.cookedMeal, targetSize: engine.config.size)
-        
+
         // Small delay for smooth transition
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
     }
-    
+
     private func handleProgressUpdate(_ progress: RenderProgress) async {
         await MainActor.run {
             self.progress = progress
-            
+
             // Trigger haptic feedback on phase changes
             if self.progress.phase != progress.phase {
                 hapticManager.renderPhaseTransition(progress.phase)
             }
         }
     }
-    
+
     private func handleRenderingError(
         _ error: Error,
         template: ViralTemplate,
         recipe: ViralRecipe,
         media: MediaBundle
     ) async {
-        
         // Get recovery action
         let recoveryAction = try? await errorRecovery.handleRenderingError(
             error,
@@ -217,30 +213,29 @@ public class ViralVideoPolishManager: ObservableObject {
             recipe: recipe,
             media: media
         )
-        
+
         await MainActor.run {
             currentState = .error(error)
             currentError = error
             isShowingProgressView = false
             isShowingErrorView = true
         }
-        
+
         // Error haptic feedback
         hapticManager.notification(.error)
-        
+
         // Handle recovery action
         if let action = recoveryAction {
             await handleRecoveryAction(action, template: template, recipe: recipe, media: media)
         }
     }
-    
+
     private func handleRecoveryAction(
         _ action: ErrorRecoveryManager.RecoveryAction,
         template: ViralTemplate,
         recipe: ViralRecipe,
         media: MediaBundle
     ) async {
-        
         switch action {
         case .retry:
             // Auto-retry after brief delay
@@ -251,14 +246,14 @@ public class ViralVideoPolishManager: ObservableObject {
             } catch {
                 print("Auto-retry failed: \(error)")
             }
-            
+
         case .retryWithReducedQuality:
             // Show user option to reduce quality
             await MainActor.run {
                 // This would show a dialog offering quality reduction
                 print("Offering quality reduction option to user")
             }
-            
+
         case .retryWithSimplifiedTemplate:
             // Auto-retry with simplified template
             let simplifiedTemplate = TemplateSimplifier.simplifyTemplate(template)
@@ -268,7 +263,7 @@ public class ViralVideoPolishManager: ObservableObject {
             } catch {
                 print("Simplified template failed: \(error)")
             }
-            
+
         case .useAlternativeTemplate(let altTemplate):
             // Auto-retry with alternative template
             do {
@@ -277,13 +272,13 @@ public class ViralVideoPolishManager: ObservableObject {
             } catch {
                 print("Alternative template failed: \(error)")
             }
-            
+
         case .showErrorToUser(let message):
             await MainActor.run {
                 // Show user-friendly error message
                 print("Showing error to user: \(message)")
             }
-            
+
         case .cancelOperation:
             await MainActor.run {
                 currentState = .idle
@@ -291,13 +286,13 @@ public class ViralVideoPolishManager: ObservableObject {
             }
         }
     }
-    
+
     private func handleMemoryPressure(_ notification: Notification) {
         let message = notification.userInfo?["message"] as? String ?? "Memory pressure detected"
-        
+
         // Show memory pressure warning to user
         print("Memory pressure: \(message)")
-        
+
         // Trigger haptic warning
         hapticManager.notification(.warning)
     }
@@ -309,13 +304,13 @@ public class ViralVideoPolishManager: ObservableObject {
 @available(iOS 14.0, *)
 public struct ViralVideoPolishView: View {
     @StateObject private var polishManager: ViralVideoPolishManager
-    
+
     let template: ViralTemplate
     let recipe: ViralRecipe
     let media: MediaBundle
     let onComplete: (URL) -> Void
     let onCancel: () -> Void
-    
+
     public init(
         template: ViralTemplate,
         recipe: ViralRecipe,
@@ -331,19 +326,19 @@ public struct ViralVideoPolishView: View {
         self.onComplete = onComplete
         self.onCancel = onCancel
     }
-    
+
     public var body: some View {
         ZStack {
             Color.black.opacity(0.8)
                 .ignoresSafeArea()
-            
+
             VStack {
                 if polishManager.isShowingProgressView {
                     SmoothTransitionContainer(transitionStyle: .spring) {
                         EnhancedProgressView(progress: .constant(polishManager.progress))
                     }
                 }
-                
+
                 if polishManager.isShowingSuccessView {
                     SmoothTransitionContainer(transitionStyle: .scale) {
                         SuccessView {
@@ -353,7 +348,7 @@ public struct ViralVideoPolishView: View {
                         }
                     }
                 }
-                
+
                 if polishManager.isShowingErrorView {
                     SmoothTransitionContainer(transitionStyle: .fade) {
                         ErrorRecoveryView(
@@ -388,10 +383,10 @@ public struct ViralVideoPolishView: View {
 @available(iOS 14.0, *)
 private struct SuccessView: View {
     let onComplete: () -> Void
-    
+
     @State private var showCheckmark = false
     @State private var showText = false
-    
+
     var body: some View {
         VStack(spacing: 24) {
             ZStack {
@@ -400,21 +395,21 @@ private struct SuccessView: View {
                     .frame(width: 80, height: 80)
                     .scaleEffect(showCheckmark ? 1 : 0)
                     .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showCheckmark)
-                
+
                 Image(systemName: "checkmark")
                     .font(.system(size: 40, weight: .bold))
                     .foregroundColor(.white)
                     .scaleEffect(showCheckmark ? 1 : 0)
                     .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: showCheckmark)
             }
-            
+
             VStack(spacing: 12) {
                 Text("Video Ready!")
                     .font(.title2)
                     .fontWeight(.bold)
                     .opacity(showText ? 1 : 0)
                     .animation(.easeInOut(duration: 0.4).delay(0.8), value: showText)
-                
+
                 Text("Your viral video has been generated successfully")
                     .font(.body)
                     .foregroundColor(.secondary)
@@ -422,7 +417,7 @@ private struct SuccessView: View {
                     .opacity(showText ? 1 : 0)
                     .animation(.easeInOut(duration: 0.4).delay(1.0), value: showText)
             }
-            
+
             Button("Continue") {
                 HapticFeedbackManager.shared.impact(.medium)
                 onComplete()
@@ -443,7 +438,6 @@ private struct SuccessView: View {
 
 /// Summary of all performance optimizations implemented
 public struct PerformanceOptimizationsSummary {
-    
     public static let optimizations: [String: String] = [
         "CVPixelBuffer Pool Reuse": "Shared pixel buffer pools across components reduce memory allocation overhead by ~40%",
         "CIContext Caching": "Single shared CIContext reduces GPU context creation time by ~60%",
@@ -456,7 +450,7 @@ public struct PerformanceOptimizationsSummary {
         "Layer Caching": "Pre-computed CALayer cache reduces overlay rendering time by ~50%",
         "Polish Features": "Loading states and smooth transitions provide premium user experience"
     ]
-    
+
     public static let targetMetrics: [String: String] = [
         "Render Time": "<5 seconds for 15s video",
         "Memory Usage": "<600MB peak",
@@ -465,21 +459,21 @@ public struct PerformanceOptimizationsSummary {
         "Success Rate": ">99%",
         "User Experience": "Premium with haptic feedback and smooth animations"
     ]
-    
+
     public static func printSummary() {
         print("🚀 Performance & Polish Optimizations Summary")
         print(String(repeating: "=", count: 50))
-        
+
         print("\n📊 Optimizations Implemented:")
         for (optimization, description) in optimizations {
             print("  ✅ \(optimization): \(description)")
         }
-        
+
         print("\n🎯 Target Metrics:")
         for (metric, target) in targetMetrics {
             print("  📈 \(metric): \(target)")
         }
-        
+
         print("\n🎬 Ready for Production!")
     }
 }

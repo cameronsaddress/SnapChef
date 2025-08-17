@@ -1,11 +1,12 @@
 import SwiftUI
+import os.log
 import CloudKit
 
 enum SubscriptionTier: String, CaseIterable {
     case free = "Free"
     case basic = "Basic"
     case premium = "Premium"
-    
+
     var price: String {
         switch self {
         case .free: return "Free"
@@ -13,7 +14,7 @@ enum SubscriptionTier: String, CaseIterable {
         case .premium: return "$9.99/mo"
         }
     }
-    
+
     var features: [String] {
         switch self {
         case .free: return ["1 meal per day", "Basic recipes", "Standard support"]
@@ -21,7 +22,7 @@ enum SubscriptionTier: String, CaseIterable {
         case .premium: return ["Unlimited meals", "Exclusive recipes", "24/7 support", "AI nutritionist"]
         }
     }
-    
+
     var displayName: String {
         return self.rawValue
     }
@@ -36,41 +37,42 @@ struct ProfileView: View {
     @State private var showingSubscriptionView = false
     @State private var showingRecipes = false
     @State private var showingFavorites = false
+    @State private var showingPerformanceSettings = false
     @State private var contentVisible = false
     @State private var profileImageScale: CGFloat = 0
-    
+
     var body: some View {
         ZStack {
             // Full screen animated background
             MagicalBackground()
                 .ignoresSafeArea()
-            
+
             ScrollView {
                 VStack(spacing: 30) {
                     // Enhanced Profile Header
                     EnhancedProfileHeader(user: authManager.currentUser)
                         .scaleEffect(profileImageScale)
-                    
+
                     // Gamification Stats
                     GamificationStatsView()
                         .staggeredFade(index: 0, isShowing: contentVisible)
-                    
+
                     // Streak Summary
                     StreakSummaryCard()
                         .staggeredFade(index: 1, isShowing: contentVisible)
-                    
+
                     // Collection Progress
                     CollectionProgressView()
                         .staggeredFade(index: 2, isShowing: contentVisible)
-                    
+
                     // Active Challenges
                     ActiveChallengesSection()
                         .staggeredFade(index: 3, isShowing: contentVisible)
-                    
+
                     // Achievement Gallery
                     ProfileAchievementGalleryView()
                         .staggeredFade(index: 4, isShowing: contentVisible)
-                    
+
                     // Subscription Status Enhanced
                     EnhancedSubscriptionCard(
                         tier: deviceManager.hasUnlimitedAccess ? .premium : .free,
@@ -79,11 +81,11 @@ struct ProfileView: View {
                         }
                     )
                     .staggeredFade(index: 5, isShowing: contentVisible)
-                    
+
                     // Settings Section Enhanced
                     EnhancedSettingsSection()
                         .staggeredFade(index: 6, isShowing: contentVisible)
-                    
+
                     // Sign Out Button (only if authenticated)
                     if cloudKitAuthManager.isAuthenticated {
                         EnhancedSignOutButton(action: {
@@ -148,7 +150,7 @@ struct EnhancedProfileHeader: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var gamificationManager: GamificationManager
     @EnvironmentObject var authManager: AuthenticationManager
-    
+
     // Computed properties for display
     private var displayName: String {
         // Priority: Auth username > CloudKit username > Custom name > User name > Guest
@@ -169,11 +171,11 @@ struct EnhancedProfileHeader: View {
             return authManager.temporaryUsername
         }
     }
-    
+
     private var profileInitial: String {
         displayName.prefix(1).uppercased()
     }
-    
+
     private var emailDisplay: String {
         if let cloudKitUser = cloudKitAuthManager.currentUser {
             return cloudKitUser.email ?? "Start your culinary journey"
@@ -183,7 +185,7 @@ struct EnhancedProfileHeader: View {
             return "Start your culinary journey"
         }
     }
-    
+
     private var currentStreak: Int {
         // Use CloudKit streak if available, otherwise calculate from local data
         if let cloudKitUser = cloudKitAuthManager.currentUser {
@@ -192,35 +194,35 @@ struct EnhancedProfileHeader: View {
             return calculateStreak()
         }
     }
-    
+
     private func calculateLevel() -> Int {
         // Calculate level from total points
         if let cloudKitUser = cloudKitAuthManager.currentUser {
             let points = cloudKitUser.totalPoints
-            return min(1 + (points / 1000), 99) // Level up every 1000 points, max level 99
+            return min(1 + (points / 1_000), 99) // Level up every 1000 points, max level 99
         } else {
             // Fallback to recipe count based level
             let recipeCount = appState.allRecipes.count
             return min(1 + (recipeCount / 5), 20) // Level up every 5 recipes for non-authenticated users
         }
     }
-    
+
     private func calculateStreak() -> Int {
         // Get all recipe creation dates
         let recipeDates = appState.allRecipes.map { $0.createdAt }
-        
+
         // Calculate based on consecutive days with recipes
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         var streak = 0
         var checkDate = today
-        
+
         // Check backwards from today
         while streak < 365 { // Limit check to last 365 days
             let hasRecipeOnDate = recipeDates.contains { date in
                 calendar.isDate(date, inSameDayAs: checkDate)
             }
-            
+
             if hasRecipeOnDate {
                 streak += 1
                 checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate) ?? checkDate
@@ -230,21 +232,21 @@ struct EnhancedProfileHeader: View {
             } else {
                 // If we haven't found any recipes yet, keep looking back
                 checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate) ?? checkDate
-                
+
                 // Stop if we've gone back more than 30 days without finding anything
                 if calendar.dateComponents([.day], from: checkDate, to: today).day ?? 0 > 30 {
                     break
                 }
             }
         }
-        
+
         return streak
     }
-    
+
     private func calculateUserStatus() -> String {
         // Status based on level (which is based on points for authenticated users)
         let level = calculateLevel()
-        
+
         if level >= 50 {
             return "⚡ Master Chef"
         } else if level >= 20 {
@@ -257,7 +259,7 @@ struct EnhancedProfileHeader: View {
             return "🌱 Beginner"
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
             ZStack {
@@ -279,9 +281,9 @@ struct EnhancedProfileHeader: View {
                     .rotationEffect(.degrees(rotationAngle))
                     .scaleEffect(glowAnimation ? 1.1 : 1)
                     .opacity(glowAnimation ? 0.8 : 1)
-                
+
                 // Profile container
-                Button(action: { 
+                Button(action: {
                     // If not authenticated, show auth view instead of edit profile
                     if !cloudKitAuthManager.isAuthenticated {
                         cloudKitAuthManager.showAuthSheet = true
@@ -328,7 +330,7 @@ struct EnhancedProfileHeader: View {
                     .frame(width: 120, height: 120)
                 }
                 .buttonStyle(PlainButtonStyle())
-                
+
                 // Level badge
                 VStack {
                     Spacer()
@@ -340,10 +342,10 @@ struct EnhancedProfileHeader: View {
                 }
                 .frame(width: 120, height: 120)
             }
-            
+
             // User info with gradient text
             VStack(spacing: 8) {
-                Button(action: { 
+                Button(action: {
                     // If not authenticated, show auth view instead of edit profile
                     if !cloudKitAuthManager.isAuthenticated {
                         cloudKitAuthManager.showAuthSheet = true
@@ -362,17 +364,17 @@ struct EnhancedProfileHeader: View {
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
-                
+
                 Text(emailDisplay)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white.opacity(0.8))
-                
+
                 // Status pills
                 HStack(spacing: 12) {
                     StatusPill(text: "🔥 \(calculateStreak()) day streak", color: Color(hex: "#f093fb"))
                     StatusPill(text: calculateUserStatus(), color: Color(hex: "#4facfe"))
                 }
-                
+
                 // Sign in with Apple button if not authenticated
                 if !cloudKitAuthManager.isAuthenticated {
                     Button(action: {
@@ -382,7 +384,7 @@ struct EnhancedProfileHeader: View {
                             Image(systemName: "apple.logo")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundColor(.white)
-                            
+
                             Text("Sign in with Apple")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
@@ -400,7 +402,7 @@ struct EnhancedProfileHeader: View {
                     }
                     .padding(.top, 16)
                 }
-                
+
                 // Food Preferences Card
                 FoodPreferencesCard()
                     .padding(.top, 16)
@@ -436,7 +438,7 @@ struct EnhancedProfileHeader: View {
 // MARK: - Level Badge
 struct LevelBadge: View {
     let level: Int
-    
+
     var body: some View {
         ZStack {
             Circle()
@@ -452,7 +454,7 @@ struct LevelBadge: View {
                 )
                 .frame(width: 36, height: 36)
                 .shadow(color: Color(hex: "#43e97b").opacity(0.5), radius: 8)
-            
+
             Text("\(level)")
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
@@ -464,7 +466,7 @@ struct LevelBadge: View {
 struct StatusPill: View {
     let text: String
     let color: Color
-    
+
     var body: some View {
         Text(text)
             .font(.system(size: 13, weight: .semibold))
@@ -490,27 +492,27 @@ struct GamificationStatsView: View {
     @State private var animateValues = false
     @State private var showingRecipes = false
     @State private var showingFavorites = false
-    
+
     private func getTotalRecipeCount() -> Int {
         // Combine local recipes with CloudKit recipes
         let localRecipeCount = appState.allRecipes.count
         let cloudKitSavedCount = cloudKitRecipeManager.userSavedRecipeIDs.count
         let cloudKitCreatedCount = cloudKitRecipeManager.userCreatedRecipeIDs.count
-        
+
         // Return the sum of local and CloudKit recipes
         // Note: CloudKit includes both saved and created recipes
         return localRecipeCount + cloudKitSavedCount + cloudKitCreatedCount
     }
-    
+
     private func getTotalFavoritesCount() -> Int {
         // Combine local favorites with CloudKit favorites
         let localFavoritesCount = appState.favoritedRecipeIds.count
         let cloudKitFavoritesCount = cloudKitRecipeManager.userFavoritedRecipeIDs.count
-        
+
         // Return the max to avoid duplicates (CloudKit likely includes all favorites)
         return max(localFavoritesCount, cloudKitFavoritesCount)
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
             HStack {
@@ -521,7 +523,7 @@ struct GamificationStatsView: View {
                 Text("🏆")
                     .font(.system(size: 24))
             }
-            
+
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                 AnimatedStatCard(
                     title: "Your Recipes",
@@ -533,7 +535,7 @@ struct GamificationStatsView: View {
                         showingRecipes = true
                     }
                 )
-                
+
                 AnimatedStatCard(
                     title: "Snaps Taken",
                     value: animateValues ? appState.totalSnapsTaken : 0,
@@ -541,7 +543,7 @@ struct GamificationStatsView: View {
                     color: Color(hex: "#f093fb"),
                     suffix: ""
                 )
-                
+
                 AnimatedStatCard(
                     title: "Favorites",
                     value: animateValues ? getTotalFavoritesCount() : 0,
@@ -552,7 +554,7 @@ struct GamificationStatsView: View {
                         showingFavorites = true
                     }
                 )
-                
+
                 AnimatedStatCard(
                     title: "Days Active",
                     value: animateValues ? Calendar.current.dateComponents([.day], from: appState.userJoinDate, to: Date()).day ?? 0 : 0,
@@ -599,10 +601,10 @@ struct AnimatedStatCard: View {
     let icon: String
     let color: Color
     let suffix: String
-    var action: (() -> Void)? = nil
-    
+    var action: (() -> Void)?
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: { action?() }) {
             GlassmorphicCard(content: {
@@ -613,24 +615,24 @@ struct AnimatedStatCard: View {
                             .fill(color.opacity(0.2))
                             .frame(width: 36, height: 36)
                             .blur(radius: 8)
-                        
+
                         Image(systemName: icon)
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(color)
                     }
-                    
+
                     // Animated counter - made smaller
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text("\(value)")
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .contentTransition(.numericText())
-                        
+
                         Text(suffix)
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white.opacity(0.8))
                     }
-                    
+
                     Text(title)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
@@ -650,15 +652,14 @@ struct AnimatedStatCard: View {
     }
 }
 
-
 // MARK: - Enhanced Subscription Card
 struct EnhancedSubscriptionCard: View {
     let tier: SubscriptionTier
     let onUpgrade: () -> Void
-    
+
     @State private var shimmerPhase: CGFloat = -1
     @State private var particleTrigger = false
-    
+
     var body: some View {
         Button(action: {
             if tier != .premium {
@@ -673,7 +674,7 @@ struct EnhancedSubscriptionCard: View {
                         Text("Your Plan")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white.opacity(0.7))
-                        
+
                         HStack(spacing: 6) {
                             Text(tier.displayName)
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
@@ -693,15 +694,15 @@ struct EnhancedSubscriptionCard: View {
                                             endPoint: .trailing
                                         )
                                 )
-                            
+
                             if tier == .premium {
                                 PremiumBadge()
                             }
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     // Compact upgrade prompt or benefits
                     if tier == .premium {
                         HStack(spacing: 4) {
@@ -722,7 +723,7 @@ struct EnhancedSubscriptionCard: View {
                                 .foregroundColor(Color(hex: "#f093fb"))
                         }
                     }
-                    
+
                     // Smaller icon
                     ZStack {
                         Circle()
@@ -730,7 +731,7 @@ struct EnhancedSubscriptionCard: View {
                                 tier == .premium ? Color(hex: "#43e97b").opacity(0.2) : Color(hex: "#f093fb").opacity(0.2)
                             )
                             .frame(width: 40, height: 40)
-                        
+
                         Image(systemName: tier == .premium ? "crown.fill" : "sparkles")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundColor(tier == .premium ? Color(hex: "#43e97b") : Color(hex: "#f093fb"))
@@ -739,7 +740,7 @@ struct EnhancedSubscriptionCard: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
                 .overlay(
-                    tier != .premium ? 
+                    tier != .premium ?
                     LinearGradient(
                         colors: [
                             Color.clear,
@@ -768,7 +769,7 @@ struct EnhancedSubscriptionCard: View {
 
 struct PremiumBadge: View {
     @State private var isAnimating = false
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "star.fill")
@@ -808,7 +809,7 @@ struct UnlimitedBenefits: View {
         "Priority support",
         "Exclusive challenges"
     ]
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(benefits, id: \.self) { benefit in
@@ -816,11 +817,11 @@ struct UnlimitedBenefits: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(Color(hex: "#43e97b"))
-                    
+
                     Text(benefit)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.9))
-                    
+
                     Spacer()
                 }
             }
@@ -834,7 +835,7 @@ struct UpgradePrompt: View {
             Text("Unlock unlimited magic ✨")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
-            
+
             HStack(spacing: 8) {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 20, weight: .medium))
@@ -846,15 +847,16 @@ struct UpgradePrompt: View {
     }
 }
 
-
 // MARK: - Enhanced Settings Section
 struct EnhancedSettingsSection: View {
     @State private var showingAISettings = false
-    
+    @State private var showingPerformanceSettings = false
+
     let settings = [
-        ("sparkles", "AI Preferences", Color(hex: "#667eea"))
+        ("sparkles", "AI Preferences", Color(hex: "#667eea")),
+        ("speedometer", "Performance", Color(hex: "#43e97b"))
     ]
-    
+
     var body: some View {
         VStack(spacing: 12) {
             ForEach(0..<settings.count, id: \.self) { index in
@@ -865,6 +867,8 @@ struct EnhancedSettingsSection: View {
                     action: {
                         if index == 0 {
                             showingAISettings = true
+                        } else if index == 1 {
+                            showingPerformanceSettings = true
                         }
                     }
                 )
@@ -873,6 +877,9 @@ struct EnhancedSettingsSection: View {
         .sheet(isPresented: $showingAISettings) {
             AISettingsView()
         }
+        .sheet(isPresented: $showingPerformanceSettings) {
+            PerformanceSettingsView()
+        }
     }
 }
 
@@ -880,10 +887,10 @@ struct EnhancedSettingsRow: View {
     let icon: String
     let title: String
     let color: Color
-    var action: (() -> Void)? = nil
-    
+    var action: (() -> Void)?
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: { action?() }) {
             GlassmorphicCard(content: {
@@ -893,19 +900,19 @@ struct EnhancedSettingsRow: View {
                         Circle()
                             .fill(color.opacity(0.2))
                             .frame(width: 40, height: 40)
-                        
+
                         Image(systemName: icon)
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(color)
                             .scaleEffect(isPressed ? 1.2 : 1)
                     }
-                    
+
                     Text(title)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
-                    
+
                     Spacer()
-                    
+
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white.opacity(0.5))
@@ -933,7 +940,7 @@ struct EnhancedSignOutButton: View {
     let action: () -> Void
     @State private var showConfirmation = false
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: {
             showConfirmation = true
@@ -945,11 +952,11 @@ struct EnhancedSignOutButton: View {
                     Image(systemName: "arrow.left.square.fill")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(Color(hex: "#ef5350"))
-                    
+
                     Text("Sign Out")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.white)
-                    
+
                     Spacer()
                 }
                 .padding(.horizontal, 24)
@@ -976,18 +983,19 @@ struct EnhancedSignOutButton: View {
 struct EditProfileView: View {
     @Binding var customName: String
     @Binding var customPhotoData: Data?
-    @Environment(\.dismiss) var dismiss
-    
+    @Environment(\.dismiss)
+    var dismiss
+
     @State private var tempName: String = ""
     @State private var showingImagePicker = false
     @State private var selectedImage: UIImage?
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 30) {
                     // Profile Photo
                     Button(action: { showingImagePicker = true }) {
@@ -1004,7 +1012,7 @@ struct EditProfileView: View {
                                     )
                                 )
                                 .frame(width: 150, height: 150)
-                            
+
                             if let image = selectedImage {
                                 Image(uiImage: image)
                                     .resizable()
@@ -1028,7 +1036,7 @@ struct EditProfileView: View {
                                         .foregroundColor(.white)
                                 }
                             }
-                            
+
                             // Edit overlay
                             VStack {
                                 Spacer()
@@ -1049,13 +1057,13 @@ struct EditProfileView: View {
                         }
                     }
                     .buttonStyle(PlainButtonStyle())
-                    
+
                     // Name Input
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Chef Name")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
-                        
+
                         TextField("Enter your chef name", text: $tempName)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.white)
@@ -1070,7 +1078,7 @@ struct EditProfileView: View {
                             )
                     }
                     .padding(.horizontal, 30)
-                    
+
                     // Additional Options
                     VStack(spacing: 20) {
                         NavigationLink(destination: FoodPreferencesView()) {
@@ -1080,7 +1088,7 @@ struct EditProfileView: View {
                                 subtitle: "Update cuisine preferences"
                             )
                         }
-                        
+
                         NavigationLink(destination: NotificationSettingsView()) {
                             ProfileOptionRow(
                                 icon: "bell",
@@ -1088,7 +1096,7 @@ struct EditProfileView: View {
                                 subtitle: "Manage alerts & reminders"
                             )
                         }
-                        
+
                         NavigationLink(destination: PrivacySettingsView()) {
                             ProfileOptionRow(
                                 icon: "lock.shield",
@@ -1099,7 +1107,7 @@ struct EditProfileView: View {
                     }
                     .padding(.horizontal, 30)
                     .padding(.top, 20)
-                    
+
                     Spacer()
                 }
                 .padding(.top, 30)
@@ -1113,7 +1121,7 @@ struct EditProfileView: View {
                     }
                     .foregroundColor(.white)
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
                         // Save the changes
@@ -1121,14 +1129,14 @@ struct EditProfileView: View {
                         if let image = selectedImage {
                             customPhotoData = image.jpegData(compressionQuality: 0.8)
                         }
-                        
+
                         // Persist to UserDefaults
                         UserDefaults.standard.set(customName, forKey: "CustomChefName")
                         if let photoData = customPhotoData {
                             // Save photo to file system instead of UserDefaults
                             saveCustomPhotoToFile(photoData)
                         }
-                        
+
                         dismiss()
                     }
                     .font(.system(size: 16, weight: .semibold))
@@ -1150,7 +1158,7 @@ struct ProfileOptionRow: View {
     let icon: String
     let title: String
     let subtitle: String
-    
+
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
@@ -1161,19 +1169,19 @@ struct ProfileOptionRow: View {
                     Circle()
                         .fill(Color.white.opacity(0.1))
                 )
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.white)
-                
+
                 Text(subtitle)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.7))
             }
-            
+
             Spacer()
-            
+
             Image(systemName: "chevron.right")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
@@ -1190,24 +1198,23 @@ struct ProfileOptionRow: View {
     }
 }
 
-
 // MARK: - Privacy Settings View
 struct PrivacySettingsView: View {
     @State private var shareAnalytics = true
     @State private var personalizedAds = false
     @State private var publicProfile = true
-    
+
     var body: some View {
         ZStack {
             MagicalBackground()
                 .ignoresSafeArea()
-            
+
             ScrollView {
                 VStack(spacing: 20) {
                     NeumorphicToggle(isOn: $shareAnalytics, label: "Share Analytics")
                     NeumorphicToggle(isOn: $personalizedAds, label: "Personalized Recommendations")
                     NeumorphicToggle(isOn: $publicProfile, label: "Public Profile")
-                    
+
                     // Delete Account Button
                     Button(action: {
                         // Show delete account confirmation
@@ -1239,35 +1246,36 @@ struct PrivacySettingsView: View {
 // MARK: - Image Picker
 struct ProfileImagePicker: UIViewControllerRepresentable {
     @Binding var selectedImage: UIImage?
-    @Environment(\.dismiss) var dismiss
-    
+    @Environment(\.dismiss)
+    var dismiss
+
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.delegate = context.coordinator
         picker.sourceType = .photoLibrary
         return picker
     }
-    
+
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let parent: ProfileImagePicker
-        
+
         init(_ parent: ProfileImagePicker) {
             self.parent = parent
         }
-        
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             if let image = info[.originalImage] as? UIImage {
                 parent.selectedImage = image
             }
             parent.dismiss()
         }
-        
+
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.dismiss()
         }
@@ -1279,7 +1287,7 @@ struct FoodPreferencesCard: View {
     @State private var selectedPreferences: [String] = UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? []
     @State private var showingPreferencesView = false
     @State private var isAnimating = false
-    
+
     var body: some View {
         Button(action: {
             showingPreferencesView = true
@@ -1302,12 +1310,12 @@ struct FoodPreferencesCard: View {
                         )
                         .frame(width: 60, height: 60)
                         .scaleEffect(isAnimating ? 1.2 : 1)
-                    
+
                     Text("🍽")
                         .font(.system(size: 36))
                         .scaleEffect(isAnimating ? 1.1 : 1)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your Food Type Choices")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
@@ -1321,7 +1329,7 @@ struct FoodPreferencesCard: View {
                                 endPoint: .trailing
                             )
                         )
-                    
+
                     if selectedPreferences.isEmpty {
                         Text("Tap to select your favorites!")
                             .font(.system(size: 14, weight: .medium))
@@ -1332,9 +1340,9 @@ struct FoodPreferencesCard: View {
                             .foregroundColor(.white.opacity(0.8))
                     }
                 }
-                
+
                 Spacer()
-                
+
                 // Arrow
                 Image(systemName: "arrow.right")
                     .font(.system(size: 20, weight: .semibold))
@@ -1386,14 +1394,15 @@ struct FoodPreferencesCard: View {
 // MARK: - AI Settings View
 struct AISettingsView: View {
     @State private var selectedProvider: String = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini"
-    @Environment(\.dismiss) var dismiss
-    
+    @Environment(\.dismiss)
+    var dismiss
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 30) {
                         // LLM Provider Section
@@ -1401,11 +1410,11 @@ struct AISettingsView: View {
                             Text("AI Model Provider")
                                 .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
-                            
+
                             Text("Choose which AI model to use for recipe generation")
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
-                            
+
                             VStack(spacing: 16) {
                                 // Grok Option
                                 ProviderOptionCard(
@@ -1419,7 +1428,7 @@ struct AISettingsView: View {
                                         UserDefaults.standard.set("grok", forKey: "SelectedLLMProvider")
                                     }
                                 )
-                                
+
                                 // Gemini Option
                                 ProviderOptionCard(
                                     name: "Gemini",
@@ -1435,13 +1444,13 @@ struct AISettingsView: View {
                             }
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Performance Note
                         VStack(spacing: 12) {
                             Image(systemName: "info.circle.fill")
                                 .font(.system(size: 20))
                                 .foregroundColor(Color(hex: "#4facfe"))
-                            
+
                             Text("Performance may vary between providers. Try both to see which works best for your cooking style!")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white.opacity(0.7))
@@ -1475,9 +1484,9 @@ struct ProviderOptionCard: View {
     let color: Color
     let isSelected: Bool
     let action: () -> Void
-    
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: {
             action()
@@ -1490,19 +1499,19 @@ struct ProviderOptionCard: View {
                     Circle()
                         .fill(color.opacity(0.2))
                         .frame(width: 60, height: 60)
-                    
+
                     Image(systemName: icon)
                         .font(.system(size: 28, weight: .semibold))
                         .foregroundColor(color)
                 }
-                
+
                 // Content
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(name)
                             .font(.system(size: 20, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
-                        
+
                         if isSelected {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 18, weight: .medium))
@@ -1510,13 +1519,13 @@ struct ProviderOptionCard: View {
                                 .transition(.scale.combined(with: .opacity))
                         }
                     }
-                    
+
                     Text(description)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                         .lineLimit(2)
                 }
-                
+
                 Spacer()
             }
             .padding(20)
@@ -1549,7 +1558,7 @@ struct CollectionProgressView: View {
     @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @State private var animateProgress = false
-    
+
     var totalRecipes: Int {
         // Use CloudKit recipe counts when available
         if cloudKitAuthManager.isAuthenticated {
@@ -1558,7 +1567,7 @@ struct CollectionProgressView: View {
             return appState.allRecipes.count
         }
     }
-    
+
     var favoriteRecipes: Int {
         // Use CloudKit favorites when available
         if cloudKitAuthManager.isAuthenticated {
@@ -1567,7 +1576,7 @@ struct CollectionProgressView: View {
             return appState.favoritedRecipeIds.count
         }
     }
-    
+
     var sharedRecipes: Int {
         if let cloudKitUser = cloudKitAuthManager.currentUser {
             return cloudKitUser.recipesShared
@@ -1575,7 +1584,7 @@ struct CollectionProgressView: View {
             return appState.totalShares
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
             HStack {
@@ -1586,7 +1595,7 @@ struct CollectionProgressView: View {
                 Text("📚")
                     .font(.system(size: 24))
             }
-            
+
             VStack(spacing: 16) {
                 CollectionProgressRow(
                     icon: "fork.knife",
@@ -1596,7 +1605,7 @@ struct CollectionProgressView: View {
                     color: Color(hex: "#667eea"),
                     animate: animateProgress
                 )
-                
+
                 CollectionProgressRow(
                     icon: "heart.fill",
                     title: "Favorites",
@@ -1605,7 +1614,7 @@ struct CollectionProgressView: View {
                     color: Color(hex: "#f093fb"),
                     animate: animateProgress
                 )
-                
+
                 CollectionProgressRow(
                     icon: "square.and.arrow.up",
                     title: "Shared",
@@ -1641,40 +1650,40 @@ struct CollectionProgressRow: View {
     let maxValue: Int
     let color: Color
     let animate: Bool
-    
+
     private var progress: Double {
         min(Double(value) / Double(maxValue), 1.0)
     }
-    
+
     private var percentage: Int {
         Int(progress * 100)
     }
-    
+
     var body: some View {
         VStack(spacing: 12) {
             HStack {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(color)
-                
+
                 Text(title)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.8))
-                
+
                 Spacer()
-                
+
                 Text("\(value)/\(maxValue)")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
             }
-            
+
             // Progress bar
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color.white.opacity(0.1))
                         .frame(height: 8)
-                    
+
                     RoundedRectangle(cornerRadius: 4)
                         .fill(
                             LinearGradient(
@@ -1699,7 +1708,7 @@ struct ProfileAchievementGalleryView: View {
     @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
     @State private var selectedAchievement: ProfileAchievement?
     @State private var cloudKitAchievements: [ProfileAchievement] = []
-    
+
     var achievements: [ProfileAchievement] {
         // Use CloudKit achievements if available, otherwise use defaults
         if !cloudKitAchievements.isEmpty {
@@ -1715,20 +1724,20 @@ struct ProfileAchievementGalleryView: View {
             ]
         }
     }
-    
+
     private func loadCloudKitAchievements() {
         Task {
             do {
                 guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { return }
-                
+
                 let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
                 let privateDB = container.privateCloudDatabase
-                
+
                 let predicate = NSPredicate(format: "userID == %@", userID)
                 let query = CKQuery(recordType: "Achievement", predicate: predicate)
-                
+
                 let (results, _) = try await privateDB.records(matching: query)
-                
+
                 var loadedAchievements: [ProfileAchievement] = []
                 for (_, result) in results {
                     if let record = try? result.get() {
@@ -1743,23 +1752,23 @@ struct ProfileAchievementGalleryView: View {
                         loadedAchievements.append(achievement)
                     }
                 }
-                
+
                 await MainActor.run {
                     self.cloudKitAchievements = loadedAchievements
                 }
-                
-                print("✅ Loaded \(loadedAchievements.count) achievements from CloudKit")
+
+                os_log("Loaded %d achievements from CloudKit", log: .default, type: .info, loadedAchievements.count)
             } catch {
-                print("❌ Failed to load CloudKit achievements: \(error)")
+                os_log("Failed to load CloudKit achievements: %@", log: .default, type: .error, error.localizedDescription)
             }
         }
     }
-    
+
     private func isAchievementUnlocked(_ achievement: ProfileAchievement) -> Bool {
         let recipeCount = cloudKitAuthManager.currentUser?.recipesCreated ?? appState.allRecipes.count
         let sharedCount = cloudKitAuthManager.currentUser?.recipesShared ?? appState.totalShares
         let streak = cloudKitAuthManager.currentUser?.currentStreak ?? 0
-        
+
         switch achievement.id {
         case "first_recipe":
             return recipeCount >= 1
@@ -1777,7 +1786,7 @@ struct ProfileAchievementGalleryView: View {
             return false
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 20) {
             HStack {
@@ -1788,7 +1797,7 @@ struct ProfileAchievementGalleryView: View {
                 Text("🏆")
                     .font(.system(size: 24))
             }
-            
+
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                 ForEach(achievements) { achievement in
                     ProfileAchievementBadge(
@@ -1830,7 +1839,7 @@ struct ProfileAchievementBadge: View {
     let achievement: ProfileAchievement
     let isUnlocked: Bool
     @State private var isAnimating = false
-    
+
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
@@ -1861,13 +1870,13 @@ struct ProfileAchievementBadge: View {
                         color: isUnlocked ? Color(hex: "#43e97b").opacity(0.5) : Color.clear,
                         radius: isAnimating ? 15 : 5
                     )
-                
+
                 Text(achievement.icon)
                     .font(.system(size: 28))
                     .scaleEffect(isUnlocked ? 1 : 0.8)
                     .opacity(isUnlocked ? 1 : 0.5)
             }
-            
+
             Text(achievement.title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(isUnlocked ? .white : .white.opacity(0.5))
@@ -1888,13 +1897,14 @@ struct ProfileAchievementBadge: View {
 struct ProfileAchievementDetailView: View {
     let achievement: ProfileAchievement
     let isUnlocked: Bool
-    @Environment(\.dismiss) var dismiss
-    
+    @Environment(\.dismiss)
+    var dismiss
+
     var body: some View {
         ZStack {
             MagicalBackground()
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 30) {
                 // Close button
                 HStack {
@@ -1906,9 +1916,9 @@ struct ProfileAchievementDetailView: View {
                     }
                 }
                 .padding()
-                
+
                 Spacer()
-                
+
                 // Achievement icon
                 ZStack {
                     Circle()
@@ -1933,23 +1943,23 @@ struct ProfileAchievementDetailView: View {
                                     lineWidth: 3
                                 )
                         )
-                    
+
                     Text(achievement.icon)
                         .font(.system(size: 60))
                         .opacity(isUnlocked ? 1 : 0.5)
                 }
-                
+
                 // Achievement info
                 VStack(spacing: 12) {
                     Text(achievement.title)
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
-                    
+
                     Text(achievement.description)
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
-                    
+
                     if isUnlocked {
                         Text("Unlocked! 🎉")
                             .font(.system(size: 20, weight: .semibold))
@@ -1963,7 +1973,7 @@ struct ProfileAchievementDetailView: View {
                     }
                 }
                 .padding(.horizontal, 40)
-                
+
                 Spacer()
             }
         }
@@ -1976,7 +1986,7 @@ struct ActiveChallengesSection: View {
     @State private var showingChallengeHub = false
     @State private var cloudKitChallenges: [Challenge] = []
     @State private var isLoadingChallenges = false
-    
+
     private var allActiveChallenges: [Challenge] {
         // Combine local and CloudKit challenges
         var combined = gamificationManager.activeChallenges + cloudKitChallenges
@@ -1991,34 +2001,34 @@ struct ActiveChallengesSection: View {
         }
         return combined
     }
-    
+
     private func loadCloudKitChallenges() {
         guard !isLoadingChallenges else { return }
         isLoadingChallenges = true
-        
+
         Task {
             do {
-                guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { 
+                guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else {
                     await MainActor.run { isLoadingChallenges = false }
-                    return 
+                    return
                 }
-                
+
                 let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
                 let privateDB = container.privateCloudDatabase
-                
+
                 // Fetch user's active challenges
                 let predicate = NSPredicate(format: "userID == %@ AND status == %@", userID, "active")
                 let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
-                
+
                 let (results, _) = try await privateDB.records(matching: query)
-                
+
                 var loadedChallenges: [Challenge] = []
                 for (_, result) in results {
                     if let record = try? result.get(),
                        let challengeRef = record["challengeID"] as? CKRecord.Reference {
                         // Fetch the actual challenge details
                         let challengeRecord = try await container.publicCloudDatabase.record(for: challengeRef.recordID)
-                        
+
                         // Create Challenge object from CloudKit record
                         let challenge = Challenge(
                             id: challengeRecord["id"] as? String ?? UUID().uuidString,
@@ -2044,22 +2054,22 @@ struct ActiveChallengesSection: View {
                         loadedChallenges.append(challenge)
                     }
                 }
-                
+
                 await MainActor.run {
                     self.cloudKitChallenges = loadedChallenges
                     self.isLoadingChallenges = false
                 }
-                
-                print("✅ Loaded \(loadedChallenges.count) active challenges from CloudKit")
+
+                os_log("Loaded %d active challenges from CloudKit", log: .default, type: .info, loadedChallenges.count)
             } catch {
-                print("❌ Failed to load CloudKit challenges: \(error)")
+                os_log("Failed to load CloudKit challenges: %@", log: .default, type: .error, error.localizedDescription)
                 await MainActor.run {
                     self.isLoadingChallenges = false
                 }
             }
         }
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
@@ -2068,21 +2078,21 @@ struct ActiveChallengesSection: View {
                     Text("Active Challenges")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
-                    
+
                     Text("\(allActiveChallenges.count) challenges active")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
-                
+
                 Spacer()
-                
+
                 Button(action: { showingChallengeHub = true }) {
                     Text("View All")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(Color(hex: "#667eea"))
                 }
             }
-            
+
             // Active Challenges List
             if allActiveChallenges.isEmpty && !isLoadingChallenges {
                 HStack {
@@ -2153,18 +2163,18 @@ struct CompactChallengeCard: View {
     let challenge: Challenge
     let action: () -> Void
     @StateObject private var progressTracker = ChallengeProgressTracker.shared
-    
+
     private var progress: Double {
         challenge.currentProgress
     }
-    
+
     private var timeRemaining: String {
         let remaining = challenge.endDate.timeIntervalSinceNow
         if remaining <= 0 { return "Ended" }
-        
-        let hours = Int(remaining) / 3600
-        let minutes = Int(remaining) % 3600 / 60
-        
+
+        let hours = Int(remaining) / 3_600
+        let minutes = Int(remaining) % 3_600 / 60
+
         if hours > 24 {
             return "\(hours / 24)d left"
         } else if hours > 0 {
@@ -2173,7 +2183,7 @@ struct CompactChallengeCard: View {
             return "\(minutes)m"
         }
     }
-    
+
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 12) {
@@ -2188,35 +2198,35 @@ struct CompactChallengeCard: View {
                             Capsule()
                                 .fill(challenge.type.color.opacity(0.3))
                         )
-                    
+
                     Spacer()
-                    
+
                     Text(timeRemaining)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
-                
+
                 // Challenge Title
                 Text(challenge.title)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                
+
                 // Points & Progress
                 HStack {
                     Label("\(challenge.points) pts", systemImage: "star.fill")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(Color(hex: "#ffd93d"))
-                    
+
                     Spacer()
-                    
+
                     // Progress Circle
                     ZStack {
                         Circle()
                             .stroke(Color.white.opacity(0.2), lineWidth: 3)
                             .frame(width: 30, height: 30)
-                        
+
                         Circle()
                             .trim(from: 0, to: progress)
                             .stroke(
@@ -2229,7 +2239,7 @@ struct CompactChallengeCard: View {
                             )
                             .frame(width: 30, height: 30)
                             .rotationEffect(.degrees(-90))
-                        
+
                         Text("\(Int(progress * 100))%")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundColor(.white)
@@ -2264,14 +2274,14 @@ struct CompactChallengeCard: View {
 private func saveCustomPhotoToFile(_ data: Data) {
     guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
     let filePath = documentsPath.appendingPathComponent("customChefPhoto.jpg")
-    
+
     do {
         try data.write(to: filePath)
         // Remove from UserDefaults if it exists
         UserDefaults.standard.removeObject(forKey: "CustomChefPhoto")
-        print("✅ Custom photo saved to file system")
+        os_log("Custom photo saved to file system", log: .default, type: .info)
     } catch {
-        print("❌ Failed to save custom photo: \(error)")
+        os_log("Failed to save custom photo: %@", log: .default, type: .error, error.localizedDescription)
     }
 }
 
@@ -2281,11 +2291,11 @@ struct ProfilePhotoHelper {
         if UserDefaults.standard.data(forKey: "CustomChefPhoto") != nil {
             UserDefaults.standard.removeObject(forKey: "CustomChefPhoto")
         }
-        
+
         // Load from file system
         guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
         let filePath = documentsPath.appendingPathComponent("customChefPhoto.jpg")
-        
+
         return try? Data(contentsOf: filePath)
     }
 }
@@ -2294,7 +2304,7 @@ struct ProfilePhotoHelper {
     ZStack {
         MagicalBackground()
             .ignoresSafeArea()
-        
+
         ProfileView()
             .environmentObject(AppState())
             .environmentObject(AuthenticationManager())

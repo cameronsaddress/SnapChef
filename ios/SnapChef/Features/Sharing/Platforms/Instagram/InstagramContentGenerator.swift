@@ -12,11 +12,11 @@ import CoreGraphics
 @MainActor
 class InstagramContentGenerator: ObservableObject {
     static let shared = InstagramContentGenerator()
-    
-    private let storySize = CGSize(width: 1080, height: 1920) // 9:16 for Stories
-    private let postSize = CGSize(width: 1080, height: 1080) // 1:1 for Posts
-    private let carouselSize = CGSize(width: 1080, height: 1350) // 4:5 for Carousel
-    
+
+    private let storySize = CGSize(width: 1_080, height: 1_920) // 9:16 for Stories
+    private let postSize = CGSize(width: 1_080, height: 1_080) // 1:1 for Posts
+    private let carouselSize = CGSize(width: 1_080, height: 1_350) // 4:5 for Carousel
+
     func generateContent(
         template: InstagramTemplate,
         content: ShareContent,
@@ -25,7 +25,7 @@ class InstagramContentGenerator: ObservableObject {
         sticker: StickerType?
     ) async throws -> UIImage {
         let size = isStory ? storySize : postSize
-        
+
         // Create the SwiftUI view for the content
         let contentView = InstagramContentView(
             template: template,
@@ -35,29 +35,29 @@ class InstagramContentGenerator: ObservableObject {
             sticker: sticker,
             isStory: isStory
         )
-        
+
         // Render to image with proper format
         let renderer = ImageRenderer(content: contentView)
         renderer.scale = 1.0 // Use device scale
-        
+
         // Configure renderer to produce opaque image
         renderer.isOpaque = true
-        
+
         guard let renderedImage = renderer.uiImage else {
             throw InstagramError.renderingFailed
         }
-        
+
         // Ensure the image is in the correct format
         return normalizeRenderedImage(renderedImage)
     }
-    
+
     func generateCarousel(
         recipe: Recipe,
         images: [UIImage],
         template: InstagramTemplate
     ) async throws -> [UIImage] {
         var carouselImages: [UIImage] = []
-        
+
         // First slide - Recipe title
         let titleSlide = InstagramCarouselSlide(
             slideType: .title,
@@ -66,11 +66,11 @@ class InstagramContentGenerator: ObservableObject {
             slideNumber: 1,
             totalSlides: images.count + 3
         )
-        
+
         if let titleImage = await renderView(titleSlide, size: carouselSize) {
             carouselImages.append(titleImage)
         }
-        
+
         // Ingredients slide
         let ingredientsSlide = InstagramCarouselSlide(
             slideType: .ingredients,
@@ -79,11 +79,11 @@ class InstagramContentGenerator: ObservableObject {
             slideNumber: 2,
             totalSlides: images.count + 3
         )
-        
+
         if let ingredientsImage = await renderView(ingredientsSlide, size: carouselSize) {
             carouselImages.append(ingredientsImage)
         }
-        
+
         // Instructions slides (can be multiple)
         let instructionsSlide = InstagramCarouselSlide(
             slideType: .instructions,
@@ -92,11 +92,11 @@ class InstagramContentGenerator: ObservableObject {
             slideNumber: 3,
             totalSlides: images.count + 3
         )
-        
+
         if let instructionsImage = await renderView(instructionsSlide, size: carouselSize) {
             carouselImages.append(instructionsImage)
         }
-        
+
         // Final result slide
         if let finalImage = images.first {
             let resultSlide = InstagramCarouselSlide(
@@ -106,15 +106,15 @@ class InstagramContentGenerator: ObservableObject {
                 slideNumber: images.count + 3,
                 totalSlides: images.count + 3
             )
-            
+
             if let resultImage = await renderView(resultSlide, size: carouselSize) {
                 carouselImages.append(resultImage)
             }
         }
-        
+
         return carouselImages
     }
-    
+
     private func renderView<V: View>(_ view: V, size: CGSize) async -> UIImage? {
         let renderer = ImageRenderer(
             content: view
@@ -122,29 +122,29 @@ class InstagramContentGenerator: ObservableObject {
         )
         renderer.scale = 1.0
         renderer.isOpaque = true
-        
+
         guard let image = renderer.uiImage else { return nil }
         return normalizeRenderedImage(image)
     }
-    
+
     private func normalizeRenderedImage(_ image: UIImage) -> UIImage {
         // Create a new opaque image context (true = opaque, no alpha channel)
         UIGraphicsBeginImageContextWithOptions(image.size, true, image.scale)
         defer { UIGraphicsEndImageContext() }
-        
+
         // Fill with white background first
         UIColor.white.setFill()
         UIRectFill(CGRect(origin: .zero, size: image.size))
-        
+
         // Draw the image on top with normal blend mode
         image.draw(in: CGRect(origin: .zero, size: image.size), blendMode: .normal, alpha: 1.0)
-        
+
         // Get the normalized image
         guard let normalizedImage = UIGraphicsGetImageFromCurrentImageContext() else {
             // If normalization fails, return original
             return image
         }
-        
+
         return normalizedImage
     }
 }
@@ -157,13 +157,13 @@ struct InstagramContentView: View {
     let backgroundColor: Color
     let sticker: StickerType?
     let isStory: Bool
-    
+
     var body: some View {
         ZStack {
             // Background
             backgroundColor
                 .ignoresSafeArea()
-            
+
             // Template-specific content
             switch template {
             case .classic:
@@ -177,7 +177,7 @@ struct InstagramContentView: View {
             case .gradient:
                 GradientTemplate(content: content, isStory: isStory)
             }
-            
+
             // Sticker overlay (for stories)
             if isStory, let sticker = sticker {
                 VStack {
@@ -189,7 +189,7 @@ struct InstagramContentView: View {
                     Spacer()
                 }
             }
-            
+
             // SnapChef branding
             VStack {
                 Spacer()
@@ -215,7 +215,7 @@ struct InstagramContentView: View {
 struct ClassicTemplate: View {
     let content: ShareContent
     let isStory: Bool
-    
+
     var body: some View {
         VStack(spacing: 20) {
             if case .recipe(let recipe) = content.type {
@@ -224,7 +224,7 @@ struct ClassicTemplate: View {
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 20)
-                
+
                 // Recipe image placeholder
                 RoundedRectangle(cornerRadius: 20)
                     .fill(Color.white.opacity(0.2))
@@ -234,12 +234,12 @@ struct ClassicTemplate: View {
                             Image(systemName: "photo")
                                 .font(.system(size: 60))
                                 .foregroundColor(.white.opacity(0.5))
-                            
+
                             Text(recipe.difficulty.emoji)
                                 .font(.system(size: 80))
                         }
                     )
-                
+
                 // Stats
                 HStack(spacing: 30) {
                     VStack(spacing: 4) {
@@ -248,14 +248,14 @@ struct ClassicTemplate: View {
                         Text("\(recipe.prepTime + recipe.cookTime)m")
                             .font(.system(size: 18, weight: .semibold))
                     }
-                    
+
                     VStack(spacing: 4) {
                         Image(systemName: "flame")
                             .font(.system(size: 24))
                         Text("\(recipe.nutrition.calories)")
                             .font(.system(size: 18, weight: .semibold))
                     }
-                    
+
                     VStack(spacing: 4) {
                         Image(systemName: "person.2")
                             .font(.system(size: 24))
@@ -272,7 +272,7 @@ struct ClassicTemplate: View {
 struct ModernTemplate: View {
     let content: ShareContent
     let isStory: Bool
-    
+
     var body: some View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 0) {
@@ -281,13 +281,13 @@ struct ModernTemplate: View {
                     Color.white.opacity(0.1)
                         .frame(height: geometry.size.height * 0.4)
                         .clipShape(DiagonalShape())
-                    
+
                     VStack(alignment: .leading, spacing: 12) {
                         if case .recipe(let recipe) = content.type {
                             Text(recipe.name)
                                 .font(.system(size: isStory ? 42 : 32, weight: .heavy))
                                 .foregroundColor(.white)
-                            
+
                             Text(recipe.description)
                                 .font(.system(size: isStory ? 18 : 16))
                                 .foregroundColor(.white.opacity(0.8))
@@ -296,9 +296,9 @@ struct ModernTemplate: View {
                     }
                     .padding(30)
                 }
-                
+
                 Spacer()
-                
+
                 // Bottom info
                 if case .recipe(let recipe) = content.type {
                     HStack {
@@ -318,27 +318,27 @@ struct ModernTemplate: View {
 struct MinimalTemplate: View {
     let content: ShareContent
     let isStory: Bool
-    
+
     var body: some View {
         VStack(spacing: 40) {
             Spacer()
-            
+
             if case .recipe(let recipe) = content.type {
                 Text(recipe.name)
                     .font(.system(size: isStory ? 36 : 28, weight: .light))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
-                
+
                 Divider()
                     .background(Color.white.opacity(0.3))
                     .frame(width: 100)
-                
+
                 Text("\(recipe.prepTime + recipe.cookTime) minutes")
                     .font(.system(size: 18, weight: .light))
                     .foregroundColor(.white.opacity(0.8))
             }
-            
+
             Spacer()
         }
     }
@@ -347,7 +347,7 @@ struct MinimalTemplate: View {
 struct BoldTemplate: View {
     let content: ShareContent
     let isStory: Bool
-    
+
     var body: some View {
         ZStack {
             // Large emoji background
@@ -355,14 +355,14 @@ struct BoldTemplate: View {
                 Text(recipe.difficulty.emoji)
                     .font(.system(size: 300))
                     .opacity(0.1)
-                
+
                 VStack(spacing: 20) {
                     Text(recipe.name.uppercased())
                         .font(.system(size: isStory ? 52 : 40, weight: .black))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
-                    
+
                     Text("READY IN \(recipe.prepTime + recipe.cookTime) MINUTES")
                         .font(.system(size: 20, weight: .heavy))
                         .foregroundColor(.white.opacity(0.9))
@@ -375,7 +375,7 @@ struct BoldTemplate: View {
 struct GradientTemplate: View {
     let content: ShareContent
     let isStory: Bool
-    
+
     var body: some View {
         ZStack {
             // Animated gradient overlay
@@ -388,17 +388,17 @@ struct GradientTemplate: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            
+
             if case .recipe(let recipe) = content.type {
                 VStack(spacing: 30) {
                     Spacer()
-                    
+
                     Text(recipe.name)
                         .font(.system(size: isStory ? 44 : 34, weight: .bold, design: .serif))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 30)
-                    
+
                     // Gradient divider
                     LinearGradient(
                         colors: [
@@ -411,14 +411,14 @@ struct GradientTemplate: View {
                     )
                     .frame(height: 2)
                     .frame(width: 200)
-                    
+
                     VStack(spacing: 8) {
                         Text("\(recipe.nutrition.calories) calories")
                         Text("\(recipe.servings) servings")
                     }
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white.opacity(0.8))
-                    
+
                     Spacer()
                 }
             }
@@ -441,12 +441,12 @@ struct DiagonalShape: Shape {
 
 struct StickerView: View {
     let type: StickerType
-    
+
     var body: some View {
         VStack(spacing: 4) {
             Text(type.emoji)
                 .font(.system(size: 60))
-            
+
             if type != .custom {
                 Text(type.text)
                     .font(.system(size: 14, weight: .bold))
@@ -469,18 +469,18 @@ struct InstagramCarouselSlide: View {
         case instructions
         case result(UIImage)
     }
-    
+
     let slideType: SlideType
     let recipe: Recipe
     let template: InstagramTemplate
     let slideNumber: Int
     let totalSlides: Int
-    
+
     var body: some View {
         ZStack {
             // Background
             template.gradient
-            
+
             // Content based on slide type
             switch slideType {
             case .title:
@@ -492,7 +492,7 @@ struct InstagramCarouselSlide: View {
             case .result(let image):
                 ResultSlideContent(recipe: recipe, image: image)
             }
-            
+
             // Slide indicator
             VStack {
                 HStack(spacing: 4) {
@@ -504,7 +504,7 @@ struct InstagramCarouselSlide: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 50)
-                
+
                 Spacer()
             }
         }
@@ -513,23 +513,23 @@ struct InstagramCarouselSlide: View {
 
 struct TitleSlideContent: View {
     let recipe: Recipe
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
-            
+
             Text(recipe.name)
                 .font(.system(size: 48, weight: .bold))
                 .foregroundColor(.white)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 30)
-            
+
             Text(recipe.description)
                 .font(.system(size: 20))
                 .foregroundColor(.white.opacity(0.9))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            
+
             Spacer()
         }
     }
@@ -537,7 +537,7 @@ struct TitleSlideContent: View {
 
 struct IngredientsSlideContent: View {
     let recipe: Recipe
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("INGREDIENTS")
@@ -545,7 +545,7 @@ struct IngredientsSlideContent: View {
                 .foregroundColor(.white)
                 .padding(.top, 100)
                 .padding(.horizontal, 30)
-            
+
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(recipe.ingredients) { ingredient in
                     HStack {
@@ -559,7 +559,7 @@ struct IngredientsSlideContent: View {
                 }
             }
             .padding(.horizontal, 40)
-            
+
             Spacer()
         }
     }
@@ -567,7 +567,7 @@ struct IngredientsSlideContent: View {
 
 struct InstructionsSlideContent: View {
     let recipe: Recipe
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("INSTRUCTIONS")
@@ -575,7 +575,7 @@ struct InstructionsSlideContent: View {
                 .foregroundColor(.white)
                 .padding(.top, 100)
                 .padding(.horizontal, 30)
-            
+
             VStack(alignment: .leading, spacing: 16) {
                 ForEach(Array(recipe.instructions.prefix(5).enumerated()), id: \.offset) { index, instruction in
                     HStack(alignment: .top) {
@@ -583,7 +583,7 @@ struct InstructionsSlideContent: View {
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(.white)
                             .frame(width: 30)
-                        
+
                         Text(instruction)
                             .font(.system(size: 16))
                             .foregroundColor(.white.opacity(0.9))
@@ -591,7 +591,7 @@ struct InstructionsSlideContent: View {
                 }
             }
             .padding(.horizontal, 40)
-            
+
             Spacer()
         }
     }
@@ -600,23 +600,23 @@ struct InstructionsSlideContent: View {
 struct ResultSlideContent: View {
     let recipe: Recipe
     let image: UIImage
-    
+
     var body: some View {
         VStack {
             Spacer()
-            
+
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(maxHeight: 600)
                 .cornerRadius(20)
                 .padding(.horizontal, 30)
-            
+
             Text("Enjoy your \(recipe.name)!")
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundColor(.white)
                 .padding(.top, 20)
-            
+
             Spacer()
         }
     }
@@ -626,7 +626,7 @@ struct ResultSlideContent: View {
 enum InstagramError: LocalizedError {
     case renderingFailed
     case templateNotSupported
-    
+
     var errorDescription: String? {
         switch self {
         case .renderingFailed:

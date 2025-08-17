@@ -4,7 +4,8 @@ import AVFoundation
 // MARK: - Emoji Flick Game
 struct EmojiFlickGame: View {
     let backgroundImage: UIImage?
-    
+    @EnvironmentObject var deviceManager: DeviceManager
+
     @State private var gameState = GameState()
     @State private var emojis: [GameEmoji] = []
     @State private var particles: [GameParticle] = []
@@ -17,20 +18,20 @@ struct EmojiFlickGame: View {
     @State private var tutorialOpacity: Double = 1.0
     @State private var tutorialFingerPosition = CGPoint(x: 100, y: 300)
     // Haptic feedback is handled via static methods
-    
+
     init(backgroundImage: UIImage? = nil) {
         self.backgroundImage = backgroundImage
     }
-    
+
     // Special effects
     @State private var magneticFieldActive = false
     @State private var timeSlowActive = false
     @State private var comboFlameActive = false
-    
+
     // Timers
     let gameTimer = Timer.publish(every: 0.016, on: .main, in: .common).autoconnect() // 60 FPS
     let spawnTimer = Timer.publish(every: 2.5, on: .main, in: .common).autoconnect()
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -44,7 +45,7 @@ struct EmojiFlickGame: View {
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
-                
+
                 // Captured fridge image as transparent background
                 if let backgroundImage = backgroundImage {
                     Image(uiImage: backgroundImage)
@@ -56,26 +57,28 @@ struct EmojiFlickGame: View {
                         .clipped()
                         .ignoresSafeArea()
                 }
-                
-                // Ambient particles
-                ForEach(particles.filter { $0.type == .ambient }) { particle in
-                    ParticleView(particle: particle)
+
+                // Conditional ambient particles
+                if deviceManager.shouldShowParticles {
+                    ForEach(particles.filter { $0.type == .ambient }.prefix(deviceManager.recommendedParticleCount)) { particle in
+                        ParticleView(particle: particle)
+                    }
                 }
-                
+
                 // Time slow overlay
                 if timeSlowActive {
                     Color.blue.opacity(0.1)
                         .ignoresSafeArea()
                         .animation(.easeInOut(duration: 0.5), value: timeSlowActive)
                 }
-                
+
                 // Magnetic field visualization
                 if magneticFieldActive {
                     MagneticFieldView()
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .opacity(0.3)
                 }
-                
+
                 // Game content
                 ZStack {
                     // Background touch detector
@@ -85,7 +88,7 @@ struct EmojiFlickGame: View {
                             DragGesture(minimumDistance: 0)
                                 .onChanged { value in
                                     createTouchSpark(at: value.location)
-                                    
+
                                     // Track drag path
                                     if backgroundDragPath.isEmpty {
                                         backgroundDragPath = [value.location]
@@ -94,7 +97,7 @@ struct EmojiFlickGame: View {
                                         if backgroundDragPath.count > 20 {
                                             backgroundDragPath.removeFirst()
                                         }
-                                        
+
                                         // Check if swipe line intersects any emoji
                                         if backgroundDragPath.count >= 2 {
                                             let lastPoint = backgroundDragPath[backgroundDragPath.count - 1]
@@ -108,7 +111,7 @@ struct EmojiFlickGame: View {
                                     backgroundDragPath = []
                                 }
                         )
-                    
+
                     // Falling emojis
                     ForEach(emojis) { emoji in
                         SimpleFallingEmojiView(
@@ -116,41 +119,44 @@ struct EmojiFlickGame: View {
                             magneticFieldActive: magneticFieldActive
                         )
                     }
-                    
-                    // Particle effects
-                    ForEach(particles.filter { $0.type != .ambient }) { particle in
-                        ParticleView(particle: particle)
+
+                    // Conditional particle effects
+                    if deviceManager.shouldShowParticles {
+                        ForEach(particles.filter { $0.type != .ambient }.prefix(deviceManager.recommendedParticleCount * 2)) { particle in
+                            ParticleView(particle: particle)
+                        }
                     }
-                    
+
                     // Score popups
                     ForEach(scorePopups) { popup in
                         ScorePopupView(popup: popup)
                     }
-                    
+
                     // Swipe trails
                     ForEach(swipeTrails) { trail in
                         SwipeTrailView(trail: trail)
                     }
-                    
-                    // Touch sparks
-                    ForEach(touchSparks) { spark in
-                        TouchSparkView(spark: spark)
+
+                    // Conditional touch sparks
+                    if deviceManager.shouldShowParticles {
+                        ForEach(touchSparks.prefix(deviceManager.recommendedParticleCount / 3)) { spark in
+                            TouchSparkView(spark: spark)
+                        }
                     }
                 }
                 .offset(x: screenShake)
                 .animation(.spring(response: 0.2, dampingFraction: 0.3), value: screenShake)
-                
-                
+
                 // Animated scoreboard at bottom left
                 AnimatedScoreboard(gameState: gameState)
                     .position(x: 120, y: geometry.size.height - 80)
-                
+
                 // Combo indicator at bottom right
                 if gameState.combo > 0 {
                     ComboIndicator(combo: gameState.combo, multiplier: gameState.multiplier)
                         .position(x: geometry.size.width - 80, y: geometry.size.height - 80)
                 }
-                
+
                 // Tutorial finger
                 if showTutorial {
                     TutorialFingerView()
@@ -168,22 +174,28 @@ struct EmojiFlickGame: View {
         }
         .onAppear {
             spawnInitialEmojis()
-            createAmbientParticles()
-            startTutorialAnimation()
+            if deviceManager.shouldShowParticles {
+                createAmbientParticles()
+            }
+            if deviceManager.animationsEnabled {
+                startTutorialAnimation()
+            } else {
+                showTutorial = false
+            }
         }
     }
-    
+
     // MARK: - Game Logic
-    
+
     private func updateGame() {
         let timeMultiplier = timeSlowActive ? 0.3 : 1.0
-        
+
         // Update emojis
         for i in emojis.indices.reversed() {
             emojis[i].position.y += emojis[i].velocity.dy * timeMultiplier
             emojis[i].position.x += emojis[i].velocity.dx * timeMultiplier
             emojis[i].rotation += emojis[i].rotationSpeed * timeMultiplier
-            
+
             // Apply gravity (reduced for slower falling)
             if !emojis[i].isFlicked {
                 emojis[i].velocity.dy += 25 * 0.016 * timeMultiplier // gravity
@@ -198,14 +210,14 @@ struct EmojiFlickGame: View {
                 emojis[i].scale *= 0.98 // Shrink as they fly away
                 emojis[i].rotationSpeed *= 1.1 // Spin faster
             }
-            
+
             // Wall bounce
             if emojis[i].position.x <= 30 || emojis[i].position.x >= UIScreen.main.bounds.width - 30 {
                 emojis[i].velocity.dx *= -0.7
                 emojis[i].position.x = max(30, min(UIScreen.main.bounds.width - 30, emojis[i].position.x))
                 HapticManager.impact(.light)
             }
-            
+
             // Remove if off screen
             let offScreenBuffer: CGFloat = 200
             if emojis[i].position.y > UIScreen.main.bounds.height + offScreenBuffer ||
@@ -213,7 +225,6 @@ struct EmojiFlickGame: View {
                emojis[i].position.x < -offScreenBuffer ||
                emojis[i].position.x > UIScreen.main.bounds.width + offScreenBuffer ||
                emojis[i].scale < 0.1 {
-                
                 if !emojis[i].isFlicked && emojis[i].position.y > UIScreen.main.bounds.height {
                     // Reset combo only if emoji fell (not flicked)
                     if gameState.combo > 0 {
@@ -224,7 +235,7 @@ struct EmojiFlickGame: View {
                 emojis.remove(at: i)
             }
         }
-        
+
         // Update particles
         for i in particles.indices.reversed() {
             particles[i].lifetime -= 0.016
@@ -232,23 +243,23 @@ struct EmojiFlickGame: View {
             particles[i].position.y += particles[i].velocity.dy * timeMultiplier
             particles[i].opacity = max(0, particles[i].lifetime / particles[i].maxLifetime)
             particles[i].scale = particles[i].baseScale * (0.5 + 0.5 * particles[i].opacity)
-            
+
             if particles[i].lifetime <= 0 {
                 particles.remove(at: i)
             }
         }
-        
+
         // Update score popups
         for i in scorePopups.indices.reversed() {
             scorePopups[i].lifetime -= 0.016
             scorePopups[i].position.y -= 60 * 0.016 // Float up
             scorePopups[i].opacity = max(0, scorePopups[i].lifetime / 1.0)
-            
+
             if scorePopups[i].lifetime <= 0 {
                 scorePopups.remove(at: i)
             }
         }
-        
+
         // Update screen shake
         if screenShake != 0 {
             screenShake *= 0.9
@@ -256,101 +267,103 @@ struct EmojiFlickGame: View {
                 screenShake = 0
             }
         }
-        
+
         // Update touch sparks
         for i in touchSparks.indices.reversed() {
             touchSparks[i].lifetime -= 0.016
             touchSparks[i].scale *= 1.1
             touchSparks[i].opacity = max(0, touchSparks[i].lifetime / 0.5)
-            
+
             if touchSparks[i].lifetime <= 0 {
                 touchSparks.remove(at: i)
             }
         }
-        
+
         // Update swipe trails
         for i in swipeTrails.indices.reversed() {
             swipeTrails[i].lifetime -= 0.016
             swipeTrails[i].opacity = max(0, swipeTrails[i].lifetime / 0.3)
-            
+
             if swipeTrails[i].lifetime <= 0 {
                 swipeTrails.remove(at: i)
             }
         }
     }
-    
+
     private func handleEmojiFlick(emoji: GameEmoji, velocity: CGVector, position: CGPoint) {
         guard let index = emojis.firstIndex(where: { $0.id == emoji.id }) else { return }
-        
+
         // Calculate flick power
         let flickPower = sqrt(velocity.dx * velocity.dx + velocity.dy * velocity.dy)
         let minFlickPower: CGFloat = 200
-        
+
         guard flickPower > minFlickPower else {
             // Too weak, just drop it
             return
         }
-        
+
         // Apply flick velocity to emoji instead of removing it
         emojis[index].velocity = CGVector(
             dx: velocity.dx * 1.5,
             dy: velocity.dy * 1.5
         )
         emojis[index].isFlicked = true
-        
+
         // Calculate score based on flick power
         let baseScore = emoji.isSpecial ? 20 : 10
-        let speedBonus = min(2.0, 1.0 + (flickPower / 1000))
+        let speedBonus = min(2.0, 1.0 + (flickPower / 1_000))
         let score = Int(Double(baseScore) * speedBonus * Double(gameState.multiplier))
-        
+
         gameState.score += score
         if gameState.score > gameState.highScore {
             gameState.highScore = gameState.score
         }
-        
+
         // Update combo
         gameState.combo += 1
         gameState.lastComboTime = Date()
         updateMultiplier()
-        
+
         // Create effects
         createFlickEffects(at: position, velocity: velocity, emoji: emoji, score: score)
-        
+
         // Create flick impact effect
         createFlickImpactEffect(at: position)
-        
+
         // Haptic feedback based on flick strength
-        if flickPower > 1000 {
+        if flickPower > 1_000 {
             HapticManager.impact(.heavy)
         } else if flickPower > 500 {
             HapticManager.impact(.medium)
         } else {
             HapticManager.impact(.light)
         }
-        
+
         // Handle special emoji effects
         if emoji.isSpecial {
             handleSpecialEmojiEffect(emoji: emoji, at: position)
         }
     }
-    
+
     private func createFlickEffects(at position: CGPoint, velocity: CGVector, emoji: GameEmoji, score: Int) {
-        // Trail particles (reduced for performance)
-        let trailCount = 10
-        for _ in 0..<trailCount {
-            let angle = atan2(velocity.dy, velocity.dx) + .random(in: -0.5...0.5)
-            let speed = CGFloat.random(in: 100...200)
-            let particle = GameParticle(
-                position: position,
-                velocity: CGVector(dx: cos(angle) * speed, dy: sin(angle) * speed),
-                color: emoji.isSpecial ? .yellow : .white,
-                size: CGFloat.random(in: 4...6),
-                lifetime: 0.5,
-                type: .trail
-            )
-            particles.append(particle)
+        // Trail particles (adaptive count based on performance)
+        if deviceManager.shouldShowParticles {
+            let trailCount = deviceManager.recommendedParticleCount / 3 // Reduced count
+            for _ in 0..<trailCount {
+                let angle = atan2(velocity.dy, velocity.dx) + .random(in: -0.5...0.5)
+                let speed = CGFloat.random(in: 100...200)
+                let particle = GameParticle(
+                    position: position,
+                    velocity: CGVector(dx: cos(angle) * speed, dy: sin(angle) * speed),
+                    color: emoji.isSpecial ? .yellow : .white,
+                    size: CGFloat.random(in: 4...6),
+                    lifetime: deviceManager.isLowPowerModeEnabled ? 0.2 : 0.5,
+                    type: .trail
+                )
+                particles.append(particle)
+            }
         }
-        
+
         // Score popup
         let popup = ScorePopup(
             position: position,
@@ -358,13 +371,13 @@ struct EmojiFlickGame: View {
             color: gameState.combo > 10 ? .yellow : (gameState.combo > 5 ? .orange : .white)
         )
         scorePopups.append(popup)
-        
+
         // Explosion for special emojis
         if emoji.isSpecial {
             createExplosion(at: position, intensity: .medium)
         }
     }
-    
+
     private func createExplosion(at position: CGPoint, intensity: GameExplosionIntensity) {
         let particleCount = intensity.particleCount
         for _ in 0..<particleCount {
@@ -380,16 +393,16 @@ struct EmojiFlickGame: View {
             )
             particles.append(particle)
         }
-        
+
         // Screen shake
         screenShake = intensity.shakeAmount
     }
-    
+
     private func handleSpecialEmojiEffect(emoji: GameEmoji, at position: CGPoint) {
         switch emoji.emoji {
         case "🌟": // Golden star - bonus points
             createExplosion(at: position, intensity: .large)
-            
+
         case "🍳": // Frying pan - clear nearby
             createExplosion(at: position, intensity: .mega)
             // Remove nearby emojis
@@ -397,24 +410,24 @@ struct EmojiFlickGame: View {
                 let distance = sqrt(pow(other.position.x - position.x, 2) + pow(other.position.y - position.y, 2))
                 return distance < 150 && other.id != emoji.id
             }
-            
+
         case "🥘": // Pot - attract emojis
             magneticFieldActive = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 magneticFieldActive = false
             }
-            
+
         case "🍯": // Honey - slow time
             timeSlowActive = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 timeSlowActive = false
             }
-            
+
         default:
             break
         }
     }
-    
+
     private func updateMultiplier() {
         // Update multiplier based on combo
         if gameState.combo >= 20 {
@@ -428,14 +441,14 @@ struct EmojiFlickGame: View {
         } else {
             gameState.multiplier = 1
         }
-        
+
         // Activate combo effects
         comboFlameActive = gameState.combo >= 10
     }
-    
+
     private func spawnEmoji() {
         let specialEmojis = ["🌟", "🍳", "🥘", "🍯"]
-        let regularEmojis = ["🍕", "🍔", "🌮", "🍜", "🍱", "🥗", "🍰", "🍪", "🧁", "🍩", 
+        let regularEmojis = ["🍕", "🍔", "🌮", "🍜", "🍱", "🥗", "🍰", "🍪", "🧁", "🍩",
                            "🥐", "🥖", "🧀", "🍖", "🍗", "🥓", "🌭", "🍟", "🥙", "🌯",
                            "🥚", "🍳", "🥞", "🧇", "🥯", "🍞", "🥨", "🧈", "🥜", "🌰",
                            "🍄", "🥦", "🥒", "🌽", "🥕", "🥔", "🍠", "🌶️", "🥑", "🍆",
@@ -443,10 +456,10 @@ struct EmojiFlickGame: View {
                            "🫐", "🍈", "🍒", "🍑", "🥝", "🍍", "🥥", "🍦", "🍧", "🍨",
                            "🍡", "🍢", "🍣", "🍤", "🍥", "🥮", "🍘", "🍙", "🍚", "🍛",
                            "🍝", "🍠", "🍲", "🍵", "☕", "🥛", "🍶", "🍾", "🧃", "🥤"]
-        
+
         let isSpecial = Double.random(in: 0...1) < 0.2 // 20% chance for special
         let emoji = isSpecial ? specialEmojis.randomElement()! : regularEmojis.randomElement()!
-        
+
         let newEmoji = GameEmoji(
             emoji: emoji,
             position: CGPoint(
@@ -459,19 +472,20 @@ struct EmojiFlickGame: View {
             ),
             isSpecial: isSpecial
         )
-        
+
         emojis.append(newEmoji)
     }
-    
+
     private func spawnInitialEmojis() {
         for _ in 0..<2 {
             spawnEmoji()
         }
     }
-    
+
     private func createAmbientParticles() {
-        // Create fewer floating background particles
-        for _ in 0..<10 {
+        // Create adaptive count of floating background particles
+        let ambientCount = deviceManager.recommendedParticleCount / 2
+        for _ in 0..<ambientCount {
             let particle = GameParticle(
                 position: CGPoint(
                     x: CGFloat.random(in: 0...UIScreen.main.bounds.width),
@@ -483,27 +497,32 @@ struct EmojiFlickGame: View {
                 ),
                 color: .white,
                 size: CGFloat.random(in: 2...3),
-                lifetime: 10.0,
+                lifetime: deviceManager.isLowPowerModeEnabled ? 5.0 : 10.0,
                 type: .ambient
             )
             particles.append(particle)
         }
     }
-    
+
     private func createTouchSpark(at position: CGPoint) {
-        // Limit number of sparks
-        if touchSparks.count > 5 {
+        // Skip sparks if particles are disabled
+        guard deviceManager.shouldShowParticles else { return }
+        
+        // Limit number of sparks based on performance
+        let maxSparks = deviceManager.recommendedParticleCount / 5
+        if touchSparks.count > maxSparks {
             return
         }
-        
+
         let spark = TouchSpark(
             position: position,
             color: [.white, .yellow, .cyan].randomElement()!
         )
         touchSparks.append(spark)
-        
-        // Create fewer particles for better performance
-        for _ in 0..<3 {
+
+        // Create adaptive particle count
+        let sparkParticleCount = max(1, deviceManager.recommendedParticleCount / 8)
+        for _ in 0..<sparkParticleCount {
             let angle = Double.random(in: 0...(2 * .pi))
             let speed = CGFloat.random(in: 50...100)
             let particle = GameParticle(
@@ -514,18 +533,19 @@ struct EmojiFlickGame: View {
                 ),
                 color: spark.color,
                 size: CGFloat.random(in: 3...5),
-                lifetime: 0.3,
+                lifetime: deviceManager.isLowPowerModeEnabled ? 0.1 : 0.3,
                 type: .trail
             )
             particles.append(particle)
         }
-        
-        // Limit total particles
-        if particles.count > 100 {
-            particles.removeFirst(particles.count - 100)
+
+        // Adaptive particle limit
+        let maxParticles = deviceManager.recommendedParticleCount * 4
+        if particles.count > maxParticles {
+            particles.removeFirst(particles.count - maxParticles)
         }
     }
-    
+
     private func updateSwipeTrail(points: [CGPoint]) {
         if points.count > 2 {
             swipeTrails.removeAll()
@@ -536,7 +556,7 @@ struct EmojiFlickGame: View {
             swipeTrails.append(trail)
         }
     }
-    
+
     private func createFlickImpactEffect(at position: CGPoint) {
         // Create a larger spark at impact point
         let impactSpark = TouchSpark(
@@ -546,7 +566,7 @@ struct EmojiFlickGame: View {
             color: .white
         )
         touchSparks.append(impactSpark)
-        
+
         // Create ring explosion (reduced particles)
         for i in 0..<8 {
             let angle = (Double(i) / 8.0) * 2 * .pi
@@ -564,7 +584,7 @@ struct EmojiFlickGame: View {
             )
             particles.append(particle)
         }
-        
+
         // Add fewer sparkles
         for _ in 0..<8 {
             let angle = Double.random(in: 0...(2 * .pi))
@@ -583,58 +603,58 @@ struct EmojiFlickGame: View {
             particles.append(particle)
         }
     }
-    
+
     private func checkEmojiIntersection(from: CGPoint, to: CGPoint) {
         let emojiRadius: CGFloat = 40 // Half of the 80pt font size
-        
+
         for i in emojis.indices where !emojis[i].isFlicked {
             let emojiCenter = emojis[i].position
-            
+
             // Check if line segment intersects with emoji circle
             if lineIntersectsCircle(lineStart: from, lineEnd: to, circleCenter: emojiCenter, radius: emojiRadius) {
                 // Calculate flick velocity based on swipe direction
                 let dx = to.x - from.x
                 let dy = to.y - from.y
                 let velocity = CGVector(dx: dx * 20, dy: dy * 20) // Scale up the velocity
-                
+
                 handleEmojiFlick(emoji: emojis[i], velocity: velocity, position: emojiCenter)
             }
         }
     }
-    
+
     private func lineIntersectsCircle(lineStart: CGPoint, lineEnd: CGPoint, circleCenter: CGPoint, radius: CGFloat) -> Bool {
         // Calculate the closest point on the line segment to the circle center
         let dx = lineEnd.x - lineStart.x
         let dy = lineEnd.y - lineStart.y
-        
+
         if dx == 0 && dy == 0 {
             // Line start and end are the same point
             let distance = sqrt(pow(lineStart.x - circleCenter.x, 2) + pow(lineStart.y - circleCenter.y, 2))
             return distance <= radius
         }
-        
+
         let t = max(0, min(1, ((circleCenter.x - lineStart.x) * dx + (circleCenter.y - lineStart.y) * dy) / (dx * dx + dy * dy)))
-        
+
         let closestPoint = CGPoint(
             x: lineStart.x + t * dx,
             y: lineStart.y + t * dy
         )
-        
+
         let distance = sqrt(pow(closestPoint.x - circleCenter.x, 2) + pow(closestPoint.y - circleCenter.y, 2))
         return distance <= radius
     }
-    
+
     private func startTutorialAnimation() {
         guard showTutorial else { return }
-        
+
         // Start finger visible on screen immediately
         tutorialFingerPosition = CGPoint(x: 200, y: 400)
-        
+
         // Wait for emojis to reach middle of screen
         let screenHeight = UIScreen.main.bounds.height
         let targetMinY = screenHeight * 0.4
         let targetMaxY = screenHeight * 0.6
-        
+
         // Check every 0.1 seconds for emojis at target position
         var tutorialTimer: Timer?
         tutorialTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
@@ -643,12 +663,12 @@ struct EmojiFlickGame: View {
                 let readyEmojis = self.emojis.filter { emoji in
                     emoji.position.y >= targetMinY && emoji.position.y <= targetMaxY && !emoji.isFlicked
                 }
-                
-                guard readyEmojis.count > 0 else { return }
-                
+
+                guard !readyEmojis.isEmpty else { return }
+
                 tutorialTimer?.invalidate()
                 tutorialTimer = nil
-                
+
                 // Flick first emoji
                 if let firstEmoji = readyEmojis.first {
                     withAnimation(.easeInOut(duration: 0.3)) {
@@ -657,7 +677,7 @@ struct EmojiFlickGame: View {
                             y: firstEmoji.position.y
                         )
                     }
-                
+
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         self.tutorialFingerPosition = CGPoint(
@@ -665,16 +685,16 @@ struct EmojiFlickGame: View {
                             y: firstEmoji.position.y - 50
                         )
                     }
-                    
+
                     let velocity = CGVector(dx: 300, dy: -150)
                     self.handleEmojiFlick(emoji: firstEmoji, velocity: velocity, position: firstEmoji.position)
                 }
             }
-            
+
             // Flick second emoji
             if readyEmojis.count >= 2 {
                 let secondEmoji = readyEmojis[1]
-                
+
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         self.tutorialFingerPosition = CGPoint(
@@ -682,7 +702,7 @@ struct EmojiFlickGame: View {
                             y: secondEmoji.position.y
                         )
                     }
-                    
+
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             self.tutorialFingerPosition = CGPoint(
@@ -690,17 +710,17 @@ struct EmojiFlickGame: View {
                                 y: secondEmoji.position.y - 50
                             )
                         }
-                        
+
                         let velocity = CGVector(dx: 300, dy: -150)
                         self.handleEmojiFlick(emoji: secondEmoji, velocity: velocity, position: secondEmoji.position)
                     }
                 }
             }
-            
+
             // Flick third emoji
             if readyEmojis.count >= 3 {
                 let thirdEmoji = readyEmojis[2]
-                
+
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         self.tutorialFingerPosition = CGPoint(
@@ -708,7 +728,7 @@ struct EmojiFlickGame: View {
                             y: thirdEmoji.position.y
                         )
                     }
-                    
+
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             self.tutorialFingerPosition = CGPoint(
@@ -716,19 +736,19 @@ struct EmojiFlickGame: View {
                                 y: thirdEmoji.position.y - 50
                             )
                         }
-                        
+
                         let velocity = CGVector(dx: 300, dy: -150)
                         self.handleEmojiFlick(emoji: thirdEmoji, velocity: velocity, position: thirdEmoji.position)
                     }
                 }
             }
-            
+
             // Fade out tutorial
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.3) {
                 withAnimation(.easeOut(duration: 0.3)) {
                     self.tutorialOpacity = 0
                 }
-                
+
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     self.showTutorial = false
                 }
@@ -745,8 +765,8 @@ struct GameState {
     var highScore: Int = UserDefaults.standard.integer(forKey: "emojiFlickHighScore")
     var combo: Int = 0
     var multiplier: Int = 1
-    var lastComboTime: Date = Date()
-    
+    var lastComboTime = Date()
+
     mutating func saveHighScore() {
         if score > highScore {
             highScore = score
@@ -761,7 +781,7 @@ struct GameEmoji: Identifiable {
     var position: CGPoint
     var velocity: CGVector
     var rotation: Double = 0
-    var rotationSpeed: Double = Double.random(in: -5...5)
+    var rotationSpeed = Double.random(in: -5...5)
     var scale: CGFloat = 1.0
     var isDragging: Bool = false
     var dragOffset: CGSize = .zero
@@ -781,7 +801,7 @@ struct GameParticle: Identifiable {
     var scale: CGFloat = 1.0
     let baseScale: CGFloat = 1.0
     var type: ParticleType
-    
+
     init(position: CGPoint, velocity: CGVector, color: Color, size: CGFloat, lifetime: Double, type: ParticleType) {
         self.position = position
         self.velocity = velocity
@@ -826,7 +846,7 @@ struct SwipeTrail: Identifiable {
 
 enum GameExplosionIntensity {
     case small, medium, large, mega
-    
+
     var particleCount: Int {
         switch self {
         case .small: return 12
@@ -835,7 +855,7 @@ enum GameExplosionIntensity {
         case .mega: return 48
         }
     }
-    
+
     var speedRange: ClosedRange<CGFloat> {
         switch self {
         case .small: return 50...150
@@ -844,7 +864,7 @@ enum GameExplosionIntensity {
         case .mega: return 200...500
         }
     }
-    
+
     var sizeRange: ClosedRange<CGFloat> {
         switch self {
         case .small: return 4...8
@@ -853,7 +873,7 @@ enum GameExplosionIntensity {
         case .mega: return 10...20
         }
     }
-    
+
     var lifetime: Double {
         switch self {
         case .small: return 0.6
@@ -862,7 +882,7 @@ enum GameExplosionIntensity {
         case .mega: return 1.2
         }
     }
-    
+
     var shakeAmount: CGFloat {
         switch self {
         case .small: return 5
@@ -879,7 +899,7 @@ struct SimpleFallingEmojiView: View {
     let emoji: GameEmoji
     let magneticFieldActive: Bool
     @State private var glowAnimation: Bool = false
-    
+
     var body: some View {
         Text(emoji.emoji)
             .font(.system(size: 80))
@@ -912,14 +932,14 @@ struct FallingEmojiView: View {
     let onFlick: (CGVector, CGPoint) -> Void
     let onTouch: (CGPoint) -> Void
     let onDrag: ([CGPoint]) -> Void
-    
+
     @State private var dragVelocity: CGVector = .zero
     @State private var lastDragPosition: CGPoint = .zero
-    @State private var dragStartTime: Date = Date()
+    @State private var dragStartTime = Date()
     @State private var isDragging: Bool = false
     @State private var glowAnimation: Bool = false
     @State private var dragPath: [CGPoint] = []
-    
+
     var body: some View {
         Text(emoji.emoji)
             .font(.system(size: 80))
@@ -947,34 +967,34 @@ struct FallingEmojiView: View {
                             dragPath = [value.location]
                             onTouch(value.location)
                         }
-                        
+
                         let currentPosition = value.location
                         let timeDelta = Date().timeIntervalSince(dragStartTime)
-                        
+
                         if timeDelta > 0 {
                             let dx = currentPosition.x - lastDragPosition.x
                             let dy = currentPosition.y - lastDragPosition.y
                             dragVelocity = CGVector(dx: dx / timeDelta, dy: dy / timeDelta)
                         }
-                        
+
                         dragPath.append(currentPosition)
                         if dragPath.count > 20 {
                             dragPath.removeFirst()
                         }
                         onDrag(dragPath)
-                        
+
                         lastDragPosition = currentPosition
                         dragStartTime = Date()
                     }
                     .onEnded { value in
                         isDragging = false
-                        
+
                         // Calculate final velocity
                         let flickVelocity = CGVector(
                             dx: dragVelocity.dx * 0.8,
                             dy: dragVelocity.dy * 0.8
                         )
-                        
+
                         onFlick(flickVelocity, value.location)
                     }
             )
@@ -990,7 +1010,7 @@ struct AnimatedScoreboard: View {
     let gameState: GameState
     @State private var scoreScale: CGFloat = 1.0
     @State private var glowOpacity: Double = 0.6
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Score
@@ -998,20 +1018,20 @@ struct AnimatedScoreboard: View {
                 Image(systemName: "star.fill")
                     .foregroundColor(.yellow)
                     .font(.system(size: 20))
-                
+
                 Text("\(gameState.score)")
                     .font(.system(size: 42, weight: .black, design: .rounded))
                     .foregroundColor(.white)
                     .scaleEffect(scoreScale)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: gameState.score)
             }
-            
+
             // High score
             HStack(spacing: 4) {
                 Image(systemName: "crown.fill")
                     .foregroundColor(.orange)
                     .font(.system(size: 14))
-                
+
                 Text("BEST: \(gameState.highScore)")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundColor(.white.opacity(0.8))
@@ -1053,7 +1073,7 @@ struct ComboIndicator: View {
     let multiplier: Int
     @State private var scale: CGFloat = 0.5
     @State private var rotation: Double = 0
-    
+
     var comboColor: Color {
         if combo >= 20 { return .red }
         if combo >= 15 { return .orange }
@@ -1061,7 +1081,7 @@ struct ComboIndicator: View {
         if combo >= 5 { return .green }
         return .blue
     }
-    
+
     var body: some View {
         ZStack {
             // Background circle
@@ -1072,13 +1092,13 @@ struct ComboIndicator: View {
                         .stroke(comboColor, lineWidth: 3)
                 )
                 .frame(width: 80, height: 80)
-            
+
             // Combo number in the center
             Text("\(combo)")
                 .font(.system(size: 48, weight: .black, design: .rounded))
                 .foregroundColor(.white)
                 .offset(y: 0) // Center of circle
-            
+
             // Multiplier below the circle
             Text("×\(multiplier)")
                 .font(.system(size: 24, weight: .bold, design: .rounded))
@@ -1107,7 +1127,7 @@ struct ComboIndicator: View {
 
 struct ParticleView: View {
     let particle: GameParticle
-    
+
     var body: some View {
         Circle()
             .fill(particle.color)
@@ -1122,7 +1142,7 @@ struct ParticleView: View {
 struct ScorePopupView: View {
     let popup: ScorePopup
     @State private var scale: CGFloat = 0.5
-    
+
     var body: some View {
         Text("+\(popup.value)")
             .font(.system(size: 32, weight: .black, design: .rounded))
@@ -1149,7 +1169,7 @@ struct ScorePopupView: View {
 
 struct TouchSparkView: View {
     let spark: TouchSpark
-    
+
     var body: some View {
         ZStack {
             // Outer glow
@@ -1167,7 +1187,7 @@ struct TouchSparkView: View {
                     )
                 )
                 .frame(width: 40 * spark.scale, height: 40 * spark.scale)
-            
+
             // Inner bright core
             Circle()
                 .fill(Color.white)
@@ -1181,22 +1201,22 @@ struct TouchSparkView: View {
 
 struct SwipeTrailView: View {
     let trail: SwipeTrail
-    
+
     var body: some View {
-        Canvas { context, size in
+        Canvas { context, _ in
             guard trail.points.count > 2 else { return }
-            
+
             var path = Path()
             path.move(to: trail.points[0])
-            
+
             for i in 1..<trail.points.count {
                 path.addLine(to: trail.points[i])
             }
-            
+
             // Draw multiple strokes for glow effect
             for (index, width) in [12.0, 8.0, 4.0].enumerated() {
                 let opacity = trail.opacity * (0.3 + 0.3 * Double(index))
-                
+
                 context.stroke(
                     path,
                     with: .linearGradient(
@@ -1216,7 +1236,7 @@ struct SwipeTrailView: View {
                     )
                 )
             }
-            
+
             // Add bright core
             context.stroke(
                 path,
@@ -1244,9 +1264,9 @@ struct AIAnalyzingIndicator: View {
     @State private var pulseScale: CGFloat = 1.0
     @State private var scannerOffset: CGFloat = -40
     @State private var scannerOpacity: Double = 0.8
-    
+
     let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
-    
+
     var body: some View {
         ZStack {
             // Main content
@@ -1255,7 +1275,7 @@ struct AIAnalyzingIndicator: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
                     .scaleEffect(pulseScale)
-                
+
                 Text("AI Analyzing\(dots)")
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundColor(.white)
@@ -1277,7 +1297,7 @@ struct AIAnalyzingIndicator: View {
                             )
                     )
             )
-            
+
             // Scanner line effect
             Rectangle()
                 .fill(
@@ -1312,12 +1332,12 @@ struct AIAnalyzingIndicator: View {
             withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
                 pulseScale = 1.2
             }
-            
+
             // Scanner animation
             withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
                 scannerOffset = 40
             }
-            
+
             // Scanner fade animation
             withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
                 scannerOpacity = 0.3
@@ -1328,7 +1348,7 @@ struct AIAnalyzingIndicator: View {
 
 struct TutorialFingerView: View {
     @State private var pulseScale: CGFloat = 1.0
-    
+
     var body: some View {
         ZStack {
             // Outer glow
@@ -1347,7 +1367,7 @@ struct TutorialFingerView: View {
                 )
                 .frame(width: 60, height: 60)
                 .scaleEffect(pulseScale)
-            
+
             // Finger emoji
             Text("👆")
                 .font(.system(size: 50))
@@ -1364,7 +1384,7 @@ struct TutorialFingerView: View {
 struct MagneticFieldView: View {
     @State private var rotation: Double = 0
     @State private var scale: CGFloat = 0.8
-    
+
     var body: some View {
         ZStack {
             ForEach(0..<3) { i in

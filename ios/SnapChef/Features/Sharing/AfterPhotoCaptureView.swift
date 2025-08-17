@@ -10,13 +10,13 @@ struct AfterPhotoCaptureView: View {
     @State private var showPhotoLibrary = false
     @State private var isUploading = false
     @State private var uploadError: String?
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 30) {
                     // Title
                     Text("Capture Your Creation")
@@ -24,11 +24,11 @@ struct AfterPhotoCaptureView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                         .padding(.top, 40)
-                    
+
                     Text("Show off your finished dish!")
                         .font(.title3)
                         .foregroundColor(.white.opacity(0.9))
-                    
+
                     // Preview area
                     ZStack {
                         RoundedRectangle(cornerRadius: 20)
@@ -37,7 +37,7 @@ struct AfterPhotoCaptureView: View {
                                 RoundedRectangle(cornerRadius: 20)
                                     .stroke(Color.white.opacity(0.3), lineWidth: 1)
                             )
-                        
+
                         if let photo = afterPhoto {
                             Image(uiImage: photo)
                                 .resizable()
@@ -49,7 +49,7 @@ struct AfterPhotoCaptureView: View {
                                 Image(systemName: "camera.fill")
                                     .font(.system(size: 60))
                                     .foregroundColor(.white.opacity(0.5))
-                                
+
                                 Text("No photo yet")
                                     .font(.headline)
                                     .foregroundColor(.white.opacity(0.5))
@@ -58,7 +58,7 @@ struct AfterPhotoCaptureView: View {
                     }
                     .frame(height: 300)
                     .padding(.horizontal, 20)
-                    
+
                     // Capture buttons
                     HStack(spacing: 20) {
                         MagneticButton(
@@ -68,7 +68,7 @@ struct AfterPhotoCaptureView: View {
                                 showCamera = true
                             }
                         )
-                        
+
                         MagneticButton(
                             title: "Choose Photo",
                             icon: "photo.fill",
@@ -78,9 +78,9 @@ struct AfterPhotoCaptureView: View {
                         )
                     }
                     .padding(.horizontal, 20)
-                    
+
                     Spacer()
-                    
+
                     // Save button
                     if afterPhoto != nil {
                         MagneticButton(
@@ -115,19 +115,19 @@ struct AfterPhotoCaptureView: View {
             Text(uploadError ?? "")
         }
     }
-    
+
     private func saveAndContinue() {
         guard let photo = afterPhoto else { return }
-        
+
         print("📷 AfterPhotoCapture: User captured after photo for recipe ID: \(recipeID)")
         isUploading = true
-        
+
         Task {
             do {
                 print("📷 AfterPhotoCapture: Starting upload to CloudKit...")
                 // Save the after photo to CloudKit
                 try await CloudKitRecipeManager.shared.updateAfterPhoto(for: recipeID, afterPhoto: photo)
-                
+
                 print("📷 AfterPhotoCapture: Upload successful, dismissing view")
                 await MainActor.run {
                     isUploading = false
@@ -148,7 +148,7 @@ struct AfterPhotoCaptureView: View {
 struct AfterPhotoCameraCapture: UIViewControllerRepresentable {
     @Binding var image: UIImage?
     @Environment(\.dismiss) var dismiss
-    
+
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.delegate = context.coordinator
@@ -156,21 +156,21 @@ struct AfterPhotoCameraCapture: UIViewControllerRepresentable {
         picker.allowsEditing = true
         return picker
     }
-    
+
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let parent: AfterPhotoCameraCapture
-        
+
         init(_ parent: AfterPhotoCameraCapture) {
             self.parent = parent
         }
-        
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             if let editedImage = info[.editedImage] as? UIImage {
                 parent.image = editedImage
             } else if let originalImage = info[.originalImage] as? UIImage {
@@ -178,7 +178,7 @@ struct AfterPhotoCameraCapture: UIViewControllerRepresentable {
             }
             parent.dismiss()
         }
-        
+
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.dismiss()
         }
@@ -189,35 +189,35 @@ struct AfterPhotoCameraCapture: UIViewControllerRepresentable {
 struct AfterPhotoLibraryPicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
     @Environment(\.dismiss) var dismiss
-    
+
     func makeUIViewController(context: Context) -> PHPickerViewController {
         var config = PHPickerConfiguration()
         config.filter = .images
         config.selectionLimit = 1
-        
+
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = context.coordinator
         return picker
     }
-    
+
     func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     class Coordinator: NSObject, PHPickerViewControllerDelegate {
         let parent: AfterPhotoLibraryPicker
-        
+
         init(_ parent: AfterPhotoLibraryPicker) {
             self.parent = parent
         }
-        
+
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
             parent.dismiss()
-            
+
             guard let provider = results.first?.itemProvider else { return }
-            
+
             if provider.canLoadObject(ofClass: UIImage.self) {
                 provider.loadObject(ofClass: UIImage.self) { image, _ in
                     if let uiImage = image as? UIImage {

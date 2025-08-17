@@ -8,37 +8,37 @@ extension UIImage {
     /// Resizes the image to fit within the specified maximum dimension while maintaining aspect ratio
     func resized(withMaxDimension maxDimension: CGFloat) -> UIImage {
         let size = self.size
-        
+
         // If image is already smaller than max dimension, return original
         if size.width <= maxDimension && size.height <= maxDimension {
             return self
         }
-        
+
         // Calculate the scaling factor
         let widthRatio = maxDimension / size.width
         let heightRatio = maxDimension / size.height
         let scaleFactor = min(widthRatio, heightRatio)
-        
+
         // Calculate new size
         let newSize = CGSize(
             width: size.width * scaleFactor,
             height: size.height * scaleFactor
         )
-        
+
         // Create resized image
         let renderer = UIGraphicsImageRenderer(size: newSize)
         let resizedImage = renderer.image { _ in
             self.draw(in: CGRect(origin: .zero, size: newSize))
         }
-        
+
         return resizedImage
     }
 } // For UIImage
 
 // MARK: - API Key
 // The API key is now securely stored in the Keychain
-// Fallback key is only used if Keychain access fails (should never happen in normal use)
-private let FALLBACK_API_KEY = "5380e4b60818cf237678fccfd4b8f767d1c94"
+// If Keychain access fails, the app should handle it gracefully without exposing keys
+// private let FALLBACK_API_KEY removed for security - never hardcode API keys
 
 // MARK: - API Error Handling
 enum APIError: Error, LocalizedError {
@@ -48,6 +48,7 @@ enum APIError: Error, LocalizedError {
     case serverError(statusCode: Int, message: String)
     case decodingError(String)
     case authenticationError // For 401 Unauthorized
+    case unauthorized(String) // For missing API key
 
     var errorDescription: String? {
         switch self {
@@ -57,6 +58,7 @@ enum APIError: Error, LocalizedError {
         case .serverError(let code, let message): return "Server error \(code): \(message)"
         case .decodingError(let details): return "Failed to decode server response: \(details)"
         case .authenticationError: return "Authentication failed. Please check your app's API key."
+        case .unauthorized(let message): return message
         }
     }
 }
@@ -142,7 +144,7 @@ final class SnapChefAPIManager {
         let instance = SnapChefAPIManager()
         return instance
     }()
-    
+
     private let serverBaseURL = "https://snapchef-server.onrender.com"
     private let session: URLSession
 
@@ -168,12 +170,14 @@ final class SnapChefAPIManager {
         existingRecipeNames: [String],
         foodPreferences: [String],
         llmProvider: String? = nil
-    ) -> URLRequest? {
+    ) throws -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
         // Set the authentication header using the securely stored key
-        let apiKey = KeychainManager.shared.getAPIKey() ?? FALLBACK_API_KEY
+        guard let apiKey = KeychainManager.shared.getAPIKey() else {
+            throw APIError.unauthorized("API key not found. Please reinstall the app.")
+        }
         request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
 
         let boundary = UUID().uuidString
@@ -195,7 +199,7 @@ final class SnapChefAPIManager {
         if !dietaryRestrictions.isEmpty {
             guard let restrictionsData = try? JSONSerialization.data(withJSONObject: dietaryRestrictions, options: []) else {
                 print("Failed to serialize dietary restrictions")
-                return nil
+                throw APIError.invalidRequestData
             }
             let restrictionsString = String(data: restrictionsData, encoding: .utf8)!
             appendFormField(name: "dietary_restrictions", value: restrictionsString)
@@ -226,42 +230,42 @@ final class SnapChefAPIManager {
         if let llmProvider = llmProvider {
             appendFormField(name: "llm_provider", value: llmProvider)
         }
-        
+
         // Append existing recipe names to avoid duplicates
         if !existingRecipeNames.isEmpty {
             guard let existingRecipesData = try? JSONSerialization.data(withJSONObject: existingRecipeNames, options: []) else {
                 print("Failed to serialize existing recipe names")
-                return nil
+                throw APIError.invalidRequestData
             }
             let existingRecipesString = String(data: existingRecipesData, encoding: .utf8)!
             appendFormField(name: "existing_recipe_names", value: existingRecipesString)
         }
-        
+
         // Append food preferences
         if !foodPreferences.isEmpty {
             guard let preferencesData = try? JSONSerialization.data(withJSONObject: foodPreferences, options: []) else {
                 print("Failed to serialize food preferences")
-                return nil
+                throw APIError.invalidRequestData
             }
             let preferencesString = String(data: preferencesData, encoding: .utf8)!
             appendFormField(name: "food_preferences", value: preferencesString)
         }
 
         // Resize image to max 2048x2048 to reduce file size while maintaining quality
-        let resizedImage = image.resized(withMaxDimension: 2048)
-        
+        let resizedImage = image.resized(withMaxDimension: 2_048)
+
         // Log original and resized dimensions
         print("Original image size: \(image.size.width)x\(image.size.height)")
         print("Resized image size: \(resizedImage.size.width)x\(resizedImage.size.height)")
-        
+
         // Append image_file with 80% JPEG compression
         guard let imageData = resizedImage.jpegData(compressionQuality: 0.8) else {
             print("Failed to get JPEG data from image")
-            return nil
+            throw APIError.invalidRequestData
         }
-        
+
         // Log final file size
-        let fileSizeMB = Double(imageData.count) / (1024 * 1024)
+        let fileSizeMB = Double(imageData.count) / (1_024 * 1_024)
         print("Final image file size: \(String(format: "%.2f", fileSizeMB)) MB")
         httpBody.append("--\(boundary)\r\n")
         httpBody.append("Content-Disposition: form-data; name=\"image_file\"; filename=\"photo.jpg\"\r\n")
@@ -296,41 +300,44 @@ final class SnapChefAPIManager {
             completion(.failure(APIError.invalidURL))
             return
         }
-        
-        print("📡 API Request to: \(url.absoluteString)")
-        print("📡 API Key: \(KeychainManager.shared.getAPIKey() ?? FALLBACK_API_KEY)")
 
-        guard let request = createMultipartRequest(
-            url: url,
-            image: image,
-            sessionId: sessionId,
-            dietaryRestrictions: dietaryRestrictions,
-            foodType: foodType,
-            difficultyPreference: difficultyPreference,
-            healthPreference: healthPreference,
-            mealType: mealType,
-            cookingTimePreference: cookingTimePreference,
-            numberOfRecipes: numberOfRecipes,
-            existingRecipeNames: existingRecipeNames,
-            foodPreferences: foodPreferences,
-            llmProvider: llmProvider
-        ) else {
-            completion(.failure(APIError.invalidRequestData))
+        print("📡 API Request to: \(url.absoluteString)")
+        print("📡 API Key: \(KeychainManager.shared.getAPIKey() != nil ? "[REDACTED]" : "Not found")")
+
+        let request: URLRequest
+        do {
+            request = try createMultipartRequest(
+                url: url,
+                image: image,
+                sessionId: sessionId,
+                dietaryRestrictions: dietaryRestrictions,
+                foodType: foodType,
+                difficultyPreference: difficultyPreference,
+                healthPreference: healthPreference,
+                mealType: mealType,
+                cookingTimePreference: cookingTimePreference,
+                numberOfRecipes: numberOfRecipes,
+                existingRecipeNames: existingRecipeNames,
+                foodPreferences: foodPreferences,
+                llmProvider: llmProvider
+            )
+        } catch {
+            completion(.failure(error))
             return
         }
 
         print("📡 Sending request with session ID: \(sessionId)")
         print("📡 Request headers: \(request.allHTTPHeaderFields ?? [:])")
-        
+
         let startTime = Date()
         session.dataTask(with: request) { data, response, error in
             let elapsed = Date().timeIntervalSince(startTime)
             print("📡 Request completed in \(String(format: "%.2f", elapsed)) seconds")
-            
+
             if let error = error {
                 print("❌ API Error: \(error.localizedDescription)")
                 print("❌ Error details: \(error)")
-                
+
                 // Check if it's a timeout error
                 if (error as NSError).code == NSURLErrorTimedOut {
                     print("❌ Request timed out after \(elapsed) seconds")
@@ -346,7 +353,7 @@ final class SnapChefAPIManager {
                 completion(.failure(APIError.noData))
                 return
             }
-            
+
             print("📡 Response status code: \(httpResponse.statusCode)")
             print("📡 Response headers: \(httpResponse.allHeaderFields)")
 
@@ -382,7 +389,7 @@ final class SnapChefAPIManager {
             }
         }.resume()
     }
-    
+
     /// Send both fridge and pantry images for recipe generation
     func sendBothImagesForRecipeGeneration(
         fridgeImage: UIImage,
@@ -406,43 +413,46 @@ final class SnapChefAPIManager {
             completion(.failure(APIError.invalidURL))
             return
         }
-        
+
         print("📡 API Request to: \(url.absoluteString)")
-        print("📡 API Key: \(KeychainManager.shared.getAPIKey() ?? FALLBACK_API_KEY)")
+        print("📡 API Key: \(KeychainManager.shared.getAPIKey() != nil ? "[REDACTED]" : "Not found")")
         print("📡 Sending both fridge and pantry images")
 
-        guard let request = createMultipartRequestWithBothImages(
-            url: url,
-            fridgeImage: fridgeImage,
-            pantryImage: pantryImage,
-            sessionId: sessionId,
-            dietaryRestrictions: dietaryRestrictions,
-            foodType: foodType,
-            difficultyPreference: difficultyPreference,
-            healthPreference: healthPreference,
-            mealType: mealType,
-            cookingTimePreference: cookingTimePreference,
-            numberOfRecipes: numberOfRecipes,
-            existingRecipeNames: existingRecipeNames,
-            foodPreferences: foodPreferences,
-            llmProvider: llmProvider
-        ) else {
-            completion(.failure(APIError.invalidRequestData))
+        let request: URLRequest
+        do {
+            request = try createMultipartRequestWithBothImages(
+                url: url,
+                fridgeImage: fridgeImage,
+                pantryImage: pantryImage,
+                sessionId: sessionId,
+                dietaryRestrictions: dietaryRestrictions,
+                foodType: foodType,
+                difficultyPreference: difficultyPreference,
+                healthPreference: healthPreference,
+                mealType: mealType,
+                cookingTimePreference: cookingTimePreference,
+                numberOfRecipes: numberOfRecipes,
+                existingRecipeNames: existingRecipeNames,
+                foodPreferences: foodPreferences,
+                llmProvider: llmProvider
+            )
+        } catch {
+            completion(.failure(error))
             return
         }
 
         print("📡 Sending request with session ID: \(sessionId)")
         print("📡 Request headers: \(request.allHTTPHeaderFields ?? [:])")
-        
+
         let startTime = Date()
         session.dataTask(with: request) { data, response, error in
             let elapsed = Date().timeIntervalSince(startTime)
             print("📡 Request completed in \(String(format: "%.2f", elapsed)) seconds")
-            
+
             if let error = error {
                 print("❌ API Error: \(error.localizedDescription)")
                 print("❌ Error details: \(error)")
-                
+
                 // Check if it's a timeout error
                 if (error as NSError).code == NSURLErrorTimedOut {
                     print("❌ Request timed out after \(elapsed) seconds")
@@ -458,7 +468,7 @@ final class SnapChefAPIManager {
                 completion(.failure(APIError.noData))
                 return
             }
-            
+
             print("📡 Response status code: \(httpResponse.statusCode)")
             print("📡 Response headers: \(httpResponse.allHeaderFields)")
 
@@ -494,7 +504,7 @@ final class SnapChefAPIManager {
             }
         }.resume()
     }
-    
+
     /// Create multipart request with both fridge and pantry images
     private func createMultipartRequestWithBothImages(
         url: URL,
@@ -511,34 +521,36 @@ final class SnapChefAPIManager {
         existingRecipeNames: [String],
         foodPreferences: [String],
         llmProvider: String? = nil
-    ) -> URLRequest? {
+    ) throws -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        
+
         // Set the authentication header using the securely stored key
-        let apiKey = KeychainManager.shared.getAPIKey() ?? FALLBACK_API_KEY
+        guard let apiKey = KeychainManager.shared.getAPIKey() else {
+            throw APIError.unauthorized("API key not found. Please reinstall the app.")
+        }
         request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
-        
+
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
+
         var httpBody = Data()
-        
+
         // Helper to append form fields
         func appendFormField(name: String, value: String) {
             httpBody.append("--\(boundary)\r\n")
             httpBody.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n")
             httpBody.append("\(value)\r\n")
         }
-        
+
         // Append session_id
         appendFormField(name: "session_id", value: sessionId)
-        
+
         // Append dietary_restrictions (as a JSON array string)
         if !dietaryRestrictions.isEmpty {
             guard let restrictionsData = try? JSONSerialization.data(withJSONObject: dietaryRestrictions, options: []) else {
                 print("Failed to serialize dietary restrictions")
-                return nil
+                throw APIError.invalidRequestData
             }
             let restrictionsString = String(data: restrictionsData, encoding: .utf8)!
             appendFormField(name: "dietary_restrictions", value: restrictionsString)
@@ -546,7 +558,7 @@ final class SnapChefAPIManager {
             // Send an empty JSON array string if no restrictions, to match FastAPI's default
             appendFormField(name: "dietary_restrictions", value: "[]")
         }
-        
+
         // Append new optional parameters if they exist
         if let foodType = foodType {
             appendFormField(name: "food_type", value: foodType)
@@ -569,72 +581,72 @@ final class SnapChefAPIManager {
         if let llmProvider = llmProvider {
             appendFormField(name: "llm_provider", value: llmProvider)
         }
-        
+
         // Append existing recipe names to avoid duplicates
         if !existingRecipeNames.isEmpty {
             guard let existingRecipesData = try? JSONSerialization.data(withJSONObject: existingRecipeNames, options: []) else {
                 print("Failed to serialize existing recipe names")
-                return nil
+                throw APIError.invalidRequestData
             }
             let existingRecipesString = String(data: existingRecipesData, encoding: .utf8)!
             appendFormField(name: "existing_recipe_names", value: existingRecipesString)
         }
-        
+
         // Append food preferences
         if !foodPreferences.isEmpty {
             guard let preferencesData = try? JSONSerialization.data(withJSONObject: foodPreferences, options: []) else {
                 print("Failed to serialize food preferences")
-                return nil
+                throw APIError.invalidRequestData
             }
             let preferencesString = String(data: preferencesData, encoding: .utf8)!
             appendFormField(name: "food_preferences", value: preferencesString)
         }
-        
+
         // Resize images to max 2048x2048 to reduce file size while maintaining quality
-        let resizedFridgeImage = fridgeImage.resized(withMaxDimension: 2048)
-        let resizedPantryImage = pantryImage.resized(withMaxDimension: 2048)
-        
+        let resizedFridgeImage = fridgeImage.resized(withMaxDimension: 2_048)
+        let resizedPantryImage = pantryImage.resized(withMaxDimension: 2_048)
+
         // Log original and resized dimensions
         print("Fridge image - Original: \(fridgeImage.size.width)x\(fridgeImage.size.height), Resized: \(resizedFridgeImage.size.width)x\(resizedFridgeImage.size.height)")
         print("Pantry image - Original: \(pantryImage.size.width)x\(pantryImage.size.height), Resized: \(resizedPantryImage.size.width)x\(resizedPantryImage.size.height)")
-        
+
         // Append fridge image file with 80% JPEG compression
         guard let fridgeImageData = resizedFridgeImage.jpegData(compressionQuality: 0.8) else {
             print("Failed to convert fridge image to JPEG data")
-            return nil
+            throw APIError.invalidRequestData
         }
-        
+
         httpBody.append("--\(boundary)\r\n")
         httpBody.append("Content-Disposition: form-data; name=\"fridge_image\"; filename=\"fridge.jpg\"\r\n")
         httpBody.append("Content-Type: image/jpeg\r\n\r\n")
         httpBody.append(fridgeImageData)
         httpBody.append("\r\n")
-        
-        print("Fridge image data size: \(fridgeImageData.count) bytes (\(String(format: "%.2f", Double(fridgeImageData.count) / 1024 / 1024)) MB)")
-        
+
+        print("Fridge image data size: \(fridgeImageData.count) bytes (\(String(format: "%.2f", Double(fridgeImageData.count) / 1_024 / 1_024)) MB)")
+
         // Append pantry image file with 80% JPEG compression
         guard let pantryImageData = resizedPantryImage.jpegData(compressionQuality: 0.8) else {
             print("Failed to convert pantry image to JPEG data")
-            return nil
+            throw APIError.invalidRequestData
         }
-        
+
         httpBody.append("--\(boundary)\r\n")
         httpBody.append("Content-Disposition: form-data; name=\"pantry_image\"; filename=\"pantry.jpg\"\r\n")
         httpBody.append("Content-Type: image/jpeg\r\n\r\n")
         httpBody.append(pantryImageData)
         httpBody.append("\r\n")
-        
-        print("Pantry image data size: \(pantryImageData.count) bytes (\(String(format: "%.2f", Double(pantryImageData.count) / 1024 / 1024)) MB)")
-        
+
+        print("Pantry image data size: \(pantryImageData.count) bytes (\(String(format: "%.2f", Double(pantryImageData.count) / 1_024 / 1_024)) MB)")
+
         // Close the multipart form
         httpBody.append("--\(boundary)--\r\n")
-        
+
         request.httpBody = httpBody
-        print("Total request body size: \(httpBody.count) bytes (\(String(format: "%.2f", Double(httpBody.count) / 1024 / 1024)) MB)")
-        
+        print("Total request body size: \(httpBody.count) bytes (\(String(format: "%.2f", Double(httpBody.count) / 1_024 / 1_024)) MB)")
+
         return request
     }
-    
+
     /// Converts API Recipe model to app's Recipe model
     func convertAPIRecipeToAppRecipe(_ apiRecipe: RecipeAPI) -> Recipe {
         // Convert ingredients
@@ -647,7 +659,7 @@ final class SnapChefAPIManager {
                 isAvailable: true
             )
         }
-        
+
         // Convert nutrition
         let nutrition = Nutrition(
             calories: apiRecipe.nutrition?.calories ?? 0,
@@ -658,7 +670,7 @@ final class SnapChefAPIManager {
             sugar: apiRecipe.nutrition?.sugar,
             sodium: apiRecipe.nutrition?.sodium
         )
-        
+
         // Convert difficulty
         let difficulty: Recipe.Difficulty
         switch apiRecipe.difficulty.lowercased() {
@@ -671,7 +683,7 @@ final class SnapChefAPIManager {
         default:
             difficulty = .medium
         }
-        
+
         // Extract dietary info from tags
         let tags = apiRecipe.tags ?? []
         let dietaryInfo = DietaryInfo(
@@ -680,7 +692,7 @@ final class SnapChefAPIManager {
             isGlutenFree: tags.contains { $0.lowercased().contains("gluten-free") || $0.lowercased().contains("gluten free") },
             isDairyFree: tags.contains { $0.lowercased().contains("dairy-free") || $0.lowercased().contains("dairy free") }
         )
-        
+
         return Recipe(
             id: UUID(uuidString: apiRecipe.id) ?? UUID(),
             name: apiRecipe.name,

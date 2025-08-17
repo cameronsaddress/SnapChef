@@ -22,10 +22,10 @@ struct XShareView: View {
     @State private var generatedImage: UIImage?
     @State private var characterCount: Int = 0
     @State private var showingShareConfirmation = false
-    
+
     private let maxCharacters = 280
     private let imageCharacters = 24 // Characters used by image URL
-    
+
     private var headerView: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
@@ -36,19 +36,19 @@ struct XShareView: View {
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
             }
-            
+
             Text("Craft the perfect post")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.gray)
         }
     }
-    
+
     private var tweetComposerSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Compose your post")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
-            
+
             // Tweet text editor
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 12)
@@ -57,7 +57,7 @@ struct XShareView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(Color.white.opacity(0.1), lineWidth: 1)
                     )
-                
+
                 TextEditor(text: $tweetText)
                     .frame(minHeight: 120)
                     .padding(12)
@@ -72,7 +72,7 @@ struct XShareView: View {
                             updateCharacterCount()
                         }
                     }
-                
+
                 if tweetText.isEmpty {
                     Text("What's happening?")
                         .foregroundColor(.gray)
@@ -83,29 +83,29 @@ struct XShareView: View {
             }
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             mainContent
         }
     }
-    
+
     private var mainContent: some View {
         ZStack {
             // X (Twitter) dark theme background
             Color.black
                 .ignoresSafeArea()
-            
+
             ScrollView {
                 VStack(spacing: 24) {
                     // Header
                     headerView
                     .padding(.top, 20)
-                    
+
                         // Tweet Composer
                         VStack(alignment: .leading, spacing: 16) {
                             tweetComposerSection
-                            
+
                             // Character count
                             HStack {
                                 Spacer()
@@ -117,13 +117,13 @@ struct XShareView: View {
                             }
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Style Selection
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Post style")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
-                            
+
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(XTweetStyle.allCases, id: \.self) { style in
@@ -140,7 +140,7 @@ struct XShareView: View {
                             }
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Options
                         VStack(spacing: 12) {
                             ToggleOption(
@@ -149,14 +149,14 @@ struct XShareView: View {
                                 isOn: $includeImage,
                                 icon: "photo"
                             )
-                            
+
                             ToggleOption(
                                 title: "Include stats",
                                 subtitle: "Show recipe details",
                                 isOn: $includeStats,
                                 icon: "chart.bar"
                             )
-                            
+
                             ToggleOption(
                                 title: "Include hashtags",
                                 subtitle: "Increase visibility",
@@ -165,14 +165,14 @@ struct XShareView: View {
                             )
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Hashtags
                         if includeHashtags {
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("Hashtags")
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundColor(.white)
-                                
+
                                 WrappingHStack(suggestedHashtags, spacing: 8) { hashtag in
                                     XHashtag(
                                         hashtag: hashtag,
@@ -190,14 +190,14 @@ struct XShareView: View {
                             }
                             .padding(.horizontal, 20)
                         }
-                        
+
                         // Preview
                         if includeImage {
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("Preview")
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundColor(.white)
-                                
+
                                 XTweetPreview(
                                     text: tweetText,
                                     image: generatedImage,
@@ -206,14 +206,14 @@ struct XShareView: View {
                             }
                             .padding(.horizontal, 20)
                         }
-                        
+
                         // Post Button
                         Button(action: postToX) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 24)
                                     .fill(Color(hex: "#1DA1F2"))
                                     .frame(height: 48)
-                                
+
                                 if isGenerating {
                                     HStack(spacing: 12) {
                                         ProgressView()
@@ -232,9 +232,9 @@ struct XShareView: View {
                         .disabled(isGenerating || characterCount > maxCharacters)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 40)
-                    }
                 }
             }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -243,7 +243,7 @@ struct XShareView: View {
                     }
                     .foregroundColor(.white)
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if characterCount <= maxCharacters {
                         Button("Post") {
@@ -253,7 +253,7 @@ struct XShareView: View {
                         .fontWeight(.semibold)
                     }
                 }
-            }
+        }
         .alert("Posted!", isPresented: $showingShareConfirmation) {
             Button("View on X") {
                 openX()
@@ -265,10 +265,10 @@ struct XShareView: View {
             Text("Your post has been copied to clipboard. Open X to paste and share!")
         }
     }
-    
+
     private var suggestedHashtags: [String] {
         var hashtags = ["SnapChef", "HomeCooking", "RecipeOfTheDay", "FoodTwitter", "CookingTime"]
-        
+
         if case .recipe(let recipe) = content.type {
             hashtags.append(contentsOf: [
                 "FoodBlogger",
@@ -276,7 +276,7 @@ struct XShareView: View {
                 "Foodie",
                 "RecipeShare"
             ])
-            
+
             // Add difficulty-specific hashtags
             if recipe.difficulty == .easy {
                 hashtags.append("EasyRecipe")
@@ -284,30 +284,30 @@ struct XShareView: View {
                 hashtags.append("ChallengingRecipe")
             }
         }
-        
+
         return hashtags
     }
-    
+
     private func generateTweetText() -> String {
         guard case .recipe(let recipe) = content.type else {
             return "Check out what I made with @SnapChef! 🍳"
         }
-        
+
         var text = ""
-        
+
         switch selectedStyle {
         case .classic:
             text = "Just made \(recipe.name) with @SnapChef! 🍳"
-            
+
         case .thread:
             text = "🧵 How to make \(recipe.name) (a thread)\n\n1/"
-            
+
         case .viral:
             text = "POV: You used AI to turn your sad fridge into \(recipe.name) ✨"
-            
+
         case .professional:
             text = "New recipe: \(recipe.name)\n\nA \(recipe.difficulty.rawValue) dish that takes just \(recipe.prepTime + recipe.cookTime) minutes."
-            
+
         case .funny:
             let funnyIntros = [
                 "My fridge: 😭\n@SnapChef: Hold my spatula",
@@ -317,23 +317,23 @@ struct XShareView: View {
             ]
             text = "\(funnyIntros.randomElement()!) \n\n\(recipe.name) achieved 🎉"
         }
-        
+
         // Add stats if enabled
         if includeStats {
             text += "\n\n⏱ \(recipe.prepTime + recipe.cookTime) min"
             text += "\n🔥 \(recipe.nutrition.calories) cal"
             text += "\n👥 Serves \(recipe.servings)"
         }
-        
+
         // Add hashtags if enabled
         if includeHashtags && !selectedHashtags.isEmpty {
             let hashtagsText = selectedHashtags.map { "#\($0)" }.joined(separator: " ")
             text += "\n\n\(hashtagsText)"
         }
-        
+
         return text
     }
-    
+
     private func updateCharacterCount() {
         var count = tweetText.count
         if includeImage {
@@ -341,10 +341,10 @@ struct XShareView: View {
         }
         characterCount = count
     }
-    
+
     private func postToX() {
         isGenerating = true
-        
+
         Task {
             // Generate image if needed
             if includeImage {
@@ -353,10 +353,10 @@ struct XShareView: View {
                         for: content,
                         style: selectedStyle
                     )
-                    
+
                     await MainActor.run {
                         generatedImage = image
-                        
+
                         // Save image to photos with proper permission handling
                         saveImageToPhotoLibrary(image)
                     }
@@ -364,17 +364,17 @@ struct XShareView: View {
                     print("Failed to generate image: \(error)")
                 }
             }
-            
+
             await MainActor.run {
                 // Copy text to clipboard
                 UIPasteboard.general.string = tweetText
-                
+
                 isGenerating = false
                 showingShareConfirmation = true
             }
         }
     }
-    
+
     private func openX() {
         // Try to open X app, fallback to web
         if let url = URL(string: "twitter://post?message=\(tweetText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
@@ -388,11 +388,11 @@ struct XShareView: View {
             }
         }
     }
-    
+
     private func saveImageToPhotoLibrary(_ image: UIImage) {
         // Check current authorization status first
         let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-        
+
         switch status {
         case .authorized, .limited:
             // Already have permission, save the image
@@ -403,7 +403,7 @@ struct XShareView: View {
                     print("Failed to save image to X share: \(error?.localizedDescription ?? "Unknown error")")
                 }
             }
-            
+
         case .notDetermined:
             // Need to request permission
             PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
@@ -417,10 +417,10 @@ struct XShareView: View {
                     }
                 }
             }
-            
+
         case .denied, .restricted:
             print("Photo library access denied for X share")
-            
+
         @unknown default:
             print("Unknown photo library authorization status")
         }
@@ -434,7 +434,7 @@ enum XTweetStyle: String, CaseIterable {
     case viral = "Viral"
     case professional = "Professional"
     case funny = "Funny"
-    
+
     var icon: String {
         switch self {
         case .classic: return "text.bubble"
@@ -451,14 +451,14 @@ struct XStyleCard: View {
     let style: XTweetStyle
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Image(systemName: style.icon)
                     .font(.system(size: 24))
                     .foregroundColor(isSelected ? .black : .white)
-                
+
                 Text(style.rawValue)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(isSelected ? .black : .white)
@@ -478,26 +478,26 @@ struct ToggleOption: View {
     let subtitle: String
     @Binding var isOn: Bool
     let icon: String
-    
+
     var body: some View {
         HStack {
             Image(systemName: icon)
                 .font(.system(size: 20))
                 .foregroundColor(Color(hex: "#1DA1F2"))
                 .frame(width: 30)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
-                
+
                 Text(subtitle)
                     .font(.system(size: 12))
                     .foregroundColor(.gray)
             }
-            
+
             Spacer()
-            
+
             Toggle("", isOn: $isOn)
                 .toggleStyle(SwitchToggleStyle(tint: Color(hex: "#1DA1F2")))
         }
@@ -512,7 +512,7 @@ struct XHashtag: View {
     let hashtag: String
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             Text("#\(hashtag)")
@@ -535,11 +535,11 @@ struct CharacterCountView: View {
     let current: Int
     let max: Int
     let includeImage: Bool
-    
+
     private var remaining: Int {
         max - current
     }
-    
+
     private var color: Color {
         if remaining < 0 {
             return .red
@@ -549,7 +549,7 @@ struct CharacterCountView: View {
             return .gray
         }
     }
-    
+
     var body: some View {
         HStack(spacing: 8) {
             if includeImage {
@@ -557,16 +557,16 @@ struct CharacterCountView: View {
                     .font(.system(size: 12))
                     .foregroundColor(.gray)
             }
-            
+
             Text("\(remaining)")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(color)
-            
+
             // Progress circle
             ZStack {
                 Circle()
                     .stroke(Color.white.opacity(0.1), lineWidth: 2)
-                
+
                 Circle()
                     .trim(from: 0, to: min(CGFloat(current) / CGFloat(max), 1.0))
                     .stroke(color, lineWidth: 2)
@@ -581,7 +581,7 @@ struct XTweetPreview: View {
     let text: String
     let image: UIImage?
     let style: XTweetStyle
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Mock tweet header
@@ -598,35 +598,35 @@ struct XTweetPreview: View {
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.white)
                     )
-                
+
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text("SnapChef")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
-                        
+
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 14))
                             .foregroundColor(Color(hex: "#1DA1F2"))
                     }
-                    
+
                     Text("@snapchef · now")
                         .font(.system(size: 14))
                         .foregroundColor(.gray)
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "ellipsis")
                     .foregroundColor(.gray)
             }
-            
+
             // Tweet text
             Text(text)
                 .font(.system(size: 15))
                 .foregroundColor(.white)
                 .lineSpacing(4)
-            
+
             // Image preview placeholder
             if image != nil {
                 RoundedRectangle(cornerRadius: 16)
@@ -638,7 +638,7 @@ struct XTweetPreview: View {
                             .foregroundColor(.gray)
                     )
             }
-            
+
             // Engagement bar
             HStack(spacing: 40) {
                 Image(systemName: "bubble.left")
@@ -666,24 +666,24 @@ struct WrappingHStack<Data: RandomAccessCollection, Content: View>: View where D
     var data: Data
     var spacing: CGFloat
     var content: (Data.Element) -> Content
-    
+
     init(_ data: Data, spacing: CGFloat = 8, @ViewBuilder content: @escaping (Data.Element) -> Content) {
         self.data = data
         self.spacing = spacing
         self.content = content
     }
-    
+
     var body: some View {
         let dataArray = Array(data)
         var width: CGFloat = 0
         var height: CGFloat = 0
-        
+
         return GeometryReader { geo in
             ZStack(alignment: .topLeading) {
                 ForEach(dataArray, id: \.self) { item in
                     content(item)
                         .alignmentGuide(.leading) { d in
-                            if (abs(width - d.width) > geo.size.width) {
+                            if abs(width - d.width) > geo.size.width {
                                 width = 0
                                 height -= d.height + spacing
                             }

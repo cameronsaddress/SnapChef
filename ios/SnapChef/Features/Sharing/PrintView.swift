@@ -5,7 +5,7 @@ struct PrintView: View {
     let recipe: Recipe
     @Environment(\.dismiss) var dismiss
     @State private var isPrinting = false
-    
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -14,11 +14,11 @@ struct PrintView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(recipe.name)
                             .font(.system(size: 28, weight: .bold))
-                        
+
                         Text(recipe.description)
                             .font(.system(size: 18))
                             .foregroundColor(.secondary)
-                        
+
                         HStack(spacing: 20) {
                             Label("\(recipe.prepTime + recipe.cookTime) min", systemImage: "clock")
                             Label("\(recipe.servings) servings", systemImage: "person.2")
@@ -27,14 +27,14 @@ struct PrintView: View {
                         .font(.system(size: 16))
                     }
                     .padding(.horizontal)
-                    
+
                     Divider()
-                    
+
                     // Ingredients
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Ingredients")
                             .font(.system(size: 22, weight: .semibold))
-                        
+
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(recipe.ingredients) { ingredient in
                                 HStack {
@@ -49,21 +49,21 @@ struct PrintView: View {
                         }
                     }
                     .padding(.horizontal)
-                    
+
                     Divider()
-                    
+
                     // Instructions
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Instructions")
                             .font(.system(size: 22, weight: .semibold))
-                        
+
                         VStack(alignment: .leading, spacing: 12) {
                             ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
                                 HStack(alignment: .top, spacing: 12) {
                                     Text("\(index + 1).")
                                         .font(.system(size: 16, weight: .semibold))
                                         .frame(width: 30, alignment: .leading)
-                                    
+
                                     Text(instruction)
                                         .font(.system(size: 16))
                                         .fixedSize(horizontal: false, vertical: true)
@@ -72,14 +72,14 @@ struct PrintView: View {
                         }
                     }
                     .padding(.horizontal)
-                    
+
                     Divider()
-                    
+
                     // Nutrition
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Nutrition (per serving)")
                             .font(.system(size: 22, weight: .semibold))
-                        
+
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                             NutritionRow(label: "Calories", value: "\(recipe.nutrition.calories)")
                             NutritionRow(label: "Protein", value: "\(recipe.nutrition.protein)g")
@@ -94,7 +94,7 @@ struct PrintView: View {
                         }
                     }
                     .padding(.horizontal)
-                    
+
                     // Footer
                     VStack(spacing: 8) {
                         Divider()
@@ -118,7 +118,7 @@ struct PrintView: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: printRecipe) {
                         if isPrinting {
@@ -134,24 +134,24 @@ struct PrintView: View {
             }
         }
     }
-    
+
     private func printRecipe() {
         isPrinting = true
-        
+
         let printController = UIPrintInteractionController.shared
-        
+
         let printInfo = UIPrintInfo(dictionary: nil)
         printInfo.jobName = "SnapChef Recipe - \(recipe.name)"
         printInfo.outputType = .general
-        
+
         printController.printInfo = printInfo
-        
+
         // Create formatted text
         let formatter = UIMarkupTextPrintFormatter(markupText: createHTMLContent())
         formatter.perPageContentInsets = UIEdgeInsets(top: 72, left: 72, bottom: 72, right: 72)
-        
+
         printController.printFormatter = formatter
-        
+
         printController.present(animated: true) { _, completed, error in
             isPrinting = false
             if completed {
@@ -163,7 +163,7 @@ struct PrintView: View {
             }
         }
     }
-    
+
     private func createHTMLContent() -> String {
         var html = """
         <html>
@@ -187,20 +187,20 @@ struct PrintView: View {
                 👥 \(recipe.servings) servings &nbsp;&nbsp;
                 \(recipe.difficulty.emoji) \(recipe.difficulty.rawValue)
             </div>
-            
+
             <h2>Ingredients</h2>
         """
-        
+
         for ingredient in recipe.ingredients {
             html += "<div class='ingredient'>• \(ingredient.name) - \(ingredient.quantity) \(ingredient.unit ?? "")</div>\n"
         }
-        
+
         html += "<h2>Instructions</h2>\n"
-        
+
         for (index, instruction) in recipe.instructions.enumerated() {
             html += "<div class='instruction'>\(index + 1). \(instruction)</div>\n"
         }
-        
+
         html += """
             <h2>Nutrition (per serving)</h2>
             <div>
@@ -209,25 +209,25 @@ struct PrintView: View {
                 <span class='nutrition'><strong>Carbs:</strong> \(recipe.nutrition.carbs)g</span>
                 <span class='nutrition'><strong>Fat:</strong> \(recipe.nutrition.fat)g</span>
         """
-        
+
         if let fiber = recipe.nutrition.fiber {
             html += "<span class='nutrition'><strong>Fiber:</strong> \(fiber)g</span>"
         }
-        
+
         if let sodium = recipe.nutrition.sodium {
             html += "<span class='nutrition'><strong>Sodium:</strong> \(sodium)mg</span>"
         }
-        
+
         html += """
             </div>
-            
+
             <div class='footer'>
                 Created with SnapChef • \(Date().formatted(date: .long, time: .omitted))
             </div>
         </body>
         </html>
         """
-        
+
         return html
     }
 }
@@ -235,7 +235,7 @@ struct PrintView: View {
 struct NutritionRow: View {
     let label: String
     let value: String
-    
+
     var body: some View {
         HStack {
             Text(label)

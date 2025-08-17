@@ -5,24 +5,24 @@ struct CloudKitAuthView: View {
     @StateObject private var authManager = CloudKitAuthManager.shared
     @StateObject private var tikTokAuthManager = TikTokAuthManager.shared
     @Environment(\.dismiss) private var dismiss
-    
+
     let requiredFor: AuthRequiredFeature?
-    
+
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var loadingMessage = "Signing in..."
-    
+
     init(requiredFor: AuthRequiredFeature? = nil) {
         self.requiredFor = requiredFor
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 32) {
                     // Header
                     VStack(spacing: 16) {
@@ -35,11 +35,11 @@ struct CloudKitAuthView: View {
                                     endPoint: .bottomTrailing
                                 )
                             )
-                        
+
                         Text("Welcome to SnapChef")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                        
+
                         if let feature = requiredFor {
                             Text("Sign in to access \(feature.title)")
                                 .font(.subheadline)
@@ -51,7 +51,7 @@ struct CloudKitAuthView: View {
                         }
                     }
                     .padding(.top, 40)
-                    
+
                     // Benefits
                     VStack(alignment: .leading, spacing: 16) {
                         CloudKitBenefitRow(icon: "trophy.fill", title: "Join Challenges", subtitle: "Compete with other chefs")
@@ -60,9 +60,9 @@ struct CloudKitAuthView: View {
                         CloudKitBenefitRow(icon: "square.and.arrow.up", title: "Share Recipes", subtitle: "Show off your creations")
                     }
                     .padding(.horizontal, 32)
-                    
+
                     Spacer()
-                    
+
                     // Sign In Buttons
                     VStack(spacing: 12) {
                         // Sign in with Apple
@@ -78,7 +78,7 @@ struct CloudKitAuthView: View {
                         .signInWithAppleButtonStyle(.white)
                         .frame(height: 50)
                         .cornerRadius(25)
-                        
+
                         // Sign in with TikTok
                         Button(action: {
                             handleTikTokSignIn()
@@ -87,7 +87,7 @@ struct CloudKitAuthView: View {
                                 Image(systemName: "music.note")
                                     .font(.title2)
                                     .foregroundColor(.white)
-                                
+
                                 Text("Continue with TikTok")
                                     .font(.headline)
                                     .fontWeight(.semibold)
@@ -108,7 +108,7 @@ struct CloudKitAuthView: View {
                     }
                     .padding(.horizontal, 24)
                     .disabled(isLoading)
-                    
+
                     // Skip for now (only for non-required features)
                     if requiredFor == nil || requiredFor == .basicRecipes {
                         Button(action: { dismiss() }) {
@@ -139,7 +139,7 @@ struct CloudKitAuthView: View {
                 .interactiveDismissDisabled()
         }
     }
-    
+
     private func handleSignInWithApple(_ result: Result<ASAuthorization, Error>) {
         Task {
             do {
@@ -148,7 +148,7 @@ struct CloudKitAuthView: View {
                     isLoading = true
                     loadingMessage = "Signing in with Apple..."
                     try await authManager.signInWithApple(authorization: authorization)
-                    
+
                     // Check if we need username setup
                     if authManager.showUsernameSelection {
                         // Username selection will be shown via sheet
@@ -159,7 +159,7 @@ struct CloudKitAuthView: View {
                 case .failure(let error):
                     // Handle specific error codes
                     let nsError = error as NSError
-                    if nsError.code == 1001 {
+                    if nsError.code == 1_001 {
                         // User cancelled - just dismiss loading
                         print("User cancelled Sign in with Apple")
                     } else {
@@ -177,14 +177,14 @@ struct CloudKitAuthView: View {
             }
         }
     }
-    
+
     private func handleTikTokSignIn() {
         Task {
             do {
                 isLoading = true
                 loadingMessage = "Connecting to TikTok..."
                 let tikTokUser = try await tikTokAuthManager.authenticate()
-                
+
                 // Create SnapChef account integration if TikTok auth succeeds
                 // For now, just dismiss the auth view
                 await MainActor.run {
@@ -200,21 +200,20 @@ struct CloudKitAuthView: View {
             }
         }
     }
-    
 }
 
 struct CloudKitBenefitRow: View {
     let icon: String
     let title: String
     let subtitle: String
-    
+
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.title2)
                 .foregroundColor(Color(hex: "#667eea"))
                 .frame(width: 40)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.headline)
@@ -223,7 +222,7 @@ struct CloudKitBenefitRow: View {
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.7))
             }
-            
+
             Spacer()
         }
     }

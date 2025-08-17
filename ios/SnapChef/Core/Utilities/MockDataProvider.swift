@@ -3,9 +3,9 @@ import Foundation
 @MainActor
 class MockDataProvider {
     static let shared = MockDataProvider()
-    
+
     private init() {}
-    
+
     var useMockData: Bool {
         #if DEBUG
         return true // Set to false to use real API
@@ -13,7 +13,7 @@ class MockDataProvider {
         return false
         #endif
     }
-    
+
     func mockRecipeResponse() -> RecipeGenerationResponse {
         let recipes = [
             Recipe(
@@ -159,7 +159,7 @@ class MockDataProvider {
                 )
             )
         ]
-        
+
         return RecipeGenerationResponse(
             success: true,
             recipes: recipes,
@@ -167,7 +167,7 @@ class MockDataProvider {
             creditsRemaining: 2
         )
     }
-    
+
     func mockDeviceStatus() -> DeviceStatus {
         return DeviceStatus(
             deviceId: "mock-device-id",
@@ -176,7 +176,7 @@ class MockDataProvider {
             hasSubscription: false
         )
     }
-    
+
     func mockUser() -> User {
         return User(
             id: "mock-user-id",
@@ -194,7 +194,7 @@ class MockDataProvider {
             deviceId: "mock-device-id",
             createdAt: Date(),
             lastLoginAt: Date(),
-            totalPoints: 1250,
+            totalPoints: 1_250,
             currentStreak: 7,
             longestStreak: 14,
             challengesCompleted: 5,
@@ -203,7 +203,7 @@ class MockDataProvider {
             showOnLeaderboard: true
         )
     }
-    
+
     func mockRecipe() -> Recipe {
         return Recipe(
             id: UUID(),

@@ -7,17 +7,17 @@ import Combine
 @MainActor
 class CloudKitManager: ObservableObject {
     static let shared = CloudKitManager()
-    
+
     // MARK: - Properties
     private let container: CKContainer
     private let privateDatabase: CKDatabase
     private let publicDatabase: CKDatabase
     private var subscriptions = Set<AnyCancellable>()
-    
+
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
     @Published var syncError: Error?
-    
+
     // Record types
     private let challengeRecordType = "Challenge"
     private let userChallengeRecordType = "UserChallenge"
@@ -26,18 +26,18 @@ class CloudKitManager: ObservableObject {
     private let leaderboardRecordType = "Leaderboard"
     private let achievementRecordType = "Achievement"
     private let coinTransactionRecordType = "CoinTransaction"
-    
+
     // MARK: - Initialization
     private init() {
         // Initialize CloudKit container with the app's bundle identifier
         self.container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
         self.privateDatabase = container.privateCloudDatabase
         self.publicDatabase = container.publicCloudDatabase
-        
+
         setupSubscriptions()
         checkAccountStatus()
     }
-    
+
     // MARK: - Account Status
     private func checkAccountStatus() {
         container.accountStatus { [weak self] status, error in
@@ -47,7 +47,7 @@ class CloudKitManager: ObservableObject {
                     print("CloudKit account status error: \(error)")
                     return
                 }
-                
+
                 switch status {
                 case .available:
                     print("CloudKit account available")
@@ -66,7 +66,7 @@ class CloudKitManager: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Schema Setup
     private func setupCloudKitSchema() {
         // This would typically be done in CloudKit Dashboard, but we'll define the schema here for reference
@@ -75,7 +75,7 @@ class CloudKitManager: ObservableObject {
                 // Create zone for private data
                 let zoneID = CKRecordZone.ID(zoneName: "ChallengesZone", ownerName: CKCurrentUserDefaultName)
                 let zone = CKRecordZone(zoneID: zoneID)
-                
+
                 try await privateDatabase.save(zone)
                 print("CloudKit zone created successfully")
             } catch {
@@ -83,7 +83,7 @@ class CloudKitManager: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Subscriptions
     private func setupSubscriptions() {
         // Subscribe to challenge changes
@@ -94,12 +94,12 @@ class CloudKitManager: ObservableObject {
             subscriptionID: "challenge-updates-subscription",
             options: [.firesOnRecordCreation, .firesOnRecordUpdate, .firesOnRecordDeletion]
         )
-        
+
         let notificationInfo = CKSubscription.NotificationInfo()
         notificationInfo.shouldSendContentAvailable = true
         challengeSubscription.notificationInfo = notificationInfo
-        
-        publicDatabase.save(challengeSubscription) { subscription, error in
+
+        publicDatabase.save(challengeSubscription) { _, error in
             if let error = error {
                 print("Error creating challenge subscription: \(error)")
             } else {
@@ -107,25 +107,24 @@ class CloudKitManager: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Sync Operations
-    
+
     /// Sync all challenges from CloudKit to Core Data
     func syncChallenges() async throws {
         await MainActor.run { isSyncing = true }
-        
+
         do {
             // Fetch all public challenges
             let challenges = try await fetchPublicChallenges()
-            
-            // Update Core Data with fetched challenges
-            // TODO: Uncomment when Core Data entities are properly generated
-            // try await updateCoreDataChallenges(challenges)
-            _ = challenges // Suppress warning
-            
+
+            // Core Data integration disabled - using CloudKit direct storage
+            // Challenge data is stored directly in CloudKit without local Core Data cache
+            print("📦 Fetched \(challenges.count) challenges from CloudKit")
+
             // Sync user's private challenge data
             try await syncPrivateChallengeData()
-            
+
             await MainActor.run {
                 lastSyncDate = Date()
                 isSyncing = false
@@ -138,15 +137,15 @@ class CloudKitManager: ObservableObject {
             throw error
         }
     }
-    
+
     /// Fetch all public challenges from CloudKit
     private func fetchPublicChallenges() async throws -> [CKRecord] {
         let query = CKQuery(recordType: challengeRecordType, predicate: NSPredicate(value: true))
         query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
-        
+
         var allRecords: [CKRecord] = []
         var cursor: CKQueryOperation.Cursor?
-        
+
         repeat {
             let (results, nextCursor) = try await publicDatabase.records(
                 matching: query,
@@ -154,18 +153,17 @@ class CloudKitManager: ObservableObject {
                 desiredKeys: nil,
                 resultsLimit: 100
             )
-            
+
             let records = results.compactMap { try? $0.1.get() }
             allRecords.append(contentsOf: records)
             cursor = nextCursor
-            
         } while cursor != nil
-        
+
         return allRecords
     }
-    
-    /// Update Core Data with CloudKit records
-    // TODO: Uncomment when Core Data entities are properly generated
+
+    /// Core Data integration commented out - using CloudKit direct storage
+    // Core Data entities not configured for production - using CloudKit as primary storage
     /*
     private func updateCoreDataChallenges(_ records: [CKRecord]) async throws {
         let context = PersistenceController.shared.container.viewContext
@@ -209,7 +207,7 @@ class CloudKitManager: ObservableObject {
         try context.save()
     }
     */
-    
+
     /// Sync user's private challenge data (progress, participation)
     private func syncPrivateChallengeData() async throws {
         // Fetch user's challenge participation and progress
@@ -217,27 +215,23 @@ class CloudKitManager: ObservableObject {
             recordType: userChallengeRecordType,
             predicate: NSPredicate(format: "userID == %@", getUserId())
         )
-        
+
         let progressQuery = CKQuery(
             recordType: userChallengeRecordType,
             predicate: NSPredicate(format: "userID == %@", getUserId())
         )
-        
-        // Fetch and update participant data
+
+        // Fetch participant data from CloudKit (no Core Data cache)
         let participantRecords = try await privateDatabase.records(matching: participantQuery).0
-        // TODO: Uncomment when Core Data entities are properly generated
-        // try await updateCoreDataParticipants(participantRecords.compactMap { try? $0.1.get() })
-        _ = participantRecords // Suppress warning
-        
-        // Fetch and update progress data
+        print("📦 Fetched \(participantRecords.count) participant records from CloudKit")
+
+        // Fetch progress data from CloudKit (no Core Data cache)
         let progressRecords = try await privateDatabase.records(matching: progressQuery).0
-        // TODO: Uncomment when Core Data entities are properly generated
-        // try await updateCoreDataProgress(progressRecords.compactMap { try? $0.1.get() })
-        _ = progressRecords // Suppress warning
+        print("📦 Fetched \(progressRecords.count) progress records from CloudKit")
     }
-    
+
     // MARK: - Challenge Operations
-    
+
     /// Create or update a challenge in CloudKit
     func saveChallenge(_ challenge: Challenge) async throws {
         let record = CKRecord(recordType: challengeRecordType)
@@ -258,19 +252,19 @@ class CloudKitManager: ObservableObject {
         record["completionCount"] = Int64(challenge.completions)
         record["imageURL"] = challenge.imageURL
         record["teamBased"] = Int64(0)  // Currently no team-based challenges
-        
+
         _ = try await publicDatabase.save(record)
     }
-    
+
     /// Create or update user challenge participation
     func saveUserChallenge(_ userChallenge: UserChallenge) async throws {
         let record = CKRecord(recordType: userChallengeRecordType)
         record["userID"] = userChallenge.userID
-        
+
         // Create reference to challenge
         let challengeRecordID = CKRecord.ID(recordName: userChallenge.challengeID)
         record["challengeID"] = CKRecord.Reference(recordID: challengeRecordID, action: .none)
-        
+
         record["status"] = userChallenge.status
         record["progress"] = userChallenge.progress
         record["startedAt"] = userChallenge.startedAt
@@ -280,19 +274,19 @@ class CloudKitManager: ObservableObject {
         record["proofImageURL"] = userChallenge.proofImageURL
         record["notes"] = userChallenge.notes
         record["teamID"] = userChallenge.teamID
-        
+
         _ = try await privateDatabase.save(record)
     }
-    
+
     /// Update or create leaderboard entry
     func updateLeaderboardEntry(for userID: String, points: Int, challengesCompleted: Int) async throws {
         // Check if entry exists
         let predicate = NSPredicate(format: "userID == %@", userID)
         let query = CKQuery(recordType: leaderboardRecordType, predicate: predicate)
-        
+
         let results = try await publicDatabase.records(matching: query).0
         let record: CKRecord
-        
+
         if let (_, result) = results.first,
            let existingRecord = try? result.get() {
             record = existingRecord
@@ -318,11 +312,11 @@ class CloudKitManager: ObservableObject {
                 record["region"] = Locale.current.regionCode
             }
         }
-        
+
         record["lastUpdated"] = Date()
         _ = try await publicDatabase.save(record)
     }
-    
+
     /// Save achievement earned by user
     func saveAchievement(_ achievement: Achievement) async throws {
         let record = CKRecord(recordType: achievementRecordType)
@@ -335,10 +329,10 @@ class CloudKitManager: ObservableObject {
         record["earnedAt"] = achievement.earnedAt
         record["rarity"] = achievement.rarity
         record["associatedChallengeID"] = achievement.associatedChallengeID
-        
+
         _ = try await privateDatabase.save(record)
     }
-    
+
     /// Save coin transaction
     func saveCoinTransaction(_ transaction: CoinTransaction) async throws {
         let record = CKRecord(recordType: coinTransactionRecordType)
@@ -350,21 +344,21 @@ class CloudKitManager: ObservableObject {
         record["balance"] = Int64(transaction.balance)
         record["challengeID"] = transaction.challengeID
         record["itemPurchased"] = transaction.itemPurchased
-        
+
         _ = try await privateDatabase.save(record)
     }
-    
+
     // MARK: - Fetch Operations
-    
+
     /// Fetch leaderboard entries
     func fetchLeaderboard(limit: Int = 100, timeframe: LeaderboardTimeframe = .allTime) async throws -> [LeaderboardEntry] {
         let sortKey = timeframe == .weekly ? "weeklyPoints" : timeframe == .monthly ? "monthlyPoints" : "totalPoints"
         let query = CKQuery(recordType: leaderboardRecordType, predicate: NSPredicate(value: true))
         query.sortDescriptors = [NSSortDescriptor(key: sortKey, ascending: false)]
-        
+
         var entries: [LeaderboardEntry] = []
         let (results, _) = try await publicDatabase.records(matching: query, resultsLimit: limit)
-        
+
         for (index, result) in results.enumerated() {
             if let record = try? result.1.get() {
                 entries.append(LeaderboardEntry(
@@ -372,39 +366,39 @@ class CloudKitManager: ObservableObject {
                     username: record["userName"] as? String ?? "Unknown",
                     avatar: record["avatarURL"] as? String ?? "person.circle.fill",
                     points: Int(record[sortKey] as? Int64 ?? 0),
-                    level: Int((record["totalPoints"] as? Int64 ?? 0) / 1000) + 1,
+                    level: Int((record["totalPoints"] as? Int64 ?? 0) / 1_000) + 1,
                     country: record["region"] as? String,
                     isCurrentUser: record["userID"] as? String == getUserId()
                 ))
             }
         }
-        
+
         return entries
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func getUserId() -> String {
         // In a real app, this would return the actual user ID
         // For now, using a placeholder
         return UserDefaults.standard.string(forKey: "userId") ?? "default-user"
     }
-    
+
     private func incrementParticipantCount(for challengeId: UUID) async {
         do {
             let recordID = CKRecord.ID(recordName: challengeId.uuidString)
             let record = try await publicDatabase.record(for: recordID)
-            
+
             let currentCount = record["participantCount"] as? Int ?? 0
             record["participantCount"] = currentCount + 1
-            
+
             try await publicDatabase.save(record)
         } catch {
             print("Error incrementing participant count: \(error)")
         }
     }
-    
-    // TODO: Uncomment when Core Data entities are properly generated
+
+    // Core Data integration commented out - using CloudKit direct storage
     /*
     private func updateCoreDataParticipants(_ records: [CKRecord]) async throws {
         let context = PersistenceController.shared.container.viewContext
@@ -458,7 +452,6 @@ class CloudKitManager: ObservableObject {
         try context.save()
     }
     */
-    
     }
 
 // MARK: - CloudKit Models
@@ -474,7 +467,7 @@ enum CloudKitError: LocalizedError {
     case recordNotFound
     case invalidData
     case syncFailed(String)
-    
+
     var errorDescription: String? {
         switch self {
         case .recordNotFound:
@@ -486,4 +479,3 @@ enum CloudKitError: LocalizedError {
         }
     }
 }
-

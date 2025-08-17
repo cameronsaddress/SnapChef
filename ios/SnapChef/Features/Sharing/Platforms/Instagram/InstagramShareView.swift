@@ -13,14 +13,14 @@ struct InstagramShareView: View {
     let isStory: Bool
     @Environment(\.dismiss) var dismiss
     @State private var selectedTemplate: InstagramTemplate = .classic
-    @State private var backgroundColor: Color = Color(hex: "#E4405F")
+    @State private var backgroundColor = Color(hex: "#E4405F")
     @State private var isGenerating = false
     @State private var generatedImage: UIImage?
     @State private var showingShareOptions = false
     @State private var selectedSticker: StickerType?
     @State private var captionText = ""
     @State private var errorMessage: String?
-    
+
     private var backgroundGradient: LinearGradient {
         LinearGradient(
             colors: [
@@ -34,14 +34,14 @@ struct InstagramShareView: View {
             endPoint: .bottomTrailing
         )
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 // Instagram gradient background
                 backgroundGradient
                 .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 24) {
                         // Header
@@ -53,19 +53,19 @@ struct InstagramShareView: View {
                                     .font(.system(size: 24, weight: .bold, design: .rounded))
                             }
                             .foregroundColor(.white)
-                            
+
                             Text(isStory ? "Create an engaging story" : "Design your perfect post")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
                         }
                         .padding(.top, 20)
-                        
+
                         // Template Selection
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Choose a template")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
-                            
+
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(InstagramTemplate.allCases, id: \.self) { template in
@@ -81,13 +81,13 @@ struct InstagramShareView: View {
                             }
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Preview
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Preview")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
-                            
+
                             InstagramPreview(
                                 content: content,
                                 template: selectedTemplate,
@@ -96,14 +96,14 @@ struct InstagramShareView: View {
                             )
                         }
                         .padding(.horizontal, 20)
-                        
+
                         if isStory {
                             // Story Stickers
                             VStack(alignment: .leading, spacing: 16) {
                                 Text("Add Stickers")
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundColor(.white)
-                                
+
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 12) {
                                         ForEach(StickerType.allCases, id: \.self) { sticker in
@@ -125,7 +125,7 @@ struct InstagramShareView: View {
                                 Text("Caption")
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundColor(.white)
-                                
+
                                 TextEditor(text: $captionText)
                                     .frame(height: 100)
                                     .padding(12)
@@ -141,13 +141,13 @@ struct InstagramShareView: View {
                             }
                             .padding(.horizontal, 20)
                         }
-                        
+
                         // Background Color Picker
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Background Color")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
-                            
+
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(InstagramColors.all, id: \.self) { color in
@@ -163,13 +163,13 @@ struct InstagramShareView: View {
                             }
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Hashtags
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Suggested Hashtags")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.white)
-                            
+
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 8) {
                                 ForEach(suggestedHashtags, id: \.self) { hashtag in
                                     InstagramHashtag(hashtag: hashtag)
@@ -177,7 +177,7 @@ struct InstagramShareView: View {
                             }
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Generate and Share Button
                         Button(action: generateAndShare) {
                             ZStack {
@@ -193,7 +193,7 @@ struct InstagramShareView: View {
                                         )
                                     )
                                     .frame(height: 56)
-                                
+
                                 if isGenerating {
                                     HStack(spacing: 12) {
                                         ProgressView()
@@ -226,7 +226,7 @@ struct InstagramShareView: View {
                     }
                     .foregroundColor(.white)
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Share") {
                         generateAndShare()
@@ -246,10 +246,10 @@ struct InstagramShareView: View {
             }
         }
     }
-    
+
     private var suggestedHashtags: [String] {
         var hashtags = ["SnapChef", "HomeCooking", "FoodStagram", "RecipeOfTheDay"]
-        
+
         if case .recipe(let recipe) = content.type {
             hashtags.append(contentsOf: [
                 "InstaFood",
@@ -259,37 +259,37 @@ struct InstagramShareView: View {
                 "RecipeShare"
             ])
         }
-        
+
         if isStory {
             hashtags.append("Stories")
         } else {
             hashtags.append("FoodPost")
         }
-        
+
         return hashtags
     }
-    
+
     private func generateCaption() -> String {
         switch content.type {
         case .recipe(let recipe):
             return """
             🍳 \(recipe.name)
-            
+
             ⏱ Ready in \(recipe.prepTime + recipe.cookTime) minutes
             🔥 Difficulty: \(recipe.difficulty.rawValue.capitalized)
-            
+
             Made with @SnapChef - Turn your fridge into amazing recipes with AI!
-            
+
             #SnapChef #HomeCooking #RecipeOfTheDay
             """
         default:
             return "Made with @SnapChef 🍳✨"
         }
     }
-    
+
     private func generateContent() {
         isGenerating = true
-        
+
         Task {
             do {
                 // Generate image based on template
@@ -300,7 +300,7 @@ struct InstagramShareView: View {
                     backgroundColor: backgroundColor,
                     sticker: selectedSticker
                 )
-                
+
                 await MainActor.run {
                     generatedImage = image
                     isGenerating = false
@@ -314,7 +314,7 @@ struct InstagramShareView: View {
             }
         }
     }
-    
+
     private func generateAndShare() {
         // If image is already generated, share directly
         if generatedImage != nil {
@@ -322,7 +322,7 @@ struct InstagramShareView: View {
         } else {
             // Generate image first, then share
             isGenerating = true
-            
+
             Task {
                 do {
                     // Generate image based on template
@@ -333,7 +333,7 @@ struct InstagramShareView: View {
                         backgroundColor: backgroundColor,
                         sticker: selectedSticker
                     )
-                    
+
                     await MainActor.run {
                         self.generatedImage = image
                         self.isGenerating = false
@@ -349,40 +349,40 @@ struct InstagramShareView: View {
             }
         }
     }
-    
+
     private func shareToInstagram() {
         guard let image = generatedImage else { return }
-        
+
         if isStory {
             shareToInstagramStory(image: image)
         } else {
             shareToInstagramFeed(image: image)
         }
     }
-    
+
     private func shareToInstagramStory(image: UIImage) {
         guard let imageData = image.pngData() else { return }
-        
+
         // Enhanced pasteboard items with attribution
         var pasteboardItems: [[String: Any]] = [[
             "com.instagram.sharedSticker.stickerImage": imageData,
             "com.instagram.sharedSticker.backgroundTopColor": "#FF0050",  // SnapChef brand colors
             "com.instagram.sharedSticker.backgroundBottomColor": "#00F2EA"
         ]]
-        
+
         // Add deep link for attribution
         if let deepLink = content.deepLink {
             pasteboardItems[0]["com.instagram.sharedSticker.contentURL"] = deepLink.absoluteString
         } else {
             pasteboardItems[0]["com.instagram.sharedSticker.contentURL"] = "https://snapchef.app"
         }
-        
+
         let pasteboardOptions = [
             UIPasteboard.OptionsKey.expirationDate: Date().addingTimeInterval(300)
         ]
-        
+
         UIPasteboard.general.setItems(pasteboardItems, options: pasteboardOptions)
-        
+
         // Try with source application parameter for better attribution
         if let url = URL(string: "instagram-stories://share?source_application=com.snapchefapp.app") {
             UIApplication.shared.open(url) { success in
@@ -395,24 +395,24 @@ struct InstagramShareView: View {
             }
         }
     }
-    
+
     private func shareToInstagramFeed(image: UIImage) {
         // Enhanced caption with call-to-action
         var fullCaption = captionText
         fullCaption += "\n\n📱 Try SnapChef: snapchef.app"
         fullCaption += "\n#MadeWithSnapChef"
-        
+
         // Copy caption to clipboard
         UIPasteboard.general.string = fullCaption
-        
+
         // Save image to photo library with proper permission handling
         saveImageAndOpenInstagram(image: image)
     }
-    
+
     private func saveImageAndOpenInstagram(image: UIImage) {
         // First normalize the image to ensure it's in the right format
         let normalizedImage = normalizeImage(image)
-        
+
         // Use the SafePhotoSaver which doesn't import Photos framework
         SafePhotoSaver.shared.saveImageToPhotoLibrary(normalizedImage) { success, error in
             if success {
@@ -433,28 +433,27 @@ struct InstagramShareView: View {
             }
         }
     }
-    
+
     private func normalizeImage(_ image: UIImage) -> UIImage {
         // Create a new opaque image context (true = opaque, no alpha channel)
         UIGraphicsBeginImageContextWithOptions(image.size, true, image.scale)
         defer { UIGraphicsEndImageContext() }
-        
+
         // Fill with white background first
         UIColor.white.setFill()
         UIRectFill(CGRect(origin: .zero, size: image.size))
-        
+
         // Draw the image on top with normal blend mode
         image.draw(in: CGRect(origin: .zero, size: image.size), blendMode: .normal, alpha: 1.0)
-        
+
         // Get the normalized image
         guard let normalizedImage = UIGraphicsGetImageFromCurrentImageContext() else {
             // If normalization fails, return original
             return image
         }
-        
+
         return normalizedImage
     }
-    
 }
 
 // MARK: - Template Card
@@ -462,7 +461,7 @@ struct InstagramTemplateCard: View {
     let template: InstagramTemplate
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
@@ -481,7 +480,7 @@ struct InstagramTemplateCard: View {
                                 lineWidth: 3
                             )
                     )
-                
+
                 Text(template.name)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white)
@@ -497,7 +496,7 @@ struct ColorOption: View {
     let color: Color
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             Circle()
@@ -521,13 +520,13 @@ struct StickerOption: View {
     let sticker: StickerType
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Text(sticker.emoji)
                     .font(.system(size: 32))
-                
+
                 Text(sticker.name)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white)
@@ -546,7 +545,7 @@ struct StickerOption: View {
 struct InstagramHashtag: View {
     let hashtag: String
     @State private var isSelected = false
-    
+
     var body: some View {
         Button(action: { isSelected.toggle() }) {
             Text("#\(hashtag)")
@@ -555,7 +554,7 @@ struct InstagramHashtag: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
-                    isSelected 
+                    isSelected
                         ? Color.white
                         : Color.white.opacity(0.2)
                 )

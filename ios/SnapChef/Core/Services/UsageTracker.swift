@@ -273,8 +273,23 @@ final class UsageTracker: ObservableObject {
     }
 
     private func trackAnalyticsEvent(_ eventName: String, metadata: [String: Any]) {
-        // TODO: Integrate with AnalyticsManager when available
-        logMessage("Analytics: \(eventName) - \(metadata)")
+        // Local analytics tracking for usage events
+        var eventData = metadata
+        eventData["event_name"] = eventName
+        eventData["timestamp"] = Date()
+        eventData["user_id"] = UserDefaults.standard.string(forKey: "userId") ?? "anonymous"
+
+        // Store locally for potential future upload
+        var events = UserDefaults.standard.array(forKey: "usage_analytics_events") as? [[String: Any]] ?? []
+        events.append(eventData)
+
+        // Keep only last 500 usage events
+        if events.count > 500 {
+            events = Array(events.suffix(500))
+        }
+
+        UserDefaults.standard.set(events, forKey: "usage_analytics_events")
+        logMessage("📊 Analytics: \(eventName) - \(eventData)")
     }
 
     private func logMessage(_ message: String) {

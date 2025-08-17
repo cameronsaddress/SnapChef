@@ -1,19 +1,19 @@
 import Foundation
 
 struct AuthConfiguration {
-    // Google Sign-In Configuration (Not currently implemented)
-    // static let googleClientID = "YOUR_GOOGLE_CLIENT_ID" // TODO: Add from Google Cloud Console when implementing
-    
-    // Facebook App Configuration
-    static let facebookAppID = "YOUR_FACEBOOK_APP_ID" // TODO: Add from Facebook Developer Console
+    // Google Sign-In Configuration (Not implemented in production)
+    // Google Sign-In is not available - Apple Sign-In is the primary authentication method
+
+    // Facebook App Configuration (Not implemented in production)
+    // Facebook SDK is not available - Apple Sign-In is the primary authentication method
     static let facebookDisplayName = "SnapChef"
-    
+
     // Apple Sign-In Configuration
     // No additional configuration needed - uses bundle identifier
-    
+
     // Backend API Configuration
     static let authEndpoint = "\(NetworkConfiguration.baseURL)/auth"
-    
+
     // User Data Storage
     struct UserData {
         static let noPasswordStored = true // We never store passwords
@@ -21,7 +21,7 @@ struct AuthConfiguration {
         static let maxUsernameLength = 20
         static let usernameRegex = "^[a-zA-Z0-9_]+$"
     }
-    
+
     // Features that require authentication
     struct RequiresAuth {
         static let challenges = true

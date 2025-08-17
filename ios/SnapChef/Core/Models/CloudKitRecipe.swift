@@ -12,7 +12,7 @@ struct CloudKitRecipe {
     let viewCount: Int
     let shareCount: Int
     let createdAt: Date
-    
+
     init(recipe: Recipe, ownerID: String = "", ownerName: String = "", cloudKitRecordID: String? = nil,
          likeCount: Int = 0, commentCount: Int = 0, viewCount: Int = 0, shareCount: Int = 0,
          createdAt: Date = Date()) {
@@ -26,7 +26,7 @@ struct CloudKitRecipe {
         self.shareCount = shareCount
         self.createdAt = createdAt
     }
-    
+
     init(from record: CKRecord) throws {
         // Extract recipe data
         let id = UUID(uuidString: record[CKField.Recipe.id] as? String ?? "") ?? UUID()
@@ -34,7 +34,7 @@ struct CloudKitRecipe {
         let description = record[CKField.Recipe.description] as? String ?? ""
         let cookingTime = Int(record[CKField.Recipe.cookingTime] as? Int64 ?? 30)
         let difficulty = Recipe.Difficulty(rawValue: record[CKField.Recipe.difficulty] as? String ?? "Easy") ?? .easy
-        
+
         // Parse ingredients from JSON
         var ingredients: [Ingredient] = []
         if let ingredientsJSON = record[CKField.Recipe.ingredients] as? String,
@@ -50,7 +50,7 @@ struct CloudKitRecipe {
                 )
             }
         }
-        
+
         // Parse instructions from JSON
         var instructions: [String] = []
         if let instructionsJSON = record[CKField.Recipe.instructions] as? String,
@@ -58,7 +58,7 @@ struct CloudKitRecipe {
            let instructionArray = try? JSONDecoder().decode([String].self, from: data) {
             instructions = instructionArray
         }
-        
+
         // Create Recipe object
         self.recipe = Recipe(
             id: id,
@@ -76,7 +76,7 @@ struct CloudKitRecipe {
             tags: [],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false)
         )
-        
+
         // Extract CloudKit metadata
         self.ownerID = record[CKField.Recipe.ownerID] as? String ?? ""
         self.ownerName = "" // Will need to be fetched separately

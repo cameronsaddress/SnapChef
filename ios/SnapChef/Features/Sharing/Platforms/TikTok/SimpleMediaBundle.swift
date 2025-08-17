@@ -13,7 +13,7 @@ public struct SimpleMediaBundle: Sendable {
     public let mealPhoto: UIImage       // Final cooked meal photo
     public let brollClips: [URL]        // Optional cooking clips
     public let musicURL: URL?           // Optional music
-    
+
     public init(
         fridgePhoto: UIImage,
         mealPhoto: UIImage,
@@ -24,12 +24,12 @@ public struct SimpleMediaBundle: Sendable {
         self.mealPhoto = mealPhoto
         self.brollClips = brollClips
         self.musicURL = musicURL
-        
+
         print("📸 SimpleMediaBundle created:")
         print("    - fridgePhoto: \(fridgePhoto.size) - Has CGImage: \(fridgePhoto.cgImage != nil)")
         print("    - mealPhoto: \(mealPhoto.size) - Has CGImage: \(mealPhoto.cgImage != nil)")
     }
-    
+
     /// Convert to legacy MediaBundle for compatibility
     public func toLegacyMediaBundle() -> MediaBundle {
         // For legacy compatibility, use fridgePhoto for beforeFridge
@@ -50,12 +50,12 @@ extension UIImage {
     public var isValidPhoto: Bool {
         // Check if we have actual image data
         guard let cgImage = self.cgImage else { return false }
-        
+
         // Check if it's not too small (likely a placeholder)
         if size.width < 100 || size.height < 100 {
             return false
         }
-        
+
         // Check if it has reasonable dimensions
         return cgImage.width > 0 && cgImage.height > 0
     }

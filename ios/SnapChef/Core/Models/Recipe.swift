@@ -27,7 +27,7 @@ public struct Recipe: Identifiable, Codable, Sendable {
             case .hard: return "#F44336"
             }
         }
-        
+
         var emoji: String {
             switch self {
             case .easy: return "🧑‍🍳"
@@ -35,7 +35,7 @@ public struct Recipe: Identifiable, Codable, Sendable {
             case .hard: return "👩‍🍳🔥"
             }
         }
-        
+
         var swiftUIColor: Color {
             switch self {
             case .easy: return Color(hex: "#43e97b")

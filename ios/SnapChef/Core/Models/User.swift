@@ -11,14 +11,14 @@ struct User: Codable {
     let deviceId: String
     let createdAt: Date
     let lastLoginAt: Date
-    
+
     // Social features
     let totalPoints: Int
     let currentStreak: Int
     let longestStreak: Int
     let challengesCompleted: Int
     let recipesShared: Int
-    
+
     // Privacy settings
     let isProfilePublic: Bool
     let showOnLeaderboard: Bool
@@ -29,12 +29,12 @@ struct Subscription: Codable {
     let status: SubscriptionStatus
     let expiresAt: Date?
     let autoRenew: Bool
-    
+
     enum SubscriptionTier: String, Codable, CaseIterable {
         case free = "free"
         case basic = "basic"
         case premium = "premium"
-        
+
         var displayName: String {
             switch self {
             case .free: return "Free"
@@ -42,7 +42,7 @@ struct Subscription: Codable {
             case .premium: return "Premium"
             }
         }
-        
+
         var price: String {
             switch self {
             case .free: return "$0"
@@ -50,7 +50,7 @@ struct Subscription: Codable {
             case .premium: return "$9.99/mo"
             }
         }
-        
+
         var features: [String] {
             switch self {
             case .free:
@@ -62,7 +62,7 @@ struct Subscription: Codable {
             }
         }
     }
-    
+
     enum SubscriptionStatus: String, Codable {
         case active = "active"
         case expired = "expired"

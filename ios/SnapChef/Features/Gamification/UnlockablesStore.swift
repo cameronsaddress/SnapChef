@@ -11,7 +11,7 @@ enum UnlockableType: String, CaseIterable, Codable {
     case profileFrame = "Profile Frame"
     case effect = "Visual Effect"
     case booster = "Booster"
-    
+
     var icon: String {
         switch self {
         case .theme: return "paintbrush.fill"
@@ -41,14 +41,14 @@ struct UnlockableItem: Identifiable, Codable {
     var isPurchased: Bool = false
     var isEquipped: Bool = false
     var purchaseDate: Date?
-    
+
     enum ItemRarity: String, Codable, CaseIterable {
         case common = "Common"
         case rare = "Rare"
         case epic = "Epic"
         case legendary = "Legendary"
         case seasonal = "Seasonal"
-        
+
         var color: Color {
             switch self {
             case .common: return .gray
@@ -58,7 +58,7 @@ struct UnlockableItem: Identifiable, Codable {
             case .seasonal: return Color(hex: "#fa709a")
             }
         }
-        
+
         var glowIntensity: Double {
             switch self {
             case .common: return 0.1
@@ -84,17 +84,17 @@ struct StoreCategory: Identifiable {
 @MainActor
 class UnlockablesStore: ObservableObject {
     static let shared = UnlockablesStore()
-    
+
     @Published var allItems: [UnlockableItem] = []
     @Published var purchasedItems: [UnlockableItem] = []
     @Published var equippedItems: [String: String] = [:] // type -> itemId
     @Published var featuredItems: [UnlockableItem] = []
     @Published var limitedTimeItems: [UnlockableItem] = []
     @Published var isLoadingStore = false
-    
+
     private let chefCoinsManager = ChefCoinsManager.shared
     private let userDefaults = UserDefaults.standard
-    
+
     // Store categories
     let categories: [StoreCategory] = [
         StoreCategory(
@@ -122,15 +122,15 @@ class UnlockablesStore: ObservableObject {
             types: [.effect, .booster]
         )
     ]
-    
+
     private init() {
         loadStore()
         loadPurchasedItems()
         loadEquippedItems()
     }
-    
+
     // MARK: - Store Management
-    
+
     /// Load store items
     private func loadStore() {
         // In a real app, this would fetch from server
@@ -138,7 +138,7 @@ class UnlockablesStore: ObservableObject {
         updateFeaturedItems()
         updateLimitedTimeItems()
     }
-    
+
     /// Update featured items
     private func updateFeaturedItems() {
         featuredItems = allItems
@@ -147,7 +147,7 @@ class UnlockablesStore: ObservableObject {
             .prefix(6)
             .map { $0 }
     }
-    
+
     /// Update limited time items
     private func updateLimitedTimeItems() {
         let now = Date()
@@ -155,144 +155,144 @@ class UnlockablesStore: ObservableObject {
             .filter { $0.isLimitedTime && ($0.expirationDate ?? now) > now && !$0.isPurchased }
             .sorted { ($0.expirationDate ?? now) < ($1.expirationDate ?? now) }
     }
-    
+
     // MARK: - Purchase Management
-    
+
     /// Purchase an item
     func purchaseItem(_ item: UnlockableItem) -> PurchaseResult {
         guard !item.isPurchased else {
             return .failure(.alreadyOwned)
         }
-        
+
         guard chefCoinsManager.canAfford(item.price) else {
             return .failure(.insufficientFunds)
         }
-        
+
         // Process purchase
         if chefCoinsManager.spendCoins(item.price, on: item.name) {
             var purchasedItem = item
             purchasedItem.isPurchased = true
             purchasedItem.purchaseDate = Date()
-            
+
             // Update arrays
             if let index = allItems.firstIndex(where: { $0.id == item.id }) {
                 allItems[index] = purchasedItem
             }
             purchasedItems.append(purchasedItem)
-            
+
             // Auto-equip if it's the first of its type
             if !hasEquippedItem(ofType: item.type) {
                 equipItem(purchasedItem)
             }
-            
+
             // Save state
             savePurchasedItems()
-            
+
             // Update store
             updateFeaturedItems()
             updateLimitedTimeItems()
-            
+
             // Analytics
             trackPurchase(purchasedItem)
-            
+
             return .success(purchasedItem)
         } else {
             return .failure(.transactionFailed)
         }
     }
-    
+
     /// Check if user has equipped item of type
     func hasEquippedItem(ofType type: UnlockableType) -> Bool {
         return equippedItems[type.rawValue] != nil
     }
-    
+
     /// Equip an item
     func equipItem(_ item: UnlockableItem) {
         guard item.isPurchased else { return }
-        
+
         // Unequip current item of same type
         if let currentId = equippedItems[item.type.rawValue],
            let index = purchasedItems.firstIndex(where: { $0.id == currentId }) {
             purchasedItems[index].isEquipped = false
         }
-        
+
         // Equip new item
         equippedItems[item.type.rawValue] = item.id
         if let index = purchasedItems.firstIndex(where: { $0.id == item.id }) {
             purchasedItems[index].isEquipped = true
         }
-        
+
         // Apply theme if it's a theme item
         if item.type == .theme {
             applyTheme(item)
         }
-        
+
         saveEquippedItems()
     }
-    
+
     /// Unequip an item
     func unequipItem(_ item: UnlockableItem) {
         guard item.isPurchased && item.isEquipped else { return }
-        
+
         equippedItems[item.type.rawValue] = nil
         if let index = purchasedItems.firstIndex(where: { $0.id == item.id }) {
             purchasedItems[index].isEquipped = false
         }
-        
+
         saveEquippedItems()
     }
-    
+
     // MARK: - Theme Management
-    
+
     /// Apply theme
     private func applyTheme(_ theme: UnlockableItem) {
         guard theme.type == .theme else { return }
-        
+
         // Store theme preference
         userDefaults.set(theme.id, forKey: "selectedTheme")
-        
+
         // Notify app to update theme
         NotificationCenter.default.post(name: .themeChanged, object: theme)
     }
-    
+
     /// Get current theme
     func getCurrentTheme() -> UnlockableItem? {
         guard let themeId = equippedItems[UnlockableType.theme.rawValue] else { return nil }
         return purchasedItems.first(where: { $0.id == themeId })
     }
-    
+
     // MARK: - Item Queries
-    
+
     /// Get items by type
     func getItems(ofType type: UnlockableType) -> [UnlockableItem] {
         return allItems.filter { $0.type == type }
     }
-    
+
     /// Get purchased items by type
     func getPurchasedItems(ofType type: UnlockableType) -> [UnlockableItem] {
         return purchasedItems.filter { $0.type == type }
     }
-    
+
     /// Get equipped item for type
     func getEquippedItem(ofType type: UnlockableType) -> UnlockableItem? {
         guard let itemId = equippedItems[type.rawValue] else { return nil }
         return purchasedItems.first(where: { $0.id == itemId })
     }
-    
+
     /// Check if item is affordable
     func canAfford(_ item: UnlockableItem) -> Bool {
         return chefCoinsManager.canAfford(item.price)
     }
-    
+
     // MARK: - Persistence
-    
+
     /// Save purchased items
     private func savePurchasedItems() {
         if let encoded = try? JSONEncoder().encode(purchasedItems) {
             userDefaults.set(encoded, forKey: "purchasedUnlockables")
         }
     }
-    
+
     /// Load purchased items
     private func loadPurchasedItems() {
         if let data = userDefaults.data(forKey: "purchasedUnlockables"),
@@ -300,30 +300,30 @@ class UnlockablesStore: ObservableObject {
             purchasedItems = decoded
         }
     }
-    
+
     /// Save equipped items
     private func saveEquippedItems() {
         userDefaults.set(equippedItems, forKey: "equippedUnlockables")
     }
-    
+
     /// Load equipped items
     private func loadEquippedItems() {
         equippedItems = userDefaults.dictionary(forKey: "equippedUnlockables") as? [String: String] ?? [:]
     }
-    
+
     // MARK: - Analytics
-    
+
     /// Track purchase
     private func trackPurchase(_ item: UnlockableItem) {
         print("Item purchased: \(item.name) for \(item.price) coins")
         // Analytics implementation would go here
     }
-    
+
     // MARK: - Mock Data
-    
+
     private func createMockStoreItems() -> [UnlockableItem] {
         var items: [UnlockableItem] = []
-        
+
         // Themes
         items.append(contentsOf: [
             UnlockableItem(
@@ -355,15 +355,15 @@ class UnlockablesStore: ObservableObject {
                 type: .theme,
                 name: "Spooky Season",
                 description: "Halloween special theme",
-                price: 1000,
+                price: 1_000,
                 previewImage: "theme_halloween",
                 rarity: .seasonal,
                 category: "Themes",
                 isLimitedTime: true,
-                expirationDate: Date().addingTimeInterval(7 * 86400)
+                expirationDate: Date().addingTimeInterval(7 * 86_400)
             )
         ])
-        
+
         // Badges
         items.append(contentsOf: [
             UnlockableItem(
@@ -391,7 +391,7 @@ class UnlockablesStore: ObservableObject {
                 expirationDate: nil
             )
         ])
-        
+
         // Titles
         items.append(contentsOf: [
             UnlockableItem(
@@ -399,7 +399,7 @@ class UnlockablesStore: ObservableObject {
                 type: .title,
                 name: "Master Chef",
                 description: "The ultimate culinary title",
-                price: 1500,
+                price: 1_500,
                 previewImage: nil,
                 rarity: .legendary,
                 category: "Profile",
@@ -419,7 +419,7 @@ class UnlockablesStore: ObservableObject {
                 expirationDate: nil
             )
         ])
-        
+
         // Sticker Packs
         items.append(contentsOf: [
             UnlockableItem(
@@ -444,10 +444,10 @@ class UnlockablesStore: ObservableObject {
                 rarity: .seasonal,
                 category: "Content",
                 isLimitedTime: true,
-                expirationDate: Date().addingTimeInterval(7 * 86400)
+                expirationDate: Date().addingTimeInterval(7 * 86_400)
             )
         ])
-        
+
         // Recipe Collections
         items.append(contentsOf: [
             UnlockableItem(
@@ -475,7 +475,7 @@ class UnlockablesStore: ObservableObject {
                 expirationDate: nil
             )
         ])
-        
+
         // Effects
         items.append(contentsOf: [
             UnlockableItem(
@@ -491,7 +491,7 @@ class UnlockablesStore: ObservableObject {
                 expirationDate: nil
             )
         ])
-        
+
         // Boosters
         items.append(contentsOf: [
             UnlockableItem(
@@ -499,7 +499,7 @@ class UnlockablesStore: ObservableObject {
                 type: .booster,
                 name: "Double Coins (7 Days)",
                 description: "Earn 2x coins for one week",
-                price: 1000,
+                price: 1_000,
                 previewImage: "booster_coins",
                 rarity: .epic,
                 category: "Effects",
@@ -519,7 +519,7 @@ class UnlockablesStore: ObservableObject {
                 expirationDate: nil
             )
         ])
-        
+
         return items
     }
 }
@@ -528,13 +528,13 @@ class UnlockablesStore: ObservableObject {
 enum PurchaseResult {
     case success(UnlockableItem)
     case failure(PurchaseError)
-    
+
     enum PurchaseError: LocalizedError {
         case insufficientFunds
         case alreadyOwned
         case transactionFailed
         case itemNotFound
-        
+
         var errorDescription: String? {
             switch self {
             case .insufficientFunds:

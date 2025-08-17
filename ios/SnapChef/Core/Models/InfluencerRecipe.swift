@@ -96,11 +96,11 @@ extension InfluencerRecipe {
                 "Cucumber", "Carrots", "Tomatoes", "Fresh herbs"
             ],
             followerCount: "398M",
-            dateShared: Date().addingTimeInterval(-86400 * 3),
+            dateShared: Date().addingTimeInterval(-86_400 * 3),
             likes: 4_892_000,
             shares: 287_000
         ),
-        
+
         // Emma Chen
         InfluencerRecipe(
             influencerName: "Emma Chen",
@@ -173,11 +173,11 @@ extension InfluencerRecipe {
                 "Coconut milk", "Rice", "Eggs", "Champagne", "Kids yogurt"
             ],
             followerCount: "13.2M",
-            dateShared: Date().addingTimeInterval(-86400 * 5),
+            dateShared: Date().addingTimeInterval(-86_400 * 5),
             likes: 892_000,
             shares: 45_000
         ),
-        
+
         // Jessica Martinez
         InfluencerRecipe(
             influencerName: "Jessica Martinez",
@@ -249,11 +249,11 @@ extension InfluencerRecipe {
                 "Fresh herbs", "Whole grain bread", "Almond milk", "Berries"
             ],
             followerCount: "43.8M",
-            dateShared: Date().addingTimeInterval(-86400 * 2),
+            dateShared: Date().addingTimeInterval(-86_400 * 2),
             likes: 2_100_000,
             shares: 98_000
         ),
-        
+
         // Rachel Thompson
         InfluencerRecipe(
             influencerName: "Rachel Thompson",
@@ -323,11 +323,11 @@ extension InfluencerRecipe {
                 "Whole grain bread", "Avocado", "Sweet tea", "Butter"
             ],
             followerCount: "27.9M",
-            dateShared: Date().addingTimeInterval(-86400 * 4),
+            dateShared: Date().addingTimeInterval(-86_400 * 4),
             likes: 1_500_000,
             shares: 72_000
         ),
-        
+
         // Lisa Anderson
         InfluencerRecipe(
             influencerName: "Lisa Anderson",
@@ -399,7 +399,7 @@ extension InfluencerRecipe {
                 "Fresh berries", "Avocados", "Kale", "Cucumber", "Celery"
             ],
             followerCount: "224M",
-            dateShared: Date().addingTimeInterval(-86400 * 1),
+            dateShared: Date().addingTimeInterval(-86_400 * 1),
             likes: 3_200_000,
             shares: 156_000
         )

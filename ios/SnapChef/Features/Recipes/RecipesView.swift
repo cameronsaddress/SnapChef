@@ -11,33 +11,33 @@ struct RecipesView: View {
     @State private var showingFilters = false
     @State private var hasInitiallyLoaded = false
     @State private var isBackgroundSyncing = false
-    
+
     // Filter states
     @State private var selectedDifficulty: Recipe.Difficulty?
     @State private var maxCookTime: Double = 120
-    @State private var maxCalories: Double = 2000
+    @State private var maxCalories: Double = 2_000
     @State private var dietaryRestrictions: Set<String> = []
-    
+
     let categories = ["All", "Quick", "Healthy", "Comfort", "Dessert", "Trending"]
-    
+
     var body: some View {
         ZStack {
             // Full screen animated background
             MagicalBackground()
                 .ignoresSafeArea()
-            
+
             ScrollView {
                     VStack(spacing: 30) {
                         // Header
                         EnhancedRecipesHeader()
                             .padding(.top, 20)
                             .staggeredFade(index: 0, isShowing: contentVisible)
-                        
+
                         // Search Bar
                         MagicalSearchBar(text: $searchText)
                             .padding(.horizontal, 20)
                             .staggeredFade(index: 1, isShowing: contentVisible)
-                        
+
                         // Categories
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
@@ -56,14 +56,14 @@ struct RecipesView: View {
                             .padding(.horizontal, 20)
                         }
                         .staggeredFade(index: 2, isShowing: contentVisible)
-                        
+
                         // Featured Recipe
                         if let featuredRecipe = appState.recentRecipes.first {
                             FeaturedRecipeCard(recipe: featuredRecipe)
                                 .padding(.horizontal, 20)
                                 .staggeredFade(index: 3, isShowing: contentVisible)
                         }
-                        
+
                         // Subtle background sync indicator (non-blocking)
                         if isBackgroundSyncing && hasInitiallyLoaded {
                             HStack {
@@ -87,12 +87,12 @@ struct RecipesView: View {
                             .transition(.scale.combined(with: .opacity))
                             .animation(.easeInOut(duration: 0.3), value: isBackgroundSyncing)
                         }
-                        
+
                         // Recipe Grid
                         RecipeGridView(recipes: filteredRecipes)
                             .padding(.horizontal, 20)
                             .staggeredFade(index: 4, isShowing: contentVisible)
-                        
+
                         // Empty State
                         if filteredRecipes.isEmpty && !cloudKitRecipeCache.isLoading {
                             EmptyRecipesView()
@@ -101,9 +101,9 @@ struct RecipesView: View {
                         }
                     }
                     .padding(.bottom, 100)
-                }
+            }
                 .scrollContentBackground(.hidden)
-                
+
                 // Floating Filter Button
                 VStack {
                     Spacer()
@@ -118,7 +118,7 @@ struct RecipesView: View {
                         .padding(30)
                     }
                 }
-            }
+        }
         .navigationBarHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear {
@@ -126,7 +126,7 @@ struct RecipesView: View {
                 contentVisible = true
             }
             hasInitiallyLoaded = true
-            
+
             // OPTIMIZATION: Start background CloudKit sync without blocking UI
             if cloudKitAuth.isAuthenticated {
                 startBackgroundCloudKitSync()
@@ -153,56 +153,56 @@ struct RecipesView: View {
             )
         }
     }
-    
+
     var activeFilterCount: Int {
         var count = 0
         if selectedDifficulty != nil { count += 1 }
         if maxCookTime < 120 { count += 1 }
-        if maxCalories < 2000 { count += 1 }
+        if maxCalories < 2_000 { count += 1 }
         if !dietaryRestrictions.isEmpty { count += 1 }
         return count
     }
-    
+
     var filteredRecipes: [Recipe] {
         // OPTIMIZATION: Prioritize local recipes for instant display
         // Show local recipes immediately, then merge CloudKit recipes
         let localRecipes = appState.recentRecipes + appState.savedRecipes
         let cloudKitRecipes = cloudKitRecipeCache.cachedRecipes
-        
+
         // Remove duplicates - local recipes take precedence
         let localRecipeIds = Set(localRecipes.map { $0.id })
         let uniqueCloudKitRecipes = cloudKitRecipes.filter { !localRecipeIds.contains($0.id) }
-        
+
         // Combine with local recipes first for instant display
         let allRecipes = localRecipes + uniqueCloudKitRecipes
-        
+
         return allRecipes.filter { recipe in
             // Search filter
-            let matchesSearch = searchText.isEmpty || 
+            let matchesSearch = searchText.isEmpty ||
                 recipe.name.localizedCaseInsensitiveContains(searchText) ||
                 recipe.description.localizedCaseInsensitiveContains(searchText) ||
                 recipe.ingredients.contains { $0.name.localizedCaseInsensitiveContains(searchText) }
-            
+
             // Category filter
             let matchesCategory = selectedCategory == "All" || self.matchesCategory(recipe, category: selectedCategory)
-            
+
             // Difficulty filter
             let matchesDifficulty = selectedDifficulty == nil || recipe.difficulty == selectedDifficulty
-            
+
             // Cook time filter
             let matchesCookTime = Double(recipe.prepTime + recipe.cookTime) <= maxCookTime
-            
+
             // Calories filter
             let matchesCalories = Double(recipe.nutrition.calories) <= maxCalories
-            
+
             // Dietary restrictions filter
             let matchesDietary = dietaryRestrictions.isEmpty || checkDietaryRestrictions(recipe)
-            
-            return matchesSearch && matchesCategory && matchesDifficulty && 
+
+            return matchesSearch && matchesCategory && matchesDifficulty &&
                    matchesCookTime && matchesCalories && matchesDietary
         }
     }
-    
+
     private func checkDietaryRestrictions(_ recipe: Recipe) -> Bool {
         // This is a simplified check - in production, you'd have more detailed ingredient data
         for restriction in dietaryRestrictions {
@@ -234,7 +234,7 @@ struct RecipesView: View {
         }
         return true
     }
-    
+
     func matchesCategory(_ recipe: Recipe, category: String) -> Bool {
         switch category {
         case "Quick": return (recipe.prepTime + recipe.cookTime) <= 30
@@ -245,28 +245,28 @@ struct RecipesView: View {
         default: return true
         }
     }
-    
+
     // MARK: - Optimized CloudKit Integration
-    
+
     /// Start background CloudKit sync without blocking UI
     private func startBackgroundCloudKitSync() {
         guard !isBackgroundSyncing else { return }
-        
+
         print("📱 RecipesView: Starting background CloudKit sync...")
         isBackgroundSyncing = true
-        
+
         Task {
             do {
                 // Get recipes from cache (intelligent caching)
                 let recipes = await cloudKitRecipeCache.getRecipes(forceRefresh: false)
                 print("✅ RecipesView: Background sync got \(recipes.count) recipes")
-                
+
                 // Fetch photos in background without blocking UI
                 await fetchPhotosInBackground(for: recipes)
-                
+
                 // Trigger manual sync for latest data
                 await CloudKitDataManager.shared.triggerManualSync()
-                
+
                 await MainActor.run {
                     isBackgroundSyncing = false
                 }
@@ -278,36 +278,35 @@ struct RecipesView: View {
             }
         }
     }
-    
+
     /// Perform foreground sync for pull-to-refresh
     private func performForegroundSync() async {
         print("📱 RecipesView: Performing foreground sync...")
         isBackgroundSyncing = true
-        
+
         do {
             // Force refresh for pull-to-refresh
             let recipes = await cloudKitRecipeCache.getRecipes(forceRefresh: true)
             print("✅ RecipesView: Foreground sync got \(recipes.count) recipes")
-            
+
             // Fetch photos with higher priority
             await fetchPhotosInBackground(for: recipes)
-            
+
             // Trigger manual sync
             await CloudKitDataManager.shared.triggerManualSync()
-            
         } catch {
             print("❌ RecipesView: Foreground sync failed: \(error)")
         }
-        
+
         isBackgroundSyncing = false
     }
-    
+
     /// Fetch photos in background without blocking main UI thread
     private func fetchPhotosInBackground(for recipes: [Recipe]) async {
         guard !recipes.isEmpty else { return }
-        
+
         print("📸 RecipesView: Fetching photos for \(recipes.count) recipes in background...")
-        
+
         // Filter recipes that need photos and aren't already in PhotoStorageManager
         let recipesNeedingPhotos = recipes.filter { recipe in
             // Check PhotoStorageManager first (single source of truth)
@@ -317,7 +316,7 @@ struct RecipesView: View {
             // Fallback check for recipes not in PhotoStorageManager
             return !appState.savedRecipesWithPhotos.contains(where: { $0.recipe.id == recipe.id })
         }
-        
+
         if !recipesNeedingPhotos.isEmpty {
             print("📸 RecipesView: \(recipesNeedingPhotos.count) recipes need photos")
             await CloudKitRecipeManager.shared.fetchPhotosForRecipes(recipesNeedingPhotos, appState: appState)
@@ -330,7 +329,7 @@ struct RecipesView: View {
 // MARK: - Enhanced Recipes Header
 struct EnhancedRecipesHeader: View {
     @State private var sparkleAnimation = false
-    
+
     var body: some View {
         VStack(spacing: 12) {
             HStack {
@@ -347,14 +346,14 @@ struct EnhancedRecipesHeader: View {
                                 endPoint: .bottom
                             )
                         )
-                    
+
                     Text("Your culinary masterpieces")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                 }
-                
+
                 Spacer()
-                
+
                 // Animated icon
                 ZStack {
                     Image(systemName: "sparkles")
@@ -378,21 +377,21 @@ struct EnhancedRecipesHeader: View {
 struct MagicalSearchBar: View {
     @Binding var text: String
     @State private var isEditing = false
-    
+
     var body: some View {
         GlassmorphicCard {
             HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(Color(hex: "#667eea"))
-                
+
                 TextField("Search recipes...", text: $text)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white)
                     .onTapGesture {
                         isEditing = true
                     }
-                
+
                 if isEditing && !text.isEmpty {
                     Button(action: {
                         text = ""
@@ -417,7 +416,7 @@ struct CategoryPill: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
-    
+
     var categoryEmoji: String {
         switch title {
         case "Quick": return "⚡"
@@ -428,7 +427,7 @@ struct CategoryPill: View {
         default: return "✨"
         }
     }
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
@@ -481,7 +480,7 @@ struct FeaturedRecipeCard: View {
     let recipe: Recipe
     @State private var isAnimating = false
     @State private var showDetail = false
-    
+
     var body: some View {
         GlassmorphicCard(content: {
             VStack(alignment: .leading, spacing: 20) {
@@ -491,21 +490,21 @@ struct FeaturedRecipeCard: View {
                         Text("Featured Recipe")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(Color(hex: "#f093fb"))
-                        
+
                         Text("Today's Star")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white.opacity(0.7))
                     }
-                    
+
                     Spacer()
-                    
+
                     // Animated star
                     Image(systemName: "star.fill")
                         .font(.system(size: 24, weight: .medium))
                         .foregroundColor(Color(hex: "#ffa726"))
                         .rotationEffect(.degrees(isAnimating ? 360 : 0))
                 }
-                
+
                 // Recipe content
                 HStack(spacing: 20) {
                     // Recipe before/after photos
@@ -515,18 +514,18 @@ struct FeaturedRecipeCard: View {
                         height: 120,
                         showLabels: true
                     )
-                    
+
                     VStack(alignment: .leading, spacing: 12) {
                         Text(recipe.name)
                             .font(.system(size: 22, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .lineLimit(2)
-                        
+
                         Text(recipe.description)
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white.opacity(0.8))
                             .lineLimit(2)
-                        
+
                         HStack(spacing: 16) {
                             HStack(spacing: 6) {
                                 Image(systemName: "clock")
@@ -535,7 +534,7 @@ struct FeaturedRecipeCard: View {
                                     .font(.system(size: 14, weight: .semibold))
                             }
                             .foregroundColor(Color(hex: "#4facfe"))
-                            
+
                             HStack(spacing: 6) {
                                 Image(systemName: "flame")
                                     .font(.system(size: 14, weight: .semibold))
@@ -545,10 +544,10 @@ struct FeaturedRecipeCard: View {
                             .foregroundColor(Color(hex: "#f093fb"))
                         }
                     }
-                    
+
                     Spacer()
                 }
-                
+
                 // Action button
                 MagneticButton(
                     title: "Cook This Now",
@@ -578,13 +577,13 @@ struct RecipeGridView: View {
         GridItem(.fixed(UIScreen.main.bounds.width / 2 - 28), spacing: 16),
         GridItem(.fixed(UIScreen.main.bounds.width / 2 - 28), spacing: 16)
     ]
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("All Recipes")
                 .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            
+
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(recipes) { recipe in
                     RecipeGridCard(recipe: recipe)
@@ -603,7 +602,7 @@ struct RecipeGridCard: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
-    
+
     var body: some View {
         // Base card with tap gesture for viewing details
         GlassmorphicCard {
@@ -619,7 +618,7 @@ struct RecipeGridCard: View {
                     .frame(height: 120) // Ensure consistent height
                     .clipped()
                     .allowsHitTesting(false) // Allow scroll to pass through
-                    
+
                     // Difficulty badge and favorite button overlay
                     VStack {
                         HStack {
@@ -638,7 +637,7 @@ struct RecipeGridCard: View {
                                             .fill(Color.black.opacity(0.3))
                                     )
                             }
-                            
+
                             Spacer()
                             DifficultyBadge(difficulty: recipe.difficulty)
                                 .allowsHitTesting(false) // Let scroll pass through badge
@@ -647,7 +646,7 @@ struct RecipeGridCard: View {
                         Spacer()
                     }
                 }
-                
+
                 // Content
                 VStack(alignment: .leading, spacing: 6) {
                         Text(recipe.name)
@@ -657,7 +656,7 @@ struct RecipeGridCard: View {
                             .multilineTextAlignment(.leading)
                             .frame(minHeight: 40, alignment: .topLeading)
                             .allowsHitTesting(false) // Allow scroll to pass through
-                        
+
                         // Author row
                         Button(action: {
                             if let currentUser = cloudKitAuth.currentUser {
@@ -675,21 +674,21 @@ struct RecipeGridCard: View {
                             }
                         }
                         .buttonStyle(BorderlessButtonStyle()) // Use BorderlessButtonStyle to not block scroll
-                        
+
                         HStack {
                             Label("\(recipe.cookTime)m", systemImage: "clock")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
                                 .allowsHitTesting(false) // Allow scroll to pass through
-                            
+
                             Spacer()
-                            
+
                             Label("\(recipe.nutrition.calories)", systemImage: "flame")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
                                 .allowsHitTesting(false) // Allow scroll to pass through
                         }
-                        
+
                         // Share button
                         HStack {
                             Spacer()
@@ -716,7 +715,7 @@ struct RecipeGridCard: View {
                             }
                             .buttonStyle(BorderlessButtonStyle()) // Use BorderlessButtonStyle to not block scroll
                         }
-                    }
+                }
             }
             .padding(12)
         }
@@ -748,24 +747,24 @@ struct RecipeGridCard: View {
             }
         }
     }
-    
+
     private func deleteRecipe() {
         withAnimation(.easeOut(duration: 0.3)) {
             appState.deleteRecipe(recipe)
         }
-        
+
         // Haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
     }
-    
+
     private func getBeforePhotoForRecipe() -> UIImage? {
         // OPTIMIZATION: Use PhotoStorageManager as primary source for instant retrieval
         if let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id),
            let photo = photos.fridgePhoto {
             return photo
         }
-        
+
         // Fallback to appState for backwards compatibility with instant migration
         if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }),
            let photo = savedRecipe.beforePhoto {
@@ -780,23 +779,23 @@ struct RecipeGridCard: View {
             }
             return photo
         }
-        
+
         return nil
     }
-    
+
     private func getAfterPhotoForRecipe() -> UIImage? {
         // OPTIMIZATION: Use PhotoStorageManager as primary source for instant retrieval
         if let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id),
            let photo = photos.mealPhoto {
             return photo
         }
-        
+
         // Fallback to appState for backwards compatibility (migration handled in getBeforePhotoForRecipe)
         if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }),
            let photo = savedRecipe.afterPhoto {
             return photo
         }
-        
+
         return nil
     }
 }
@@ -804,7 +803,7 @@ struct RecipeGridCard: View {
 // MARK: - Empty Recipes View
 struct EmptyRecipesView: View {
     @State private var bounceAnimation = false
-    
+
     var body: some View {
         VStack(spacing: 20) {
             // Animated icon
@@ -823,23 +822,23 @@ struct EmptyRecipesView: View {
                     )
                     .frame(width: 120, height: 120)
                     .scaleEffect(bounceAnimation ? 1.2 : 1)
-                
+
                 Image(systemName: "camera.viewfinder")
                     .font(.system(size: 50, weight: .medium))
                     .foregroundColor(Color(hex: "#667eea"))
                     .scaleEffect(bounceAnimation ? 1.1 : 1)
             }
-            
+
             Text("No recipes yet!")
                 .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            
+
             Text("Snap your fridge to create your first masterpiece")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            
+
             MagneticButton(
                 title: "Start Cooking",
                 icon: "camera.fill",
@@ -862,15 +861,15 @@ struct RecipeFiltersView: View {
     @Binding var maxCookTime: Double
     @Binding var maxCalories: Double
     @Binding var dietaryRestrictions: Set<String>
-    
+
     let restrictions = ["Vegetarian", "Vegan", "Gluten-Free", "Dairy-Free", "Keto", "Paleo"]
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 30) {
                         // Difficulty
@@ -878,7 +877,7 @@ struct RecipeFiltersView: View {
                             Text("Difficulty")
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
-                            
+
                             HStack(spacing: 12) {
                                 ForEach(Recipe.Difficulty.allCases, id: \.self) { difficulty in
                                     DifficultyFilterPill(
@@ -891,49 +890,49 @@ struct RecipeFiltersView: View {
                                 }
                             }
                         }
-                        
+
                         // Cook Time
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("Max Cook Time")
                                     .font(.system(size: 20, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
-                                
+
                                 Spacer()
-                                
+
                                 Text("\(Int(maxCookTime)) min")
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundColor(Color(hex: "#4facfe"))
                             }
-                            
+
                             Slider(value: $maxCookTime, in: 15...120, step: 15)
                                 .accentColor(Color(hex: "#4facfe"))
                         }
-                        
+
                         // Calories
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("Max Calories")
                                     .font(.system(size: 20, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
-                                
+
                                 Spacer()
-                                
+
                                 Text("\(Int(maxCalories))")
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundColor(Color(hex: "#f093fb"))
                             }
-                            
-                            Slider(value: $maxCalories, in: 200...2000, step: 100)
+
+                            Slider(value: $maxCalories, in: 200...2_000, step: 100)
                                 .accentColor(Color(hex: "#f093fb"))
                         }
-                        
+
                         // Dietary Restrictions
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Dietary Restrictions")
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
-                            
+
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                                 ForEach(restrictions, id: \.self) { restriction in
                                     RestrictionPill(
@@ -950,7 +949,7 @@ struct RecipeFiltersView: View {
                                 }
                             }
                         }
-                        
+
                         // Apply button
                         MagneticButton(
                             title: "Apply Filters",
@@ -972,7 +971,7 @@ struct RecipeFiltersView: View {
                     Button("Clear") {
                         selectedDifficulty = nil
                         maxCookTime = 60
-                        maxCalories = 1000
+                        maxCalories = 1_000
                         dietaryRestrictions = []
                     }
                     .foregroundColor(Color(hex: "#667eea"))
@@ -987,7 +986,7 @@ struct DifficultyFilterPill: View {
     let difficulty: Recipe.Difficulty
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
@@ -1027,7 +1026,7 @@ struct RestrictionPill: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             Text(title)
@@ -1061,7 +1060,7 @@ struct RestrictionPill: View {
     ZStack {
         MagicalBackground()
             .ignoresSafeArea()
-        
+
         RecipesView()
             .environmentObject(AppState())
     }

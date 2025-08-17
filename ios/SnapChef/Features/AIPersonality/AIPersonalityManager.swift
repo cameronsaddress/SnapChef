@@ -13,7 +13,7 @@ struct AIChefPersona: Identifiable, Codable {
     let color: String
     var isUnlocked: Bool
     var unlockRequirement: String?
-    
+
     enum PersonalityType: String, Codable, CaseIterable {
         case gordon = "Gordon (Intense)"
         case julia = "Julia (Encouraging)"
@@ -23,7 +23,7 @@ struct AIChefPersona: Identifiable, Codable {
         case robot = "Robot (Logical)"
         case pirate = "Pirate (Adventurous)"
         case wizard = "Wizard (Mystical)"
-        
+
         var description: String {
             switch self {
             case .gordon: return "Passionate about perfection, direct feedback"
@@ -37,7 +37,7 @@ struct AIChefPersona: Identifiable, Codable {
             }
         }
     }
-    
+
     enum VoiceStyle: String, Codable {
         case enthusiastic = "Enthusiastic"
         case calm = "Calm"
@@ -54,13 +54,13 @@ struct SurpriseRecipeSettings {
     var wildnessLevel: WildnessLevel = .medium
     var allowedCuisines: Set<String> = Set(Cuisine.allCases.map { $0.rawValue })
     var avoidIngredients: Set<String> = []
-    
+
     enum WildnessLevel: String, CaseIterable {
         case mild = "Mild Surprises"
         case medium = "Moderate Adventures"
         case wild = "Complete Chaos"
         case insane = "Culinary Madness"
-        
+
         var description: String {
             switch self {
             case .mild: return "Familiar recipes with small twists"
@@ -69,7 +69,7 @@ struct SurpriseRecipeSettings {
             case .insane: return "Prepare for anything!"
             }
         }
-        
+
         var color: Color {
             switch self {
             case .mild: return Color(hex: "#43e97b")
@@ -98,14 +98,14 @@ enum Cuisine: String, CaseIterable {
 @MainActor
 class AIPersonalityManager: ObservableObject {
     static let shared = AIPersonalityManager()
-    
+
     @Published var currentPersona: AIChefPersona
     @Published var unlockedPersonas: Set<UUID> = []
     @Published var surpriseSettings = SurpriseRecipeSettings()
     @Published var messageHistory: [AIMessage] = []
-    
+
     let allPersonas: [AIChefPersona]
-    
+
     private init() {
         // Initialize all personas
         allPersonas = [
@@ -244,39 +244,39 @@ class AIPersonalityManager: ObservableObject {
                 unlockRequirement: "Create 'Mystical Meal' achievement"
             )
         ]
-        
+
         // Set default persona
         currentPersona = allPersonas.first!
-        
+
         // Unlock default personas
         unlockedPersonas.insert(allPersonas[0].id)
         unlockedPersonas.insert(allPersonas[1].id)
     }
-    
+
     // MARK: - Persona Management
-    
+
     func selectPersona(_ persona: AIChefPersona) {
         guard unlockedPersonas.contains(persona.id) else { return }
         currentPersona = persona
-        
+
         // Add welcome message
         addMessage(
             getPersonaGreeting(),
             type: .chef
         )
     }
-    
+
     func unlockPersona(_ personaId: UUID) {
         unlockedPersonas.insert(personaId)
-        
+
         // Celebration animation would trigger here
         if let persona = allPersonas.first(where: { $0.id == personaId }) {
             print("Unlocked: \(persona.name)!")
         }
     }
-    
+
     // MARK: - Message Generation
-    
+
     func getPersonaGreeting() -> String {
         switch currentPersona.personality {
         case .gordon:
@@ -297,10 +297,10 @@ class AIPersonalityManager: ObservableObject {
             return "Welcome, apprentice! The kitchen spirits await our culinary magic!"
         }
     }
-    
+
     func generateRecipeIntro(for recipe: Recipe) -> String {
         let phrase = currentPersona.catchPhrases.randomElement() ?? ""
-        
+
         switch currentPersona.personality {
         case .gordon:
             return "\(recipe.name)! \(phrase) This is going to be absolutely stunning when done right!"
@@ -320,7 +320,7 @@ class AIPersonalityManager: ObservableObject {
             return "The spirits have chosen... \(recipe.name)! \(phrase)"
         }
     }
-    
+
     func generateEncouragement() -> String {
         switch currentPersona.personality {
         case .gordon:
@@ -341,12 +341,12 @@ class AIPersonalityManager: ObservableObject {
             return ["The magic is strong!", "Excellent spellwork!", "The spirits are pleased!"].randomElement()!
         }
     }
-    
+
     // MARK: - Surprise Recipe Generation
-    
+
     func generateSurprisePrompt() -> String {
         let wildness = surpriseSettings.wildnessLevel
-        
+
         switch wildness {
         case .mild:
             return "Create a familiar recipe with a small twist"
@@ -358,13 +358,13 @@ class AIPersonalityManager: ObservableObject {
             return "Go completely wild - surprise me with something I've never imagined!"
         }
     }
-    
+
     func shouldAddSurpriseElement() -> Bool {
         surpriseSettings.isEnabled && Int.random(in: 0...100) < 30 // 30% chance
     }
-    
+
     // MARK: - Message History
-    
+
     func addMessage(_ content: String, type: AIMessageType) {
         let message = AIMessage(
             content: content,
@@ -374,7 +374,7 @@ class AIPersonalityManager: ObservableObject {
         )
         messageHistory.append(message)
     }
-    
+
     func clearMessageHistory() {
         messageHistory.removeAll()
     }

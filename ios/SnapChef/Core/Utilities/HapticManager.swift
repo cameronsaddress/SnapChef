@@ -7,13 +7,13 @@ class HapticManager {
         generator.prepare()
         generator.impactOccurred()
     }
-    
+
     static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
         let generator = UINotificationFeedbackGenerator()
         generator.prepare()
         generator.notificationOccurred(type)
     }
-    
+
     static func selection() {
         let generator = UISelectionFeedbackGenerator()
         generator.prepare()

@@ -15,19 +15,18 @@ import Combine
 /// Enhanced progress view with smooth animations and haptic feedback
 @available(iOS 14.0, *)
 public struct EnhancedProgressView: View {
-    
     @Binding var progress: RenderProgress
     @State private var isAnimating = false
     @State private var lastPhase: RenderPhase = .planning
     @State private var smoothProgress: Double = 0.0
-    
+
     private let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
     private let selectionFeedback = UISelectionFeedbackGenerator()
-    
+
     public init(progress: Binding<RenderProgress>) {
         self._progress = progress
     }
-    
+
     public var body: some View {
         VStack(spacing: 24) {
             // Phase indicator with smooth transitions
@@ -40,13 +39,13 @@ public struct EnhancedProgressView: View {
                     removal: .move(edge: .leading).combined(with: .opacity)
                 ))
                 .id(progress.phase.rawValue)
-            
+
             // Enhanced progress ring
             ZStack {
                 Circle()
                     .stroke(Color.gray.opacity(0.3), lineWidth: 8)
                     .frame(width: 120, height: 120)
-                
+
                 Circle()
                     .trim(from: 0, to: smoothProgress)
                     .stroke(
@@ -60,24 +59,24 @@ public struct EnhancedProgressView: View {
                     .frame(width: 120, height: 120)
                     .rotationEffect(.degrees(-90))
                     .animation(.easeInOut(duration: 0.3), value: smoothProgress)
-                
+
                 VStack {
                     Text("\(Int(smoothProgress * 100))%")
                         .font(.title2)
                         .fontWeight(.bold)
-                    
+
                     if let memoryUsage = progress.memoryUsage {
-                        let memoryMB = Double(memoryUsage) / 1024.0 / 1024.0
+                        let memoryMB = Double(memoryUsage) / 1_024.0 / 1_024.0
                         Text("\(String(format: "%.1f", memoryMB)) MB")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 }
             }
-            
+
             // Phase timeline
             PhaseTimelineView(currentPhase: progress.phase)
-            
+
             // Performance indicators
             if let memoryUsage = progress.memoryUsage {
                 PerformanceIndicatorsView(memoryUsage: memoryUsage)
@@ -99,7 +98,7 @@ public struct EnhancedProgressView: View {
             prepareHapticFeedback()
         }
     }
-    
+
     private func triggerPhaseHaptic(_ phase: RenderPhase) {
         switch phase {
         case .planning:
@@ -121,7 +120,7 @@ public struct EnhancedProgressView: View {
             successFeedback.notificationOccurred(.success)
         }
     }
-    
+
     private func prepareHapticFeedback() {
         impactFeedback.prepare()
         selectionFeedback.prepare()
@@ -134,7 +133,7 @@ public struct EnhancedProgressView: View {
 struct PhaseTimelineView: View {
     let currentPhase: RenderPhase
     private let phases = RenderPhase.allCases
-    
+
     var body: some View {
         HStack(spacing: 8) {
             ForEach(Array(phases.enumerated()), id: \.offset) { index, phase in
@@ -142,7 +141,7 @@ struct PhaseTimelineView: View {
                     Circle()
                         .fill(phaseColor(for: phase))
                         .frame(width: 12, height: 12)
-                    
+
                     if phase == currentPhase {
                         Circle()
                             .stroke(Color.blue, lineWidth: 2)
@@ -151,7 +150,7 @@ struct PhaseTimelineView: View {
                             .animation(.easeInOut(duration: 0.3), value: currentPhase)
                     }
                 }
-                
+
                 if index < phases.count - 1 {
                     Rectangle()
                         .fill(index < phaseIndex(currentPhase) ? Color.blue : Color.gray.opacity(0.3))
@@ -162,11 +161,11 @@ struct PhaseTimelineView: View {
         }
         .padding(.horizontal)
     }
-    
+
     private func phaseColor(for phase: RenderPhase) -> Color {
         let currentIndex = phaseIndex(currentPhase)
         let phaseIdx = phaseIndex(phase)
-        
+
         if phaseIdx < currentIndex {
             return .blue
         } else if phaseIdx == currentIndex {
@@ -175,11 +174,11 @@ struct PhaseTimelineView: View {
             return .gray.opacity(0.3)
         }
     }
-    
+
     private func isCurrentPhase(_ phase: RenderPhase) -> Bool {
         return phase == currentPhase
     }
-    
+
     private func phaseIndex(_ phase: RenderPhase) -> Int {
         return phases.firstIndex(of: phase) ?? 0
     }
@@ -190,15 +189,15 @@ struct PhaseTimelineView: View {
 @available(iOS 14.0, *)
 struct PerformanceIndicatorsView: View {
     let memoryUsage: UInt64
-    
+
     private var memoryMB: Double {
-        return Double(memoryUsage) / 1024.0 / 1024.0
+        return Double(memoryUsage) / 1_024.0 / 1_024.0
     }
-    
+
     private var memoryPercentage: Double {
         return min(Double(memoryUsage) / Double(ExportSettings.maxMemoryUsage), 1.0)
     }
-    
+
     var body: some View {
         VStack(spacing: 12) {
             HStack {
@@ -213,14 +212,14 @@ struct PerformanceIndicatorsView: View {
                     .fontWeight(.medium)
                     .foregroundColor(memoryColor)
             }
-            
+
             ProgressView(value: memoryPercentage)
                 .progressViewStyle(LinearProgressViewStyle(tint: memoryColor))
                 .animation(.easeInOut(duration: 0.3), value: memoryPercentage)
         }
         .padding(.horizontal)
     }
-    
+
     private var memoryColor: Color {
         if memoryPercentage > 0.9 {
             return .red
@@ -238,21 +237,21 @@ struct PerformanceIndicatorsView: View {
 public struct LoadingStatesView: View {
     @State private var isAnimating = false
     @State private var animationOffset: CGFloat = 0
-    
+
     let message: String
     let style: LoadingStyle
-    
+
     public enum LoadingStyle {
         case subtle
         case prominent
         case minimal
     }
-    
+
     public init(message: String = "Processing...", style: LoadingStyle = .prominent) {
         self.message = message
         self.style = style
     }
-    
+
     public var body: some View {
         VStack(spacing: 16) {
             switch style {
@@ -263,7 +262,7 @@ public struct LoadingStatesView: View {
             case .minimal:
                 minimalLoader
             }
-            
+
             Text(message)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
@@ -273,7 +272,7 @@ public struct LoadingStatesView: View {
             startAnimation()
         }
     }
-    
+
     private var subtleLoader: some View {
         HStack(spacing: 8) {
             ForEach(0..<3) { index in
@@ -290,13 +289,13 @@ public struct LoadingStatesView: View {
             }
         }
     }
-    
+
     private var prominentLoader: some View {
         ZStack {
             Circle()
                 .stroke(Color.blue.opacity(0.3), lineWidth: 4)
                 .frame(width: 60, height: 60)
-            
+
             Circle()
                 .trim(from: 0, to: 0.3)
                 .stroke(Color.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round))
@@ -308,13 +307,13 @@ public struct LoadingStatesView: View {
                 )
         }
     }
-    
+
     private var minimalLoader: some View {
         ProgressView()
             .progressViewStyle(CircularProgressViewStyle(tint: .blue))
             .scaleEffect(0.8)
     }
-    
+
     private func startAnimation() {
         isAnimating = true
     }
@@ -325,22 +324,22 @@ public struct LoadingStatesView: View {
 @available(iOS 14.0, *)
 public struct SmoothTransitionContainer<Content: View>: View {
     @State private var isVisible = false
-    
+
     let content: Content
     let transitionStyle: TransitionStyle
-    
+
     public enum TransitionStyle {
         case fade
         case slide
         case scale
         case spring
     }
-    
+
     public init(transitionStyle: TransitionStyle = .spring, @ViewBuilder content: () -> Content) {
         self.transitionStyle = transitionStyle
         self.content = content()
     }
-    
+
     public var body: some View {
         content
             .opacity(isVisible ? 1 : 0)
@@ -353,7 +352,7 @@ public struct SmoothTransitionContainer<Content: View>: View {
                 }
             }
     }
-    
+
     private func animationForStyle() -> Animation {
         switch transitionStyle {
         case .fade:
@@ -375,9 +374,9 @@ public struct ErrorRecoveryView: View {
     let error: Error
     let retryAction: () -> Void
     let cancelAction: () -> Void
-    
+
     @State private var isRetrying = false
-    
+
     public init(
         error: Error,
         retryAction: @escaping () -> Void,
@@ -387,23 +386,23 @@ public struct ErrorRecoveryView: View {
         self.retryAction = retryAction
         self.cancelAction = cancelAction
     }
-    
+
     public var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48))
                 .foregroundColor(.orange)
-            
+
             Text("Something went wrong")
                 .font(.headline)
                 .fontWeight(.semibold)
-            
+
             Text(error.localizedDescription)
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
-            
+
             HStack(spacing: 16) {
                 Button("Cancel") {
                     let impactFeedback = UIImpactFeedbackGenerator(style: .light)
@@ -411,11 +410,11 @@ public struct ErrorRecoveryView: View {
                     cancelAction()
                 }
                 .buttonStyle(SecondaryButtonStyle())
-                
+
                 Button("Retry") {
                     let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                     impactFeedback.impactOccurred()
-                    
+
                     isRetrying = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         retryAction()
@@ -464,17 +463,17 @@ struct SecondaryButtonStyle: ButtonStyle {
 
 public final class HapticFeedbackManager: @unchecked Sendable {
     public static let shared = HapticFeedbackManager()
-    
+
     private var impactLight: UIImpactFeedbackGenerator?
     private var impactMedium: UIImpactFeedbackGenerator?
     private var impactHeavy: UIImpactFeedbackGenerator?
     private var selection: UISelectionFeedbackGenerator?
     private var notification: UINotificationFeedbackGenerator?
-    
+
     private init() {
         // Initialize on first use to avoid MainActor issues
     }
-    
+
     @MainActor
     private func ensureGeneratorsInitialized() {
         if impactLight == nil {
@@ -485,7 +484,7 @@ public final class HapticFeedbackManager: @unchecked Sendable {
             notification = UINotificationFeedbackGenerator()
         }
     }
-    
+
     @MainActor
     public func prepareHaptics() {
         ensureGeneratorsInitialized()
@@ -494,7 +493,7 @@ public final class HapticFeedbackManager: @unchecked Sendable {
         impactHeavy?.prepare()
         selection?.prepare()
     }
-    
+
     @MainActor
     public func impact(_ intensity: UIImpactFeedbackGenerator.FeedbackStyle) {
         ensureGeneratorsInitialized()
@@ -509,19 +508,19 @@ public final class HapticFeedbackManager: @unchecked Sendable {
             impactMedium?.impactOccurred()
         }
     }
-    
+
     @MainActor
     public func selectionFeedback() {
         ensureGeneratorsInitialized()
         selection?.selectionChanged()
     }
-    
+
     @MainActor
     public func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
         ensureGeneratorsInitialized()
         notification?.notificationOccurred(type)
     }
-    
+
     @MainActor
     public func renderPhaseTransition(_ phase: RenderPhase) {
         switch phase {

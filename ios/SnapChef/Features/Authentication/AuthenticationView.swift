@@ -4,23 +4,23 @@ import AuthenticationServices
 struct AuthenticationView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @Environment(\.dismiss) private var dismiss
-    
+
     let requiredFor: AuthRequiredFeature?
-    
+
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
-    
+
     init(requiredFor: AuthRequiredFeature? = nil) {
         self.requiredFor = requiredFor
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 32) {
                     // Header
                     VStack(spacing: 16) {
@@ -33,11 +33,11 @@ struct AuthenticationView: View {
                                     endPoint: .bottomTrailing
                                 )
                             )
-                        
+
                         Text("Sign In to SnapChef")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                        
+
                         if let feature = requiredFor {
                             Text("Sign in required for \(feature.title)")
                                 .font(.subheadline)
@@ -49,7 +49,7 @@ struct AuthenticationView: View {
                         }
                     }
                     .padding(.top, 40)
-                    
+
                     // Benefits
                     VStack(alignment: .leading, spacing: 16) {
                         FeatureItem(icon: "trophy.fill", title: "Join Challenges", description: "Compete with other chefs")
@@ -58,9 +58,9 @@ struct AuthenticationView: View {
                         FeatureItem(icon: "square.and.arrow.up", title: "Share Recipes", description: "Show off your creations")
                     }
                     .padding(.horizontal, 32)
-                    
+
                     Spacer()
-                    
+
                     // Sign In Buttons
                     VStack(spacing: 12) {
                         // Sign in with Apple
@@ -76,7 +76,7 @@ struct AuthenticationView: View {
                         .signInWithAppleButtonStyle(.white)
                         .frame(height: 50)
                         .cornerRadius(25)
-                        
+
                         // Sign in with Google
                         Button(action: signInWithGoogle) {
                             HStack {
@@ -92,7 +92,7 @@ struct AuthenticationView: View {
                             .background(Color.white)
                             .cornerRadius(25)
                         }
-                        
+
                         // Sign in with Facebook
                         Button(action: signInWithFacebook) {
                             HStack {
@@ -110,7 +110,7 @@ struct AuthenticationView: View {
                     }
                     .padding(.horizontal, 24)
                     .disabled(isLoading)
-                    
+
                     // Skip for now
                     if requiredFor == nil || requiredFor == .basicRecipes {
                         Button(action: { dismiss() }) {
@@ -137,12 +137,12 @@ struct AuthenticationView: View {
             isLoading ? LoadingOverlay() : nil
         )
     }
-    
+
     // MARK: - Sign In Methods
-    
+
     private func handleSignInWithApple(_ result: Result<ASAuthorization, Error>) {
         isLoading = true
-        
+
         Task {
             do {
                 switch result {
@@ -159,17 +159,17 @@ struct AuthenticationView: View {
             isLoading = false
         }
     }
-    
+
     private func signInWithGoogle() {
         isLoading = true
-        
+
         Task {
             do {
                 guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                       let rootViewController = windowScene.windows.first?.rootViewController else {
                     throw AuthError.unknown
                 }
-                
+
                 try await authManager.signInWithGoogle(presentingViewController: rootViewController)
                 dismiss()
             } catch {
@@ -179,17 +179,17 @@ struct AuthenticationView: View {
             isLoading = false
         }
     }
-    
+
     private func signInWithFacebook() {
         isLoading = true
-        
+
         Task {
             do {
                 guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                       let rootViewController = windowScene.windows.first?.rootViewController else {
                     throw AuthError.unknown
                 }
-                
+
                 try await authManager.signInWithFacebook(presentingViewController: rootViewController)
                 dismiss()
             } catch {
@@ -205,14 +205,14 @@ struct FeatureItem: View {
     let icon: String
     let title: String
     let description: String
-    
+
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.title2)
                 .foregroundColor(Color(hex: "#667eea"))
                 .frame(width: 40)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.headline)
@@ -221,7 +221,7 @@ struct FeatureItem: View {
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.7))
             }
-            
+
             Spacer()
         }
     }
@@ -232,7 +232,7 @@ struct LoadingOverlay: View {
         ZStack {
             Color.black.opacity(0.4)
                 .ignoresSafeArea()
-            
+
             ProgressView()
                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 .scaleEffect(1.5)

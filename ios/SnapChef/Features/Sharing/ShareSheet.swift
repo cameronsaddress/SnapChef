@@ -5,30 +5,30 @@ struct SimpleShareSheet: View {
     @Environment(\.dismiss) var dismiss
     @State private var shareMessage = ""
     @State private var showingCopiedAlert = false
-    
+
     var body: some View {
         NavigationView {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 24) {
                     // Preview card
                     SimpleSharePreviewCard(recipe: recipe)
                         .padding(.horizontal, 20)
-                    
+
                     // Share message
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Share message")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white.opacity(0.8))
-                        
+
                         TextField("Add a message...", text: $shareMessage, axis: .vertical)
                             .textFieldStyle(ShareTextFieldStyle())
                             .lineLimit(3...5)
                     }
                     .padding(.horizontal, 20)
-                    
+
                     // Share buttons
                     VStack(spacing: 16) {
                         LegacySharePlatformButton(
@@ -37,21 +37,21 @@ struct SimpleShareSheet: View {
                             message: shareMessage,
                             onShare: { trackShare(platform: "tiktok") }
                         )
-                        
+
                         LegacySharePlatformButton(
                             platform: .instagram,
                             recipe: recipe,
                             message: shareMessage,
                             onShare: { trackShare(platform: "instagram") }
                         )
-                        
+
                         LegacySharePlatformButton(
                             platform: .twitter,
                             recipe: recipe,
                             message: shareMessage,
                             onShare: { trackShare(platform: "twitter") }
                         )
-                        
+
                         LegacySharePlatformButton(
                             platform: .copy,
                             recipe: recipe,
@@ -63,9 +63,9 @@ struct SimpleShareSheet: View {
                         )
                     }
                     .padding(.horizontal, 20)
-                    
+
                     Spacer()
-                    
+
                     // Reward info
                     HStack {
                         Image(systemName: "sparkles")
@@ -103,7 +103,7 @@ struct SimpleShareSheet: View {
             Text("Recipe link copied to clipboard")
         }
     }
-    
+
     private func trackShare(platform: String) {
         Task {
             do {
@@ -114,13 +114,13 @@ struct SimpleShareSheet: View {
             }
         }
     }
-    
+
     private func copyToClipboard() {
         let text = formatShareText()
         UIPasteboard.general.string = text
         showingCopiedAlert = true
     }
-    
+
     private func formatShareText() -> String {
         var text = "🍳 \(recipe.name)\n\n"
         if !shareMessage.isEmpty {
@@ -134,13 +134,13 @@ struct SimpleShareSheet: View {
 
 struct SimpleSharePreviewCard: View {
     let recipe: Recipe
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(recipe.name)
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(.white)
-            
+
             HStack(spacing: 16) {
                 Label("\(recipe.prepTime + recipe.cookTime)m", systemImage: "clock")
                 Label("\(recipe.nutrition.calories) cal", systemImage: "flame")
@@ -176,7 +176,7 @@ struct LegacySharePlatformButton: View {
     let recipe: Recipe
     let message: String
     let onShare: () -> Void
-    
+
     var body: some View {
         Button(action: {
             platform.share(recipe: recipe, message: message)
@@ -185,12 +185,12 @@ struct LegacySharePlatformButton: View {
             HStack {
                 Image(systemName: platform.icon)
                     .font(.system(size: 20))
-                
+
                 Text(platform.title)
                     .font(.system(size: 17, weight: .semibold))
-                
+
                 Spacer()
-                
+
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 14))
                     .opacity(0.7)
@@ -209,7 +209,7 @@ enum SharePlatform {
     case instagram
     case twitter
     case copy
-    
+
     var title: String {
         switch self {
         case .tiktok: return "Share to TikTok"
@@ -218,7 +218,7 @@ enum SharePlatform {
         case .copy: return "Copy Text"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .tiktok: return "music.note"
@@ -227,7 +227,7 @@ enum SharePlatform {
         case .copy: return "doc.on.doc"
         }
     }
-    
+
     var background: some View {
         Group {
             switch self {
@@ -250,7 +250,7 @@ enum SharePlatform {
             }
         }
     }
-    
+
     @MainActor
     func share(recipe: Recipe, message: String) {
         // We'll handle the view controller lookup inside each share method
@@ -265,46 +265,46 @@ enum SharePlatform {
             copyText(recipe: recipe, message: message)
         }
     }
-    
+
     @MainActor
     private func shareTikTok(recipe: Recipe, message: String) {
         let text = formatShareText(recipe: recipe, message: message)
         UIPasteboard.general.string = text
-        
+
         if let url = URL(string: "tiktok://"), UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)
         }
     }
-    
+
     @MainActor
     private func shareInstagram(recipe: Recipe, message: String) {
         let text = formatShareText(recipe: recipe, message: message)
         UIPasteboard.general.string = text
-        
+
         if let url = URL(string: "instagram://camera"), UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)
         } else if let url = URL(string: "instagram://"), UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)
         }
     }
-    
+
     @MainActor
     private func shareTwitter(recipe: Recipe, message: String) {
         let text = formatShareText(recipe: recipe, message: message)
         let encodedText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        
+
         if let url = URL(string: "twitter://post?text=\(encodedText)"), UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)
         } else if let url = URL(string: "https://twitter.com/intent/tweet?text=\(encodedText)") {
             UIApplication.shared.open(url)
         }
     }
-    
+
     private func copyText(recipe: Recipe, message: String) {
         let text = formatShareText(recipe: recipe, message: message)
         UIPasteboard.general.string = text
     }
-    
+
     private func formatShareText(recipe: Recipe, message: String) -> String {
         var text = ""
         if !message.isEmpty {

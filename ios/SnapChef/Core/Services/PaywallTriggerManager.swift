@@ -307,10 +307,11 @@ final class PaywallTriggerManager: ObservableObject, @unchecked Sendable {
     /// Gets the most appropriate paywall context for current user state
     /// - Returns: Suggested paywall context or nil if none appropriate
     func getSuggestedPaywallContext() -> PaywallContext? {
-        let userPhase = lifecycleManager.getCurrentPhase()
-        let daysActive = lifecycleManager.daysActive
-        let recipesCreated = lifecycleManager.recipesCreated
-        let videosShared = lifecycleManager.videosShared
+        // Note: User lifecycle data available but not used in this simple implementation
+        _ = lifecycleManager.getCurrentPhase()
+        _ = lifecycleManager.daysActive
+        _ = lifecycleManager.recipesCreated
+        _ = lifecycleManager.videosShared
 
         // Priority order based on context priority
         let potentialContexts: [(PaywallContext, Bool)] = [
@@ -520,8 +521,23 @@ final class PaywallTriggerManager: ObservableObject, @unchecked Sendable {
             timestamp: Date()
         )
 
-        // TODO: Integrate with AnalyticsManager when available
-        logMessage("Analytics: \(event) - \(analyticsData.analyticsData)")
+        // Local analytics tracking for paywall events
+        var eventData = analyticsData.analyticsData
+        eventData["event_name"] = event
+        eventData["timestamp"] = Date()
+        eventData["user_id"] = UserDefaults.standard.string(forKey: "userId") ?? "anonymous"
+
+        // Store locally for potential future upload
+        var events = UserDefaults.standard.array(forKey: "paywall_analytics_events") as? [[String: Any]] ?? []
+        events.append(eventData)
+
+        // Keep only last 200 paywall events
+        if events.count > 200 {
+            events = Array(events.suffix(200))
+        }
+
+        UserDefaults.standard.set(events, forKey: "paywall_analytics_events")
+        logMessage("📊 Analytics: \(event) - \(eventData)")
     }
 
     private func logMessage(_ message: String) {

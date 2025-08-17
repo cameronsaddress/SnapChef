@@ -16,13 +16,13 @@ struct ShareGeneratorView: View {
     @State private var isUploadingToCloudKit = false
     @StateObject private var cloudKitSync = CloudKitSyncService.shared
     @StateObject private var socialShareManager = SocialShareManager.shared
-    
+
     enum ShareStyle: String, CaseIterable {
         case homeCook = "Home Cook"
         case chefMode = "Chef Mode"
         case foodie = "Foodie Fun"
         case rustic = "Rustic Charm"
-        
+
         var emoji: String {
             switch self {
             case .homeCook: return "🏠"
@@ -31,7 +31,7 @@ struct ShareGeneratorView: View {
             case .rustic: return "🌾"
             }
         }
-        
+
         var description: String {
             switch self {
             case .homeCook: return "Warm & inviting"
@@ -41,13 +41,13 @@ struct ShareGeneratorView: View {
             }
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 30) {
                         // Preview Section
@@ -61,7 +61,7 @@ struct ShareGeneratorView: View {
                         )
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
-                        
+
                         // Take After Photo Button - styled like MagneticButton
                         MagneticButton(
                             title: afterPhoto != nil ? "Update after photo ✓" : "Take your after photo",
@@ -71,7 +71,7 @@ struct ShareGeneratorView: View {
                             }
                         )
                         .padding(.horizontal, 20)
-                        
+
                         // Share for Credits Button
                         MagneticButton(
                             title: "Share for Credits",
@@ -110,31 +110,31 @@ struct ShareGeneratorView: View {
             }
         }
     }
-    
+
     private func generateShareImage() {
         isGenerating = true
         isUploadingToCloudKit = true
-        
+
         // Haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
-        
+
         // First upload recipe to CloudKit
         Task {
             do {
                 // Create image data from the after photo if available
                 let imageData = afterPhoto?.jpegData(compressionQuality: 0.8)
-                
+
                 // Upload recipe to CloudKit
                 let recordID = try await cloudKitSync.uploadRecipe(recipe, imageData: imageData)
                 cloudKitRecordID = recordID
-                
+
                 // Generate shareable URL
                 shareURL = socialShareManager.generateUniversalLink(for: recipe, cloudKitRecordID: recordID)
-                
+
                 await MainActor.run {
                     isUploadingToCloudKit = false
-                    
+
                     // Create the share image
                     let shareContent = ShareImageContent(
                         recipe: recipe,
@@ -142,35 +142,35 @@ struct ShareGeneratorView: View {
                         afterPhoto: afterPhoto,
                         style: selectedStyle
                     )
-                    
+
                     let renderer = ImageRenderer(content: shareContent)
                     renderer.scale = 3.0 // High quality
-                    
+
                     if let uiImage = renderer.uiImage {
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             generatedImage = uiImage
                             isGenerating = false
                         }
-                        
+
                         // Auto-navigate to share sheet after generation
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             shareSheet = true
-                            
+
                             // Award coins for sharing
                             ChefCoinsManager.shared.awardSocialCoins(action: .share)
-                            
+
                             // Track social share streak
                             Task {
                                 await StreakManager.shared.recordActivity(for: .socialShare)
                             }
-                            
+
                             // Post notification for recipe sharing
                             NotificationCenter.default.post(
                                 name: Notification.Name("RecipeShared"),
                                 object: nil,
                                 userInfo: ["recipeId": recipe.id]
                             )
-                            
+
                             // Track social challenge progress
                             ChallengeProgressTracker.shared.trackAction(.recipeShared, metadata: [
                                 "recipeId": recipe.id,
@@ -192,7 +192,7 @@ struct ShareGeneratorView: View {
             }
         }
     }
-    
+
     private func generateLocalShareImage() {
         // Fallback for when CloudKit upload fails
         let shareContent = ShareImageContent(
@@ -201,58 +201,58 @@ struct ShareGeneratorView: View {
             afterPhoto: afterPhoto,
             style: selectedStyle
         )
-        
+
         let renderer = ImageRenderer(content: shareContent)
         renderer.scale = 3.0
-        
+
         if let uiImage = renderer.uiImage {
             generatedImage = uiImage
             shareSheet = true
         }
     }
-    
+
     private func generateShareText() -> String {
         var text = """
         🔥 MY FRIDGE CHALLENGE 🔥
-        
-        I just turned these random ingredients into \(recipe.name)! 
-        
+
+        I just turned these random ingredients into \(recipe.name)!
+
         ⏱ Ready in just \(recipe.prepTime + recipe.cookTime) minutes
         🎯 Difficulty: \(recipe.difficulty.emoji) \(recipe.difficulty.rawValue.capitalized)
         """
-        
+
         if let shareURL = shareURL {
             text += """
-            
-            
+
+
             👨‍🍳 Get the full recipe here:
             \(shareURL.absoluteString)
             """
         }
-        
+
         text += """
-        
-        
-        Think you can beat my fridge game? 
+
+
+        Think you can beat my fridge game?
         Download SnapChef and show me what you got!
-        
+
         #FridgeChallenge #SnapChef #CookingMagic
         """
-        
+
         return text
     }
-    
+
     private func buildShareItems(image: UIImage) -> [Any] {
         var items: [Any] = [image]
-        
+
         // Add the share URL if available
         if let shareURL = shareURL {
             items.append(shareURL)
         }
-        
+
         // Add the share text
         items.append(generateShareText())
-        
+
         return items
     }
 }
@@ -265,14 +265,14 @@ struct SharePreviewSection: View {
     let selectedStyle: ShareGeneratorView.ShareStyle
     let animationPhase: Double
     @Binding var showingCamera: Bool
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Text("Preview")
                 .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            
+
             // Preview Container
             GeometryReader { geometry in
                 ZStack {
@@ -291,7 +291,7 @@ struct SharePreviewSection: View {
                         )
                         .blur(radius: 30)
                         .scaleEffect(1.2)
-                    
+
                     // Preview content
                     ShareImageContent(
                         recipe: recipe,
@@ -313,7 +313,7 @@ struct SharePreviewSection: View {
                 }
                 .frame(width: geometry.size.width, height: geometry.size.width * 1.4)
             }
-            .aspectRatio(1/1.4, contentMode: .fit)
+            .aspectRatio(1 / 1.4, contentMode: .fit)
         }
     }
 }
@@ -324,10 +324,10 @@ struct ShareImageContent: View {
     let ingredientsPhoto: UIImage?
     let afterPhoto: UIImage?
     let style: ShareGeneratorView.ShareStyle
-    
+
     @State private var customChefName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
     @State private var customPhotoData: Data? = SharePhotoHelper.loadCustomPhotoFromFile()
-    
+
     var backgroundGradient: LinearGradient {
         switch style {
         case .homeCook:
@@ -354,7 +354,7 @@ struct ShareImageContent: View {
                     Color(hex: "#fc466b"),
                     Color(hex: "#3f5efb")
                 ],
-                startPoint: .topLeading,  
+                startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         case .rustic:
@@ -368,16 +368,16 @@ struct ShareImageContent: View {
             )
         }
     }
-    
+
     var body: some View {
         ZStack {
             // Background
             RoundedRectangle(cornerRadius: 24)
                 .fill(backgroundGradient)
-            
+
             // Pattern overlay
             GeometryReader { geometry in
-                ForEach(0..<20) { index in
+                ForEach(0..<20) { _ in
                     Circle()
                         .fill(Color.white.opacity(0.05))
                         .frame(width: 100, height: 100)
@@ -387,7 +387,7 @@ struct ShareImageContent: View {
                         )
                 }
             }
-            
+
             VStack(spacing: 24) {
                 // Header
                 VStack(spacing: 12) {
@@ -395,12 +395,12 @@ struct ShareImageContent: View {
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundColor(textColor)
                         .tracking(2)
-                    
+
                     Text("Can you beat this?")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(textColor.opacity(0.8))
                 }
-                
+
                 // Before/After Images
                 HStack(spacing: 16) {
                     // Before (Ingredients)
@@ -409,7 +409,7 @@ struct ShareImageContent: View {
                             RoundedRectangle(cornerRadius: 16)
                                 .fill(Color.white.opacity(0.2))
                                 .frame(width: 140, height: 140)
-                            
+
                             if let photo = ingredientsPhoto {
                                 Image(uiImage: photo)
                                     .resizable()
@@ -421,7 +421,7 @@ struct ShareImageContent: View {
                                     .font(.system(size: 40))
                                     .foregroundColor(textColor.opacity(0.5))
                             }
-                            
+
                             // Label
                             VStack {
                                 Spacer()
@@ -436,12 +436,12 @@ struct ShareImageContent: View {
                             }
                         }
                     }
-                    
+
                     // Arrow
                     Image(systemName: "arrow.right")
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(textColor)
-                    
+
                     // After (Recipe)
                     VStack(spacing: 8) {
                         ZStack {
@@ -457,7 +457,7 @@ struct ShareImageContent: View {
                                     )
                                 )
                                 .frame(width: 140, height: 140)
-                            
+
                             if let photo = afterPhoto {
                                 Image(uiImage: photo)
                                     .resizable()
@@ -469,7 +469,7 @@ struct ShareImageContent: View {
                                     .font(.system(size: 60))
                                     .foregroundColor(.white.opacity(0.5))
                             }
-                            
+
                             // Label
                             VStack {
                                 Spacer()
@@ -485,7 +485,7 @@ struct ShareImageContent: View {
                         }
                     }
                 }
-                
+
                 // Recipe Name
                 Text(recipe.name.uppercased())
                     .font(.system(size: 28, weight: .black, design: .rounded))
@@ -493,7 +493,7 @@ struct ShareImageContent: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .padding(.horizontal, 20)
-                
+
                 // Stats
                 HStack(spacing: 30) {
                     StatBadge(
@@ -501,22 +501,22 @@ struct ShareImageContent: View {
                         value: "\(recipe.prepTime + recipe.cookTime)m",
                         color: textColor
                     )
-                    
+
                     StatBadge(
                         icon: "flame",
                         value: "\(recipe.nutrition.calories)",
                         color: textColor
                     )
-                    
+
                     StatBadge(
                         icon: "chart.bar.fill",
                         value: recipe.difficulty.rawValue.capitalized,
                         color: textColor
                     )
                 }
-                
+
                 Spacer()
-                
+
                 // App branding with custom chef info
                 VStack(spacing: 12) {
                     HStack(spacing: 16) {
@@ -542,12 +542,12 @@ struct ShareImageContent: View {
                                         .foregroundColor(textColor)
                                 )
                         }
-                        
+
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Made by \(customChefName.isEmpty ? "SnapChef" : customChefName)")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(textColor.opacity(0.8))
-                            
+
                             HStack(spacing: 4) {
                                 Image(systemName: "sparkles")
                                     .font(.system(size: 12, weight: .bold))
@@ -565,7 +565,7 @@ struct ShareImageContent: View {
         .frame(width: 350, height: 490)
         .shadow(color: Color.black.opacity(0.3), radius: 20, y: 10)
     }
-    
+
     var textColor: Color {
         switch style {
         case .chefMode:
@@ -581,7 +581,7 @@ struct StatBadge: View {
     let icon: String
     let value: String
     let color: Color
-    
+
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: icon)
@@ -596,13 +596,13 @@ struct StatBadge: View {
 // MARK: - Style Selector
 struct StyleSelectorView: View {
     @Binding var selectedStyle: ShareGeneratorView.ShareStyle
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Choose Style")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(ShareGeneratorView.ShareStyle.allCases, id: \.self) { style in
@@ -627,13 +627,13 @@ struct StyleOptionCard: View {
     let style: ShareGeneratorView.ShareStyle
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Text(style.emoji)
                     .font(.system(size: 30))
-                
+
                 Text(style.rawValue)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(isSelected ? .white : .white.opacity(0.7))
@@ -674,16 +674,15 @@ struct StyleOptionCard: View {
     }
 }
 
-
 // MARK: - Share Sheet
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
-    
+
     func makeUIViewController(context: Context) -> UIActivityViewController {
         let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
         return controller
     }
-    
+
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
@@ -694,11 +693,11 @@ struct SharePhotoHelper {
         if UserDefaults.standard.data(forKey: "CustomChefPhoto") != nil {
             UserDefaults.standard.removeObject(forKey: "CustomChefPhoto")
         }
-        
+
         // Load from file system
         guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
         let filePath = documentsPath.appendingPathComponent("customChefPhoto.jpg")
-        
+
         return try? Data(contentsOf: filePath)
     }
 }

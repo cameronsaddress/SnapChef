@@ -5,16 +5,16 @@ import Combine
 @MainActor
 class PremiumChallengeManager: ObservableObject {
     static let shared = PremiumChallengeManager()
-    
+
     @Published var isPremiumUser = false
     @Published var premiumChallenges: [Challenge] = []
     @Published var doubleRewardsActive = false
     @Published var exclusiveBadges: [GameBadge] = []
     @Published var premiumLeaderboardAccess = false
-    
+
     private let subscriptionManager = SubscriptionManager.shared
     private var cancellables = Set<AnyCancellable>()
-    
+
     // Premium features
     enum PremiumFeature {
         case exclusiveChallenges
@@ -23,7 +23,7 @@ class PremiumChallengeManager: ObservableObject {
         case priorityLeaderboard
         case unlimitedTeams
         case advancedAnalytics
-        
+
         var title: String {
             switch self {
             case .exclusiveChallenges: return "Exclusive Challenges"
@@ -34,7 +34,7 @@ class PremiumChallengeManager: ObservableObject {
             case .advancedAnalytics: return "Advanced Analytics"
             }
         }
-        
+
         var description: String {
             switch self {
             case .exclusiveChallenges: return "Access premium-only cooking challenges"
@@ -45,7 +45,7 @@ class PremiumChallengeManager: ObservableObject {
             case .advancedAnalytics: return "Deep insights into your cooking journey"
             }
         }
-        
+
         var icon: String {
             switch self {
             case .exclusiveChallenges: return "star.circle.fill"
@@ -57,12 +57,12 @@ class PremiumChallengeManager: ObservableObject {
             }
         }
     }
-    
+
     private init() {
         setupSubscriptionObserver()
         loadPremiumContent()
     }
-    
+
     private func setupSubscriptionObserver() {
         // Observe subscription status changes
         subscriptionManager.$isPremium
@@ -70,14 +70,14 @@ class PremiumChallengeManager: ObservableObject {
                 self?.isPremiumUser = isPremium
                 self?.doubleRewardsActive = isPremium
                 self?.premiumLeaderboardAccess = isPremium
-                
+
                 if isPremium {
                     self?.unlockPremiumFeatures()
                 }
             }
             .store(in: &cancellables)
     }
-    
+
     private func loadPremiumContent() {
         // Create premium-only challenges
         premiumChallenges = [
@@ -88,7 +88,7 @@ class PremiumChallengeManager: ObservableObject {
                 type: .special,
                 category: "premium",
                 difficulty: .expert,
-                points: 1000,
+                points: 1_000,
                 coins: 500,
                 startDate: Date(),
                 endDate: Date().addingTimeInterval(7 * 24 * 60 * 60),
@@ -113,7 +113,7 @@ class PremiumChallengeManager: ObservableObject {
                 type: .weekly,
                 category: "premium",
                 difficulty: .expert,
-                points: 1500,
+                points: 1_500,
                 coins: 750,
                 startDate: Date(),
                 endDate: Date().addingTimeInterval(7 * 24 * 60 * 60),
@@ -157,7 +157,7 @@ class PremiumChallengeManager: ObservableObject {
                 isPremium: true
             )
         ]
-        
+
         // Create exclusive badges
         exclusiveBadges = [
             GameBadge(
@@ -183,55 +183,55 @@ class PremiumChallengeManager: ObservableObject {
             )
         ]
     }
-    
+
     func unlockPremiumFeatures() {
         // Activate all premium features
         doubleRewardsActive = true
         premiumLeaderboardAccess = true
-        
+
         // Notify user of unlocked features
         NotificationCenter.default.post(
             name: Notification.Name("PremiumFeaturesUnlocked"),
             object: nil
         )
-        
+
         // Update badges
         if let eliteBadgeIndex = exclusiveBadges.firstIndex(where: { $0.name == "Elite Chef" }) {
             // Badge is already created with current date
         }
     }
-    
+
     func applyDoubleRewards(basePoints: Int, baseCoins: Int) -> (points: Int, coins: Int) {
         if doubleRewardsActive {
             return (points: basePoints * 2, coins: baseCoins * 2)
         }
         return (points: basePoints, coins: baseCoins)
     }
-    
+
     func canAccessPremiumChallenge(_ challengeId: String) -> Bool {
         return isPremiumUser || !premiumChallenges.contains(where: { $0.id == challengeId })
     }
-    
+
     func getPremiumChallengeCount() -> Int {
         return premiumChallenges.filter { $0.isActive }.count
     }
-    
+
     func updatePremiumChallengeProgress(challengeId: String, progress: Double) {
         guard isPremiumUser else { return }
-        
+
         if let index = premiumChallenges.firstIndex(where: { $0.id == challengeId }) {
             premiumChallenges[index].currentProgress = progress
-            
+
             if progress >= 1.0 {
                 premiumChallenges[index].isCompleted = true
                 awardPremiumBadgeProgress()
             }
         }
     }
-    
+
     private func awardPremiumBadgeProgress() {
         let completedCount = premiumChallenges.filter { $0.isCompleted }.count
-        
+
         // Update innovator badge progress
         if completedCount >= 5 {
             if !exclusiveBadges.contains(where: { $0.name == "Culinary Innovator" }) {
@@ -245,12 +245,12 @@ class PremiumChallengeManager: ObservableObject {
                 exclusiveBadges.append(innovatorBadge)
             }
         }
-        
+
         // Check fusion master badge
-        let fusionCompleted = premiumChallenges.filter { 
-            $0.title.contains("Fusion") && $0.isCompleted 
+        let fusionCompleted = premiumChallenges.filter {
+            $0.title.contains("Fusion") && $0.isCompleted
         }.count
-        
+
         if fusionCompleted > 0 {
             if !exclusiveBadges.contains(where: { $0.name == "Master of Fusion" }) {
                 let fusionBadge = GameBadge(
@@ -271,7 +271,7 @@ struct PremiumChallengeCard: View {
     let challenge: Challenge
     let isLocked: Bool
     let onTap: () -> Void
-    
+
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 12) {
@@ -287,27 +287,27 @@ struct PremiumChallengeCard: View {
                             Capsule()
                                 .fill(Color(hex: "#FFD700"))
                         )
-                    
+
                     Spacer()
-                    
+
                     if isLocked {
                         Image(systemName: "lock.fill")
                             .foregroundColor(.white.opacity(0.6))
                     }
                 }
-                
+
                 // Challenge Info
                 VStack(alignment: .leading, spacing: 8) {
                     Text(challenge.title)
                         .font(.title3)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
-                    
+
                     Text(challenge.description)
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.8))
                         .lineLimit(2)
-                    
+
                     // Rewards with 2x indicator
                     HStack(spacing: 16) {
                         HStack(spacing: 4) {
@@ -320,7 +320,7 @@ struct PremiumChallengeCard: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(Color(hex: "#FFD700"))
                         }
-                        
+
                         HStack(spacing: 4) {
                             Image(systemName: "bitcoinsign.circle.fill")
                                 .foregroundColor(Color(hex: "#FFD700"))
@@ -331,9 +331,9 @@ struct PremiumChallengeCard: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(Color(hex: "#FFD700"))
                         }
-                        
+
                         Spacer()
-                        
+
                         // Difficulty
                         Text(challenge.difficulty.label.uppercased())
                             .font(.caption)
@@ -381,7 +381,7 @@ struct PremiumChallengeCard: View {
                     )
             )
             .overlay(
-                isLocked ? 
+                isLocked ?
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color.black.opacity(0.5))
                 : nil
@@ -396,13 +396,13 @@ struct PremiumChallengeCard: View {
 struct PremiumFeaturesView: View {
     @StateObject private var premiumManager = PremiumChallengeManager.shared
     @State private var showingSubscriptionView = false
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 ScrollView {
                     VStack(spacing: 24) {
                         // Header
@@ -410,18 +410,18 @@ struct PremiumFeaturesView: View {
                             Image(systemName: "crown.fill")
                                 .font(.system(size: 60))
                                 .foregroundColor(Color(hex: "#FFD700"))
-                            
+
                             Text("SnapChef Premium")
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
-                            
+
                             Text("Unlock exclusive challenges and double your rewards")
                                 .font(.subheadline)
                                 .foregroundColor(.white.opacity(0.8))
                                 .multilineTextAlignment(.center)
                         }
                         .padding(.top, 20)
-                        
+
                         // Features List
                         VStack(spacing: 16) {
                             ForEach([
@@ -436,7 +436,7 @@ struct PremiumFeaturesView: View {
                             }
                         }
                         .padding(.horizontal)
-                        
+
                         // Subscribe Button
                         if !premiumManager.isPremiumUser {
                             Button(action: { showingSubscriptionView = true }) {
@@ -461,7 +461,7 @@ struct PremiumFeaturesView: View {
                                 Label("Premium Active", systemImage: "checkmark.circle.fill")
                                     .font(.headline)
                                     .foregroundColor(Color(hex: "#FFD700"))
-                                
+
                                 Text("Enjoying all premium benefits")
                                     .font(.subheadline)
                                     .foregroundColor(.white.opacity(0.8))
@@ -493,24 +493,24 @@ struct PremiumFeaturesView: View {
 
 struct PremiumFeatureRow: View {
     let feature: PremiumChallengeManager.PremiumFeature
-    
+
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: feature.icon)
                 .font(.title2)
                 .foregroundColor(Color(hex: "#FFD700"))
                 .frame(width: 40)
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(feature.title)
                     .font(.headline)
                     .foregroundColor(.white)
-                
+
                 Text(feature.description)
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.7))
             }
-            
+
             Spacer()
         }
         .padding()

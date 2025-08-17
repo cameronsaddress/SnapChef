@@ -209,7 +209,7 @@ import CloudKit
 // MARK: - CloudKit Configuration
 struct CloudKitConfig {
     static let containerIdentifier = "iCloud.com.snapchefapp.app"
-    
+
     // Record Types
     static let userRecordType = "User"
     static let challengeRecordType = "Challenge"
@@ -219,7 +219,7 @@ struct CloudKitConfig {
     static let leaderboardRecordType = "Leaderboard"
     static let achievementRecordType = "Achievement"
     static let coinTransactionRecordType = "CoinTransaction"
-    
+
     // Social Record Types
     static let followRecordType = "Follow"
     static let recipeLikeRecordType = "RecipeLike"
@@ -227,11 +227,11 @@ struct CloudKitConfig {
     static let recipeCommentRecordType = "RecipeComment"
     static let recipeRecordType = "Recipe"
     static let activityRecordType = "Activity"
-    
+
     // Zone Names
     static let challengesZone = "ChallengesZone"
     static let userDataZone = "UserDataZone"
-    
+
     // Subscription IDs
     static let challengeUpdatesSubscription = "challenge-updates"
     static let teamMessagesSubscription = "team-messages"
@@ -265,7 +265,7 @@ struct CKField {
         static let lastLoginAt = "lastLoginAt"
         static let lastActiveAt = "lastActiveAt"
     }
-    
+
     // Challenge Fields
     struct Challenge {
         static let id = "id"
@@ -289,7 +289,7 @@ struct CKField {
         static let minTeamSize = "minTeamSize"
         static let maxTeamSize = "maxTeamSize"
     }
-    
+
     // UserChallenge Fields
     struct UserChallenge {
         static let userID = "userID"
@@ -304,12 +304,9 @@ struct CKField {
         static let notes = "notes"
         static let teamID = "teamID"
     }
-    
+
     // Team Fields
-    
-    
-    
-    
+
     // Leaderboard Fields
     struct Leaderboard {
         static let userID = "userID"
@@ -324,7 +321,7 @@ struct CKField {
         static let lastUpdated = "lastUpdated"
         static let region = "region"
     }
-    
+
     // Achievement Fields
     struct Achievement {
         static let id = "id"
@@ -337,7 +334,7 @@ struct CKField {
         static let rarity = "rarity"
         static let associatedChallengeID = "associatedChallengeID"
     }
-    
+
     // CoinTransaction Fields
     struct CoinTransaction {
         static let userID = "userID"
@@ -349,7 +346,7 @@ struct CKField {
         static let challengeID = "challengeID"
         static let itemPurchased = "itemPurchased"
     }
-    
+
     // Follow Fields
     struct Follow {
         static let followerID = "followerID"
@@ -357,7 +354,7 @@ struct CKField {
         static let followedAt = "followedAt"
         static let isActive = "isActive"
     }
-    
+
     // RecipeLike Fields
     struct RecipeLike {
         static let userID = "userID"
@@ -365,7 +362,7 @@ struct CKField {
         static let likedAt = "likedAt"
         static let recipeOwnerID = "recipeOwnerID"
     }
-    
+
     // RecipeView Fields
     struct RecipeView {
         static let userID = "userID"
@@ -375,7 +372,7 @@ struct CKField {
         static let recipeOwnerID = "recipeOwnerID"
         static let source = "source"
     }
-    
+
     // RecipeComment Fields
     struct RecipeComment {
         static let id = "id"
@@ -388,7 +385,7 @@ struct CKField {
         static let parentCommentID = "parentCommentID"
         static let likeCount = "likeCount"
     }
-    
+
     // Recipe Fields
     struct Recipe {
         static let id = "id"
@@ -411,7 +408,7 @@ struct CKField {
         static let difficulty = "difficulty"
         static let cuisine = "cuisine"
     }
-    
+
     // Activity Fields
     struct Activity {
         static let id = "id"
@@ -453,7 +450,7 @@ extension CloudKitConfig {
         record[CKField.Challenge.teamBased] = 0
         return record
     }
-    
+
     // Example: How to query active challenges
     static func activeChallengePredicate() -> NSPredicate {
         return NSPredicate(format: "%K == %d AND %K <= %@ AND %K >= %@",

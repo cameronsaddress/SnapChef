@@ -6,7 +6,7 @@ enum RewardTier: String, CaseIterable, Codable {
     case bronze = "Bronze"
     case silver = "Silver"
     case gold = "Gold"
-    
+
     var multiplier: Double {
         switch self {
         case .bronze: return 1.0
@@ -14,7 +14,7 @@ enum RewardTier: String, CaseIterable, Codable {
         case .gold: return 2.0
         }
     }
-    
+
     var color: Color {
         switch self {
         case .bronze: return Color(hex: "#CD7F32")
@@ -22,7 +22,7 @@ enum RewardTier: String, CaseIterable, Codable {
         case .gold: return Color(hex: "#FFD700")
         }
     }
-    
+
     var icon: String {
         switch self {
         case .bronze: return "medal.fill"
@@ -30,7 +30,7 @@ enum RewardTier: String, CaseIterable, Codable {
         case .gold: return "crown.fill"
         }
     }
-    
+
     var minimumScore: Double {
         switch self {
         case .bronze: return 0.5    // 50% completion
@@ -50,7 +50,7 @@ enum RewardType: String, CaseIterable, Codable {
     case sticker = "Sticker"
     case recipeUnlock = "Recipe Unlock"
     case booster = "Booster"
-    
+
     var icon: String {
         switch self {
         case .chefCoins: return "dollarsign.circle.fill"
@@ -77,7 +77,7 @@ struct Reward: Identifiable, Codable {
     let unlockableId: String?
     let timestamp: Date
     var isClaimed: Bool = false
-    
+
     var displayValue: String {
         switch type {
         case .chefCoins:
@@ -94,31 +94,31 @@ struct Reward: Identifiable, Codable {
 @MainActor
 class RewardSystem: ObservableObject {
     static let shared = RewardSystem()
-    
+
     @Published var pendingRewards: [Reward] = []
     @Published var claimedRewards: [Reward] = []
     @Published var isShowingRewardAnimation = false
     @Published var currentRewardAnimation: Reward?
-    
+
     private let gamificationManager = GamificationManager.shared
     private let chefCoinsManager = ChefCoinsManager.shared
-    
+
     private init() {
         loadRewards()
     }
-    
+
     // MARK: - Challenge Completion Rewards
-    
+
     /// Calculate rewards based on challenge completion
     func calculateChallengeRewards(for challenge: Challenge, completionScore: Double) -> [Reward] {
         var rewards: [Reward] = []
         let tier = determineTier(for: completionScore)
-        
+
         // Base coins reward
         let baseCoins = challenge.points
         let tierMultiplier = tier.multiplier
         let totalCoins = Int(Double(baseCoins) * tierMultiplier)
-        
+
         rewards.append(Reward(
             type: .chefCoins,
             tier: tier,
@@ -129,7 +129,7 @@ class RewardSystem: ObservableObject {
             unlockableId: nil,
             timestamp: Date()
         ))
-        
+
         // Experience points
         let xpValue = Int(Double(baseCoins) * 0.5 * tierMultiplier)
         rewards.append(Reward(
@@ -142,7 +142,7 @@ class RewardSystem: ObservableObject {
             unlockableId: nil,
             timestamp: Date()
         ))
-        
+
         // Special rewards based on tier
         if tier == .gold {
             // Gold tier gets special rewards
@@ -158,7 +158,7 @@ class RewardSystem: ObservableObject {
                 unlockableId: "badge_\(badgeName.lowercased().replacingOccurrences(of: " ", with: "_"))",
                 timestamp: Date()
             ))
-            
+
             // Title reward
             let title = "Gold \(challenge.type.rawValue) Master"
             rewards.append(Reward(
@@ -172,7 +172,7 @@ class RewardSystem: ObservableObject {
                     timestamp: Date()
                 ))
             }
-        
+
         // Challenge-specific unlockables
         // Create unlockable based on challenge difficulty
         if challenge.difficulty.rawValue >= 3 { // Hard or above
@@ -180,10 +180,10 @@ class RewardSystem: ObservableObject {
             let unlockableTier = tier == .bronze ? .silver : tier // Bronze gets silver tier unlockable
             rewards.append(createUnlockableReward(for: unlockable, tier: unlockableTier))
         }
-        
+
         return rewards
     }
-    
+
     /// Determine reward tier based on completion score
     private func determineTier(for score: Double) -> RewardTier {
         if score >= RewardTier.gold.minimumScore {
@@ -194,11 +194,11 @@ class RewardSystem: ObservableObject {
             return .bronze
         }
     }
-    
+
     /// Create unlockable reward based on type
     private func createUnlockableReward(for unlockable: String, tier: RewardTier) -> Reward {
         let lowercased = unlockable.lowercased()
-        
+
         if lowercased.contains("theme") {
             return Reward(
                 type: .theme,
@@ -245,16 +245,16 @@ class RewardSystem: ObservableObject {
             )
         }
     }
-    
+
     // MARK: - Reward Management
-    
+
     /// Award rewards for challenge completion
     func awardChallengeRewards(for challenge: Challenge, completionScore: Double) {
         let rewards = calculateChallengeRewards(for: challenge, completionScore: completionScore)
-        
+
         for reward in rewards {
             pendingRewards.append(reward)
-            
+
             // Process immediate rewards
             switch reward.type {
             case .chefCoins:
@@ -266,33 +266,33 @@ class RewardSystem: ObservableObject {
                 break
             }
         }
-        
+
         // Save rewards
         saveRewards()
-        
+
         // Trigger celebration animation
         if let firstReward = rewards.first {
             showRewardAnimation(for: firstReward)
         }
     }
-    
+
     /// Claim a pending reward
     func claimReward(_ reward: Reward) {
         guard let index = pendingRewards.firstIndex(where: { $0.id == reward.id }) else { return }
-        
+
         var claimedReward = pendingRewards[index]
         claimedReward.isClaimed = true
-        
+
         pendingRewards.remove(at: index)
         claimedRewards.append(claimedReward)
-        
+
         // Apply the reward
         applyReward(claimedReward)
-        
+
         // Save state
         saveRewards()
     }
-    
+
     /// Apply a reward to the user's account
     private func applyReward(_ reward: Reward) {
         switch reward.type {
@@ -316,14 +316,14 @@ class RewardSystem: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Streak Rewards
-    
+
     /// Award streak rewards
     func awardStreakReward(days: Int) {
         let coinsReward: Int
         let tier: RewardTier
-        
+
         switch days {
         case 3:
             coinsReward = 50
@@ -335,12 +335,12 @@ class RewardSystem: ObservableObject {
             coinsReward = 300
             tier = .silver
         case 30:
-            coinsReward = 1000
+            coinsReward = 1_000
             tier = .gold
         default:
             return
         }
-        
+
         let reward = Reward(
             type: .chefCoins,
             tier: tier,
@@ -351,59 +351,59 @@ class RewardSystem: ObservableObject {
             unlockableId: nil,
             timestamp: Date()
         )
-        
+
         pendingRewards.append(reward)
         chefCoinsManager.earnCoins(coinsReward, reason: "\(days)-day streak")
         showRewardAnimation(for: reward)
         saveRewards()
     }
-    
+
     // MARK: - Animation
-    
+
     /// Show reward animation
     func showRewardAnimation(for reward: Reward) {
         currentRewardAnimation = reward
         isShowingRewardAnimation = true
-        
+
         // Auto-hide after delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             self?.isShowingRewardAnimation = false
             self?.currentRewardAnimation = nil
         }
     }
-    
+
     // MARK: - Persistence
-    
+
     /// Save rewards to UserDefaults
     private func saveRewards() {
         let encoder = JSONEncoder()
-        
+
         if let pendingData = try? encoder.encode(pendingRewards) {
             UserDefaults.standard.set(pendingData, forKey: "pendingRewards")
         }
-        
+
         if let claimedData = try? encoder.encode(claimedRewards) {
             UserDefaults.standard.set(claimedData, forKey: "claimedRewards")
         }
     }
-    
+
     /// Load rewards from UserDefaults
     private func loadRewards() {
         let decoder = JSONDecoder()
-        
+
         if let pendingData = UserDefaults.standard.data(forKey: "pendingRewards"),
            let pending = try? decoder.decode([Reward].self, from: pendingData) {
             pendingRewards = pending
         }
-        
+
         if let claimedData = UserDefaults.standard.data(forKey: "claimedRewards"),
            let claimed = try? decoder.decode([Reward].self, from: claimedData) {
             claimedRewards = claimed
         }
     }
-    
+
     // MARK: - Analytics
-    
+
     /// Track reward analytics
     func trackRewardClaimed(_ reward: Reward) {
         // Analytics implementation would go here

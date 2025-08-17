@@ -43,7 +43,7 @@ struct SnapChefApp: App {
                 .onAppear {
                     setupApp()
                 }
-                
+
                 .onOpenURL { url in
                     handleIncomingURL(url)
                 }
@@ -70,87 +70,87 @@ struct SnapChefApp: App {
                 }
         }
     }
-    
+
     // MARK: - App Setup Functions
 
     private func setupApp() {
         configureNavigationBar()
         configureTableView()
         configureWindow()
-        
+
         // Set default LLM provider to Gemini if not already set
         if UserDefaults.standard.object(forKey: "SelectedLLMProvider") == nil {
             UserDefaults.standard.set("gemini", forKey: "SelectedLLMProvider")
         }
-        
+
         // Initialize social media SDKs
         SDKInitializer.initializeSDKs()
         SDKInitializer.verifyURLSchemes()
-        
+
         KeychainManager.shared.ensureAPIKeyExists()
         NetworkManager.shared.configure()
         deviceManager.checkDeviceStatus()
-        
+
         Task {
             _ = await ChallengeNotificationManager.shared.requestNotificationPermission()
         }
-        
+
         Task {
             let sessionID = cloudKitDataManager.startAppSession()
             appState.currentSessionID = sessionID
-            
+
             try? await cloudKitDataManager.registerDevice()
             // Removed automatic sync on app launch - only sync when user visits recipe views
             cloudKitDataManager.trackScreenView("AppLaunch")
-            
+
             // Sync CloudKit photos to PhotoStorageManager
             await syncCloudKitPhotosToStorage()
         }
     }
-    
+
     private func configureNavigationBar() {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()
         appearance.backgroundColor = .clear
         appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
         appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
-        
+
         UINavigationBar.appearance().standardAppearance = appearance
         UINavigationBar.appearance().compactAppearance = appearance
         UINavigationBar.appearance().scrollEdgeAppearance = appearance
     }
-    
+
     private func configureTableView() {
         UITableView.appearance().backgroundColor = .clear
         UITableViewCell.appearance().backgroundColor = .clear
         UICollectionView.appearance().backgroundColor = .clear
     }
-    
+
     private func configureWindow() {
         UIScrollView.appearance().backgroundColor = .clear
     }
-    
+
     private func handleIncomingURL(_ url: URL) {
         // First check if it's an SDK callback
         if SDKInitializer.handleOpenURL(url) {
             return
         }
-        
+
         // Otherwise handle as a deep link
         if socialShareManager.handleIncomingURL(url) {
             socialShareManager.resolvePendingDeepLink()
         }
     }
-    
+
     @MainActor
     private func syncCloudKitPhotosToStorage() async {
         print("📸 Starting CloudKit photo sync to PhotoStorageManager...")
-        
+
         // Get all CloudKit recipes
         let cloudKitRecipes = await CloudKitRecipeCache.shared.getRecipes(forceRefresh: false)
-        
+
         print("📸 Found \(cloudKitRecipes.count) CloudKit recipes to check for photos")
-        
+
         // Fetch photos for recipes that don't have them in PhotoStorageManager
         for recipe in cloudKitRecipes {
             // Check if we already have photos in PhotoStorageManager
@@ -158,11 +158,11 @@ struct SnapChefApp: App {
                 print("📸 Recipe \(recipe.name) already has complete photos in storage")
                 continue
             }
-            
+
             // Fetch photos from CloudKit
             do {
                 let photos = try await CloudKitRecipeManager.shared.fetchRecipePhotos(for: recipe.id.uuidString)
-                
+
                 // Store in PhotoStorageManager if we got any photos
                 if photos.before != nil || photos.after != nil {
                     PhotoStorageManager.shared.storePhotos(
@@ -178,7 +178,7 @@ struct SnapChefApp: App {
                 print("❌ Failed to sync photos for recipe \(recipe.name): \(error)")
             }
         }
-        
+
         print("✅ CloudKit photo sync completed")
     }
 }
@@ -188,24 +188,23 @@ struct DeepLinkRecipeView: View {
     @EnvironmentObject var socialShareManager: SocialShareManager
     @EnvironmentObject var cloudKitSync: CloudKitSyncService
     @Environment(\.dismiss) var dismiss
-    
+
     @State private var recipe: Recipe?
     @State private var isLoading = true
     @State private var errorMessage: String?
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
-                
+
                 if isLoading {
                     VStack(spacing: 20) {
                         ProgressView()
                             .scaleEffect(1.5)
                             .tint(.white)
-                        
+
                         Text("Loading recipe...")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.white)
@@ -215,17 +214,17 @@ struct DeepLinkRecipeView: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 50))
                             .foregroundColor(.yellow)
-                        
+
                         Text("Oops!")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
-                        
+
                         Text(errorMessage)
                             .font(.system(size: 16))
                             .foregroundColor(.white.opacity(0.8))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
-                        
+
                         Button("Close") {
                             dismiss()
                         }
@@ -253,14 +252,14 @@ struct DeepLinkRecipeView: View {
             await loadRecipeFromDeepLink()
         }
     }
-    
+
     private func loadRecipeFromDeepLink() async {
         guard case .recipe(let recipeID) = socialShareManager.pendingDeepLink else {
             errorMessage = "Invalid recipe link"
             isLoading = false
             return
         }
-        
+
         do {
             let (fetchedRecipe, _) = try await cloudKitSync.fetchRecipe(by: recipeID)
             recipe = fetchedRecipe

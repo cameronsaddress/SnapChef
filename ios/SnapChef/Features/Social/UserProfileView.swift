@@ -4,22 +4,22 @@ import CloudKit
 struct UserProfileView: View {
     let userID: String
     let userName: String
-    
+
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = UserProfileViewModel()
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @Environment(\.dismiss) var dismiss
-    
+
     @State private var selectedTab = 0
     @State private var showingFollowers = false
     @State private var showingFollowing = false
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 if viewModel.isLoading && viewModel.userProfile == nil {
                     ProgressView()
                         .scaleEffect(1.5)
@@ -29,15 +29,15 @@ struct UserProfileView: View {
                         VStack(spacing: 24) {
                             // Profile Header
                             profileHeader(user: user)
-                            
+
                             // Stats Section
                             statsSection(user: user)
-                            
+
                             // Follow/Following Button
                             if user.recordID != cloudKitAuth.currentUser?.recordID {
                                 followButton(user: user)
                             }
-                            
+
                             // Content Tabs
                             contentTabs(user: user)
                         }
@@ -78,7 +78,7 @@ struct UserProfileView: View {
                 .environmentObject(appState)
         }
     }
-    
+
     // MARK: - Profile Header
     private func profileHeader(user: CloudKitUser) -> some View {
         VStack(spacing: 16) {
@@ -93,11 +93,11 @@ struct UserProfileView: View {
                         )
                     )
                     .frame(width: 100, height: 100)
-                
+
                 Text((user.displayName ?? "U").prefix(1).uppercased())
                     .font(.system(size: 40, weight: .bold))
                     .foregroundColor(.white)
-                
+
                 if user.isVerified {
                     VStack {
                         HStack {
@@ -116,19 +116,19 @@ struct UserProfileView: View {
                     .frame(width: 100, height: 100)
                 }
             }
-            
+
             // User Info
             VStack(spacing: 8) {
                 Text(user.displayName ?? "Chef")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                
+
                 if let username = user.username {
                     Text("@\(username)")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
-                
+
                 // Member Since
                 Text("Member since \(user.createdAt.formatted(date: .abbreviated, time: .omitted))")
                     .font(.system(size: 14))
@@ -137,7 +137,7 @@ struct UserProfileView: View {
         }
         .padding(.top, 20)
     }
-    
+
     // MARK: - Stats Section
     private func statsSection(user: CloudKitUser) -> some View {
         HStack(spacing: 0) {
@@ -154,7 +154,7 @@ struct UserProfileView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(PlainButtonStyle())
-            
+
             // Following
             Button(action: { showingFollowing = true }) {
                 VStack(spacing: 4) {
@@ -168,7 +168,7 @@ struct UserProfileView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(PlainButtonStyle())
-            
+
             // Recipes
             VStack(spacing: 4) {
                 Text("\(user.recipesShared)")
@@ -191,7 +191,7 @@ struct UserProfileView: View {
                 )
         )
     }
-    
+
     // MARK: - Follow Button
     private func followButton(user: CloudKitUser) -> some View {
         Button(action: {
@@ -215,7 +215,7 @@ struct UserProfileView: View {
         }
         .disabled(viewModel.isLoadingFollow)
     }
-    
+
     // MARK: - Content Tabs
     private func contentTabs(user: CloudKitUser) -> some View {
         VStack(spacing: 0) {
@@ -227,7 +227,7 @@ struct UserProfileView: View {
                             Image(systemName: index == 0 ? "fork.knife" : index == 1 ? "trophy" : "chart.bar.fill")
                                 .font(.system(size: 20, weight: .medium))
                                 .foregroundColor(selectedTab == index ? .white : .white.opacity(0.5))
-                            
+
                             Text(index == 0 ? "Recipes" : index == 1 ? "Achievements" : "Stats")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(selectedTab == index ? .white : .white.opacity(0.5))
@@ -249,7 +249,7 @@ struct UserProfileView: View {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color.white.opacity(0.05))
             )
-            
+
             // Tab Content
             Group {
                 switch selectedTab {
@@ -266,7 +266,7 @@ struct UserProfileView: View {
             .padding(.top, 20)
         }
     }
-    
+
     // MARK: - Recipes Tab
     private var recipesTab: some View {
         Group {
@@ -289,7 +289,7 @@ struct UserProfileView: View {
             }
         }
     }
-    
+
     // MARK: - Achievements Tab
     private func achievementsTab(user: CloudKitUser) -> some View {
         VStack(spacing: 20) {
@@ -301,12 +301,12 @@ struct UserProfileView: View {
                             Circle()
                                 .fill(achievement.isUnlocked ? Color(hex: "#43e97b").opacity(0.2) : Color.white.opacity(0.1))
                                 .frame(width: 60, height: 60)
-                            
+
                             Text(achievement.icon)
                                 .font(.system(size: 28))
                                 .opacity(achievement.isUnlocked ? 1 : 0.3)
                         }
-                        
+
                         Text(achievement.title)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(achievement.isUnlocked ? .white : .white.opacity(0.5))
@@ -315,7 +315,7 @@ struct UserProfileView: View {
                     }
                 }
             }
-            
+
             // Level Progress
             VStack(spacing: 12) {
                 HStack {
@@ -327,13 +327,13 @@ struct UserProfileView: View {
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundColor(Color(hex: "#43e97b"))
                 }
-                
+
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color.white.opacity(0.1))
                             .frame(height: 8)
-                        
+
                         RoundedRectangle(cornerRadius: 4)
                             .fill(
                                 LinearGradient(
@@ -346,7 +346,7 @@ struct UserProfileView: View {
                     }
                 }
                 .frame(height: 8)
-                
+
                 HStack {
                     Text("\(user.totalPoints) XP")
                         .font(.system(size: 14))
@@ -364,7 +364,7 @@ struct UserProfileView: View {
             )
         }
     }
-    
+
     // MARK: - Stats Tab
     private func statsTab(user: CloudKitUser) -> some View {
         VStack(spacing: 16) {
@@ -380,7 +380,7 @@ struct UserProfileView: View {
 // MARK: - Recipe Grid Item
 struct RecipeGridItem: View {
     let recipe: RecipeData
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Recipe Image
@@ -415,12 +415,12 @@ struct RecipeGridItem: View {
                         }
                     }
                 )
-            
+
             Text(recipe.title)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(1)
-            
+
             Text(recipe.createdAt.formatted(date: .abbreviated, time: .omitted))
                 .font(.system(size: 12))
                 .foregroundColor(.white.opacity(0.6))
@@ -434,25 +434,25 @@ struct StatRow: View {
     let label: String
     let value: String
     let color: Color
-    
+
     var body: some View {
         HStack(spacing: 16) {
             ZStack {
                 Circle()
                     .fill(color.opacity(0.2))
                     .frame(width: 40, height: 40)
-                
+
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .medium))
                     .foregroundColor(color)
             }
-            
+
             Text(label)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white.opacity(0.8))
-            
+
             Spacer()
-            
+
             Text(value)
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
@@ -469,15 +469,15 @@ struct StatRow: View {
 struct FollowListView: View {
     let userID: String
     let mode: FollowMode
-    
+
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = FollowListViewModel()
     @Environment(\.dismiss) var dismiss
-    
+
     enum FollowMode {
         case followers
         case following
-        
+
         var title: String {
             switch self {
             case .followers: return "Followers"
@@ -485,13 +485,13 @@ struct FollowListView: View {
             }
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
-                
+
                 if viewModel.isLoading {
                     ProgressView()
                         .scaleEffect(1.5)
@@ -537,7 +537,7 @@ struct FollowListView: View {
 struct UserListRow: View {
     let user: CloudKitUser
     @State private var showingProfile = false
-    
+
     var body: some View {
         Button(action: { showingProfile = true }) {
             HStack(spacing: 16) {
@@ -556,29 +556,29 @@ struct UserListRow: View {
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(.white)
                     )
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text(user.displayName ?? "Chef")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
-                        
+
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.system(size: 14))
                                 .foregroundColor(Color(hex: "#43e97b"))
                         }
                     }
-                    
+
                     if let username = user.username {
                         Text("@\(username)")
                             .font(.system(size: 14))
                             .foregroundColor(.white.opacity(0.7))
                     }
                 }
-                
+
                 Spacer()
-                
+
                 // Stats
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(user.recipesShared)")

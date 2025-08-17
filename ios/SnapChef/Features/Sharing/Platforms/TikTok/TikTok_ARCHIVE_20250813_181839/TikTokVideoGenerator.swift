@@ -14,10 +14,10 @@ import UIKit
 class TikTokVideoGenerator: ObservableObject {
     @Published var isGenerating = false
     @Published var currentProgress: Double = 0
-    
-    private let videoSize = CGSize(width: 1080, height: 1920) // 9:16 aspect ratio for TikTok
+
+    private let videoSize = CGSize(width: 1_080, height: 1_920) // 9:16 aspect ratio for TikTok
     private let frameDuration = CMTime(value: 1, timescale: 30) // 30 fps
-    
+
     func generateVideo(
         template: TikTokTemplate,
         content: ShareContent,
@@ -25,14 +25,14 @@ class TikTokVideoGenerator: ObservableObject {
     ) async throws -> URL {
         isGenerating = true
         currentProgress = 0
-        
+
         // Create temporary output URL
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("tiktok_video_\(Date().timeIntervalSince1970).mp4")
-        
+
         // Remove existing file if needed
         try? FileManager.default.removeItem(at: outputURL)
-        
+
         // Generate video based on template
         switch template {
         case .beforeAfterReveal:
@@ -50,9 +50,9 @@ class TikTokVideoGenerator: ObservableObject {
             return try await generateBeforeAfterVideo(content: content, outputURL: outputURL, progress: progress)
         }
     }
-    
+
     // MARK: - Template Implementations
-    
+
     private func generateBeforeAfterVideo(
         content: ShareContent,
         outputURL: URL,
@@ -60,17 +60,17 @@ class TikTokVideoGenerator: ObservableObject {
     ) async throws -> URL {
         // Create video writer
         let videoWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
-        
+
         // Configure video settings
         let videoSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: videoSize.width,
             AVVideoHeightKey: videoSize.height
         ]
-        
+
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         videoInput.expectsMediaDataInRealTime = false
-        
+
         let pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(
             assetWriterInput: videoInput,
             sourcePixelBufferAttributes: [
@@ -79,15 +79,15 @@ class TikTokVideoGenerator: ObservableObject {
                 kCVPixelBufferHeightKey as String: videoSize.height
             ]
         )
-        
+
         videoWriter.add(videoInput)
         videoWriter.startWriting()
         videoWriter.startSession(atSourceTime: .zero)
-        
+
         // Generate frames
         let totalFrames = 150 // 5 seconds at 30fps
         var frameCount = 0
-        
+
         while frameCount < totalFrames {
             if videoInput.isReadyForMoreMediaData {
                 autoreleasepool {
@@ -101,7 +101,7 @@ class TikTokVideoGenerator: ObservableObject {
                         pixelBufferAdaptor.append(pixelBuffer, withPresentationTime: presentationTime)
                     }
                 }
-                
+
                 frameCount += 1
                 let progressValue = Double(frameCount) / Double(totalFrames)
                 Task {
@@ -112,15 +112,15 @@ class TikTokVideoGenerator: ObservableObject {
                 }
             }
         }
-        
+
         // Finish writing
         videoInput.markAsFinished()
         await videoWriter.finishWriting()
-        
+
         isGenerating = false
         return outputURL
     }
-    
+
     private func generateQuickRecipeVideo(
         content: ShareContent,
         outputURL: URL,
@@ -129,7 +129,7 @@ class TikTokVideoGenerator: ObservableObject {
         // Simplified implementation - would create recipe steps animation
         return try await generateBeforeAfterVideo(content: content, outputURL: outputURL, progress: progress)
     }
-    
+
     private func generateIngredients360Video(
         content: ShareContent,
         outputURL: URL,
@@ -138,7 +138,7 @@ class TikTokVideoGenerator: ObservableObject {
         // Simplified implementation - would create 360 rotation of ingredients
         return try await generateBeforeAfterVideo(content: content, outputURL: outputURL, progress: progress)
     }
-    
+
     private func generateTimelapseVideo(
         content: ShareContent,
         outputURL: URL,
@@ -147,7 +147,7 @@ class TikTokVideoGenerator: ObservableObject {
         // Simplified implementation - would create timelapse effect
         return try await generateBeforeAfterVideo(content: content, outputURL: outputURL, progress: progress)
     }
-    
+
     private func generateSplitScreenVideo(
         content: ShareContent,
         outputURL: URL,
@@ -156,9 +156,9 @@ class TikTokVideoGenerator: ObservableObject {
         // Simplified implementation - would create split screen comparison
         return try await generateBeforeAfterVideo(content: content, outputURL: outputURL, progress: progress)
     }
-    
+
     // MARK: - Frame Generation
-    
+
     private func createFrame(
         for template: TikTokTemplate,
         content: ShareContent,
@@ -175,15 +175,15 @@ class TikTokVideoGenerator: ObservableObject {
             nil,
             &pixelBuffer
         )
-        
+
         guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
             return nil
         }
-        
+
         // Lock buffer
         CVPixelBufferLockBaseAddress(buffer, [])
         defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
-        
+
         // Create graphics context
         guard let context = CGContext(
             data: CVPixelBufferGetBaseAddress(buffer),
@@ -196,7 +196,7 @@ class TikTokVideoGenerator: ObservableObject {
         ) else {
             return nil
         }
-        
+
         // Draw frame content
         drawFrameContent(
             in: context,
@@ -205,10 +205,10 @@ class TikTokVideoGenerator: ObservableObject {
             frameIndex: frameIndex,
             totalFrames: totalFrames
         )
-        
+
         return buffer
     }
-    
+
     private func drawFrameContent(
         in context: CGContext,
         template: TikTokTemplate,
@@ -217,11 +217,11 @@ class TikTokVideoGenerator: ObservableObject {
         totalFrames: Int
     ) {
         let progress = Double(frameIndex) / Double(totalFrames)
-        
+
         // Fill background
         context.setFillColor(UIColor.black.cgColor)
         context.fill(CGRect(origin: .zero, size: videoSize))
-        
+
         // Draw template-specific content
         switch template {
         case .beforeAfterReveal:
@@ -229,18 +229,18 @@ class TikTokVideoGenerator: ObservableObject {
         default:
             drawDefaultTemplate(in: context, content: content, progress: progress)
         }
-        
+
         // Add overlays
         drawTikTokOverlays(in: context, content: content)
     }
-    
+
     private func drawBeforeAfterReveal(in context: CGContext, content: ShareContent, progress: Double) {
         // Draw gradient background
         let gradientColors = [
             UIColor(red: 1, green: 0, blue: 0.31, alpha: 1).cgColor, // #FF0050
             UIColor(red: 0, green: 0.95, blue: 0.92, alpha: 1).cgColor  // #00F2EA
         ]
-        
+
         if let gradient = CGGradient(
             colorsSpace: CGColorSpaceCreateDeviceRGB(),
             colors: gradientColors as CFArray,
@@ -253,10 +253,10 @@ class TikTokVideoGenerator: ObservableObject {
                 options: []
             )
         }
-        
+
         // Draw reveal animation
         let revealWidth = videoSize.width * CGFloat(progress)
-        
+
         // Draw "before" text
         if progress < 0.5 {
             drawCenteredText(
@@ -267,7 +267,7 @@ class TikTokVideoGenerator: ObservableObject {
                 color: .white
             )
         }
-        
+
         // Draw "after" text
         if progress > 0.5 {
             drawCenteredText(
@@ -278,7 +278,7 @@ class TikTokVideoGenerator: ObservableObject {
                 color: .white
             )
         }
-        
+
         // Draw recipe name
         if case .recipe(let recipe) = content.type {
             drawCenteredText(
@@ -290,7 +290,7 @@ class TikTokVideoGenerator: ObservableObject {
             )
         }
     }
-    
+
     private func drawDefaultTemplate(in context: CGContext, content: ShareContent, progress: Double) {
         // Simple default template
         drawCenteredText(
@@ -301,7 +301,7 @@ class TikTokVideoGenerator: ObservableObject {
             color: .white
         )
     }
-    
+
     private func drawTikTokOverlays(in context: CGContext, content: ShareContent) {
         // Add SnapChef watermark
         drawCenteredText(
@@ -312,7 +312,7 @@ class TikTokVideoGenerator: ObservableObject {
             color: UIColor.white.withAlphaComponent(0.8)
         )
     }
-    
+
     private func drawCenteredText(
         _ text: String,
         in context: CGContext,
@@ -324,17 +324,17 @@ class TikTokVideoGenerator: ObservableObject {
             .font: UIFont.systemFont(ofSize: fontSize, weight: .bold),
             .foregroundColor: color
         ]
-        
+
         let attributedString = NSAttributedString(string: text, attributes: attributes)
         let size = attributedString.size()
-        
+
         let rect = CGRect(
             x: point.x - size.width / 2,
             y: point.y - size.height / 2,
             width: size.width,
             height: size.height
         )
-        
+
         UIGraphicsPushContext(context)
         attributedString.draw(in: rect)
         UIGraphicsPopContext()

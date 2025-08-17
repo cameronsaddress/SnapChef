@@ -24,11 +24,11 @@ struct RecipeDetailView: View {
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @StateObject private var commentsViewModel = RecipeCommentsViewModel()
-    
+
     // New states for branded share
     @State private var showBrandedShare = false
     @State private var shareContent: ShareContent?
-    
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -41,7 +41,7 @@ struct RecipeDetailView: View {
                         showLabels: true
                     )
                     .padding(.horizontal, 20)
-                    
+
                     // Recipe Info
                     VStack(alignment: .leading, spacing: 16) {
                         // Recipe title with like and share buttons
@@ -49,11 +49,11 @@ struct RecipeDetailView: View {
                             Text(recipe.name)
                                 .font(.system(size: 32, weight: .bold, design: .rounded))
                                 .fixedSize(horizontal: false, vertical: true)
-                            
+
                             Spacer()
-                            
+
                             // Share button - opens branded popup directly
-                            Button(action: { 
+                            Button(action: {
                                 // Use branded share popup with all platforms
                                 shareContent = ShareContent(
                                     type: .recipe(recipe),
@@ -68,7 +68,7 @@ struct RecipeDetailView: View {
                                         .foregroundColor(.blue)
                                 }
                             }
-                            
+
                             // Like button
                             Button(action: toggleLike) {
                                 VStack(spacing: 4) {
@@ -78,7 +78,7 @@ struct RecipeDetailView: View {
                                             .foregroundColor(.pink)
                                             .scaleEffect(isLiked ? 1.1 : 0)
                                             .opacity(isLiked ? 1 : 0)
-                                        
+
                                         Image(systemName: "heart")
                                             .font(.system(size: 24, weight: .medium))
                                             .foregroundColor(.gray)
@@ -86,7 +86,7 @@ struct RecipeDetailView: View {
                                             .opacity(isLiked ? 0 : 1)
                                     }
                                     .animation(.spring(response: 0.3, dampingFraction: 0.6, blendDuration: 0), value: isLiked)
-                                    
+
                                     if likeCount > 0 {
                                         Text("\(likeCount)")
                                             .font(.system(size: 14, weight: .bold))
@@ -98,7 +98,7 @@ struct RecipeDetailView: View {
                             .disabled(isLoadingLike)
                             .opacity(isLoadingLike ? 0.6 : 1.0)
                         }
-                        
+
                         // Author info (if available)
                         if let cloudKitRecipe = cloudKitRecipe, !cloudKitRecipe.ownerID.isEmpty {
                             Button(action: { showingUserProfile = true }) {
@@ -113,11 +113,11 @@ struct RecipeDetailView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
-                        
+
                         Text(recipe.description)
                             .font(.system(size: 18))
                             .foregroundColor(.secondary)
-                        
+
                         HStack(spacing: 20) {
                             Label("\(recipe.prepTime + recipe.cookTime)m", systemImage: "clock")
                             Label("\(recipe.servings) servings", systemImage: "person.2")
@@ -126,12 +126,12 @@ struct RecipeDetailView: View {
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.secondary)
                     }
-                    
+
                     // Ingredients
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Ingredients")
                             .font(.system(size: 24, weight: .bold))
-                        
+
                         ForEach(recipe.ingredients) { ingredient in
                             HStack {
                                 Image(systemName: ingredient.isAvailable ? "checkmark.circle.fill" : "circle")
@@ -141,12 +141,12 @@ struct RecipeDetailView: View {
                             .padding(.vertical, 4)
                         }
                     }
-                    
+
                     // Instructions
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Instructions")
                             .font(.system(size: 24, weight: .bold))
-                        
+
                         ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
                             HStack(alignment: .top) {
                                 Text("\(index + 1).")
@@ -160,12 +160,12 @@ struct RecipeDetailView: View {
                             .padding(.vertical, 8)
                         }
                     }
-                    
+
                     // Nutrition
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Nutrition Facts")
                             .font(.system(size: 24, weight: .bold))
-                        
+
                         HStack(spacing: 16) {
                             RecipeDetailNutritionItem(label: "Calories", value: "\(recipe.nutrition.calories)")
                             RecipeDetailNutritionItem(label: "Protein", value: "\(recipe.nutrition.protein)g")
@@ -173,7 +173,7 @@ struct RecipeDetailView: View {
                             RecipeDetailNutritionItem(label: "Fat", value: "\(recipe.nutrition.fat)g")
                         }
                     }
-                    
+
                     // Delete Recipe Button
                     Button(action: {
                         showingDeleteAlert = true
@@ -192,28 +192,28 @@ struct RecipeDetailView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-                    
+
                     Divider()
                         .padding(.horizontal, 20)
-                    
+
                     // Comments Section
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Text("Comments")
                                 .font(.system(size: 24, weight: .bold))
                             Spacer()
-                            if commentsViewModel.comments.count > 0 {
+                            if !commentsViewModel.comments.isEmpty {
                                 Text("\(commentsViewModel.comments.count)")
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(.secondary)
                             }
                         }
-                        
+
                         // Comment Input
                         HStack(spacing: 12) {
                             TextField("Add a comment...", text: $newCommentText)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
-                            
+
                             Button(action: submitComment) {
                                 Image(systemName: "paperplane.fill")
                                     .font(.system(size: 20))
@@ -221,7 +221,7 @@ struct RecipeDetailView: View {
                             }
                             .disabled(newCommentText.isEmpty || isSubmittingComment)
                         }
-                        
+
                         // Comments List
                         if commentsViewModel.isLoading && commentsViewModel.comments.isEmpty {
                             HStack {
@@ -245,7 +245,7 @@ struct RecipeDetailView: View {
                                 })
                                 .padding(.vertical, 8)
                             }
-                            
+
                             if commentsViewModel.comments.count > 5 {
                                 Button(action: { showingAllComments = true }) {
                                     Text("View all \(commentsViewModel.comments.count) comments")
@@ -267,8 +267,7 @@ struct RecipeDetailView: View {
                             .foregroundColor(.white)
                     }
                 }
-                
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
@@ -313,12 +312,12 @@ struct RecipeDetailView: View {
             }
         }
     }
-    
+
     // MARK: - Delete Recipe
     private func deleteRecipe() {
         withAnimation(.spring()) {
             appState.deleteRecipe(recipe)
-            
+
             // Also remove from CloudKit if it's a CloudKit recipe
             if cloudKitAuth.isAuthenticated {
                 Task {
@@ -339,23 +338,23 @@ struct RecipeDetailView: View {
                     }
                 }
             }
-            
+
             // Dismiss the detail view after deletion
             dismiss()
         }
     }
-    
+
     private func toggleLike() {
         guard !isLoadingLike else { return }
-        
+
         // Haptic feedback
         let impactGenerator = UIImpactFeedbackGenerator(style: .medium)
         impactGenerator.impactOccurred()
-        
+
         Task {
             isLoadingLike = true
             defer { isLoadingLike = false }
-            
+
             do {
                 if isLiked {
                     try await cloudKitSync.unlikeRecipe(recipe.id.uuidString)
@@ -371,7 +370,7 @@ struct RecipeDetailView: View {
                         isLiked = true
                         likeCount += 1
                     }
-                    
+
                     // Success haptic for like
                     let successGenerator = UINotificationFeedbackGenerator()
                     successGenerator.notificationOccurred(.success)
@@ -384,7 +383,7 @@ struct RecipeDetailView: View {
             }
         }
     }
-    
+
     private func loadLikeStatus() async {
         do {
             isLiked = try await cloudKitSync.isRecipeLiked(recipe.id.uuidString)
@@ -393,10 +392,10 @@ struct RecipeDetailView: View {
             print("Failed to load like status: \(error)")
         }
     }
-    
+
     private func loadAuthorInfo() async {
         guard let cloudKitRecipe = cloudKitRecipe, !cloudKitRecipe.ownerID.isEmpty else { return }
-        
+
         do {
             let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
             let record = try await database.record(for: CKRecord.ID(recordName: cloudKitRecipe.ownerID))
@@ -408,43 +407,43 @@ struct RecipeDetailView: View {
             print("Failed to load author info: \(error)")
         }
     }
-    
+
     private func submitComment() {
         guard !newCommentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        
+
         Task {
             isSubmittingComment = true
             defer { isSubmittingComment = false }
-            
+
             await commentsViewModel.addComment(
                 to: recipe.id.uuidString,
                 content: newCommentText
             )
-            
+
             await MainActor.run {
                 newCommentText = ""
             }
         }
     }
-    
+
     // MARK: - Share Functions
     // shareVia function removed - now using branded popup directly
-    
+
     private func shareRecipe() {
         let recipeText = """
         \(recipe.name)
-        
+
         \(recipe.description)
-        
+
         ⏱ Cooking time: \(recipe.prepTime + recipe.cookTime) minutes
         🍽 Servings: \(recipe.servings)
         📊 Difficulty: \(recipe.difficulty.rawValue)
-        
+
         Created with SnapChef - Turn your fridge into amazing recipes!
         """
-        
+
         let activityVC = UIActivityViewController(activityItems: [recipeText], applicationActivities: nil)
-        
+
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first,
            let rootVC = window.rootViewController {
@@ -461,7 +460,7 @@ struct RecipeDetailView: View {
 struct RecipeDetailNutritionItem: View {
     let label: String
     let value: String
-    
+
     var body: some View {
         VStack(spacing: 4) {
             Text(value)
@@ -481,7 +480,7 @@ struct RecipeDetailNutritionItem: View {
 struct RecipeCommentRow: View {
     let comment: CommentItem
     let onUserTap: () -> Void
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
@@ -503,7 +502,7 @@ struct RecipeCommentRow: View {
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Button(action: onUserTap) {
@@ -512,14 +511,14 @@ struct RecipeCommentRow: View {
                                 .foregroundColor(.primary)
                         }
                         .buttonStyle(PlainButtonStyle())
-                        
+
                         Text("• \(comment.timeAgoText)")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
-                        
+
                         Spacer()
                     }
-                    
+
                     Text(comment.content)
                         .font(.system(size: 15))
                         .foregroundColor(.primary)
@@ -536,7 +535,7 @@ struct RecipePrintView: View {
     let recipe: Recipe
     @Environment(\.dismiss) var dismiss
     @State private var isPrinting = false
-    
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -546,11 +545,11 @@ struct RecipePrintView: View {
                         Text("SnapChef Recipe")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.secondary)
-                        
+
                         Text(recipe.name)
                             .font(.system(size: 28, weight: .bold))
                             .multilineTextAlignment(.center)
-                        
+
                         HStack(spacing: 20) {
                             Label("\(recipe.prepTime + recipe.cookTime) min", systemImage: "clock")
                             Label("\(recipe.servings) servings", systemImage: "person.2")
@@ -561,14 +560,14 @@ struct RecipePrintView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.bottom, 10)
-                    
+
                     Divider()
-                    
+
                     // Ingredients
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Ingredients")
                             .font(.system(size: 20, weight: .bold))
-                        
+
                         ForEach(recipe.ingredients) { ingredient in
                             HStack {
                                 Text("•")
@@ -579,14 +578,14 @@ struct RecipePrintView: View {
                         }
                     }
                     .padding(.bottom, 10)
-                    
+
                     Divider()
-                    
+
                     // Instructions
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Instructions")
                             .font(.system(size: 20, weight: .bold))
-                        
+
                         ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
                             HStack(alignment: .top, spacing: 12) {
                                 Text("\(index + 1).")
@@ -600,14 +599,14 @@ struct RecipePrintView: View {
                         }
                     }
                     .padding(.bottom, 10)
-                    
+
                     Divider()
-                    
+
                     // Nutrition
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Nutrition Facts (per serving)")
                             .font(.system(size: 16, weight: .bold))
-                        
+
                         HStack(spacing: 20) {
                             Text("Calories: \(recipe.nutrition.calories)")
                             Text("Protein: \(recipe.nutrition.protein)g")
@@ -616,9 +615,9 @@ struct RecipePrintView: View {
                         }
                         .font(.system(size: 14))
                     }
-                    
+
                     Spacer(minLength: 40)
-                    
+
                     // Footer
                     Text("Created with SnapChef • \(Date().formatted(date: .abbreviated, time: .omitted))")
                         .font(.system(size: 12))
@@ -638,7 +637,7 @@ struct RecipePrintView: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: printRecipe) {
                         Label("Print", systemImage: "printer.fill")
@@ -649,23 +648,23 @@ struct RecipePrintView: View {
             }
         }
     }
-    
+
     private func printRecipe() {
         isPrinting = true
-        
+
         let printInfo = UIPrintInfo(dictionary: nil)
         printInfo.jobName = "SnapChef Recipe - \(recipe.name)"
         printInfo.outputType = .general
-        
+
         let printController = UIPrintInteractionController.shared
         printController.printInfo = printInfo
-        
+
         // Create a text representation of the recipe
         let formatter = UISimpleTextPrintFormatter(text: createPrintableText())
         formatter.perPageContentInsets = UIEdgeInsets(top: 72, left: 72, bottom: 72, right: 72)
-        
+
         printController.printFormatter = formatter
-        
+
         printController.present(animated: true) { _, completed, error in
             isPrinting = false
             if completed {
@@ -675,34 +674,34 @@ struct RecipePrintView: View {
             }
         }
     }
-    
+
     private func createPrintableText() -> String {
         var text = "SNAPCHEF RECIPE\n\n"
         text += "\(recipe.name.uppercased())\n\n"
         text += "Prep Time: \(recipe.prepTime) min | Cook Time: \(recipe.cookTime) min\n"
         text += "Servings: \(recipe.servings) | Difficulty: \(recipe.difficulty.rawValue)\n\n"
-        
+
         text += "INGREDIENTS\n"
         text += String(repeating: "-", count: 40) + "\n"
         for ingredient in recipe.ingredients {
             text += "• \(ingredient.quantity) \(ingredient.unit ?? "") \(ingredient.name)\n"
         }
-        
+
         text += "\nINSTRUCTIONS\n"
         text += String(repeating: "-", count: 40) + "\n"
         for (index, instruction) in recipe.instructions.enumerated() {
             text += "\(index + 1). \(instruction)\n\n"
         }
-        
+
         text += "\nNUTRITION FACTS (per serving)\n"
         text += String(repeating: "-", count: 40) + "\n"
         text += "Calories: \(recipe.nutrition.calories) | "
         text += "Protein: \(recipe.nutrition.protein)g | "
         text += "Carbs: \(recipe.nutrition.carbs)g | "
         text += "Fat: \(recipe.nutrition.fat)g\n\n"
-        
+
         text += "\nCreated with SnapChef • \(Date().formatted(date: .abbreviated, time: .omitted))"
-        
+
         return text
     }
 }

@@ -1,8 +1,6 @@
 import SwiftUI
 import AuthenticationServices
-// import GoogleSignIn  // TODO: Add GoogleSignIn package dependency
-// import FBSDKCoreKit  // TODO: Add Facebook SDK package dependency
-// import FBSDKLoginKit
+// Note: Google Sign-In and Facebook SDK not implemented - using Apple Sign-In only for production
 
 @MainActor
 final class AuthenticationManager: ObservableObject {
@@ -10,22 +8,22 @@ final class AuthenticationManager: ObservableObject {
     @Published var currentUser: User?
     @Published var showAuthSheet: Bool = false
     @Published var showUsernameSetup: Bool = false
-    @Published var temporaryUsername: String = "Chef\(Int.random(in: 10000...99999))"
+    @Published var temporaryUsername: String = "Chef\(Int.random(in: 10_000...99_999))"
     @Published var profileImage: UIImage?
-    
+
     private let keychain = KeychainService()
     private let authTokenKey = "com.snapchef.authToken"
-    
+
     init() {
         checkAuthStatus()
     }
-    
+
     private func checkAuthStatus() {
         if let token = keychain.get(authTokenKey) {
             validateToken(token)
         }
     }
-    
+
     private func validateToken(_ token: String) {
         Task {
             do {
@@ -38,16 +36,16 @@ final class AuthenticationManager: ObservableObject {
             }
         }
     }
-    
+
     func signInWithApple(authorization: ASAuthorization) async throws {
         guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
             throw AuthError.invalidCredential
         }
-        
+
         let userId = appleIDCredential.user
         let email = appleIDCredential.email
         let fullName = appleIDCredential.fullName
-        
+
         let authData = AppleAuthData(
             userId: userId,
             email: email,
@@ -55,98 +53,54 @@ final class AuthenticationManager: ObservableObject {
             familyName: fullName?.familyName,
             identityToken: appleIDCredential.identityToken
         )
-        
+
         try await authenticateWithBackend(provider: .apple, authData: authData)
     }
-    
+
     func signInWithGoogle(presentingViewController: UIViewController) async throws {
-        // TODO: Implement when GoogleSignIn package is added
+        // Google Sign-In not implemented in production - use Apple Sign-In instead
+        print("⚠️ Google Sign-In not available - redirecting to Apple Sign-In")
         throw AuthError.missingConfiguration
-        /*
-        guard let clientID = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_CLIENT_ID") as? String else {
-            throw AuthError.missingConfiguration
-        }
-        
-        let config = GIDConfiguration(clientID: clientID)
-        GIDSignIn.sharedInstance.configuration = config
-        
-        let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: presentingViewController)
-        
-        let authData = GoogleAuthData(
-            userId: result.user.userID ?? "",
-            email: result.user.profile?.email,
-            name: result.user.profile?.name,
-            idToken: result.user.idToken?.tokenString
-        )
-        
-        try await authenticateWithBackend(provider: .google, authData: authData)
-        */
     }
-    
+
     func signInWithFacebook(presentingViewController: UIViewController) async throws {
-        // TODO: Implement when Facebook SDK is added
+        // Facebook SDK not implemented in production - use Apple Sign-In instead
+        print("⚠️ Facebook Sign-In not available - redirecting to Apple Sign-In")
         throw AuthError.missingConfiguration
-        /*
-        let loginManager = LoginManager()
-        
-        do {
-            let result = try await loginManager.logIn(permissions: ["public_profile", "email"], from: presentingViewController)
-            
-            guard let token = result?.token else {
-                throw AuthError.invalidCredential
-            }
-            
-            // Get user info
-            let request = GraphRequest(graphPath: "me", parameters: ["fields": "id, name, email"])
-            let graphResult = try await request.start()
-            
-            let authData = FacebookAuthData(
-                userId: graphResult.userId ?? "",
-                email: graphResult.email,
-                name: graphResult.name,
-                accessToken: token.tokenString
-            )
-            
-            try await authenticateWithBackend(provider: .facebook, authData: authData)
-        } catch {
-            throw AuthError.unknown
-        }
-        */
     }
-    
+
     private func authenticateWithBackend<T: Encodable>(provider: AuthProvider, authData: T) async throws {
         let response = try await NetworkManager.shared.authenticate(
             provider: provider,
             authData: authData
         )
-        
+
         self.keychain.set(response.token, forKey: self.authTokenKey)
         self.currentUser = response.user
         self.isAuthenticated = true
         self.showAuthSheet = false
-        
+
         // Check if user needs to set up username
         if response.user.username.hasPrefix("Chef") && response.user.username.count == 10 {
             // User has a temporary username, show setup
             self.showUsernameSetup = true
         }
     }
-    
+
     func signOut() {
         keychain.delete(authTokenKey)
         currentUser = nil
         isAuthenticated = false
-        
-        // Sign out from Google if needed
-        // GIDSignIn.sharedInstance.signOut()  // TODO: Enable when GoogleSignIn is added
+
+        // Note: Only Apple Sign-In is supported in production
     }
-    
+
     func promptForAuthIfNeeded(deviceManager: DeviceManager) {
         if !isAuthenticated && deviceManager.freeUsesRemaining == 0 && !deviceManager.hasUnlimitedAccess {
             showAuthSheet = true
         }
     }
-    
+
     // Check if authentication is required for specific features
     func isAuthRequiredFor(feature: AuthRequiredFeature) -> Bool {
         switch feature {
@@ -156,7 +110,7 @@ final class AuthenticationManager: ObservableObject {
             return false // Basic recipe generation doesn't require auth
         }
     }
-    
+
     // Update username after setup
     func updateUsername(_ username: String) {
         if var user = currentUser {
@@ -183,13 +137,13 @@ final class AuthenticationManager: ObservableObject {
             )
         }
     }
-    
+
     // Update profile image
     func updateProfileImage(_ image: UIImage) {
         self.profileImage = image
         // In a real app, you'd upload this to CloudKit or your backend
     }
-    
+
     func promptAuthForFeature(_ feature: AuthRequiredFeature) {
         if isAuthRequiredFor(feature: feature) {
             showAuthSheet = true
@@ -211,7 +165,7 @@ enum AuthRequiredFeature {
     case teams
     case streaks
     case premiumFeatures
-    
+
     var title: String {
         switch self {
         case .basicRecipes: return "Basic Recipes"
@@ -223,7 +177,7 @@ enum AuthRequiredFeature {
         case .premiumFeatures: return "Premium Features"
         }
     }
-    
+
     var requiresAuth: Bool {
         switch self {
         case .basicRecipes:
@@ -239,7 +193,7 @@ enum AuthError: LocalizedError {
     case missingConfiguration
     case networkError
     case unknown
-    
+
     var errorDescription: String? {
         switch self {
         case .invalidCredential:

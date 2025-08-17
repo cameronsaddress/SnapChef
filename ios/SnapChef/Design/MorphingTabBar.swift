@@ -3,7 +3,7 @@ import SwiftUI
 struct MorphingTabBar: View {
     @Binding var selectedTab: Int
     @Namespace private var animation
-    
+
     let tabs = [
         ("house.fill", "Home", Color(hex: "#667eea")),
         ("camera.fill", "Snap", Color(hex: "#f093fb")),
@@ -11,7 +11,7 @@ struct MorphingTabBar: View {
         ("heart.text.square.fill", "Feed", Color(hex: "#f77062")),
         ("person.fill", "Profile", Color(hex: "#43e97b"))
     ]
-    
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(0..<tabs.count, id: \.self) { index in
@@ -45,9 +45,9 @@ struct MorphingTabItem: View {
     let isSelected: Bool
     let namespace: Namespace.ID
     let action: () -> Void
-    
+
     @State private var iconRotation: Double = 0
-    
+
     var body: some View {
         Button(action: {
             action()
@@ -65,21 +65,21 @@ struct MorphingTabItem: View {
                             .fill(color.opacity(0.2))
                             .frame(width: 60, height: 40)
                             .matchedGeometryEffect(id: "background", in: namespace)
-                        
+
                         // Glow effect
                         RoundedRectangle(cornerRadius: 16)
                             .fill(color.opacity(0.1))
                             .frame(width: 70, height: 50)
                             .blur(radius: 10)
                     }
-                    
+
                     Image(systemName: icon)
                         .font(.system(size: 24, weight: isSelected ? .semibold : .regular))
                         .foregroundColor(isSelected ? color : .white.opacity(0.6))
                         .scaleEffect(isSelected ? 1.1 : 1)
                         .rotationEffect(.degrees(iconRotation))
                 }
-                
+
                 if isSelected {
                     Text(title)
                         .font(.system(size: 11, weight: .semibold))
@@ -99,13 +99,13 @@ struct MorphingTabItem: View {
 // MARK: - Glassmorphic Tab Bar Background
 struct GlassmorphicTabBarBackground: View {
     @State private var shimmerPhase: CGFloat = -1
-    
+
     var body: some View {
         ZStack {
             // Base blur
             RoundedRectangle(cornerRadius: 24)
                 .fill(.ultraThinMaterial)
-            
+
             // Gradient overlay
             RoundedRectangle(cornerRadius: 24)
                 .fill(
@@ -118,7 +118,7 @@ struct GlassmorphicTabBarBackground: View {
                         endPoint: .bottomTrailing
                     )
                 )
-            
+
             // Border
             RoundedRectangle(cornerRadius: 24)
                 .stroke(
@@ -132,7 +132,7 @@ struct GlassmorphicTabBarBackground: View {
                     ),
                     lineWidth: 1
                 )
-            
+
             // Shimmer effect
             RoundedRectangle(cornerRadius: 24)
                 .fill(
@@ -161,14 +161,14 @@ struct GlassmorphicTabBarBackground: View {
 // MARK: - Floating Tab Bar Modifier
 struct FloatingTabBar: ViewModifier {
     @Binding var selectedTab: Int
-    
+
     func body(content: Content) -> some View {
         ZStack {
             content
-            
+
             VStack {
                 Spacer()
-                
+
                 MorphingTabBar(selectedTab: $selectedTab)
                     .padding(.horizontal, 30)
                     .padding(.bottom, 30)
@@ -186,20 +186,20 @@ struct FloatingTabBar: ViewModifier {
 struct CustomTabView<Content: View>: View {
     @Binding var selectedTab: Int
     let content: () -> Content
-    
+
     init(selectedTab: Binding<Int>, @ViewBuilder content: @escaping () -> Content) {
         self._selectedTab = selectedTab
         self.content = content
     }
-    
+
     var body: some View {
         ZStack {
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
+
             VStack {
                 Spacer()
-                
+
                 MorphingTabBar(selectedTab: $selectedTab)
                     .padding(.horizontal, 30)
                     .padding(.bottom, 30)
@@ -217,19 +217,19 @@ struct CustomTabView<Content: View>: View {
 struct TabIndicatorShape: Shape {
     var tabWidth: CGFloat
     var xOffset: CGFloat
-    
+
     var animatableData: CGFloat {
         get { xOffset }
         set { xOffset = newValue }
     }
-    
+
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        
+
         let radius: CGFloat = 16
         let indicatorWidth = tabWidth - 20
         let x = xOffset + 10
-        
+
         path.move(to: CGPoint(x: x + radius, y: 0))
         path.addLine(to: CGPoint(x: x + indicatorWidth - radius, y: 0))
         path.addArc(
@@ -263,7 +263,7 @@ struct TabIndicatorShape: Shape {
             endAngle: .degrees(270),
             clockwise: false
         )
-        
+
         return path
     }
 }
@@ -273,10 +273,10 @@ struct TabIndicatorShape: Shape {
     ZStack {
         MagicalBackground()
             .ignoresSafeArea()
-        
+
         VStack {
             Spacer()
-            
+
             MorphingTabBar(selectedTab: .constant(0))
                 .padding(.horizontal, 30)
                 .padding(.bottom, 30)

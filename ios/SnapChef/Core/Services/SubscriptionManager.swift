@@ -5,21 +5,21 @@ import SwiftUI
 @MainActor
 class SubscriptionManager: ObservableObject {
     static let shared = SubscriptionManager()
-    
+
     // MARK: - Published Properties
     @Published var isPremium = false
     @Published var isLoading = false
     @Published var products: [Product] = []
     @Published var purchasedSubscriptions: [Product] = []
     @Published var subscriptionStatus: SubscriptionStatus = .none
-    
+
     // MARK: - Subscription Status
     enum SubscriptionStatus {
         case none
         case active(product: Product, expirationDate: Date?)
         case expired
         case inGracePeriod
-        
+
         var isActive: Bool {
             switch self {
             case .active, .inGracePeriod:
@@ -29,37 +29,37 @@ class SubscriptionManager: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Product Identifiers
     enum ProductID: String, CaseIterable {
         case monthly = "com.snapchef.premium.monthly"
         case yearly = "com.snapchef.premium.yearly"
     }
-    
+
     // MARK: - Properties
     private var updateListenerTask: Task<Void, Error>?
     private let productIDs = ProductID.allCases.map { $0.rawValue }
-    
+
     // MARK: - Initialization
     private init() {
         // Start listening for transactions
         updateListenerTask = listenForTransactions()
-        
+
         // Load products and check subscription status
         Task {
             await loadProducts()
             await updateSubscriptionStatus()
         }
     }
-    
+
     deinit {
         updateListenerTask?.cancel()
     }
-    
+
     // MARK: - Product Loading
     func loadProducts() async {
         isLoading = true
-        
+
         do {
             // Fetch products from App Store
             print("Attempting to load products with IDs: \(productIDs)")
@@ -72,64 +72,64 @@ class SubscriptionManager: ObservableObject {
             print("Failed to load products: \(error)")
             print("Error details: \(error.localizedDescription)")
         }
-        
+
         isLoading = false
     }
-    
+
     // MARK: - Purchase
     func purchase(_ product: Product) async throws -> StoreKit.Transaction? {
         // Attempt purchase
         let result = try await product.purchase()
-        
+
         switch result {
         case .success(let verification):
             // Check verification
             let transaction = try checkVerified(verification)
-            
+
             // Update subscription status
             await updateSubscriptionStatus()
-            
+
             // Finish transaction
             await transaction.finish()
-            
+
             return transaction
-            
+
         case .userCancelled:
             print("User cancelled purchase")
             return nil
-            
+
         case .pending:
             print("Purchase pending")
             return nil
-            
+
         @unknown default:
             print("Unknown purchase result")
             return nil
         }
     }
-    
+
     // MARK: - Restore Purchases
     func restorePurchases() async {
         do {
             // Sync with App Store
             try await AppStore.sync()
-            
+
             // Update subscription status
             await updateSubscriptionStatus()
         } catch {
             print("Failed to restore purchases: \(error)")
         }
     }
-    
+
     // MARK: - Update Subscription Status
     func updateSubscriptionStatus() async {
         var highestStatus: Product.SubscriptionInfo.Status?
         var highestProduct: Product?
-        
+
         // Check all subscription statuses
         for product in products {
             guard let status = try? await product.subscription?.status.first else { continue }
-            
+
             switch status.state {
             case .subscribed, .inGracePeriod:
                 if highestStatus == nil {
@@ -140,7 +140,7 @@ class SubscriptionManager: ObservableObject {
                 break
             }
         }
-        
+
         // Update subscription status
         if let status = highestStatus, let product = highestProduct {
             switch status.state {
@@ -150,15 +150,15 @@ class SubscriptionManager: ObservableObject {
                     expirationDate: nil // Will be set from transaction
                 )
                 isPremium = true
-                
+
             case .inGracePeriod:
                 subscriptionStatus = .inGracePeriod
                 isPremium = true
-                
+
             case .expired:
                 subscriptionStatus = .expired
                 isPremium = false
-                
+
             default:
                 subscriptionStatus = .none
                 isPremium = false
@@ -167,7 +167,7 @@ class SubscriptionManager: ObservableObject {
             subscriptionStatus = .none
             isPremium = false
         }
-        
+
         // Update purchased subscriptions
         purchasedSubscriptions = []
         for product in products {
@@ -180,10 +180,10 @@ class SubscriptionManager: ObservableObject {
                 }
             }
         }
-        
+
         print("Subscription status updated: \(subscriptionStatus)")
     }
-    
+
     // MARK: - Transaction Listener
     private func listenForTransactions() -> Task<Void, Error> {
         return Task.detached {
@@ -191,10 +191,10 @@ class SubscriptionManager: ObservableObject {
             for await result in StoreKit.Transaction.updates {
                 do {
                     let transaction = try await self.checkVerified(result)
-                    
+
                     // Update subscription status
                     await self.updateSubscriptionStatus()
-                    
+
                     // Finish transaction
                     await transaction.finish()
                 } catch {
@@ -203,7 +203,7 @@ class SubscriptionManager: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Verification
     private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
         switch result {
@@ -213,12 +213,12 @@ class SubscriptionManager: ObservableObject {
             throw error
         }
     }
-    
+
     // MARK: - Entitlement Checking
     func hasActiveSubscription() -> Bool {
         return isPremium
     }
-    
+
     func canAccessPremiumFeature(_ feature: PremiumFeature) -> Bool {
         switch feature {
         case .unlimitedRecipes:
@@ -240,13 +240,13 @@ class SubscriptionManager: ObservableObject {
             return isPremium
         }
     }
-    
+
     // MARK: - Premium Challenge Management
-    
+
     /// Get available premium challenges
     func getPremiumChallenges() -> [String] {
         guard isPremium else { return [] }
-        
+
         return [
             "Master Chef Marathon",
             "Michelin Star Week",
@@ -257,70 +257,70 @@ class SubscriptionManager: ObservableObject {
             "Social Butterfly Supreme"
         ]
     }
-    
+
     /// Check if a challenge is premium-only
     func isPremiumChallenge(_ challengeTitle: String) -> Bool {
         return getPremiumChallenges().contains(challengeTitle)
     }
-    
+
     /// Get reward multiplier for premium users
     func getPremiumRewardMultiplier() -> Double {
         return isPremium ? 2.0 : 1.0
     }
-    
+
     // MARK: - Dynamic Limits System
-    
+
     /// Get current daily limits based on user lifecycle phase and subscription status
     func getCurrentLimits() -> DailyLimits {
         return UserLifecycleManager.shared.getDailyLimits()
     }
-    
+
     /// Get remaining recipes for today using UsageTracker
     func getRemainingRecipes() -> Int {
         return UsageTracker.shared.getRemainingRecipes()
     }
-    
+
     /// Get remaining videos for today using UsageTracker
     func getRemainingVideos() -> Int {
         return UsageTracker.shared.getRemainingVideos()
     }
-    
+
     /// Check if user has reached daily limit for a specific tracker feature
     func hasReachedDailyLimit(for feature: TrackerFeature) -> Bool {
         return UsageTracker.shared.hasReachedLimit(for: feature)
     }
-    
+
     /// Get remaining usage for a lifecycle feature
     func getRemainingUsage(for feature: UsageFeature) -> Int {
         return UserLifecycleManager.shared.getRemainingUsage(for: feature)
     }
-    
+
     /// Check if user has reached daily limit for a lifecycle feature
     func hasReachedDailyLimit(for feature: UsageFeature) -> Bool {
         return UserLifecycleManager.shared.hasReachedDailyLimit(for: feature)
     }
-    
+
     // MARK: - Legacy Support (Deprecated)
-    
+
     /// @deprecated Use getRemainingRecipes() instead
     func getRemainingDailyRecipes() -> Int {
         return getRemainingRecipes()
     }
-    
+
     /// @deprecated Use UsageTracker.shared.trackRecipeGenerated() instead
     func incrementDailyRecipeCount() {
         UsageTracker.shared.trackRecipeGenerated()
         UserLifecycleManager.shared.trackRecipeCreated()
     }
-    
+
     // MARK: - Price Formatting
     func formattedPrice(for product: Product) -> String {
         return product.displayPrice
     }
-    
+
     func formattedIntroductoryPrice(for product: Product) -> String? {
         guard let intro = product.subscription?.introductoryOffer else { return nil }
-        
+
         switch intro.type {
         case .introductory:
             return "\(intro.period.value) \(intro.period.unit) free trial"

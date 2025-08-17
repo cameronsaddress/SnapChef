@@ -3,9 +3,9 @@ import Foundation
 @MainActor
 class AnalyticsManager {
     static let shared = AnalyticsManager()
-    
+
     private init() {}
-    
+
     func initialize() {
         #if DEBUG
         print("Analytics initialized in debug mode")
@@ -14,7 +14,7 @@ class AnalyticsManager {
         // FirebaseApp.configure()
         #endif
     }
-    
+
     func logEvent(_ event: String, parameters: [String: Any]? = nil) {
         #if DEBUG
         print("Analytics Event: \(event)")
@@ -26,7 +26,7 @@ class AnalyticsManager {
         // Analytics.logEvent(event, parameters: parameters)
         #endif
     }
-    
+
     func setUserProperty(_ value: String?, forName name: String) {
         #if DEBUG
         print("Analytics User Property: \(name) = \(value ?? "nil")")
@@ -35,7 +35,7 @@ class AnalyticsManager {
         // Analytics.setUserProperty(value, forName: name)
         #endif
     }
-    
+
     func logScreen(_ screenName: String, screenClass: String? = nil) {
         #if DEBUG
         print("Analytics Screen View: \(screenName)")

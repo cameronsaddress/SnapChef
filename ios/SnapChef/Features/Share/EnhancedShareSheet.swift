@@ -2,19 +2,20 @@ import SwiftUI
 
 struct EnhancedShareSheet: View {
     let recipe: Recipe
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss)
+    var dismiss
     @State private var selectedPlatform: SharePlatform?
     @State private var showShareAnimation = false
     @State private var contentReady = false
     @State private var generatedImage: UIImage?
-    
+
     enum SharePlatform: String, CaseIterable {
         case instagram = "Instagram"
         case tiktok = "TikTok"
         case twitter = "Twitter"
         case messages = "Messages"
         case more = "More"
-        
+
         var icon: String {
             switch self {
             case .instagram: return "camera.fill"
@@ -24,7 +25,7 @@ struct EnhancedShareSheet: View {
             case .more: return "ellipsis"
             }
         }
-        
+
         var color: Color {
             switch self {
             case .instagram: return Color(hex: "#E4405F")
@@ -35,7 +36,7 @@ struct EnhancedShareSheet: View {
             }
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -43,26 +44,26 @@ struct EnhancedShareSheet: View {
                 MagicalBackground()
                     .ignoresSafeArea()
                     .overlay(Color.black.opacity(0.3))
-                
+
                 ScrollView {
                     VStack(spacing: 30) {
                         // Recipe Preview Card
                         ShareableRecipeCard(recipe: recipe, image: $generatedImage)
                             .scaleEffect(contentReady ? 1 : 0.8)
                             .opacity(contentReady ? 1 : 0)
-                        
+
                         // Share message
                         VStack(spacing: 16) {
                             Text("Share your creation!")
                                 .font(.system(size: 28, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
-                            
+
                             Text("Inspire others with your culinary magic ✨")
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
                         }
                         .staggeredFade(index: 0, isShowing: contentReady)
-                        
+
                         // Platform grid
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                             ForEach(SharePlatform.allCases, id: \.self) { platform in
@@ -75,13 +76,13 @@ struct EnhancedShareSheet: View {
                                     }
                                 )
                                 .staggeredFade(
-                                    index: SharePlatform.allCases.firstIndex(of: platform)! + 1,
+                                    index: (SharePlatform.allCases.firstIndex(of: platform) ?? 0) + 1,
                                     isShowing: contentReady
                                 )
                             }
                         }
                         .padding(.horizontal, 20)
-                        
+
                         // Viral tips
                         ViralTipsCard()
                             .padding(.horizontal, 20)
@@ -115,15 +116,15 @@ struct EnhancedShareSheet: View {
             }
         )
     }
-    
+
     private func shareToplatform(_ platform: SharePlatform) {
         // Trigger haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
-        
+
         // Show success animation
         showShareAnimation = true
-        
+
         // Perform actual share
         switch platform {
         case .instagram:
@@ -137,30 +138,30 @@ struct EnhancedShareSheet: View {
         case .more:
             showSystemShareSheet()
         }
-        
+
         // Hide animation after delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             showShareAnimation = false
             dismiss()
         }
     }
-    
+
     private func shareToInstagram() {
         // Instagram-specific sharing logic
     }
-    
+
     private func shareToTikTok() {
         // TikTok-specific sharing logic
     }
-    
+
     private func shareToTwitter() {
         // Twitter-specific sharing logic
     }
-    
+
     private func shareToMessages() {
         // Messages-specific sharing logic
     }
-    
+
     private func showSystemShareSheet() {
         // System share sheet
     }
@@ -171,7 +172,7 @@ struct ShareableRecipeCard: View {
     let recipe: Recipe
     @Binding var image: UIImage?
     @State private var glowAnimation = false
-    
+
     var body: some View {
         GlassmorphicCard(content: {
             VStack(spacing: 0) {
@@ -188,12 +189,12 @@ struct ShareableRecipeCard: View {
                         endPoint: .bottomTrailing
                     )
                     .frame(height: 200)
-                    
+
                     // Recipe image or emoji
                     Text(recipe.difficulty.emoji)
                         .font(.system(size: 80))
                         .scaleEffect(glowAnimation ? 1.1 : 1)
-                    
+
                     // App branding
                     VStack {
                         HStack {
@@ -220,7 +221,7 @@ struct ShareableRecipeCard: View {
                         Spacer()
                     }
                 }
-                
+
                 // Content
                 VStack(alignment: .leading, spacing: 20) {
                     // Recipe name
@@ -228,28 +229,28 @@ struct ShareableRecipeCard: View {
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.leading)
-                    
+
                     // Stats row
                     HStack(spacing: 24) {
                         ShareStatItem(icon: "clock", value: "\(recipe.prepTime + recipe.cookTime)m", color: Color(hex: "#4facfe"))
                         ShareStatItem(icon: "flame", value: "\(recipe.nutrition.calories) cal", color: Color(hex: "#f093fb"))
                         ShareStatItem(icon: "star.fill", value: recipe.difficulty.rawValue, color: Color(hex: "#ffa726"))
                     }
-                    
+
                     // Description
                     Text(recipe.description)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.9))
                         .lineLimit(3)
-                    
+
                     // Call to action
                     HStack {
                         Text("Try it with SnapChef!")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.white.opacity(0.8))
-                        
+
                         Spacer()
-                        
+
                         Image(systemName: "arrow.up.forward.circle.fill")
                             .font(.system(size: 20))
                             .foregroundColor(Color(hex: "#667eea"))
@@ -269,7 +270,7 @@ struct ShareableRecipeCard: View {
             generateShareImage()
         }
     }
-    
+
     private func generateShareImage() {
         // Convert view to UIImage for sharing
     }
@@ -280,13 +281,13 @@ struct ShareStatItem: View {
     let icon: String
     let value: String
     let color: Color
-    
+
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(color)
-            
+
             Text(value)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.white)
@@ -299,9 +300,9 @@ struct SharePlatformButton: View {
     let platform: EnhancedShareSheet.SharePlatform
     let isSelected: Bool
     let action: () -> Void
-    
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: action) {
             GlassmorphicCard(content: {
@@ -311,13 +312,13 @@ struct SharePlatformButton: View {
                         Circle()
                             .fill(platform.color.opacity(0.2))
                             .frame(width: 60, height: 60)
-                        
+
                         Image(systemName: platform.icon)
                             .font(.system(size: 28, weight: .semibold))
                             .foregroundColor(platform.color)
                             .scaleEffect(isPressed ? 1.2 : 1)
                     }
-                    
+
                     Text(platform.rawValue)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
@@ -346,7 +347,7 @@ struct ViralTipsCard: View {
         ("#️⃣", "Use 5-10 relevant hashtags"),
         ("💬", "Ask questions to encourage comments")
     ]
-    
+
     var body: some View {
         GlassmorphicCard(content: {
             VStack(spacing: 16) {
@@ -354,25 +355,25 @@ struct ViralTipsCard: View {
                     Text("Pro Tips for Going Viral")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
-                    
+
                     Spacer()
-                    
+
                     Text("💡")
                         .font(.system(size: 20))
                 }
-                
+
                 // Animated tip carousel
                 TabView(selection: $currentTip) {
                     ForEach(0..<tips.count, id: \.self) { index in
                         HStack(spacing: 12) {
                             Text(tips[index].0)
                                 .font(.system(size: 24))
-                            
+
                             Text(tips[index].1)
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white.opacity(0.9))
                                 .multilineTextAlignment(.leading)
-                            
+
                             Spacer()
                         }
                         .tag(index)
@@ -391,14 +392,14 @@ struct ShareSuccessAnimation: View {
     @State private var scale: CGFloat = 0
     @State private var opacity: Double = 0
     @State private var checkmarkScale: CGFloat = 0
-    
+
     var body: some View {
         ZStack {
             // Dark overlay
             Color.black.opacity(0.7)
                 .ignoresSafeArea()
                 .opacity(opacity)
-            
+
             // Success circle
             ZStack {
                 Circle()
@@ -414,13 +415,13 @@ struct ShareSuccessAnimation: View {
                     )
                     .frame(width: 120, height: 120)
                     .scaleEffect(scale)
-                
+
                 Image(systemName: "checkmark")
                     .font(.system(size: 60, weight: .bold))
                     .foregroundColor(.white)
                     .scaleEffect(checkmarkScale)
             }
-            
+
             // Confetti particles
             ForEach(0..<20) { _ in
                 ConfettiParticle()
@@ -431,7 +432,7 @@ struct ShareSuccessAnimation: View {
                 scale = 1
                 opacity = 1
             }
-            
+
             withAnimation(.spring(response: 0.5, dampingFraction: 0.6).delay(0.2)) {
                 checkmarkScale = 1
             }
@@ -442,20 +443,20 @@ struct ShareSuccessAnimation: View {
 struct ConfettiParticle: View {
     @State private var position = CGPoint(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2)
     @State private var opacity: Double = 1
-    
+
     let color = [
         Color(hex: "#667eea"),
         Color(hex: "#764ba2"),
         Color(hex: "#f093fb"),
         Color(hex: "#4facfe"),
         Color(hex: "#43e97b")
-    ].randomElement()!
-    
+    ].randomElement() ?? Color.blue
+
     let velocity = CGVector(
         dx: CGFloat.random(in: -200...200),
         dy: CGFloat.random(in: -300...(-100))
     )
-    
+
     var body: some View {
         Circle()
             .fill(color)

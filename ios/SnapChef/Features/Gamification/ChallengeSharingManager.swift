@@ -15,13 +15,13 @@ enum NotificationCategory: String {
 @MainActor
 class ChallengeSharingManager: ObservableObject {
     static let shared = ChallengeSharingManager()
-    
+
     @Published var isGeneratingShare = false
     @Published var generatedShareImage: UIImage?
     @Published var shareProgress: Double = 0
-    
+
     private lazy var gamificationManager = GamificationManager.shared
-    
+
     // Social Platform Types
     enum SocialPlatform: String, CaseIterable {
         case instagram = "Instagram"
@@ -30,7 +30,7 @@ class ChallengeSharingManager: ObservableObject {
         case snapchat = "Snapchat"
         case tiktok = "TikTok"
         case general = "Share"
-        
+
         var icon: String {
             switch self {
             case .instagram: return "camera.fill"
@@ -41,7 +41,7 @@ class ChallengeSharingManager: ObservableObject {
             case .general: return "square.and.arrow.up"
             }
         }
-        
+
         var color: Color {
             switch self {
             case .instagram: return Color(hex: "#E4405F")
@@ -52,7 +52,7 @@ class ChallengeSharingManager: ObservableObject {
             case .general: return Color(hex: "#667eea")
             }
         }
-        
+
         var hashtagSuggestions: [String] {
             switch self {
             case .instagram:
@@ -70,7 +70,7 @@ class ChallengeSharingManager: ObservableObject {
             }
         }
     }
-    
+
     // Share Content Types
     enum ShareContentType {
         case challengeComplete(Challenge)
@@ -79,16 +79,16 @@ class ChallengeSharingManager: ObservableObject {
         case leaderboardRank(Int, LeaderboardScope)
         case badgeUnlocked(GameBadge)
         case weeklyStats
-        
+
         enum LeaderboardScope {
             case weekly, monthly, allTime
         }
     }
-    
+
     private init() {}
-    
+
     // MARK: - Share Generation
-    
+
     func generateShareContent(
         type: ShareContentType,
         platform: SocialPlatform,
@@ -98,92 +98,92 @@ class ChallengeSharingManager: ObservableObject {
             isGeneratingShare = true
             shareProgress = 0
         }
-        
+
         let shareView = createShareView(for: type, platform: platform)
         let shareText = generateShareText(for: type, platform: platform, customMessage: customMessage)
-        
+
         // Render the view to an image
         let renderer = ImageRenderer(content: shareView)
         renderer.scale = 3.0 // High quality
-        
+
         let image = renderer.uiImage
-        
+
         await MainActor.run {
             generatedShareImage = image
             isGeneratingShare = false
             shareProgress = 1.0
         }
-        
+
         // Track share analytics
         trackShareAnalytics(type: type, platform: platform)
-        
+
         return (image, shareText)
     }
-    
+
     // MARK: - Share View Creation
-    
+
     @ViewBuilder
     private func createShareView(for type: ShareContentType, platform: SocialPlatform) -> some View {
         ZStack {
             // Background
             ShareBackgroundView(platform: platform)
-            
+
             // Content
             switch type {
             case .challengeComplete(let challenge):
                 ChallengeCompleteShareView(challenge: challenge, platform: platform)
-                
+
             case .levelUp(let level):
                 LevelUpShareView(level: level, platform: platform)
-                
+
             case .streakMilestone(let days):
                 StreakMilestoneShareView(days: days, platform: platform)
-                
+
             case .leaderboardRank(let rank, let scope):
                 LeaderboardRankShareView(rank: rank, scope: scope, platform: platform)
-                
+
             case .badgeUnlocked(let badge):
                 BadgeUnlockedShareView(badge: badge, platform: platform)
-                
+
             case .weeklyStats:
                 WeeklyStatsShareView(stats: gamificationManager.userStats, platform: platform)
             }
         }
-        .frame(width: 1080, height: 1920) // Instagram story size
+        .frame(width: 1_080, height: 1_920) // Instagram story size
     }
-    
+
     // MARK: - Share Text Generation
-    
+
     private func generateShareText(
         for type: ShareContentType,
         platform: SocialPlatform,
         customMessage: String?
     ) -> String {
         var text = ""
-        
+
         // Add custom message if provided
         if let customMessage = customMessage {
             text = customMessage + "\n\n"
         }
-        
+
         // Generate type-specific text
         switch type {
         case .challengeComplete(let challenge):
             text += "🎉 Challenge Complete! I just finished \"\(challenge.title)\" and earned \(challenge.points) points! 🔥\n\n"
-            
+
         case .levelUp(let level):
             text += "🆙 LEVEL UP! Just reached Level \(level) on SnapChef! 🎊\n\n"
-            
+
         case .streakMilestone(let days):
             text += "🔥 \(days)-DAY STREAK! I've been cooking with SnapChef for \(days) days straight! 💪\n\n"
-            
+
         case .leaderboardRank(let rank, let scope):
             let scopeText = scope == .weekly ? "this week" : scope == .monthly ? "this month" : "all-time"
             text += "🏆 Ranked #\(rank) \(scopeText) on SnapChef! Think you can beat me? 😎\n\n"
-            
+
         case .badgeUnlocked(let badge):
             text += "🏅 New Badge Unlocked: \(badge.name)! \(badge.description) ✨\n\n"
-            
+
         case .weeklyStats:
             let stats = gamificationManager.userStats
             text += """
@@ -192,22 +192,22 @@ class ChallengeSharingManager: ObservableObject {
             • \(stats.recipesCreated) Recipes Created
             • \(stats.currentStreak) Day Streak
             • \(stats.challengesCompleted) Challenges Completed
-            
+
             """
         }
-        
+
         // Add call to action
         text += "Join me on SnapChef and start your cooking journey! 👨‍🍳\n\n"
-        
+
         // Add platform-specific hashtags
         let hashtags = platform.hashtagSuggestions.joined(separator: " ")
         text += hashtags
-        
+
         return text
     }
-    
+
     // MARK: - Social Platform Integration
-    
+
     func shareToSocialPlatform(
         _ platform: SocialPlatform,
         image: UIImage?,
@@ -229,17 +229,17 @@ class ChallengeSharingManager: ObservableObject {
         case .general:
             showGeneralShareSheet(items: [text, image].compactMap { $0 }, from: viewController)
         }
-        
+
         // Award social sharing points
         awardSocialSharingPoints(platform: platform)
     }
-    
+
     private func shareToInstagram(image: UIImage?, from viewController: UIViewController) {
         guard let image = image else { return }
-        
+
         // Save to camera roll with permission handling
         saveImageToPhotoLibrary(image)
-        
+
         // Open Instagram
         if let instagramURL = URL(string: "instagram://library?LocalIdentifier=\(UUID().uuidString)") {
             if UIApplication.shared.canOpenURL(instagramURL) {
@@ -249,7 +249,7 @@ class ChallengeSharingManager: ObservableObject {
             }
         }
     }
-    
+
     private func shareToTwitter(text: String, image: UIImage?, url: URL?, from viewController: UIViewController) {
         if SLComposeViewController.isAvailable(forServiceType: SLServiceTypeTwitter) {
             if let twitterVC = SLComposeViewController(forServiceType: SLServiceTypeTwitter) {
@@ -274,7 +274,7 @@ class ChallengeSharingManager: ObservableObject {
             }
         }
     }
-    
+
     private func shareToFacebook(text: String, image: UIImage?, url: URL?, from viewController: UIViewController) {
         if SLComposeViewController.isAvailable(forServiceType: SLServiceTypeFacebook) {
             if let facebookVC = SLComposeViewController(forServiceType: SLServiceTypeFacebook) {
@@ -291,13 +291,13 @@ class ChallengeSharingManager: ObservableObject {
             showGeneralShareSheet(items: [text, image].compactMap { $0 }, from: viewController)
         }
     }
-    
+
     private func shareToSnapchat(image: UIImage?, from viewController: UIViewController) {
         guard let image = image else { return }
-        
+
         // Save to camera roll with permission handling
         saveImageToPhotoLibrary(image)
-        
+
         // Open Snapchat
         if let snapchatURL = URL(string: "snapchat://") {
             if UIApplication.shared.canOpenURL(snapchatURL) {
@@ -307,13 +307,13 @@ class ChallengeSharingManager: ObservableObject {
             }
         }
     }
-    
+
     private func shareToTikTok(image: UIImage?, from viewController: UIViewController) {
         guard let image = image else { return }
-        
+
         // Save to camera roll with permission handling
         saveImageToPhotoLibrary(image)
-        
+
         // Open TikTok
         if let tiktokURL = URL(string: "tiktok://") {
             if UIApplication.shared.canOpenURL(tiktokURL) {
@@ -323,24 +323,24 @@ class ChallengeSharingManager: ObservableObject {
             }
         }
     }
-    
+
     private func showGeneralShareSheet(items: [Any], from viewController: UIViewController) {
         let activityController = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        
+
         // For iPad
         if let popover = activityController.popoverPresentationController {
             popover.sourceView = viewController.view
             popover.sourceRect = CGRect(x: viewController.view.bounds.midX, y: viewController.view.bounds.midY, width: 0, height: 0)
             popover.permittedArrowDirections = []
         }
-        
+
         viewController.present(activityController, animated: true)
     }
-    
+
     private func saveImageToPhotoLibrary(_ image: UIImage) {
         // Check current authorization status first
         let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-        
+
         switch status {
         case .authorized, .limited:
             // Already have permission, save the image
@@ -351,7 +351,7 @@ class ChallengeSharingManager: ObservableObject {
                     print("Failed to save challenge image: \(error?.localizedDescription ?? "Unknown error")")
                 }
             }
-            
+
         case .notDetermined:
             // Need to request permission
             PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
@@ -365,23 +365,23 @@ class ChallengeSharingManager: ObservableObject {
                     }
                 }
             }
-            
+
         case .denied, .restricted:
             print("Photo library access denied for challenge sharing")
-            
+
         @unknown default:
             print("Unknown photo library authorization status")
         }
     }
-    
+
     private func showAlert(title: String, message: String, on viewController: UIViewController) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         viewController.present(alert, animated: true)
     }
-    
+
     // MARK: - Friend Challenge System
-    
+
     func createFriendChallenge(
         challengeType: String,
         friendUsername: String,
@@ -400,28 +400,28 @@ class ChallengeSharingManager: ObservableObject {
             currentProgress: 0,
             participants: 2
         )
-        
+
         // Save to CloudKit and notify friend
         try await CloudKitManager.shared.createFriendChallenge(challenge, withFriend: friendUsername)
-        
+
         // Send notification
         ChallengeNotificationManager.shared.notifyFriendChallengeInvite(
             from: UserDefaults.standard.string(forKey: "username") ?? "A friend",
             challengeName: challengeType
         )
     }
-    
+
     // MARK: - Analytics & Rewards
-    
+
     private func awardSocialSharingPoints(platform: SocialPlatform) {
         // Award points for sharing
         let points = platform == .general ? 10 : 25
         gamificationManager.awardPoints(points, reason: "Shared on \(platform.rawValue)")
-        
+
         // Update sharing stats
         let sharesCount = UserDefaults.standard.integer(forKey: "socialShares") + 1
         UserDefaults.standard.set(sharesCount, forKey: "socialShares")
-        
+
         // Check for sharing achievements
         switch sharesCount {
         case 1:
@@ -436,14 +436,14 @@ class ChallengeSharingManager: ObservableObject {
             break
         }
     }
-    
+
     private func trackShareAnalytics(type: ShareContentType, platform: SocialPlatform) {
         // Track share event
         var eventParams: [String: Any] = [
             "platform": platform.rawValue,
             "timestamp": Date()
         ]
-        
+
         switch type {
         case .challengeComplete(let challenge):
             eventParams["type"] = "challenge_complete"
@@ -463,10 +463,18 @@ class ChallengeSharingManager: ObservableObject {
         case .weeklyStats:
             eventParams["type"] = "weekly_stats"
         }
-        
-        // Send to analytics service
-        // TODO: Add analytics when AnalyticsService is available
-        // AnalyticsService.shared.trackEvent("social_share", parameters: eventParams)
+
+        // Store analytics locally for challenge sharing events
+        var events = UserDefaults.standard.array(forKey: "challenge_sharing_analytics") as? [[String: Any]] ?? []
+        events.append(eventParams)
+
+        // Keep only last 200 sharing events
+        if events.count > 200 {
+            events = Array(events.suffix(200))
+        }
+
+        UserDefaults.standard.set(events, forKey: "challenge_sharing_analytics")
+        print("📊 Challenge sharing analytics: \(eventParams)")
     }
 }
 
@@ -474,7 +482,7 @@ class ChallengeSharingManager: ObservableObject {
 
 struct ShareBackgroundView: View {
     let platform: ChallengeSharingManager.SocialPlatform
-    
+
     var body: some View {
         ZStack {
             // Gradient background
@@ -487,7 +495,7 @@ struct ShareBackgroundView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            
+
             // Pattern overlay
             GeometryReader { geometry in
                 ForEach(0..<30) { _ in
@@ -507,48 +515,48 @@ struct ShareBackgroundView: View {
 struct ChallengeCompleteShareView: View {
     let challenge: Challenge
     let platform: ChallengeSharingManager.SocialPlatform
-    
+
     var body: some View {
         VStack(spacing: 40) {
             Spacer()
-            
+
             // Trophy icon
             Image(systemName: "trophy.fill")
                 .font(.system(size: 120))
                 .foregroundColor(.yellow)
                 .shadow(color: .black.opacity(0.3), radius: 20)
-            
+
             // Challenge title
             Text("CHALLENGE COMPLETE!")
                 .font(.system(size: 48, weight: .black, design: .rounded))
                 .foregroundColor(.white)
                 .multilineTextAlignment(.center)
-            
+
             Text(challenge.title)
                 .font(.system(size: 36, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            
+
             // Reward
             VStack(spacing: 16) {
                 Text("Earned")
                     .font(.system(size: 24, weight: .medium))
                     .foregroundColor(.white.opacity(0.8))
-                
+
                 Text("\(challenge.points) Points")
                     .font(.system(size: 56, weight: .black, design: .rounded))
                     .foregroundColor(.yellow)
             }
-            
+
             Spacer()
-            
+
             // App branding
             VStack(spacing: 16) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 40))
                     .foregroundColor(.white)
-                
+
                 Text("SnapChef")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -561,11 +569,11 @@ struct ChallengeCompleteShareView: View {
 struct LevelUpShareView: View {
     let level: Int
     let platform: ChallengeSharingManager.SocialPlatform
-    
+
     var body: some View {
         VStack(spacing: 40) {
             Spacer()
-            
+
             // Level badge
             ZStack {
                 Circle()
@@ -579,30 +587,30 @@ struct LevelUpShareView: View {
                     )
                     .frame(width: 200, height: 200)
                     .shadow(color: .yellow.opacity(0.5), radius: 30)
-                
+
                 VStack(spacing: 8) {
                     Text("LEVEL")
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
-                    
+
                     Text("\(level)")
                         .font(.system(size: 72, weight: .black, design: .rounded))
                         .foregroundColor(.white)
                 }
             }
-            
+
             Text("LEVEL UP!")
                 .font(.system(size: 56, weight: .black, design: .rounded))
                 .foregroundColor(.white)
-            
+
             Spacer()
-            
+
             // App branding
             VStack(spacing: 16) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 40))
                     .foregroundColor(.white)
-                
+
                 Text("SnapChef")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -615,40 +623,40 @@ struct LevelUpShareView: View {
 struct StreakMilestoneShareView: View {
     let days: Int
     let platform: ChallengeSharingManager.SocialPlatform
-    
+
     var body: some View {
         VStack(spacing: 40) {
             Spacer()
-            
+
             // Flame icon
             Image(systemName: "flame.fill")
                 .font(.system(size: 120))
                 .foregroundColor(.orange)
                 .shadow(color: .orange.opacity(0.5), radius: 30)
-            
+
             // Streak count
             VStack(spacing: 16) {
                 Text("\(days)")
                     .font(.system(size: 120, weight: .black, design: .rounded))
                     .foregroundColor(.white)
-                
+
                 Text("DAY STREAK")
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
             }
-            
+
             Text("On Fire! 🔥")
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundColor(.orange)
-            
+
             Spacer()
-            
+
             // App branding
             VStack(spacing: 16) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 40))
                     .foregroundColor(.white)
-                
+
                 Text("SnapChef")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -662,11 +670,11 @@ struct LeaderboardRankShareView: View {
     let rank: Int
     let scope: ChallengeSharingManager.ShareContentType.LeaderboardScope
     let platform: ChallengeSharingManager.SocialPlatform
-    
+
     var body: some View {
         VStack(spacing: 40) {
             Spacer()
-            
+
             // Rank display
             ZStack {
                 Circle()
@@ -679,30 +687,30 @@ struct LeaderboardRankShareView: View {
                     )
                     .frame(width: 200, height: 200)
                     .shadow(color: Color(hex: "#667eea").opacity(0.5), radius: 30)
-                
+
                 VStack(spacing: 8) {
                     Text("#\(rank)")
                         .font(.system(size: 72, weight: .black, design: .rounded))
                         .foregroundColor(.white)
-                    
+
                     Text(scopeText)
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.white.opacity(0.9))
                 }
             }
-            
+
             Text("LEADERBOARD")
                 .font(.system(size: 48, weight: .black, design: .rounded))
                 .foregroundColor(.white)
-            
+
             Spacer()
-            
+
             // App branding
             VStack(spacing: 16) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 40))
                     .foregroundColor(.white)
-                
+
                 Text("SnapChef")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -710,7 +718,7 @@ struct LeaderboardRankShareView: View {
             .padding(.bottom, 80)
         }
     }
-    
+
     var scopeText: String {
         switch scope {
         case .weekly: return "THIS WEEK"
@@ -720,40 +728,38 @@ struct LeaderboardRankShareView: View {
     }
 }
 
-
-
 struct BadgeUnlockedShareView: View {
     let badge: GameBadge
     let platform: ChallengeSharingManager.SocialPlatform
-    
+
     var body: some View {
         VStack(spacing: 40) {
             Spacer()
-            
+
             // Badge icon
             ZStack {
                 Circle()
                     .fill(badge.rarity.color)
                     .frame(width: 180, height: 180)
                     .shadow(color: badge.rarity.color.opacity(0.5), radius: 30)
-                
+
                 Image(systemName: badge.icon)
                     .font(.system(size: 80))
                     .foregroundColor(.white)
             }
-            
+
             // Badge info
             VStack(spacing: 16) {
                 Text("NEW BADGE")
                     .font(.system(size: 32, weight: .bold))
                     .foregroundColor(.white.opacity(0.8))
-                
+
                 Text(badge.name)
                     .font(.system(size: 48, weight: .black, design: .rounded))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
-                
+
                 Text(badge.rarity.rawValue.uppercased())
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(badge.rarity.color)
@@ -764,15 +770,15 @@ struct BadgeUnlockedShareView: View {
                             .fill(Color.white)
                     )
             }
-            
+
             Spacer()
-            
+
             // App branding
             VStack(spacing: 16) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 40))
                     .foregroundColor(.white)
-                
+
                 Text("SnapChef")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -785,47 +791,47 @@ struct BadgeUnlockedShareView: View {
 struct WeeklyStatsShareView: View {
     let stats: UserGameStats
     let platform: ChallengeSharingManager.SocialPlatform
-    
+
     var body: some View {
         VStack(spacing: 40) {
             Spacer()
-            
+
             Text("WEEKLY STATS")
                 .font(.system(size: 48, weight: .black, design: .rounded))
                 .foregroundColor(.white)
-            
+
             // Stats grid
             VStack(spacing: 30) {
                 HStack(spacing: 40) {
                     StatCard(icon: "star.fill", value: "\(stats.level)", label: "Level")
                     StatCard(icon: "flame.fill", value: "\(stats.currentStreak)", label: "Streak")
                 }
-                
+
                 HStack(spacing: 40) {
                     StatCard(icon: "fork.knife", value: "\(stats.recipesCreated)", label: "Recipes")
                     StatCard(icon: "trophy.fill", value: "\(stats.challengesCompleted)", label: "Challenges")
                 }
             }
-            
+
             // Total points
             VStack(spacing: 8) {
                 Text("\(stats.totalPoints)")
                     .font(.system(size: 72, weight: .black, design: .rounded))
                     .foregroundColor(.yellow)
-                
+
                 Text("TOTAL POINTS")
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(.white)
             }
-            
+
             Spacer()
-            
+
             // App branding
             VStack(spacing: 16) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 40))
                     .foregroundColor(.white)
-                
+
                 Text("SnapChef")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -840,17 +846,17 @@ struct StatCard: View {
     let icon: String
     let value: String
     let label: String
-    
+
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 40))
                 .foregroundColor(.white)
-            
+
             Text(value)
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            
+
             Text(label)
                 .font(.system(size: 20, weight: .medium))
                 .foregroundColor(.white.opacity(0.8))
@@ -871,19 +877,19 @@ extension CloudKitManager {
 extension ChallengeNotificationManager {
     func notifyFriendChallengeInvite(from userName: String, challengeName: String) {
         guard notificationsEnabled else { return }
-        
+
         let content = UNMutableNotificationContent()
         content.title = "Challenge Invite! ⚔️"
         content.body = "\(userName) challenged you to \(challengeName)! Are you ready?"
         content.sound = .default
         content.categoryIdentifier = NotificationCategory.newChallenge.rawValue
-        
+
         let request = UNNotificationRequest(
             identifier: "friend_challenge_\(UUID().uuidString)",
             content: content,
             trigger: nil
         )
-        
+
         Task.detached {
             let center = UNUserNotificationCenter.current()
             try? await center.add(request)
