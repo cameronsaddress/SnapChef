@@ -647,6 +647,42 @@ final class SnapChefAPIManager {
         return request
     }
 
+    /// Handles HTTP status codes and returns appropriate SnapChef errors
+    private func handleHTTPStatusCode(_ statusCode: Int, data: Data?) -> SnapChefError? {
+        switch statusCode {
+        case 200...299:
+            return nil // Success
+        case 400:
+            return .validationError("Invalid request. Please check your input.", fields: [])
+        case 401:
+            return .authenticationError("Authentication failed. Please sign in again.")
+        case 403:
+            return .unauthorizedError("Access denied. Please check your permissions.")
+        case 404:
+            return .apiError("Service not found. Please try again later.", statusCode: statusCode, recovery: .contactSupport)
+        case 409:
+            return .apiError("Conflict detected. Please refresh and try again.", statusCode: statusCode, recovery: .retry)
+        case 413:
+            return .validationError("Image file is too large. Please use a smaller image.", fields: ["image"])
+        case 429:
+            return .rateLimitError("Too many requests. Please wait a moment before trying again.", retryAfter: 60)
+        case 500...502:
+            return .apiError("Server is temporarily unavailable. Please try again.", statusCode: statusCode, recovery: .retry)
+        case 503:
+            return .apiError("Service temporarily unavailable for maintenance.", statusCode: statusCode, recovery: .retryAfter(300))
+        case 504:
+            return .timeoutError("Server response timeout. Please try again.")
+        default:
+            let message: String
+            if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                message = "Server error (\(statusCode)): \(responseString)"
+            } else {
+                message = "Unexpected server error (\(statusCode))"
+            }
+            return .apiError(message, statusCode: statusCode, recovery: .retry)
+        }
+    }
+
     /// Converts API Recipe model to app's Recipe model
     func convertAPIRecipeToAppRecipe(_ apiRecipe: RecipeAPI) -> Recipe {
         // Convert ingredients

@@ -8,6 +8,10 @@ final class AppState: ObservableObject {
     @Published var currentUser: User?
     @Published var isLoading: Bool = false
     @Published var error: AppError?
+    @Published var currentSnapChefError: SnapChefError?
+    
+    // Global error handler reference
+    private let globalErrorHandler = GlobalErrorHandler.shared
     @Published var selectedRecipe: Recipe?
     @Published var recentRecipes: [Recipe] = []
     @Published var freeUsesRemaining: Int = 10 // For testing
@@ -33,10 +37,10 @@ final class AppState: ObservableObject {
     // CloudKit Session Tracking
     @Published var currentSessionID: String = ""
 
-    // Progressive Authentication
-    @Published var anonymousProfile: AnonymousUserProfile?
+    // Unified Authentication
+    @Published var cloudKitAuthManager = CloudKitAuthManager.shared
 
-    // Progressive Premium Integration
+    // Progressive Premium Integration  
     private let userLifecycle = UserLifecycleManager.shared
     private let usageTracker = UsageTracker.shared
 
@@ -69,8 +73,7 @@ final class AppState: ObservableObject {
         // Load total snaps taken
         self.totalSnapsTaken = userDefaults.integer(forKey: totalSnapsTakenKey)
 
-        // Load anonymous profile
-        self.anonymousProfile = KeychainProfileManager.shared.getOrCreateProfile()
+        // Initialize unified auth manager (handles anonymous profile internally)
 
         // Initialize challenge system
         initializeChallengeSystem()
@@ -118,21 +121,11 @@ final class AppState: ObservableObject {
         totalShares += 1
 
         // Update CloudKit user profile if authenticated
-        if CloudKitAuthManager.shared.isAuthenticated {
+        if unifiedAuthManager.isAuthenticated {
             Task {
                 do {
-                    if let userID = UserDefaults.standard.string(forKey: "currentUserID") {
-                        let profileID = CKRecord.ID(recordName: "profile_\(userID)")
-                        let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-                        let privateDB = container.privateCloudDatabase
-
-                        let profileRecord = try await privateDB.record(for: profileID)
-                        let currentShares = profileRecord["recipesShared"] as? Int64 ?? 0
-                        profileRecord["recipesShared"] = currentShares + 1
-
-                        _ = try await privateDB.save(profileRecord)
-                        print("✅ Updated share count in CloudKit")
-                    }
+                    try await CloudKitService.shared.incrementRecipesShared()
+                    print("✅ Updated share count in CloudKit")
                 } catch {
                     print("❌ Failed to update share count in CloudKit: \(error)")
                 }
@@ -154,6 +147,30 @@ final class AppState: ObservableObject {
 
     func clearError() {
         error = nil
+        currentSnapChefError = nil
+        globalErrorHandler.clearError()
+    }
+    
+    /// Handles errors using the new comprehensive error system
+    func handleError(_ error: SnapChefError, context: String = "") {
+        currentSnapChefError = error
+        globalErrorHandler.handleError(error, context: context)
+    }
+    
+    /// Converts legacy AppError to SnapChefError
+    func handleLegacyError(_ legacyError: AppError, context: String = "") {
+        let snapChefError: SnapChefError
+        switch legacyError {
+        case .networkError(let message):
+            snapChefError = .networkError(message)
+        case .authenticationError(let message):
+            snapChefError = .authenticationError(message)
+        case .apiError(let message):
+            snapChefError = .apiError(message, recovery: .retry)
+        case .unknown(let message):
+            snapChefError = .unknown(message)
+        }
+        handleError(snapChefError, context: context)
     }
 
     func toggleFavorite(_ recipeId: UUID) {
@@ -172,16 +189,16 @@ final class AppState: ObservableObject {
         }
 
         // Sync with CloudKit if authenticated
-        if CloudKitAuthManager.shared.isAuthenticated {
+        if unifiedAuthManager.isAuthenticated {
             Task {
                 do {
                     if wasAdded {
-                        try await CloudKitRecipeManager.shared.addRecipeToUserProfile(
+                        try await CloudKitService.shared.addRecipeToUserProfile(
                             recipeId.uuidString,
                             type: .favorited
                         )
                     } else {
-                        try await CloudKitRecipeManager.shared.removeRecipeFromUserProfile(
+                        try await CloudKitService.shared.removeRecipeFromUserProfile(
                             recipeId.uuidString,
                             type: .favorited
                         )
@@ -359,7 +376,7 @@ final class AppState: ObservableObject {
         gamificationManager.trackRecipeCreated(recipe)
 
         // Track anonymous action for progressive auth
-        trackAnonymousAction(.recipeCreated)
+        unifiedAuthManager.trackAnonymousAction(.recipeCreated)
     }
 
     func claimPendingRewards() {
@@ -379,83 +396,23 @@ final class AppState: ObservableObject {
         showChallengeCompletion = false
     }
 
-    // MARK: - Progressive Authentication Methods
-
-    /// Tracks anonymous user actions and updates profile
+    // MARK: - Progressive Authentication Helpers
+    
+    /// Convenience method to track actions - delegates to unified auth manager
     func trackAnonymousAction(_ action: AnonymousAction) {
-        guard var profile = anonymousProfile else { return }
-
-        // Update counters based on action type
+        unifiedAuthManager.trackAnonymousAction(action)
+        
+        // Still track for Progressive Premium systems
         switch action {
-        case .recipeCreated:
-            profile.recipesCreatedCount += 1
-        case .recipeViewed:
-            profile.recipesViewedCount += 1
         case .videoGenerated:
-            profile.videosGeneratedCount += 1
-            // Track in Progressive Premium systems
             userLifecycle.trackVideoShared()
             usageTracker.trackVideoCreated()
         case .videoShared:
-            profile.videosSharedCount += 1
-            // Track in Progressive Premium systems
             userLifecycle.trackVideoShared()
         case .appOpened:
-            profile.appOpenCount += 1
-            // Track app open for lifecycle management
             userLifecycle.updateLastActive()
-        case .challengeViewed:
-            profile.challengesViewed += 1
-        case .socialExplored:
-            profile.socialFeaturesExplored += 1
-        }
-
-        // Update last active timestamp
-        profile.updateLastActive()
-
-        // Save updated profile
-        if KeychainProfileManager.shared.saveProfile(profile) {
-            self.anonymousProfile = profile
-        }
-
-        // Check if we should show authentication prompt
-        checkAuthPromptConditions(for: action)
-    }
-
-    /// Checks if authentication prompt should be shown based on current action
-    private func checkAuthPromptConditions(for action: AnonymousAction) {
-        guard let profile = anonymousProfile else { return }
-
-        // Only prompt if user is still anonymous
-        guard profile.authenticationState == .anonymous else { return }
-
-        let authTrigger = AuthPromptTrigger.shared
-
-        // Trigger appropriate prompt based on action
-        switch action {
-        case .recipeCreated:
-            if profile.recipesCreatedCount == 1 {
-                authTrigger.onFirstRecipeSuccess()
-            }
-        case .videoGenerated:
-            authTrigger.onViralContentCreated()
-        case .videoShared:
-            authTrigger.onShareAttempt()
-        case .socialExplored:
-            authTrigger.onSocialFeatureExplored()
-        case .challengeViewed:
-            if profile.challengesViewed >= 2 {
-                authTrigger.onChallengeInterest()
-            }
-        case .appOpened:
-            if profile.daysSinceLastActive >= 1 && profile.appOpenCount >= 3 {
-                authTrigger.onReturningUser()
-            }
-        case .recipeViewed:
-            // Check for high engagement trigger
-            if profile.engagementScore >= 3.0 && profile.daysSinceFirstLaunch >= 3 {
-                authTrigger.onWeeklyHighEngagement()
-            }
+        default:
+            break
         }
     }
 

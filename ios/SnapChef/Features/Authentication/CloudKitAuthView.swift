@@ -2,7 +2,7 @@ import SwiftUI
 import AuthenticationServices
 
 struct CloudKitAuthView: View {
-    @StateObject private var authManager = CloudKitAuthManager.shared
+    @StateObject private var cloudKitAuthManager = CloudKitAuthManager.shared
     @StateObject private var tikTokAuthManager = TikTokAuthManager.shared
     @Environment(\.dismiss) private var dismiss
 
@@ -134,7 +134,7 @@ struct CloudKitAuthView: View {
         .overlay(
             isLoading ? LoadingOverlay(message: loadingMessage) : nil
         )
-        .sheet(isPresented: $authManager.showUsernameSelection) {
+        .sheet(isPresented: $cloudKitAuthManager.showUsernameSelection) {
             UsernameSetupView()
                 .interactiveDismissDisabled()
         }
@@ -147,10 +147,10 @@ struct CloudKitAuthView: View {
                 case .success(let authorization):
                     isLoading = true
                     loadingMessage = "Signing in with Apple..."
-                    try await authManager.signInWithApple(authorization: authorization)
+                    try await cloudKitAuthManager.signInWithApple(authorization: authorization)
 
                     // Check if we need username setup
-                    if authManager.showUsernameSelection {
+                    if cloudKitAuthManager.showUsernameSelection {
                         // Username selection will be shown via sheet
                         isLoading = false
                     } else {
@@ -183,7 +183,7 @@ struct CloudKitAuthView: View {
             do {
                 isLoading = true
                 loadingMessage = "Connecting to TikTok..."
-                let tikTokUser = try await tikTokAuthManager.authenticate()
+                let _ = try await tikTokAuthManager.authenticate()
 
                 // Create SnapChef account integration if TikTok auth succeeds
                 // For now, just dismiss the auth view
