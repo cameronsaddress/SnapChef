@@ -43,6 +43,8 @@ struct TikTokShareView: View {
     @StateObject private var engine = ViralVideoEngine()
     @StateObject private var contentAPI = TikTokContentPostingAPI.shared
     @StateObject private var authTrigger = AuthPromptTrigger.shared
+    @StateObject private var usageTracker = UsageTracker.shared
+    @StateObject private var paywallTrigger = PaywallTriggerManager.shared
     private let template: ViralTemplate = .kineticTextSteps
     @State private var isGenerating = false
     @State private var videoURL: URL?
@@ -58,6 +60,7 @@ struct TikTokShareView: View {
     @State private var showDirectPostPreview = false
     @State private var showTokenExpiredAlert = false
     @State private var tokenExpiredMessage = ""
+    @State private var showLimitReached = false
 
     var body: some View {
         NavigationStack {
@@ -167,6 +170,21 @@ struct TikTokShareView: View {
         }
         .sheet(isPresented: $authTrigger.shouldShowPrompt) {
             ProgressiveAuthPrompt()
+        }
+        .alert("Daily Video Limit Reached", isPresented: $showLimitReached) {
+            Button("Upgrade to Premium") {
+                showLimitReached = false
+                // Present premium upgrade sheet
+                NotificationCenter.default.post(
+                    name: Notification.Name("ShowPremiumUpgrade"),
+                    object: nil
+                )
+            }
+            Button("OK", role: .cancel) {
+                showLimitReached = false
+            }
+        } message: {
+            Text("You've reached your daily limit of \(usageTracker.dailyVideoLimit ?? 0) videos. Upgrade to Premium for unlimited video creation!")
         }
     }
 
@@ -508,6 +526,12 @@ struct TikTokShareView: View {
                 }
                 
                 Spacer()
+                
+                // Usage counter for videos
+                UsageCounterView.videos(
+                    current: usageTracker.dailyVideoCount,
+                    limit: usageTracker.dailyVideoLimit
+                )
             }
             
             // Progress indicator
@@ -649,6 +673,16 @@ struct TikTokShareView: View {
     }
 
     private func generate() {
+        // Check if user has reached daily video limit
+        if usageTracker.hasReachedLimit(for: .videos) {
+            // Show paywall if limit reached
+            if paywallTrigger.shouldShowPaywall(for: .limitReached) {
+                // Show limit reached message and paywall
+                showLimitReached = true
+                return
+            }
+        }
+        
         Task {
             await performGeneration()
         }
@@ -659,6 +693,10 @@ struct TikTokShareView: View {
         let (recipe, media) = inputs
         
         await MainActor.run {
+            // Track video generation for usage limits
+            usageTracker.trackVideoGenerated()
+            UserLifecycleManager.shared.trackVideoShared()
+            
             // Haptic feedback
             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.prepare()
@@ -884,30 +922,44 @@ struct TikTokShareView: View {
                     .foregroundColor(.white)
                 } else {
                     VStack(spacing: 4) {
-                        HStack(spacing: 8) {
-                            Image(systemName: postingMethod.icon)
-                                .font(.system(size: 16, weight: .bold))
-                            Text(postingMethod == .shareKit ? "Generate & Open in TikTok" : "Generate & Post Directly")
-                                .font(.system(size: 18, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        
-                        if selectedHashtags.isEmpty {
-                            Text("(Select hashtags first)")
+                        if usageTracker.hasReachedLimit(for: .videos) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 16, weight: .bold))
+                                Text("Daily Video Limit Reached")
+                                    .font(.system(size: 18, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            
+                            Text("Upgrade to Premium for unlimited")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.7))
-                                .transition(.opacity.combined(with: .scale))
-                        } else if postingMethod == .directPost && !contentAPI.hasValidToken {
-                            Text("(Sign in to TikTok first)")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.7))
-                                .transition(.opacity.combined(with: .scale))
+                        } else {
+                            HStack(spacing: 8) {
+                                Image(systemName: postingMethod.icon)
+                                    .font(.system(size: 16, weight: .bold))
+                                Text(postingMethod == .shareKit ? "Generate & Open in TikTok" : "Generate & Post Directly")
+                                    .font(.system(size: 18, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            
+                            if selectedHashtags.isEmpty {
+                                Text("(Select hashtags first)")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .transition(.opacity.combined(with: .scale))
+                            } else if postingMethod == .directPost && !contentAPI.hasValidToken {
+                                Text("(Sign in to TikTok first)")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .transition(.opacity.combined(with: .scale))
+                            }
                         }
                     }
                 }
             }
         }
-        .disabled(isGenerating || showSuccess || (postingMethod == .directPost && !contentAPI.hasValidToken) || selectedHashtags.isEmpty)
+        .disabled(isGenerating || showSuccess || (postingMethod == .directPost && !contentAPI.hasValidToken) || selectedHashtags.isEmpty || usageTracker.hasReachedLimit(for: .videos))
         .scaleEffect(isGenerating ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isGenerating)
         .modifier(ShakeEffect(shakeNumber: buttonShake ? 2 : 0))

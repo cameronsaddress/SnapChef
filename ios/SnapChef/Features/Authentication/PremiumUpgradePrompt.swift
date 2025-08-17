@@ -3,27 +3,44 @@ import SwiftUI
 struct PremiumUpgradePrompt: View {
     @Binding var isPresented: Bool
     @State private var showSubscriptionView = false
+    @StateObject private var userLifecycle = UserLifecycleManager.shared
+    @StateObject private var usageTracker = UsageTracker.shared
     let reason: UpgradeReason
     
     enum UpgradeReason {
         case dailyLimitReached
         case premiumFeature(String)
+        case videoLimitReached
+        case challengeLimitReached
         
         var title: String {
             switch self {
             case .dailyLimitReached:
-                return "Daily Limit Reached"
-            case .premiumFeature(let feature):
+                return "Recipe Limit Reached"
+            case .videoLimitReached:
+                return "Video Limit Reached"
+            case .premiumFeature(_):
                 return "Premium Feature"
+            case .challengeLimitReached:
+                return "Challenge Limit Reached"
             }
         }
         
-        var message: String {
+        @MainActor
+        func message(userLifecycle: UserLifecycleManager) -> String {
             switch self {
             case .dailyLimitReached:
-                return "You've used all 3 free recipes today. Upgrade to Premium for unlimited recipes!"
+                let dailyLimits = userLifecycle.getDailyLimits()
+                let limit = dailyLimits.recipes
+                return "You've used all \(limit) free recipes today. Upgrade to Premium for unlimited recipes!"
+            case .videoLimitReached:
+                let dailyLimits = userLifecycle.getDailyLimits()
+                let limit = dailyLimits.videos
+                return "You've created your \(limit == 1 ? "daily video" : "\(limit) daily videos"). Upgrade for unlimited video creation!"
             case .premiumFeature(let feature):
                 return "\(feature) is a premium feature. Upgrade to unlock all features!"
+            case .challengeLimitReached:
+                return "You've reached your daily challenge limit. Upgrade for unlimited challenges and 2x rewards!"
             }
         }
         
@@ -31,8 +48,12 @@ struct PremiumUpgradePrompt: View {
             switch self {
             case .dailyLimitReached:
                 return "hourglass"
+            case .videoLimitReached:
+                return "video.slash"
             case .premiumFeature:
                 return "lock.fill"
+            case .challengeLimitReached:
+                return "trophy.fill"
             }
         }
     }
@@ -84,17 +105,33 @@ struct PremiumUpgradePrompt: View {
                     .foregroundColor(.white)
                 
                 // Message
-                Text(reason.message)
+                Text(reason.message(userLifecycle: userLifecycle))
                     .font(.system(size: 18))
                     .foregroundColor(.white.opacity(0.9))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 
-                // Benefits
+                // Benefits - Dynamic based on user phase
                 VStack(alignment: .leading, spacing: 12) {
+                    if userLifecycle.currentPhase == .honeymoon {
+                        Text("Currently in Premium Preview")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.green)
+                            .padding(.bottom, 4)
+                    }
+                    
                     BenefitRow(icon: "infinity", text: "Unlimited recipes every day")
-                    BenefitRow(icon: "sparkles", text: "Advanced AI features")
-                    BenefitRow(icon: "bookmark.fill", text: "Save unlimited favorites")
+                    BenefitRow(icon: "video.fill", text: "Unlimited TikTok videos")
+                    BenefitRow(icon: "sparkles", text: "Premium video effects")
+                    BenefitRow(icon: "trophy.fill", text: "2x challenge rewards")
+                    
+                    if userLifecycle.currentPhase == .honeymoon {
+                        let daysRemaining = 7 - userLifecycle.daysActive
+                        Text("\(daysRemaining) days of free premium remaining")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.6))
+                            .padding(.top, 4)
+                    }
                 }
                 .padding(.vertical, 16)
                 
@@ -107,10 +144,23 @@ struct PremiumUpgradePrompt: View {
                     }
                 )
                 
-                // Continue with limited
-                if case .dailyLimitReached = reason {
+                // Continue with limited - Dynamic based on reason
+                switch reason {
+                case .dailyLimitReached, .videoLimitReached:
                     Button(action: { isPresented = false }) {
-                        Text("Wait until tomorrow")
+                        VStack(spacing: 4) {
+                            Text("Continue with Free")
+                                .font(.system(size: 16, weight: .medium))
+                            Text("Resets at midnight")
+                                .font(.system(size: 12))
+                                .opacity(0.7)
+                        }
+                        .foregroundColor(.white.opacity(0.6))
+                    }
+                    .padding(.top, 8)
+                default:
+                    Button(action: { isPresented = false }) {
+                        Text("Maybe Later")
                             .font(.system(size: 16))
                             .foregroundColor(.white.opacity(0.6))
                     }
