@@ -584,9 +584,9 @@ class DiscoverUsersViewModel: ObservableObject {
             // For CloudKit users, actually perform the follow/unfollow
             do {
                 if user.isFollowing {
-                    try await cloudKitAuth.unfollowUser(user.id)
+                    try await cloudKitAuth.unfollowUser(userID: user.id)
                 } else {
-                    try await cloudKitAuth.followUser(user.id)
+                    try await cloudKitAuth.followUser(userID: user.id)
                 }
 
                 // Update local state

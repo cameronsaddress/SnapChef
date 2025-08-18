@@ -361,7 +361,10 @@ class ChallengeAnalyticsService: ObservableObject {
     }
 
     private func storeAnalyticsToFile(_ data: Data) {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            print("Warning: Could not access documents directory for analytics storage")
+            return
+        }
         let analyticsPath = documentsPath.appendingPathComponent("analytics_data.json")
         try? data.write(to: analyticsPath)
     }

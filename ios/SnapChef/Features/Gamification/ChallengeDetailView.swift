@@ -97,10 +97,6 @@ struct ChallengeDetailView: View {
         // Check if authentication is required
         let authManager = CloudKitAuthManager.shared
         if authManager.isAuthRequiredFor(feature: .challenges) {
-            // Set completion handler to join challenge after auth
-            authManager.authCompletionHandler = { [self] in
-                joinChallenge()
-            }
             authManager.promptAuthForFeature(.challenges)
             return
         }

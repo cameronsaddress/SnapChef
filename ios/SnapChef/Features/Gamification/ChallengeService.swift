@@ -219,13 +219,17 @@ class ChallengeService {
     // MARK: - Helper Methods
 
     private func addAuthenticationHeaders(to request: inout URLRequest) {
-        // Add authentication token
-        if let token = UserDefaults.standard.string(forKey: "authToken") {
+        // Add authentication token from secure keychain storage
+        if let token = KeychainManager.shared.getAuthToken() {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
-        // Add API key
-        request.setValue("YOUR_API_KEY", forHTTPHeaderField: "X-API-Key")
+        // Add API key from secure keychain storage
+        if let apiKey = KeychainManager.shared.getAPIKey() {
+            request.setValue(apiKey, forHTTPHeaderField: "X-API-Key")
+        } else {
+            print("⚠️ WARNING: No API key found in keychain. Please configure API key securely.")
+        }
     }
 
     private func getUserId() -> String {

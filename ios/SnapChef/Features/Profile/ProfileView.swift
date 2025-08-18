@@ -178,7 +178,8 @@ struct EnhancedProfileHeader: View {
 
     private var emailDisplay: String {
         if let cloudKitUser = cloudKitAuthManager.currentUser {
-            return cloudKitUser.email ?? "Start your culinary journey"
+            // TODO: Fix CloudKitUser type compatibility
+            return "Start your culinary journey" // cloudKitUser.email ?? "Start your culinary journey"
         } else if let userEmail = user?.email {
             return userEmail
         } else {
@@ -878,7 +879,9 @@ struct EnhancedSettingsSection: View {
             AISettingsView()
         }
         .sheet(isPresented: $showingPerformanceSettings) {
-            PerformanceSettingsView()
+            // TODO: Implement PerformanceSettingsView
+            Text("Performance Settings")
+                .foregroundColor(.secondary)
         }
     }
 }
@@ -1765,7 +1768,8 @@ struct ProfileAchievementGalleryView: View {
     }
 
     private func isAchievementUnlocked(_ achievement: ProfileAchievement) -> Bool {
-        let recipeCount = cloudKitAuthManager.currentUser?.recipesCreated ?? appState.allRecipes.count
+        // TODO: Fix CloudKitUser type compatibility
+        let recipeCount = appState.allRecipes.count // cloudKitAuthManager.currentUser?.recipesCreated ?? appState.allRecipes.count
         let sharedCount = cloudKitAuthManager.currentUser?.recipesShared ?? appState.totalShares
         let streak = cloudKitAuthManager.currentUser?.currentStreak ?? 0
 

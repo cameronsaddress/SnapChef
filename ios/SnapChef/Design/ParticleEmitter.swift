@@ -14,18 +14,76 @@ class ParticleEmitter: ObservableObject {
     private var lastEmissionTime: TimeInterval = 0
     private var isLowPowerMode: Bool = false
     private var maxActiveParticles: Int = 200
+    private var deviceCapabilities: DeviceCapabilities
+    private var frameRateTarget: Int = 60
+    private var lastFrameTime: TimeInterval = 0
+    private var frameDropCounter: Int = 0
+    
+    // Performance throttling
+    private var particleThrottleRatio: Float = 1.0
+    private var shouldUpdateParticles: Bool = true
+    private var updateCounter: Int = 0
 
-    init(configuration: EmitterConfiguration = .trail, lowPowerMode: Bool = false) {
+    init(configuration: EmitterConfiguration = .trail, deviceManager: DeviceManager? = nil) {
         self.configuration = configuration
-        self.isLowPowerMode = lowPowerMode
-        self.maxActiveParticles = lowPowerMode ? 50 : 200
+        
+        // Initialize with default capabilities - we'll update on main actor if needed
+        self.deviceCapabilities = DeviceCapabilities.default
+        
+        // For isolated properties, use ProcessInfo as fallback since we can't access main actor here
+        self.isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+        
+        setupPerformanceSettings(deviceManager: deviceManager)
         setupParticlePool()
+        setupPerformanceMonitoring()
+    }
+    
+    private func setupPerformanceSettings(deviceManager: DeviceManager?) {
+        let deviceType = deviceCapabilities.deviceType
+        
+        switch deviceType {
+        case .highEnd:
+            maxActiveParticles = isLowPowerMode ? 50 : 200
+            frameRateTarget = 60
+            particleThrottleRatio = 1.0
+        case .midRange:
+            maxActiveParticles = isLowPowerMode ? 25 : 100
+            frameRateTarget = 45
+            particleThrottleRatio = 0.7
+        case .lowEnd:
+            maxActiveParticles = isLowPowerMode ? 10 : 50
+            frameRateTarget = 30
+            particleThrottleRatio = 0.4
+        }
+        
+        // Override with device manager settings if available
+        // Note: We'll update these asynchronously on the main actor if needed
+        // For now, use the default settings from device capabilities
+    }
+    
+    private func setupPerformanceMonitoring() {
+        // Monitor performance and adjust particle count dynamically
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.adjustPerformanceSettings()
+        }
+    }
+    
+    private func adjustPerformanceSettings() {
+        // If we're dropping frames, reduce particle count
+        if frameDropCounter > 5 {
+            particleThrottleRatio = max(0.2, particleThrottleRatio * 0.8)
+            frameDropCounter = 0
+        } else if frameDropCounter == 0 && particleThrottleRatio < 1.0 {
+            // Gradually increase if performance is good
+            particleThrottleRatio = min(1.0, particleThrottleRatio * 1.1)
+        }
     }
 
     // MARK: - Particle Pool Management
     private func setupParticlePool() {
         // Pre-allocate particles for better performance
-        let poolSize = isLowPowerMode ? 50 : 200
+        let poolSize = min(maxActiveParticles * 2, isLowPowerMode ? 100 : 400)
+        particlePool.reserveCapacity(poolSize)
         for _ in 0..<poolSize {
             particlePool.append(EmitterParticle())
         }
@@ -54,8 +112,12 @@ class ParticleEmitter: ObservableObject {
     }
 
     func emit(at position: CGPoint, velocity: CGVector = .zero) {
+        // Apply throttling based on performance
+        guard Float.random(in: 0...1) <= particleThrottleRatio else { return }
+        
         // Limit particles based on performance mode
-        guard particles.count < maxActiveParticles else { return }
+        let currentLimit = Int(Float(maxActiveParticles) * particleThrottleRatio)
+        guard particles.count < currentLimit else { return }
         guard let particle = getParticleFromPool() else { return }
 
         let angle = CGFloat.random(in: 0...(2 * .pi))
@@ -63,9 +125,10 @@ class ParticleEmitter: ObservableObject {
         let spreadAngle = configuration.spread * (.pi / 180)
         let finalAngle = angle + CGFloat.random(in: -spreadAngle...spreadAngle)
         
-        // Reduce particle lifetime in low power mode
-        let adjustedLifetime = isLowPowerMode ? configuration.lifetime * 0.5 : configuration.lifetime
-        let adjustedSize = isLowPowerMode ? configuration.baseSize * 0.7 : configuration.baseSize
+        // Adjust properties based on device capabilities and power mode
+        let performanceMultiplier = deviceCapabilities.performanceMultiplier * particleThrottleRatio
+        let adjustedLifetime = configuration.lifetime * (isLowPowerMode ? 0.5 : 1.0) * Double(performanceMultiplier)
+        let adjustedSize = configuration.baseSize * (isLowPowerMode ? 0.7 : 1.0) * CGFloat(performanceMultiplier)
 
         particle.reset(
             position: position,
@@ -91,26 +154,46 @@ class ParticleEmitter: ObservableObject {
 
     @objc private func update() {
         let currentTime = CACurrentMediaTime()
+        let frameDelta = currentTime - lastFrameTime
+        
+        // Monitor frame rate and adjust accordingly
+        let expectedFrameTime = 1.0 / Double(frameRateTarget)
+        if frameDelta > expectedFrameTime * 1.5 {
+            frameDropCounter += 1
+        } else {
+            frameDropCounter = max(0, frameDropCounter - 1)
+        }
+        
+        lastFrameTime = currentTime
+        
+        // Throttle updates based on performance
+        updateCounter += 1
+        shouldUpdateParticles = updateCounter % max(1, Int(1.0 / particleThrottleRatio)) == 0
+        
         let deltaTime = currentTime - lastEmissionTime
         
-        // Adjust emission rate based on power mode
-        let adjustedEmissionRate = isLowPowerMode ? configuration.emissionRate / 2 : configuration.emissionRate
+        // Adjust emission rate based on power mode and performance
+        let baseEmissionRate = configuration.emissionRate
+        let adjustedEmissionRate = Int(Float(baseEmissionRate) * particleThrottleRatio * (isLowPowerMode ? 0.5 : 1.0))
 
         // Emit new particles
-        if isEmitting && deltaTime > (1.0 / Double(adjustedEmissionRate)) {
+        if isEmitting && adjustedEmissionRate > 0 && deltaTime > (1.0 / Double(adjustedEmissionRate)) {
             emit(at: configuration.emissionPoint)
             lastEmissionTime = currentTime
         }
 
-        // Update existing particles at reduced rate in low power mode
-        let updateRate = isLowPowerMode ? 1.0 / 30.0 : 1.0 / 60.0 // 30 FPS vs 60 FPS
-        updateParticles(deltaTime: updateRate)
+        // Update existing particles with adaptive frame rate
+        if shouldUpdateParticles {
+            let updateRate = 1.0 / Double(frameRateTarget)
+            updateParticles(deltaTime: updateRate)
+        }
     }
 
     private func updateParticles(deltaTime: TimeInterval) {
-        particles = particles.compactMap { particle in
+        // Use removeAll with closure for better performance
+        particles.removeAll { particle in
             particle.update(deltaTime: deltaTime, configuration: configuration)
-            return particle.isActive ? particle : nil
+            return !particle.isActive
         }
     }
 }
@@ -302,6 +385,49 @@ struct ParticleEmitterView: View {
             }
         }
         .allowsHitTesting(false)
+    }
+}
+
+//MARK: - Device Capabilities
+struct DeviceCapabilities {
+    enum DeviceType {
+        case highEnd
+        case midRange
+        case lowEnd
+    }
+    
+    let deviceType: DeviceType
+    let performanceMultiplier: Float
+    
+    // Static default for non-main-actor initialization
+    static let `default` = DeviceCapabilities(deviceType: .midRange, performanceMultiplier: 0.7)
+    
+    private init(deviceType: DeviceType, performanceMultiplier: Float) {
+        self.deviceType = deviceType
+        self.performanceMultiplier = performanceMultiplier
+    }
+    
+    @MainActor init() {
+        let deviceModel = UIDevice.current.model
+        let systemVersion = UIDevice.current.systemVersion
+        
+        // Detect device capabilities based on model and processor count
+        if deviceModel.contains("iPhone") {
+            if ProcessInfo.processInfo.processorCount >= 6 {
+                deviceType = .highEnd
+                performanceMultiplier = 1.0
+            } else if ProcessInfo.processInfo.processorCount >= 4 {
+                deviceType = .midRange
+                performanceMultiplier = 0.7
+            } else {
+                deviceType = .lowEnd
+                performanceMultiplier = 0.4
+            }
+        } else {
+            // iPad or other devices - assume higher performance
+            deviceType = .highEnd
+            performanceMultiplier = 1.0
+        }
     }
 }
 

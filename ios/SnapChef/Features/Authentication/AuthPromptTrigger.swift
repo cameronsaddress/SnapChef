@@ -113,8 +113,8 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
     /// Evaluates whether to show an authentication prompt for a specific context
     /// - Parameter context: The trigger context being evaluated
     /// - Returns: True if prompt should be shown, false otherwise
-    func shouldTriggerPrompt(for context: TriggerContext) -> Bool {
-        guard let profile = profileManager.loadProfile() else {
+    func shouldTriggerPrompt(for context: TriggerContext) async -> Bool {
+        guard let profile = await profileManager.loadProfile() else {
             return false
         }
 
@@ -148,8 +148,8 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
 
     /// Triggers a prompt for the specified context if conditions are met
     /// - Parameter context: The trigger context
-    func triggerPrompt(for context: TriggerContext) {
-        guard shouldTriggerPrompt(for: context) else {
+    func triggerPrompt(for context: TriggerContext) async {
+        guard await shouldTriggerPrompt(for: context) else {
             return
         }
 
@@ -158,24 +158,26 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
         lastPromptDate = Date()
 
         // Record the prompt event
-        _ = profileManager.recordAuthPromptEvent(context: context.rawValue, action: "shown")
+        Task {
+            await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "shown")
+        }
     }
 
     /// Records user action on the authentication prompt
     /// - Parameters:
     ///   - action: Action taken by user ("completed", "dismissed", "never")
     ///   - context: The context that triggered the prompt
-    func recordPromptAction(_ action: String, for context: TriggerContext) {
-        _ = profileManager.recordAuthPromptEvent(context: context.rawValue, action: action)
+    func recordPromptAction(_ action: String, for context: TriggerContext) async {
+        await profileManager.recordAuthPromptEvent(context: context.rawValue, action: action)
 
         // Update authentication state if applicable
         switch action {
         case "completed":
-            _ = profileManager.updateAuthenticationState(.authenticated)
+            await profileManager.updateAuthenticationState(.authenticated)
         case "never":
-            _ = profileManager.updateAuthenticationState(.neverAsk)
+            await profileManager.updateAuthenticationState(.neverAsk)
         case "dismissed":
-            _ = profileManager.updateAuthenticationState(.dismissed)
+            await profileManager.updateAuthenticationState(.dismissed)
         default:
             break
         }
@@ -189,13 +191,15 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
     func dismissPrompt() {
         shouldShowPrompt = false
         if let context = currentContext {
-            recordPromptAction("dismissed", for: context)
+            Task {
+                await recordPromptAction("dismissed", for: context)
+            }
         }
     }
 
     /// Checks if user has indicated they never want to be prompted
-    func hasUserOptedOut() -> Bool {
-        guard let profile = profileManager.loadProfile() else {
+    func hasUserOptedOut() async -> Bool {
+        guard let profile = await profileManager.loadProfile() else {
             return false
         }
         return profile.authenticationState == .neverAsk
@@ -205,42 +209,58 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
 
     /// Trigger for first successful recipe creation
     func onFirstRecipeSuccess() {
-        triggerPrompt(for: .firstRecipeSuccess)
+        Task {
+            await triggerPrompt(for: .firstRecipeSuccess)
+        }
     }
 
     /// Trigger for viral content creation (video generation)
     func onViralContentCreated() {
-        triggerPrompt(for: .viralContentCreated)
+        Task {
+            await triggerPrompt(for: .viralContentCreated)
+        }
     }
 
     /// Trigger when user hits daily limits (if implemented)
     func onDailyLimitReached() {
-        triggerPrompt(for: .dailyLimitReached)
+        Task {
+            await triggerPrompt(for: .dailyLimitReached)
+        }
     }
 
     /// Trigger when user explores social features
     func onSocialFeatureExplored() {
-        triggerPrompt(for: .socialFeatureExplored)
+        Task {
+            await triggerPrompt(for: .socialFeatureExplored)
+        }
     }
 
     /// Trigger when user shows interest in challenges
     func onChallengeInterest() {
-        triggerPrompt(for: .challengeInterest)
+        Task {
+            await triggerPrompt(for: .challengeInterest)
+        }
     }
 
     /// Trigger when user attempts to share content
     func onShareAttempt() {
-        triggerPrompt(for: .shareAttempt)
+        Task {
+            await triggerPrompt(for: .shareAttempt)
+        }
     }
 
     /// Trigger for high engagement users
     func onWeeklyHighEngagement() {
-        triggerPrompt(for: .weeklyHighEngagement)
+        Task {
+            await triggerPrompt(for: .weeklyHighEngagement)
+        }
     }
 
     /// Trigger for returning users
     func onReturningUser() {
-        triggerPrompt(for: .returningUser)
+        Task {
+            await triggerPrompt(for: .returningUser)
+        }
     }
 
     // MARK: - Private Helper Methods
@@ -325,8 +345,8 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
 
 extension AuthPromptTrigger {
     /// Gets analytics data about prompt performance
-    func getPromptAnalytics() -> [String: Any] {
-        guard let profile = profileManager.loadProfile() else {
+    func getPromptAnalytics() async -> [String: Any] {
+        guard let profile = await profileManager.loadProfile() else {
             return [:]
         }
 
@@ -345,14 +365,14 @@ extension AuthPromptTrigger {
             "totalNever": totalNever,
             "conversionRate": conversionRate,
             "dismissalRate": dismissalRate,
-            "userOptedOut": hasUserOptedOut(),
+            "userOptedOut": await hasUserOptedOut(),
             "engagementScore": profile.engagementScore
         ]
     }
 
     /// Gets the most effective prompt contexts for analytics
-    func getContextEffectiveness() -> [String: Double] {
-        guard let profile = profileManager.loadProfile() else {
+    func getContextEffectiveness() async -> [String: Double] {
+        guard let profile = await profileManager.loadProfile() else {
             return [:]
         }
 
@@ -386,11 +406,11 @@ extension AuthPromptTrigger {
 #if DEBUG
 extension AuthPromptTrigger {
     /// Resets all prompt history for testing
-    func resetForTesting() {
+    func resetForTesting() async {
         shouldShowPrompt = false
         currentContext = nil
         lastPromptDate = nil
-        profileManager.resetProfileForTesting()
+        await profileManager.resetProfileForTesting()
     }
 
     /// Forces a prompt for testing purposes
@@ -401,18 +421,18 @@ extension AuthPromptTrigger {
     }
 
     /// Simulates user actions for testing
-    func simulatePromptShown(for context: TriggerContext) {
-        _ = profileManager.recordAuthPromptEvent(context: context.rawValue, action: "shown")
+    func simulatePromptShown(for context: TriggerContext) async {
+        await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "shown")
     }
 
-    func simulatePromptCompleted(for context: TriggerContext) {
-        _ = profileManager.recordAuthPromptEvent(context: context.rawValue, action: "completed")
-        _ = profileManager.updateAuthenticationState(.authenticated)
+    func simulatePromptCompleted(for context: TriggerContext) async {
+        await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "completed")
+        await profileManager.updateAuthenticationState(.authenticated)
     }
 
-    func simulatePromptDismissed(for context: TriggerContext) {
-        _ = profileManager.recordAuthPromptEvent(context: context.rawValue, action: "dismissed")
-        _ = profileManager.updateAuthenticationState(.dismissed)
+    func simulatePromptDismissed(for context: TriggerContext) async {
+        await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "dismissed")
+        await profileManager.updateAuthenticationState(.dismissed)
     }
 }
 #endif

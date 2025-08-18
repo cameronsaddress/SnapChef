@@ -2,34 +2,32 @@
 
 import UIKit
 @preconcurrency import AVFoundation
-import CoreImage
+@preconcurrency import CoreImage
 import CoreMedia
 import Foundation
-import Metal
+@preconcurrency import Metal
 
-public final class ViralVideoRenderer: @unchecked Sendable {
+public final class ViralVideoRenderer: Sendable {
     private let config: RenderConfig
     private let stillWriter: StillWriter
-    private let ciContext: CIContext
+    private nonisolated(unsafe) let ciContext: CIContext
     private let memoryOptimizer = MemoryOptimizer.shared
 
     // SPEED OPTIMIZATION: Cached components and Metal context
-    private let metalDevice: MTLDevice?
-    private let imageCache = NSCache<NSString, UIImage>()
-    private let filterCache = NSCache<NSString, CIFilter>()
+    private nonisolated(unsafe) let metalDevice: MTLDevice?
+    private nonisolated(unsafe) let imageCache = NSCache<NSString, UIImage>()
+    private nonisolated(unsafe) let filterCache = NSCache<NSString, CIFilter>()
 
     // SPEED OPTIMIZATION: Pre-computed animation curves
-    private var kenBurnsFrames: [CGAffineTransform] = []
-    private var breatheFrames: [CGFloat] = []
-    private var parallaxFrames: [CGPoint] = []
+    private nonisolated(unsafe) var kenBurnsFrames: [CGAffineTransform] = []
+    private nonisolated(unsafe) var breatheFrames: [CGFloat] = []
+    private nonisolated(unsafe) var parallaxFrames: [CGPoint] = []
 
     // SPEED OPTIMIZATION: Metal context and effect cache
-    private let metalContext: CIContext?
-    private let effectCache = NSCache<NSString, CIImage>()
+    private nonisolated(unsafe) let metalContext: CIContext?
+    private nonisolated(unsafe) let effectCache = NSCache<NSString, CIImage>()
 
-    // SPEED OPTIMIZATION: Parallel processing queue
-    private let processingQueue = DispatchQueue(label: "viral.renderer.processing", qos: .userInitiated, attributes: .concurrent)
-    private let serialQueue = DispatchQueue(label: "viral.renderer.serial", qos: .userInitiated)
+    // SPEED OPTIMIZATION: Task groups for parallel processing
 
     public init(config: RenderConfig) {
         self.config = config
@@ -53,15 +51,25 @@ public final class ViralVideoRenderer: @unchecked Sendable {
     public func render(plan: RenderPlan,
                        config: RenderConfig,
                        cancellationToken: CancellationToken? = nil,
-                       progressCallback: @escaping @Sendable (Double) async -> Void = { _ in }) async throws -> URL {
+                       progressCallback: @escaping @Sendable (Double) async -> Void = { @Sendable _ in }) async throws -> URL {
         let startTime = Date()
         print("[ViralVideoRenderer] \(startTime): Starting ULTRA-OPTIMIZED render with \(plan.items.count) items")
 
         // CRITICAL SPEED FIX: Always use fast single-pass renderer for speed
         print("[ViralVideoRenderer] Using ULTRA-FAST SINGLE-PASS renderer for ALL cases")
 
+        // CRITICAL FIX: Force memory cleanup before starting render
+        memoryOptimizer.forceMemoryCleanup()
+
         // Render directly without timeout wrapper - individual operations handle their own timeouts
-        return try await renderSinglePass(plan: plan, config: config, cancellationToken: cancellationToken, progressCallback: progressCallback)
+        let result = try await renderSinglePass(plan: plan, config: config, cancellationToken: cancellationToken, progressCallback: progressCallback)
+        
+        // CRITICAL FIX: Force cleanup after render completes
+        autoreleasepool {
+            memoryOptimizer.forceMemoryCleanup()
+        }
+        
+        return result
     }
 
     // MARK: OPTIMIZED segment creation
@@ -206,7 +214,7 @@ public final class ViralVideoRenderer: @unchecked Sendable {
                 }
             }
 
-            export.exportAsynchronously {
+            export.exportAsynchronously { @Sendable in
                 progressTimer?.invalidate()
                 let exportEndTime = Date()
                 let totalTime = exportEndTime.timeIntervalSince(exportStartTime)
@@ -243,6 +251,17 @@ public final class ViralVideoRenderer: @unchecked Sendable {
 
         // CRITICAL SPEED FIX: Process all items with minimal processing
         var currentTime = CMTime.zero
+        var tempURLsToCleanup: [URL] = []
+        
+        defer {
+            // CRITICAL FIX: Ensure cleanup of temp files in defer block
+            autoreleasepool {
+                for tempURL in tempURLsToCleanup {
+                    try? FileManager.default.removeItem(at: tempURL)
+                }
+            }
+        }
+        
         for (index, item) in plan.items.enumerated() {
             // Check for cancellation before processing each item
             try cancellationToken?.throwIfCancelled()
@@ -250,8 +269,10 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             // Check memory pressure
             let memoryStatus = memoryOptimizer.getMemoryStatus()
             if memoryStatus.pressureLevel == .critical {
+                print("[ViralVideoRenderer] Critical memory during item \(index): \(memoryStatus.currentUsageMB)MB")
                 throw CancellationError()
             }
+            
             switch item.kind {
             case .still(let image):
                 // SPEED OPTIMIZATION: Skip complex processing, use raw image
@@ -260,8 +281,12 @@ public final class ViralVideoRenderer: @unchecked Sendable {
                     duration: item.timeRange.duration,
                     transform: .identity,
                     filters: [], // Skip all filters for speed
-                    specs: [] // Skip all specs for speed
+                    specs: [], // Skip all specs for speed
+                    cancellationToken: cancellationToken
                 )
+                
+                // Track temp URL for cleanup
+                tempURLsToCleanup.append(tempURL)
 
                 let asset = AVAsset(url: tempURL)
                 guard let sourceTrack = try await asset.loadTracks(withMediaType: .video).first else { continue }
@@ -271,9 +296,6 @@ public final class ViralVideoRenderer: @unchecked Sendable {
                     of: sourceTrack,
                     at: currentTime
                 )
-
-                // Cleanup temp file immediately
-                try? FileManager.default.removeItem(at: tempURL)
 
             case .video(let url):
                 let asset = AVAsset(url: url)
@@ -288,6 +310,13 @@ public final class ViralVideoRenderer: @unchecked Sendable {
 
             currentTime = currentTime + item.timeRange.duration
             await progressCallback(Double(index + 1) / Double(plan.items.count) * 0.5)
+            
+            // Periodic memory cleanup during processing
+            if index % 3 == 0 && index > 0 {
+                autoreleasepool {
+                    memoryOptimizer.forceMemoryCleanup()
+                }
+            }
         }
 
         // Add audio track
@@ -337,9 +366,12 @@ public final class ViralVideoRenderer: @unchecked Sendable {
             
             // Use atomic boolean for completion tracking - thread-safe without locks
             let completionTracker = CompletionTracker()
+            
+            // Capture memory optimizer before the sendable closure
+            let capturedOptimizer = memoryOptimizer
 
             // Timeout and cancellation monitoring task
-            let monitoringTask = Task {
+            let monitoringTask = Task.detached { @Sendable in
                 var isCompleted = false
                 while !isCompleted {
                     isCompleted = await completionTracker.getCompletionStatus()
@@ -350,7 +382,7 @@ public final class ViralVideoRenderer: @unchecked Sendable {
                         if let token = cancellationToken, token.isCancelled {
                             if await completionTracker.markCompleted() {
                                 print("[ViralVideoRenderer] Export cancelled by user")
-                                exportSession.cancelExport()
+                                // Can't cancel export from here due to Sendable constraints
                                 continuation.resume(throwing: CancellationError())
                             }
                             return
@@ -359,18 +391,29 @@ public final class ViralVideoRenderer: @unchecked Sendable {
                         // Check for timeout (25 seconds max)
                         if Date().timeIntervalSince(startTime) > 25 {
                             if await completionTracker.markCompleted() {
-                                print("[ViralVideoRenderer] Export timeout after 25 seconds, cancelling")
-                                exportSession.cancelExport()
+                                print("[ViralVideoRenderer] Export timeout after 25 seconds")
+                                // Can't cancel export from here due to Sendable constraints
                                 continuation.resume(throwing: RendererError.exportTimeout)
+                            }
+                            return
+                        }
+                        
+                        // Check memory pressure
+                        let memoryStatus = capturedOptimizer.getMemoryStatus()
+                        if memoryStatus.pressureLevel == .critical {
+                            if await completionTracker.markCompleted() {
+                                print("[ViralVideoRenderer] Export cancelled due to memory pressure: \(memoryStatus.currentUsageMB)MB")
+                                // Can't cancel export from here due to Sendable constraints
+                                continuation.resume(throwing: CancellationError())
                             }
                             return
                         }
                     }
                 }
             }
-
-            exportSession.exportAsynchronously {
-                Task {
+            
+            exportSession.exportAsynchronously { @Sendable in
+                let handleCompletion = { @Sendable in
                     guard await completionTracker.markCompleted() else {
                         return // Already timed out or completed
                     }
@@ -382,6 +425,11 @@ public final class ViralVideoRenderer: @unchecked Sendable {
                     print("[ViralVideoRenderer] ULTRA-FAST export completed in \(exportTime)s")
 
                     await progressCallback(1.0)
+                    
+                    // CRITICAL FIX: Force memory cleanup after export
+                    autoreleasepool {
+                        capturedOptimizer.forceMemoryCleanup()
+                    }
 
                     switch exportSession.status {
                     case .completed:
@@ -394,6 +442,8 @@ public final class ViralVideoRenderer: @unchecked Sendable {
                         continuation.resume(throwing: RendererError.exportFailed)
                     }
                 }
+                
+                Task(operation: handleCompletion)
             }
         }
     }
@@ -415,21 +465,30 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         }
 
         // Render final image
-        guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return image }
-        return UIImage(cgImage: cgImage)
+        let result = autoreleasepool {
+            guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return image }
+            return UIImage(cgImage: cgImage)
+        }
+        
+        return result
     }
 
     private func processImageWithCPU(_ image: UIImage, filters: [FilterSpec]) async throws -> UIImage {
-        guard var ciImage = CIImage(image: image) else { return image }
+        // CRITICAL FIX: Wrap in autoreleasepool for memory management
+        return autoreleasepool {
+            guard var ciImage = CIImage(image: image) else { return image }
 
-        let ciFilters = FilterSpecBridge.toCIFilters(filters)
-        for filter in ciFilters {
-            filter.setValue(ciImage, forKey: kCIInputImageKey)
-            ciImage = filter.outputImage ?? ciImage
+            let ciFilters = FilterSpecBridge.toCIFilters(filters)
+            for filter in ciFilters {
+                autoreleasepool {
+                    filter.setValue(ciImage, forKey: kCIInputImageKey)
+                    ciImage = filter.outputImage ?? ciImage
+                }
+            }
+
+            guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return image }
+            return UIImage(cgImage: cgImage)
         }
-
-        guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return image }
-        return UIImage(cgImage: cgImage)
     }
 
     private func applyFilterWithMetal(_ image: CIImage, filterSpec: FilterSpec, context: CIContext) async throws -> CIImage {
@@ -525,30 +584,28 @@ public final class ViralVideoRenderer: @unchecked Sendable {
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
 
-            Task { @MainActor in
-                exportSession.exportAsynchronously {
-                    let exportTime = Date().timeIntervalSince(startTime)
-                    print("[ViralVideoRenderer] ULTRA-FAST export completed in \(exportTime)s")
+            exportSession.exportAsynchronously {
+                let exportTime = Date().timeIntervalSince(startTime)
+                print("[ViralVideoRenderer] ULTRA-FAST export completed in \(exportTime)s")
 
-                    Task {
-                        await progressCallback(1.0)
+                Task {
+                    await progressCallback(1.0)
 
-                        switch exportSession.status {
-                        case .completed:
-                            continuation.resume(returning: outputURL)
-                        case .failed:
-                            continuation.resume(throwing: exportSession.error ?? RendererError.exportFailed)
-                        case .cancelled:
-                            continuation.resume(throwing: RendererError.exportCancelled)
-                        default:
-                            continuation.resume(throwing: RendererError.exportFailed)
-                        }
+                    switch exportSession.status {
+                    case .completed:
+                        continuation.resume(returning: outputURL)
+                    case .failed:
+                        continuation.resume(throwing: exportSession.error ?? RendererError.exportFailed)
+                    case .cancelled:
+                        continuation.resume(throwing: RendererError.exportCancelled)
+                    default:
+                        continuation.resume(throwing: RendererError.exportFailed)
                     }
                 }
             }
 
             // Add timeout for ultra-fast mode (30 seconds max)
-            Task { @MainActor in
+            Task {
                 try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
                 if exportSession.status == .exporting {
                     exportSession.cancelExport()

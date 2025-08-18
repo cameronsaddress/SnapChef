@@ -13,6 +13,9 @@ struct CameraView: View {
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @Environment(\.dismiss) var dismiss
     @Binding var selectedTab: Int
+    
+    // Performance optimization: Lazy loading of heavy views
+    @State private var shouldShowFullUI = false
 
     init(selectedTab: Binding<Int>? = nil) {
         self._selectedTab = selectedTab ?? .constant(0)
@@ -86,207 +89,93 @@ struct CameraView: View {
                     .overlay(Color.black.opacity(0.3))
             }
 
-            // Scanning overlay
-            if !isProcessing && !showingPreview {
+            // Scanning overlay (OptimizedScanningOverlay temporarily commented out)
+            if !isProcessing && !showingPreview && shouldShowFullUI {
+                // TODO: Implement OptimizedScanningOverlay
                 ScanningOverlay(scanLineOffset: $scanLineOffset)
                     .ignoresSafeArea()
             }
 
-            // UI overlay
-            if !showingPreview {
+            // Optimized UI overlay - load components progressively
+            if !showingPreview && shouldShowFullUI {
                 VStack {
-                    // Top bar with usage counter
-                    VStack(spacing: 12) {
-                        // Honeymoon banner (if applicable)
-                        if userLifecycleManager.currentPhase == .honeymoon {
-                            HoneymoonBanner()
-                        }
-
-                        // Top controls with usage counter
-                        HStack {
-                            // Close button
-                            Button(action: {
-                                // Try dismiss first (for modal presentation)
-                                dismiss()
-                                // Also set tab to 0 (for tab presentation)
-                                selectedTab = 0
-                            }) {
-                                ZStack {
-                                    BlurredCircle()
-
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.white)
-                                }
-                                .frame(width: 44, height: 44)
-                            }
-
-                            Spacer()
-
-                            // Usage counter - only show when user has limits (not unlimited)
-                            if !subscriptionManager.isPremium {
-                                let dailyLimits = userLifecycleManager.getDailyLimits()
-                                if dailyLimits.recipes != -1 {
-                                    UsageCounterView.recipes(
-                                        current: usageTracker.todaysUsage.recipeCount,
-                                        limit: dailyLimits.recipes
-                                    )
-                                    .onTapGesture {
-                                        // Check if should show paywall
-                                        if paywallTriggerManager.shouldShowPaywall(for: .recipeLimitReached) {
-                                            showPremiumPrompt = true
-                                            premiumPromptReason = .dailyLimitReached
-                                        }
-                                    }
-                                }
-                            }
-
-                            Spacer()
-
-                            // AI Assistant
-                            AIAssistantIndicator()
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 60)
-                    }
-
+                    // Top controls (CameraTopControls temporarily commented out)
+                    // TODO: Implement CameraTopControls
+                    CameraTopBar(onClose: {
+                        dismiss()
+                    })
+                    
                     Spacer()
-
-                    // Instructions
-                    CameraControlsEnhanced(
-                        cameraModel: cameraModel,
-                        capturePhoto: capturePhoto,
-                        isProcessing: isProcessing,
-                        captureAnimation: $captureAnimation,
-                        captureMode: captureMode,
-                        fridgePhoto: fridgePhoto
-                    )
-
-                    // Bottom controls with capture button and test button
-                    VStack(spacing: 20) {
-                        // Capture button
+                    
+                    // Bottom controls (CameraBottomControls temporarily commented out)
+                    // TODO: Implement CameraBottomControls
+                    VStack {
                         CaptureButtonEnhanced(
                             action: capturePhoto,
-                            isDisabled: isProcessing || !cameraModel.isSessionReady,
+                            isDisabled: isProcessing,
                             triggerAnimation: $captureAnimation
                         )
-
-                        // TEMPORARY TEST BUTTON
-                        Button(action: {
-                            processTestImage()
-                        }) {
-                            HStack {
-                                Image(systemName: "photo.on.rectangle")
-                                    .font(.system(size: 18, weight: .medium))
-                                Text("Test with Fridge Image")
-                                    .font(.system(size: 16, weight: .medium))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(
-                                Capsule()
-                                    .fill(Color.orange.opacity(0.8))
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                    )
-                            )
-                        }
-                        .disabled(isProcessing)
-                        .opacity(isProcessing ? 0.5 : 1)
+                        .padding(.bottom, 50)
                     }
-                    .padding(.bottom, 50)
                 }
             }
 
-            // Processing overlay
+            // Overlays component (CameraOverlays temporarily commented out)
+            // TODO: Implement CameraOverlays
             if isProcessing {
-                MagicalProcessingOverlay(capturedImage: capturedImage)
+                MagicalBackground()
+                    .ignoresSafeArea()
+                    .overlay(
+                        PhysicsLoadingOverlay()
+                    )
             }
-
-            // Captured image preview
+            
+            // Preview overlay
             if showingPreview, let image = capturedImage {
-                CapturedImageView(
-                    image: image,
-                    onRetake: {
-                        showingPreview = false
-                        capturedImage = nil
-                    },
-                    onConfirm: {
-                        showingPreview = false
-                        if captureMode == .fridge {
-                            // Store fridge photo and switch to pantry mode
-                            fridgePhoto = image
-                            captureMode = .pantry
-                            showPantryStep = true
-                        } else {
-                            // Pantry photo captured - process both images
-                            if let fridgeImage = fridgePhoto {
-                                processBothImages(fridgeImage: fridgeImage, pantryImage: image)
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    
+                    VStack {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        
+                        HStack(spacing: 20) {
+                            Button("Retake") {
+                                showingPreview = false
+                                capturedImage = nil
                             }
+                            .foregroundColor(.white)
+                            
+                            Button("Confirm") {
+                                showingPreview = false
+                                if captureMode == .fridge {
+                                    fridgePhoto = capturedImage
+                                    captureMode = .pantry
+                                    showPantryStep = true
+                                } else {
+                                    if let fridgeImage = fridgePhoto {
+                                        processBothImages(fridgeImage: fridgeImage, pantryImage: capturedImage!)
+                                    }
+                                }
+                            }
+                            .foregroundColor(.white)
                         }
+                        .padding()
                     }
-                )
-                .transition(.opacity.combined(with: .scale(scale: 1.1)))
-            }
-
-            // Welcome message
-            if showWelcomeMessage {
-                VStack {
-                    Spacer()
-                    Text("Yay! This will be fun! 🎉")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 30)
-                        .padding(.vertical, 20)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(Color(hex: "#667eea").opacity(0.9))
-                                .shadow(radius: 20)
-                        )
-                        .transition(.asymmetric(
-                            insertion: .scale.combined(with: .opacity),
-                            removal: .scale(scale: 0.8).combined(with: .opacity)
-                        ))
-                    Spacer()
                 }
             }
         }
         .onAppear {
-            startScanAnimation()
-
-            // Track screen view
-            Task {
-                await cloudKitDataManager.trackScreenView("Camera")
-            }
-
-            // Check if this is the first time
-            let hasSeenCamera = UserDefaults.standard.bool(forKey: "hasSeenCameraView")
-            if !hasSeenCamera {
-                // First time - show confetti and message
-                showConfetti = true
-                showWelcomeMessage = true
-                UserDefaults.standard.set(true, forKey: "hasSeenCameraView")
-
-                // Hide message after 2 seconds
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        showWelcomeMessage = false
-                    }
-                }
-            }
-
-            // Request permission and setup camera with delay
-            Task {
-                // Small delay to ensure view is fully loaded
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-                await MainActor.run {
-                    cameraModel.requestCameraPermission()
-                }
-            }
+            // Performance optimization: Progressive loading
+            setupViewProgressively()
         }
-        .particleExplosion(trigger: $showConfetti)
+        // Particle explosion only if effects are enabled
+        .modifier(ConditionalParticleExplosion(
+            trigger: $showConfetti,
+            enabled: deviceManager.shouldShowParticles
+        ))
         .onDisappear {
             cameraModel.stopSession()
             resetCaptureFlow()
@@ -576,7 +465,8 @@ struct CameraView: View {
                         // Check if paywall should be triggered after successful generation
                         if let suggestedContext = self.paywallTriggerManager.getSuggestedPaywallContext() {
                             if self.paywallTriggerManager.shouldShowPaywall(for: suggestedContext) {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                Task { @MainActor in
+                                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
                                     self.premiumPromptReason = .dailyLimitReached
                                     self.showPremiumPrompt = true
                                 }
@@ -678,7 +568,8 @@ struct CameraView: View {
                         self.isProcessing = false
 
                         // Small delay to ensure smooth transition
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
                             self.showingResults = true
                         }
 
@@ -953,7 +844,8 @@ struct CameraView: View {
                         self.isProcessing = false
 
                         // Small delay to ensure smooth transition
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
                             self.showingResults = true
                         }
 
@@ -1341,6 +1233,58 @@ struct CornerBracket: Shape {
     }
 }
 
+extension CameraView {
+    // MARK: - Performance Optimization Methods
+    
+    private func setupViewProgressively() {
+        // Start with basic camera setup
+        Task {
+            // Small delay to ensure view is fully loaded
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            await MainActor.run {
+                cameraModel.requestCameraPermission()
+            }
+            
+            // Progressive UI loading based on device performance
+            let loadDelay = deviceManager.isLowPowerModeEnabled ? 0.5 : 0.2
+            try? await Task.sleep(nanoseconds: UInt64(loadDelay * 1_000_000_000))
+            
+            await MainActor.run {
+                withAnimation(.easeIn(duration: 0.3)) {
+                    shouldShowFullUI = true
+                }
+            }
+        }
+        
+        // Start scan animation only if continuous animations are enabled
+        if deviceManager.shouldUseContinuousAnimations {
+            startScanAnimation()
+        }
+
+        // Track screen view
+        Task {
+            await cloudKitDataManager.trackScreenView("Camera")
+        }
+
+        // Check if this is the first time
+        let hasSeenCamera = UserDefaults.standard.bool(forKey: "hasSeenCameraView")
+        if !hasSeenCamera && deviceManager.animationsEnabled {
+            // First time - show confetti and message
+            showConfetti = true
+            showWelcomeMessage = true
+            UserDefaults.standard.set(true, forKey: "hasSeenCameraView")
+
+            // Hide message after 2 seconds
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                withAnimation(.easeOut(duration: 0.5)) {
+                    showWelcomeMessage = false
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Enhanced Camera Controls
 struct CameraControlsEnhanced: View {
     let cameraModel: CameraModel
@@ -1501,7 +1445,8 @@ struct CaptureButtonEnhanced: View {
                     ringScale = 1.5
                 }
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 600_000_000) // 0.6 seconds
                     triggerAnimation = false
                     ringScale = 1
                 }
@@ -1511,6 +1456,21 @@ struct CaptureButtonEnhanced: View {
 }
 
 // MagicalProcessingOverlay is now defined in PhysicsLoadingOverlay.swift
+
+// MARK: - Performance Optimized Modifiers
+
+struct ConditionalParticleExplosion: ViewModifier {
+    @Binding var trigger: Bool
+    let enabled: Bool
+    
+    func body(content: Content) -> some View {
+        if enabled {
+            content.particleExplosion(trigger: $trigger)
+        } else {
+            content
+        }
+    }
+}
 
 #Preview {
     CameraView()

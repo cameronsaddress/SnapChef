@@ -462,20 +462,37 @@ GlassmorphicCard(
 
 ## Recent Component Updates
 
-### Challenge System (January 2025)
-- Added complete challenge system with 20+ new components
-- Integrated gamification with recipe creation flow
-- Added Core Data persistence and CloudKit sync
-- Implemented real-time progress tracking
-- Created comprehensive UI for challenges and rewards
+### Progressive Authentication System (January 2025)
+- Added AnonymousUserProfile with keychain storage
+- Implemented KeychainProfileManager for secure profile management
+- Added AuthPromptTrigger for smart authentication prompts
+- Integrated progressive authentication throughout app flow
+
+### Progressive Premium System (January 2025)
+- Added UserLifecycleManager for user phase tracking
+- Implemented UsageTracker for daily limits enforcement
+- Added dynamic limit adjustments based on user lifecycle
+- Integrated with existing challenge and subscription systems
+
+### Core Architecture Updates (January 2025)
+- Refactored AppState into focused ViewModels (RecipesViewModel, AuthViewModel, GamificationViewModel)
+- Updated navigation to single NavigationStack architecture
+- Added comprehensive error handling with SnapChefError system
+- Improved Swift 6 concurrency compliance
+
+### TikTok Integration (January 2025)
+- Complete viral video generation system
+- Multiple rendering engines (ViralVideoRenderer, ViralVideoRendererPro)
+- Advanced overlay and effects system
+- Performance optimization for video creation
 
 ### Fixed Issues
-- GlassmorphicCard parameter consistency
-- Recipe model updates (tags, dietaryInfo)
-- MainActor isolation for async operations
-- String indexing and regex patterns
+- Swift 6 concurrency violations in TikTok video export
+- EXC_BREAKPOINT crashes from force unwraps in video generation
+- CloudKit authentication flow improvements
+- Performance optimizations for particle systems
 
 ---
 
-Last Updated: January 31, 2025
-Version: 1.1.0
+Last Updated: January 18, 2025
+Version: 2.0.0

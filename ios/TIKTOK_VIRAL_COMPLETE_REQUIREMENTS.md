@@ -306,7 +306,7 @@ func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>)
 
 ### Sandbox Credentials
 - **Client Key**: sbawj0946ft24i4wjv
-- **Client Secret**: 1BsqJsVa6bKjzlt2BvJgrapjgfNw7Ewk
+- **Client Secret**: [REDACTED - Use KeychainManager]
 - **Redirect URI**: https://example.dev/share
 
 ## Dynamic Text Mapping Rules

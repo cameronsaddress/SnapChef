@@ -7,20 +7,20 @@ import UIKit
 @preconcurrency import VideoToolbox
 import Metal
 
-public final class StillWriter: @unchecked Sendable {
+public final class StillWriter: Sendable {
     private let config: RenderConfig
-    private let ciContext: CIContext
-    private var pixelBufferPool: CVPixelBufferPool?
+    private nonisolated(unsafe) let ciContext: CIContext
+    private nonisolated(unsafe) var pixelBufferPool: CVPixelBufferPool?
     private let memoryOptimizer = MemoryOptimizer.shared
 
     // SPEED OPTIMIZATION: Pre-computed animation curves
-    private var kenBurnsFrames: [CGAffineTransform] = []
-    private var breatheFrames: [CGFloat] = []
-    private var parallaxFrames: [CGPoint] = []
+    private nonisolated(unsafe) var kenBurnsFrames: [CGAffineTransform] = []
+    private nonisolated(unsafe) var breatheFrames: [CGFloat] = []
+    private nonisolated(unsafe) var parallaxFrames: [CGPoint] = []
 
     // SPEED OPTIMIZATION: Metal acceleration and caching
-    private let metalContext: CIContext?
-    private let effectCache = NSCache<NSString, CIImage>()
+    private nonisolated(unsafe) let metalContext: CIContext?
+    private nonisolated(unsafe) let effectCache = NSCache<NSString, CIImage>()
 
     public init(config: RenderConfig) {
         self.config = config
@@ -165,6 +165,15 @@ public final class StillWriter: @unchecked Sendable {
 
         // Log memory usage at start
         memoryOptimizer.logMemoryProfile(phase: "StillWriter start")
+        
+        // CRITICAL FIX: Track temp files for proper cleanup
+        var tempResources: [Any] = []
+        defer {
+            autoreleasepool {
+                tempResources.removeAll()
+                memoryOptimizer.forceMemoryCleanup()
+            }
+        }
 
         for frame in 0..<totalFrames {
             // Check for cancellation before processing each frame
@@ -174,8 +183,10 @@ public final class StillWriter: @unchecked Sendable {
             if frame % 10 == 0 {
                 let memoryStatus = memoryOptimizer.getMemoryStatus()
                 if memoryStatus.pressureLevel == .critical {
+                    print("[StillWriter] Critical memory at frame \(frame): \(memoryStatus.currentUsageMB)MB")
                     throw CancellationError()
                 } else if memoryStatus.pressureLevel == .warning {
+                    print("[StillWriter] Warning memory at frame \(frame): \(memoryStatus.currentUsageMB)MB - forcing cleanup")
                     memoryOptimizer.forceMemoryCleanup()
                 }
             }
@@ -295,7 +306,9 @@ public final class StillWriter: @unchecked Sendable {
             )
 
             // SPEED OPTIMIZATION: Apply filters efficiently with caching
-            img = try await applyFiltersEfficiently(to: img, filters: filters, specs: specs, frame: frame, totalFrames: totalFrames)
+            img = autoreleasepool {
+                try! applyFiltersEfficiently(to: img, filters: filters, specs: specs, frame: frame, totalFrames: totalFrames)
+            }
 
             // SPEED OPTIMIZATION: Render with Metal acceleration if available
             // Fix Ken Burns edge glitches: Ensure bounds are integer-aligned and proper layer setup
@@ -339,7 +352,7 @@ public final class StillWriter: @unchecked Sendable {
                 // Additional memory cleanup for long sequences
                 if frame > 0 && frame % 60 == 0 {
                     autoreleasepool {
-                        // Force cleanup of any accumulated memory
+                        memoryOptimizer.forceMemoryCleanup()
                     }
                 }
             }
@@ -348,14 +361,20 @@ public final class StillWriter: @unchecked Sendable {
         input.markAsFinished()
         await progressCallback(1.0)
 
+        // CRITICAL FIX: Proper completion handling with memory cleanup
         await withCheckedContinuation { continuation in
-            writer.finishWriting {
-                if writer.status == .failed {
-                    print("❌ AVAssetWriter failed with error: \(writer.error?.localizedDescription ?? "Unknown")")
-                } else if writer.status == .completed {
-                    print("✅ StillWriter successfully created video at: \(out.path)")
+            writer.finishWriting { [weak self] in
+                autoreleasepool {
+                    if writer.status == .failed {
+                        print("❌ AVAssetWriter failed with error: \(writer.error?.localizedDescription ?? "Unknown")")
+                    } else if writer.status == .completed {
+                        print("✅ StillWriter successfully created video at: \(out.path)")
+                    }
+                    
+                    // Force cleanup after completion
+                    self?.memoryOptimizer.forceMemoryCleanup()
+                    continuation.resume()
                 }
-                continuation.resume()
             }
         }
 
@@ -635,7 +654,9 @@ public final class StillWriter: @unchecked Sendable {
             let time = CMTime(value: CMTimeValue(frame), timescale: config.fps)
 
             // Simple render without effects
-            ciContext.render(fitted, to: pixelBuffer, bounds: canvas, colorSpace: CGColorSpaceCreateDeviceRGB())
+            autoreleasepool {
+                ciContext.render(fitted, to: pixelBuffer, bounds: canvas, colorSpace: CGColorSpaceCreateDeviceRGB())
+            }
 
             guard adaptor.append(pixelBuffer, withPresentationTime: time) else {
                 throw StillWriterError.cannotStartWriting("Failed to append frame")
@@ -647,8 +668,12 @@ public final class StillWriter: @unchecked Sendable {
         input.markAsFinished()
 
         await withCheckedContinuation { continuation in
-            writer.finishWriting {
-                continuation.resume()
+            writer.finishWriting { [weak self] in
+                autoreleasepool {
+                    // Force cleanup after simple video creation
+                    self?.memoryOptimizer.forceMemoryCleanup()
+                    continuation.resume()
+                }
             }
         }
 
@@ -660,55 +685,59 @@ public final class StillWriter: @unchecked Sendable {
     }
 
     // MARK: SPEED OPTIMIZATION: Efficient filter application with caching
-    private func applyFiltersEfficiently(to image: CIImage, filters: [CIFilter], specs: [FilterSpec], frame: Int, totalFrames: Int) async throws -> CIImage {
-        var img = image
+    private func applyFiltersEfficiently(to image: CIImage, filters: [CIFilter], specs: [FilterSpec], frame: Int, totalFrames: Int) throws -> CIImage {
+        // CRITICAL FIX: Wrap entire filter application in autoreleasepool
+        return autoreleasepool {
+            var img = image
 
-        // SPEED OPTIMIZATION: Use Metal context if available for better performance
-        // Note: renderContext is available if needed for future optimizations
+            // SPEED OPTIMIZATION: Use Metal context if available for better performance
+            // Note: renderContext is available if needed for future optimizations
 
-        // Apply filters in batches to reduce pipeline overhead
-        for (index, filter) in filters.enumerated() {
-            autoreleasepool {
-                let cacheKey = "filter_\(index)_\(frame)" as NSString
+            // Apply filters in batches to reduce pipeline overhead
+            for (index, filter) in filters.enumerated() {
+                autoreleasepool {
+                    let cacheKey = "filter_\(index)_\(frame)" as NSString
 
-                // Check cache first
-                if let cachedResult = effectCache.object(forKey: cacheKey) {
-                    img = cachedResult
-                    return
-                }
+                    // Check cache first
+                    if let cachedResult = effectCache.object(forKey: cacheKey) {
+                        img = cachedResult
+                        return
+                    }
 
-                // Apply filter
-                if !isGeneratorFilter(filter) {
-                    filter.setValue(img, forKey: kCIInputImageKey)
-                }
+                    // Apply filter
+                    if !isGeneratorFilter(filter) {
+                        filter.setValue(img, forKey: kCIInputImageKey)
+                    }
 
-                if let outputImage = filter.outputImage {
-                    if isGeneratorFilter(filter) {
-                        // Composite generator filters
-                        let composite = CIFilter(name: "CISourceOverCompositing")!
-                        composite.setValue(outputImage, forKey: kCIInputImageKey)
-                        composite.setValue(img, forKey: kCIInputBackgroundImageKey)
-                        img = composite.outputImage ?? img
-                    } else {
-                        img = outputImage
+                    if let outputImage = filter.outputImage {
+                        if isGeneratorFilter(filter) {
+                            // Composite generator filters - handle missing filter gracefully
+                            if let composite = CIFilter(name: "CISourceOverCompositing") {
+                                composite.setValue(outputImage, forKey: kCIInputImageKey)
+                                composite.setValue(img, forKey: kCIInputBackgroundImageKey)
+                                img = composite.outputImage ?? img
+                            }
+                        } else {
+                            img = outputImage
+                        }
+                    }
+
+                    // Cache result for potential reuse
+                    if filters.count < 5 { // Only cache for simpler cases
+                        effectCache.setObject(img, forKey: cacheKey)
                     }
                 }
+            }
 
-                // Cache result for potential reuse
-                if filters.count < 5 { // Only cache for simpler cases
-                    effectCache.setObject(img, forKey: cacheKey)
+            // Apply motion effects with specs
+            for (index, spec) in specs.enumerated() {
+                if index < specs.count {
+                    img = applyMotionEffectOptimized(to: img, filterSpec: spec, frame: frame, totalFrames: totalFrames)
                 }
             }
-        }
 
-        // Apply motion effects with specs
-        for (index, spec) in specs.enumerated() {
-            if index < specs.count {
-                img = applyMotionEffectOptimized(to: img, filterSpec: spec, frame: frame, totalFrames: totalFrames)
-            }
+            return img
         }
-
-        return img
     }
 
     private func isGeneratorFilter(_ filter: CIFilter) -> Bool {

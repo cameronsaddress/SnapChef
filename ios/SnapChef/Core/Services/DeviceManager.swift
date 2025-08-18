@@ -180,7 +180,9 @@ final class DeviceManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handlePowerStateChange()
+            Task { @MainActor in
+                self?.handlePowerStateChange()
+            }
         }
     }
     

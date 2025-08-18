@@ -95,7 +95,10 @@ class NetworkManager {
     // MARK: - Generic HTTP Methods
 
     private func get<T: Decodable>(_ endpoint: String, headers: [String: String] = [:]) async throws -> T {
-        var request = URLRequest(url: URL(string: endpoint)!)
+        guard let url = URL(string: endpoint) else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -125,7 +128,10 @@ class NetworkManager {
     }
 
     private func post<T: Decodable, U: Encodable>(_ endpoint: String, body: U, additionalHeaders: [String: String] = [:]) async throws -> T {
-        var request = URLRequest(url: URL(string: endpoint)!)
+        guard let url = URL(string: endpoint) else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -158,7 +164,10 @@ class NetworkManager {
     }
 
     private func post<T: Decodable>(_ endpoint: String, body: [String: Any]) async throws -> T {
-        var request = URLRequest(url: URL(string: endpoint)!)
+        guard let url = URL(string: endpoint) else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -211,6 +220,7 @@ struct EmptyRequest: Encodable {}
 // MARK: - Errors
 
 enum NetworkError: LocalizedError {
+    case invalidURL
     case invalidInput
     case invalidResponse
     case httpError(Int)
@@ -219,6 +229,8 @@ enum NetworkError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .invalidURL:
+            return "Invalid URL"
         case .invalidInput:
             return "Invalid input data"
         case .invalidResponse:

@@ -89,6 +89,7 @@ struct SubscriptionView: View {
                                 PlanCard(
                                     plan: plan,
                                     isSelected: selectedPlan == plan,
+                                    products: subscriptionManager.products,
                                     onSelect: { selectedPlan = plan }
                                 )
                             }
@@ -259,6 +260,7 @@ struct FeatureRow: View {
 struct PlanCard: View {
     let plan: SubscriptionView.SubscriptionPlan
     let isSelected: Bool
+    let products: [Product]
     let onSelect: () -> Void
 
     var body: some View {
@@ -289,7 +291,7 @@ struct PlanCard: View {
 
                 Spacer()
 
-                Text(plan.getPrice(from: subscriptionManager.products))
+                Text(plan.getPrice(from: products))
                     .font(.system(size: 18, weight: .medium))
 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")

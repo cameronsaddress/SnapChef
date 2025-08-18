@@ -749,7 +749,14 @@ final class RecipeModule: ObservableObject {
         components.host = "recipe"
         components.path = "/\(recipeID)"
         
-        return components.url ?? URL(string: "snapchef://recipe/\(recipeID)")!
+        if let url = components.url {
+            return url
+        } else if let fallbackURL = URL(string: "snapchef://recipe/\(recipeID)") {
+            return fallbackURL
+        } else {
+            // Final fallback to a generic URL
+            return URL(string: "snapchef://error")!
+        }
     }
     
     /// Handle incoming recipe share link

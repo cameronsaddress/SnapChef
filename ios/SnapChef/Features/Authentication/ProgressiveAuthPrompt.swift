@@ -290,7 +290,9 @@ struct ProgressiveAuthPrompt: View {
                         HStack(spacing: 16) {
                             // Maybe Later
                             Button(action: {
-                                authTrigger.recordPromptAction("dismissed", for: currentContext)
+                                Task {
+                                    await authTrigger.recordPromptAction("dismissed", for: currentContext)
+                                }
                                 dismissPrompt()
                             }) {
                                 Text("Maybe Later")
@@ -306,7 +308,9 @@ struct ProgressiveAuthPrompt: View {
 
                             // Don't Ask Again
                             Button(action: {
-                                authTrigger.recordPromptAction("never", for: currentContext)
+                                Task {
+                                    await authTrigger.recordPromptAction("never", for: currentContext)
+                                }
                                 dismissPrompt()
                             }) {
                                 Text("Don't Ask Again")
@@ -387,7 +391,9 @@ struct ProgressiveAuthPrompt: View {
                     throw error
                 }
                 await MainActor.run {
-                    authTrigger.recordPromptAction("completed", for: currentContext)
+                    Task {
+                        await authTrigger.recordPromptAction("completed", for: currentContext)
+                    }
                     showSuccessAndDismiss()
                 }
             } catch {
@@ -409,7 +415,9 @@ struct ProgressiveAuthPrompt: View {
                 // TikTok authentication using the shared manager
                 _ = try await tikTokAuthManager.authenticate()
                 await MainActor.run {
-                    authTrigger.recordPromptAction("completed", for: currentContext)
+                    Task {
+                        await authTrigger.recordPromptAction("completed", for: currentContext)
+                    }
                     showSuccessAndDismiss()
                 }
             } catch {
@@ -498,7 +506,9 @@ extension ProgressiveAuthPrompt {
     static func showForFirstRecipe() -> some View {
         ProgressiveAuthPrompt()
             .onAppear {
-                AuthPromptTrigger.shared.triggerPrompt(for: .firstRecipeSuccess)
+                Task {
+                    await AuthPromptTrigger.shared.triggerPrompt(for: .firstRecipeSuccess)
+                }
             }
     }
 
@@ -506,7 +516,9 @@ extension ProgressiveAuthPrompt {
     static func showForViralContent() -> some View {
         ProgressiveAuthPrompt()
             .onAppear {
-                AuthPromptTrigger.shared.triggerPrompt(for: .viralContentCreated)
+                Task {
+                    await AuthPromptTrigger.shared.triggerPrompt(for: .viralContentCreated)
+                }
             }
     }
 
@@ -514,7 +526,9 @@ extension ProgressiveAuthPrompt {
     static func showForSocial() -> some View {
         ProgressiveAuthPrompt()
             .onAppear {
-                AuthPromptTrigger.shared.triggerPrompt(for: .socialFeatureExplored)
+                Task {
+                    await AuthPromptTrigger.shared.triggerPrompt(for: .socialFeatureExplored)
+                }
             }
     }
 
@@ -522,7 +536,9 @@ extension ProgressiveAuthPrompt {
     static func showForChallenges() -> some View {
         ProgressiveAuthPrompt()
             .onAppear {
-                AuthPromptTrigger.shared.triggerPrompt(for: .challengeInterest)
+                Task {
+                    await AuthPromptTrigger.shared.triggerPrompt(for: .challengeInterest)
+                }
             }
     }
 }

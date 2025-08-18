@@ -163,7 +163,9 @@ public final class TikTokContentPostingAPI: ObservableObject {
         let validToken = try await ensureValidToken()
         self.accessToken = validToken
 
-        let url = URL(string: "\(baseURL)/\(apiVersion)/post/publish/video/init/")!
+        guard let url = URL(string: "\(baseURL)/\(apiVersion)/post/publish/video/init/") else {
+            throw TikTokAPIError.invalidURL("Invalid URL")
+        }
 
         // Build post_info with caption in title field
         let hashtags = parseHashtagsFromTitle(title)
@@ -275,7 +277,9 @@ public final class TikTokContentPostingAPI: ObservableObject {
             throw TikTokAPIError.unauthorized("No access token available")
         }
 
-        let url = URL(string: "\(baseURL)/\(apiVersion)/post/publish/video/init/")!
+        guard let url = URL(string: "\(baseURL)/\(apiVersion)/post/publish/video/init/") else {
+            throw TikTokAPIError.invalidURL("Invalid URL")
+        }
 
         // Build caption with hashtags
         let hashtags = parseHashtagsFromTitle(title)
@@ -313,7 +317,9 @@ public final class TikTokContentPostingAPI: ObservableObject {
             throw TikTokAPIError.unauthorized("No access token available")
         }
 
-        let url = URL(string: "\(baseURL)/\(apiVersion)/post/publish/status/fetch/")!
+        guard let url = URL(string: "\(baseURL)/\(apiVersion)/post/publish/status/fetch/") else {
+            throw TikTokAPIError.invalidURL("Invalid URL")
+        }
 
         let requestBody = StatusCheckRequest(publish_id: publishId)
 
@@ -326,7 +332,9 @@ public final class TikTokContentPostingAPI: ObservableObject {
     /// - Parameter refreshToken: Refresh token
     /// - Returns: New access token
     public func refreshToken(_ refreshToken: String) async throws -> String {
-        let url = URL(string: "\(baseURL)/\(apiVersion)/oauth/token/")!
+        guard let url = URL(string: "\(baseURL)/\(apiVersion)/oauth/token/") else {
+            throw TikTokAPIError.invalidURL("Invalid URL")
+        }
 
         let requestBody = TokenRefreshRequest(
             client_key: clientKey,

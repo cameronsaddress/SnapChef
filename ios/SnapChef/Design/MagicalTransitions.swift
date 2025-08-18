@@ -3,15 +3,22 @@ import SwiftUI
 // MARK: - Liquid Transition
 struct LiquidTransition: ViewModifier {
     let isActive: Bool
+    @EnvironmentObject var deviceManager: DeviceManager
 
     func body(content: Content) -> some View {
         content
             .mask(
                 GeometryReader { geometry in
-                    LiquidMask(
-                        size: geometry.size,
-                        progress: isActive ? 1 : 0
-                    )
+                    if deviceManager.shouldUseHeavyEffects {
+                        LiquidMask(
+                            size: geometry.size,
+                            progress: isActive ? 1 : 0
+                        )
+                    } else {
+                        // Simple fade mask for low-end devices
+                        Rectangle()
+                            .opacity(isActive ? 1 : 0)
+                    }
                 }
             )
     }
@@ -20,6 +27,7 @@ struct LiquidTransition: ViewModifier {
 struct LiquidMask: View {
     let size: CGSize
     let progress: CGFloat
+    @EnvironmentObject var deviceManager: DeviceManager
 
     var body: some View {
         Canvas { context, _ in
@@ -28,8 +36,11 @@ struct LiquidMask: View {
             let radius = size.width * 1.5 * progress
             let center = CGPoint(x: size.width / 2, y: size.height / 2)
 
-            // Create liquid blob shape
-            for angle in stride(from: 0, to: 360, by: 1) {
+            // Adjust detail level based on device capabilities
+            let angleStep = deviceManager.isLowPowerModeEnabled ? 5 : 1
+            
+            // Create liquid blob shape with adaptive detail
+            for angle in stride(from: 0, to: 360, by: angleStep) {
                 let radian = Double(angle) * .pi / 180
                 let variation = sin(radian * 5) * 20 * progress
                 let currentRadius = radius + variation
@@ -53,33 +64,45 @@ struct LiquidMask: View {
 // MARK: - Particle Explosion Transition
 struct ParticleExplosion: ViewModifier {
     @Binding var trigger: Bool
+    @EnvironmentObject var deviceManager: DeviceManager
 
     @State private var particles: [TransitionExplosionParticle] = []
+    @State private var lastUpdateTime: TimeInterval = 0
 
     func body(content: Content) -> some View {
         content
             .overlay(
                 Canvas { context, _ in
-                    for particle in particles {
-                        context.opacity = particle.opacity
+                    // Skip rendering if particles are disabled
+                    guard deviceManager.shouldShowParticles else { return }
+                    
+                    let currentTime = CACurrentMediaTime()
+                    let shouldUpdate = currentTime - lastUpdateTime > (1.0 / 30.0) // 30 FPS max
+                    
+                    if shouldUpdate {
+                        lastUpdateTime = currentTime
+                        
+                        for particle in particles {
+                            context.opacity = particle.opacity
 
-                        let rect = CGRect(
-                            x: particle.position.x - particle.size / 2,
-                            y: particle.position.y - particle.size / 2,
-                            width: particle.size,
-                            height: particle.size
-                        )
+                            let rect = CGRect(
+                                x: particle.position.x - particle.size / 2,
+                                y: particle.position.y - particle.size / 2,
+                                width: particle.size,
+                                height: particle.size
+                            )
 
-                        context.fill(
-                            Circle().path(in: rect),
-                            with: .color(particle.color)
-                        )
+                            context.fill(
+                                Circle().path(in: rect),
+                                with: .color(particle.color)
+                            )
+                        }
                     }
                 }
                 .allowsHitTesting(false)
             )
             .onChange(of: trigger) { _ in
-                if trigger {
+                if trigger && deviceManager.shouldShowParticles {
                     explode()
                 }
             }
@@ -94,7 +117,14 @@ struct ParticleExplosion: ViewModifier {
             Color(hex: "#43e97b")
         ]
 
-        particles = (0..<50).map { _ in
+        // Adjust particle count based on device capabilities
+        let particleCount = deviceManager.recommendedParticleCount
+        guard particleCount > 0 else {
+            trigger = false
+            return
+        }
+
+        particles = (0..<particleCount).map { _ in
             TransitionExplosionParticle(
                 position: CGPoint(
                     x: UIScreen.main.bounds.width / 2,
@@ -110,8 +140,11 @@ struct ParticleExplosion: ViewModifier {
             )
         }
 
+        // Use adaptive frame rate based on device capabilities
+        let updateInterval = deviceManager.isLowPowerModeEnabled ? 0.033 : 0.016 // 30fps vs 60fps
+        
         var particleTimer: Timer?
-        particleTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { _ in
+        particleTimer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { _ in
             Task { @MainActor in
                 updateParticles()
 

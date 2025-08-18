@@ -23,24 +23,53 @@ GitHub: https://github.com/cameronsaddress/snapchef
 Entry Point: SnapChefApp.swift
     └── ContentView
         ├── LaunchAnimationView (first run)
-        └── MainTabView
+        ├── OnboardingView (first launch)
+        └── MainTabView (5-tab structure)
             ├── Tab 0: HomeView
-            ├── Tab 1: CameraView
+            ├── Tab 1: CameraView (no tab bar when active)
             ├── Tab 2: RecipesView
-            ├── Tab 3: ChallengeHubView
+            ├── Tab 3: SocialFeedView (with activity feed)
             └── Tab 4: ProfileView
 ```
 
 ### State Management
-- **Global State**: `AppState` (recipes, user data, chef personas)
-- **Auth State**: `AuthenticationManager` (user auth)
-- **Device State**: `DeviceManager` (device fingerprinting)
-- **Game State**: `GamificationManager` (points, badges, challenges)
+- **Global State**: `AppState` (delegates to focused ViewModels)
+  - `RecipesViewModel` (recipe management, Core Data + CloudKit)
+  - `AuthViewModel` (dual auth system, progressive premium)
+  - `GamificationViewModel` (challenges, subscriptions)
+- **Auth State**: `CloudKitAuthManager` (unified auth system)
+- **Device State**: `DeviceManager` (device management, preferences)
+- **Progressive Premium**: `UserLifecycleManager` (3-phase lifecycle)
+
+### Data Architecture
+- **Hybrid Storage**: CloudKit for sync + Core Data for offline
+- **Progressive Premium**: 3-phase user lifecycle (Honeymoon → Trial → Standard)
+- **Dual Authentication**: Anonymous users + optional CloudKit auth
+- **API Integration**: Gemini as default LLM provider
 
 ### Data Flow Pattern
 ```
-User Action → View → ViewModel/Manager → API/Storage → State Update → View Update
+User Action → View → ViewModel → Manager/Service → API/CloudKit/Core Data → State Update → View Update
 ```
+
+## App Overview
+
+### Current Features (v1.1.0-stable)
+- **Camera Flow**: Snap fridge → AI analysis → Recipe generation
+- **Recipe Management**: Save, favorite, view history (CloudKit + Core Data)
+- **Social Features**: Activity feed, follow/unfollow, recipe sharing
+- **Challenge System**: Daily/Weekly/Community challenges with rewards
+- **Progressive Premium**: 3-phase lifecycle with usage limits
+- **Video Generation**: TikTok-style recipe videos with custom overlays
+- **Dual Authentication**: Start anonymous, optionally upgrade to CloudKit
+- **Subscription System**: Premium plans with StoreKit integration
+
+### Navigation Flow
+1. **Home Tab**: Main CTA, challenges, recent recipes, mystery meal
+2. **Camera Tab**: Full-screen capture experience (hides tab bar)
+3. **Recipes Tab**: Browse saved/recent recipes with filters
+4. **Social Tab**: Activity feed, discover users, social stats
+5. **Profile Tab**: User settings, subscription, achievements
 
 ## Common Development Tasks
 
@@ -68,17 +97,23 @@ struct YourFeatureView: View {
 
 ### 2. Working with API
 ```swift
-// Always use SnapChefAPIManager
+// Always use SnapChefAPIManager with Gemini as default
 SnapChefAPIManager.shared.sendImageForRecipeGeneration(
     image: uiImage,
     sessionId: UUID().uuidString,
-    // ... other params
+    dietaryRestrictions: [],
+    llmProvider: "gemini", // Default provider
+    // ... other preferences
 ) { result in
     switch result {
     case .success(let response):
-        // Handle success
+        // Convert and save recipes
+        let recipes = response.data.recipes.map { 
+            SnapChefAPIManager.shared.convertAPIRecipeToAppRecipe($0)
+        }
     case .failure(let error):
-        // Handle error
+        // Use comprehensive error handling
+        appState.handleError(SnapChefError.from(error))
     }
 }
 ```
@@ -103,16 +138,23 @@ Color(hex: "#667eea") // Primary purple
 Color(hex: "#4facfe") // Primary blue
 ```
 
-### 4. Managing Challenges
+### 4. Managing Challenges & Progressive Premium
 ```swift
-// Track progress
-ChallengeProgressTracker.shared.trackAction(.recipeCreated, metadata: [:])
+// Track recipe creation with progressive features
+appState.trackRecipeCreated(recipe)
+
+// Check usage limits based on lifecycle phase
+if appState.canCreateRecipe() {
+    // Proceed with recipe creation
+} else {
+    // Show upgrade prompt based on user phase
+}
+
+// Track challenge progress
+ChallengeProgressTracker.shared.handleRecipeCreated(recipe)
 
 // Complete challenge
 GamificationManager.shared.completeChallenge(challengeId: "id")
-
-// Award coins
-ChefCoinsManager.shared.awardCoins(amount: 100, reason: "Challenge completed")
 ```
 
 ## File Organization Rules
@@ -149,25 +191,17 @@ Design/
 - Processing shows `EmojiFlickGame` mini-game
 - Results displayed in `RecipeResultsView`
 
-### 2. Recipe Model Structure
-```swift
-struct Recipe {
-    let id: UUID
-    let name: String
-    let ingredients: [Ingredient]
-    let instructions: [String]
-    let nutrition: Nutrition
-    let tags: [String]          // Required!
-    let dietaryInfo: DietaryInfo // Required!
-    // ... other fields
-}
-```
+### 2. Authentication Flow (Dual System)
+- **Phase 1**: Anonymous users with `AnonymousUserProfile` in Keychain
+- **Phase 2**: Progressive auth prompts based on usage (7+ recipes)
+- **Phase 3**: Optional CloudKit authentication for sync
+- **Data**: Local persistence works independently of auth state
 
 ### 3. Challenge System
-- Uses Core Data for persistence
-- CloudKit integration pending
+- Uses CloudKit for real-time sync + Core Data for offline
+- Dynamic challenge generation via `ChallengeGenerator`
 - Real-time tracking via `ChallengeProgressTracker`
-- Premium users get 2x rewards
+- Premium users get enhanced rewards
 
 ### 4. Navigation Patterns
 - Single `NavigationStack` at root
@@ -248,27 +282,18 @@ xcodebuild clean -project SnapChef.xcodeproj -scheme SnapChef
 xcodebuild test -project SnapChef.xcodeproj -scheme SnapChef
 ```
 
-## Current Status (v1.1.0-stable)
+## Premium Features (3-Phase Lifecycle)
 
-### ✅ Working Features
-- Complete camera flow with AI recipe generation
-- Challenge system with gamification
-- Recipe browsing and details
-- Social sharing with styles
-- Profile and preferences
-- Daily check-ins and streaks
+### Phase System
+1. **Honeymoon (Days 0-7)**: High limits, gentle introduction
+2. **Trial (Days 8-30)**: Reduced limits, upgrade prompts
+3. **Standard (Day 31+)**: Base limits, strong upgrade incentives
 
-### 🚧 Pending Implementation
-- CloudKit sync configuration
-- Push notifications setup
-- Analytics integration
-- Subscription receipt validation
-- App Store icons
-
-### ⚠️ Known Issues
-- Core Data build warnings (cosmetic)
-- Some unused variables
-- No app icons configured
+### Daily Limits by Phase
+- **Honeymoon**: 10 recipes, 3 videos, basic features
+- **Trial**: 5 recipes, 2 videos, limited premium effects
+- **Standard**: 3 recipes, 1 video, minimal features
+- **Premium**: Unlimited everything
 
 ## API Integration
 
@@ -278,21 +303,49 @@ POST https://snapchef-server.onrender.com/analyze_fridge_image
 Headers: X-App-API-Key: [from keychain]
 ```
 
-### Request Fields
-- `image_file`: JPEG data
+### Key Request Fields
+- `image_file`: JPEG data (resized to 2048px max)
 - `session_id`: UUID string
 - `dietary_restrictions`: JSON array
-- `number_of_recipes`: String (default "5")
+- `llm_provider`: "gemini" (default), "openai", etc.
+- `food_preferences`: JSON array
+- `existing_recipe_names`: Avoid duplicates
 
 ### Response Format
 ```json
 {
   "data": {
+    "image_analysis": { "is_food_image": true },
     "ingredients": [...],
     "recipes": [...]
-  }
+  },
+  "message": "Success"
 }
 ```
+
+## Current Status (v1.1.0-stable)
+
+### ✅ Working Features
+- Complete camera flow with Gemini AI integration
+- Hybrid CloudKit + Core Data storage
+- Dual authentication system (anonymous → CloudKit)
+- 3-phase progressive premium lifecycle
+- Challenge system with real-time CloudKit sync
+- Social features: follow/unfollow, activity feed
+- TikTok video generation with custom overlays
+- StoreKit subscription integration
+- Comprehensive error handling system
+
+### 🚧 In Development
+- Enhanced CloudKit conflict resolution
+- Advanced analytics integration
+- Push notification system
+- AI-powered challenge recommendations
+
+### ⚠️ Known Issues
+- Core Data bundle resource warnings (cosmetic)
+- Some Swift 6 concurrency warnings
+- Package.resolved file needs cleanup
 
 ## Questions to Ask Before Making Changes
 

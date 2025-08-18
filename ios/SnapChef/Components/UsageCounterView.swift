@@ -159,7 +159,7 @@ struct UsageCounterView: View {
         if isUnlimited {
             return "♾️ \(type)"
         } else {
-            return "\(current)/\(limit!) \(type) today"
+            return "\(current)/\(limit ?? 0) \(type) today"
         }
     }
 

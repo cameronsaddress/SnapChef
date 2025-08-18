@@ -246,7 +246,18 @@ class AIPersonalityManager: ObservableObject {
         ]
 
         // Set default persona
-        currentPersona = allPersonas.first!
+        currentPersona = allPersonas.first ?? AIChefPersona(
+            id: UUID(),
+            name: "Chef Assistant",
+            emoji: "👨‍🍳",
+            personality: .julia,
+            voiceStyle: .calm,
+            specialties: ["Cooking guidance", "Recipe assistance"],
+            catchPhrases: ["Let's cook together!", "You're doing great!"],
+            color: "#43e97b",
+            isUnlocked: true,
+            unlockRequirement: nil
+        )
 
         // Unlock default personas
         unlockedPersonas.insert(allPersonas[0].id)

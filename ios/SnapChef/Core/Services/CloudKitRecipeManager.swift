@@ -82,12 +82,15 @@ class CloudKitRecipeManager: ObservableObject {
             print("⚠️ CloudKit: No BEFORE (fridge) photo provided for recipe '\(recipe.name)' (ID: \(recipeID))")
         }
 
-        // Save to CloudKit - use private database for user's own recipes
-        // This avoids permission issues with public database
+        // Save to CloudKit with enhanced error handling and retry logic
         do {
-            let savedRecord = try await privateDB.save(record)
+            let savedRecord = try await saveRecordWithRetry(record: record, database: privateDB, maxRetries: 3)
             print("✅ Recipe saved to CloudKit with ID: \(savedRecord.recordID.recordName)")
         } catch let error as CKError {
+            // Handle specific CloudKit errors
+            let snapChefError = CloudKitErrorHandler.snapChefError(from: error)
+            ErrorAnalytics.logError(snapChefError, context: "recipe_upload_\(recipeID)")
+            
             // If record already exists, just update the reference
             if error.code == .serverRecordChanged || error.code == .unknownItem {
                 print("⚠️ Recipe already exists in CloudKit: \(recipeID)")
@@ -96,12 +99,20 @@ class CloudKitRecipeManager: ObservableObject {
                     _ = try await privateDB.record(for: record.recordID)
                     print("✅ Using existing recipe: \(recipeID)")
                 } catch {
-                    // If we can't fetch it, throw the original error
-                    throw error
+                    // If we can't fetch it, throw the converted error
+                    throw snapChefError
                 }
             } else {
-                throw error
+                throw snapChefError
             }
+        } catch {
+            // Handle non-CloudKit errors
+            let snapChefError = SnapChefError.cloudKitError(
+                CKError(CKError.internalError),
+                recovery: .retry
+            )
+            ErrorAnalytics.logError(snapChefError, context: "recipe_upload_unexpected_\(recipeID)")
+            throw snapChefError
         }
 
         // Cache locally
@@ -438,31 +449,61 @@ class CloudKitRecipeManager: ObservableObject {
             return cached
         }
 
-        // Fetch from CloudKit - try private database first, then public
+        // Fetch from CloudKit with enhanced error handling
         let recordID = CKRecord.ID(recordName: recipeID)
 
         do {
             // Try private database first (user's own recipes)
-            let record = try await privateDB.record(for: recordID)
+            let record = try await fetchRecordWithRetry(recordID: recordID, database: privateDB, maxRetries: 2)
             let recipe = try parseRecipeFromRecord(record)
             cachedRecipes[recipeID] = recipe
             print("☁️ Recipe fetched from private CloudKit: \(recipeID)")
             return recipe
-        } catch {
+        } catch let error as CKError {
             // If not in private, try public database
-            let record = try await publicDB.record(for: recordID)
-
-            // Parse recipe
-            let recipe = try parseRecipeFromRecord(record)
-
-            // Cache locally
-            cachedRecipes[recipeID] = recipe
-
-            // Increment view count
-            await incrementViewCount(for: recipeID)
-
-            print("☁️ Recipe fetched from public CloudKit: \(recipeID)")
-            return recipe
+            do {
+                let record = try await fetchRecordWithRetry(recordID: recordID, database: publicDB, maxRetries: 2)
+                let recipe = try parseRecipeFromRecord(record)
+                cachedRecipes[recipeID] = recipe
+                
+                // Increment view count for public recipes
+                Task {
+                    await incrementViewCount(for: recipeID)
+                }
+                
+                print("☁️ Recipe fetched from public CloudKit: \(recipeID)")
+                return recipe
+            } catch let publicError as CKError {
+                // Both databases failed - convert and throw appropriate error
+                let snapChefError = CloudKitErrorHandler.snapChefError(from: publicError)
+                ErrorAnalytics.logError(snapChefError, context: "recipe_fetch_failed_\(recipeID)")
+                throw snapChefError
+            } catch {
+                // Non-CloudKit error from public database
+                let snapChefError = SnapChefError.unknown("Failed to fetch recipe: \(error.localizedDescription)")
+                ErrorAnalytics.logError(snapChefError, context: "recipe_fetch_unexpected_\(recipeID)")
+                throw snapChefError
+            }
+        } catch {
+            // Non-CloudKit error from private database - still try public
+            do {
+                let record = try await fetchRecordWithRetry(recordID: recordID, database: publicDB, maxRetries: 2)
+                let recipe = try parseRecipeFromRecord(record)
+                cachedRecipes[recipeID] = recipe
+                
+                // Increment view count for public recipes
+                Task {
+                    await incrementViewCount(for: recipeID)
+                }
+                
+                print("☁️ Recipe fetched from public CloudKit after private error: \(recipeID)")
+                return recipe
+            } catch {
+                // Both attempts failed with non-CloudKit errors
+                let snapChefError = SnapChefError.unknown("Failed to fetch recipe from both databases: \(error.localizedDescription)")
+                ErrorAnalytics.logError(snapChefError, context: "recipe_fetch_total_failure_\(recipeID)")
+                throw snapChefError
+            }
         }
     }
 
@@ -755,7 +796,14 @@ class CloudKitRecipeManager: ObservableObject {
         components.host = "recipe"
         components.path = "/\(recipeID)"
 
-        return components.url ?? URL(string: "snapchef://recipe/\(recipeID)")!
+        if let url = components.url {
+            return url
+        } else if let fallbackURL = URL(string: "snapchef://recipe/\(recipeID)") {
+            return fallbackURL
+        } else {
+            // Final fallback to a generic URL
+            return URL(string: "snapchef://error")!
+        }
     }
 
     /// Handle incoming recipe share link
@@ -1088,6 +1136,101 @@ class CloudKitRecipeManager: ObservableObject {
             let photos = await fetchPhotosFromRecord(record, recipeTitle: recipeTitle, recipeID: recipeID)
             return photos
         }
+    }
+
+    /// Helper to fetch photos from a CKRecord
+    /// Retry helper for CloudKit record saves with exponential backoff
+    private func saveRecordWithRetry(record: CKRecord, database: CKDatabase, maxRetries: Int) async throws -> CKRecord {
+        var lastError: Error?
+        
+        for attempt in 0..<maxRetries {
+            do {
+                let savedRecord = try await database.save(record)
+                if attempt > 0 {
+                    print("✅ CloudKit save succeeded on attempt \(attempt + 1)")
+                }
+                return savedRecord
+            } catch let error as CKError {
+                lastError = error
+                
+                // Don't retry on certain errors
+                switch error.code {
+                case .notAuthenticated, .permissionFailure, .quotaExceeded:
+                    throw error
+                case .zoneBusy, .serviceUnavailable, .requestRateLimited:
+                    // These are retryable
+                    if attempt < maxRetries - 1 {
+                        let delay = calculateCloudKitBackoffDelay(attempt: attempt, baseDelay: 1.0)
+                        print("⏳ CloudKit save failed (attempt \(attempt + 1)), retrying in \(delay)s: \(error.localizedDescription)")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    }
+                    throw error
+                default:
+                    // For other errors, retry with shorter delays
+                    if attempt < maxRetries - 1 {
+                        let delay = calculateCloudKitBackoffDelay(attempt: attempt, baseDelay: 0.5)
+                        print("⏳ CloudKit save error (attempt \(attempt + 1)), retrying in \(delay)s: \(error.localizedDescription)")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    }
+                    throw error
+                }
+            } catch {
+                lastError = error
+                // Non-CloudKit errors generally shouldn't be retried
+                throw error
+            }
+        }
+        
+        throw lastError ?? SnapChefError.unknown("CloudKit save failed after all retries")
+    }
+    
+    /// Retry helper for CloudKit record fetches with exponential backoff
+    private func fetchRecordWithRetry(recordID: CKRecord.ID, database: CKDatabase, maxRetries: Int) async throws -> CKRecord {
+        var lastError: Error?
+        
+        for attempt in 0..<maxRetries {
+            do {
+                let record = try await database.record(for: recordID)
+                if attempt > 0 {
+                    print("✅ CloudKit fetch succeeded on attempt \(attempt + 1)")
+                }
+                return record
+            } catch let error as CKError {
+                lastError = error
+                
+                // Don't retry on certain errors
+                switch error.code {
+                case .unknownItem, .notAuthenticated, .permissionFailure:
+                    throw error
+                case .zoneBusy, .serviceUnavailable, .requestRateLimited, .networkFailure:
+                    // These are retryable
+                    if attempt < maxRetries - 1 {
+                        let delay = calculateCloudKitBackoffDelay(attempt: attempt, baseDelay: 0.5)
+                        print("⏳ CloudKit fetch failed (attempt \(attempt + 1)), retrying in \(delay)s: \(error.localizedDescription)")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    }
+                    throw error
+                default:
+                    throw error
+                }
+            } catch {
+                lastError = error
+                throw error
+            }
+        }
+        
+        throw lastError ?? SnapChefError.unknown("CloudKit fetch failed after all retries")
+    }
+    
+    /// Calculate exponential backoff delay for CloudKit operations
+    private func calculateCloudKitBackoffDelay(attempt: Int, baseDelay: TimeInterval) -> TimeInterval {
+        let exponentialDelay = baseDelay * pow(2.0, Double(attempt))
+        let jitter = Double.random(in: 0.1...0.2) * exponentialDelay
+        let maxDelay: TimeInterval = 10.0 // Cap at 10 seconds for CloudKit
+        return min(exponentialDelay + jitter, maxDelay)
     }
 
     /// Helper to fetch photos from a CKRecord

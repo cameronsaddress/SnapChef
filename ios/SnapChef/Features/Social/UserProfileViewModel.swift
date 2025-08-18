@@ -26,7 +26,7 @@ class UserProfileViewModel: ObservableObject {
 
             // Check if following
             if cloudKitAuth.isAuthenticated {
-                self.isFollowing = try await cloudKitAuth.isFollowing(userID)
+                self.isFollowing = await cloudKitAuth.isFollowing(userID: userID)
             }
 
             // Load user's recipes
@@ -49,10 +49,10 @@ class UserProfileViewModel: ObservableObject {
 
         do {
             if isFollowing {
-                try await cloudKitAuth.unfollowUser(userID)
+                try await cloudKitAuth.unfollowUser(userID: userID)
                 isFollowing = false
             } else {
-                try await cloudKitAuth.followUser(userID)
+                try await cloudKitAuth.followUser(userID: userID)
                 isFollowing = true
             }
         } catch {

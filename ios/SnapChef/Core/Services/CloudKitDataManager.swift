@@ -54,11 +54,20 @@ final class CloudKitDataManager: ObservableObject {
         record["lastUpdated"] = Date()
 
         do {
-            _ = try await privateDB.save(record)
+            _ = try await saveRecordWithRetry(record: record, database: privateDB, maxRetries: 2)
             print("✅ Preferences synced to CloudKit")
+        } catch let error as CKError {
+            let snapChefError = CloudKitErrorHandler.snapChefError(from: error)
+            let errorMessage = "Failed to sync preferences: \(snapChefError.userFriendlyMessage)"
+            syncErrors.append(errorMessage)
+            ErrorAnalytics.logError(snapChefError, context: "user_preferences_sync")
+            throw snapChefError
         } catch {
-            syncErrors.append("Failed to sync preferences: \(error.localizedDescription)")
-            throw error
+            let errorMessage = "Failed to sync preferences: \(error.localizedDescription)"
+            syncErrors.append(errorMessage)
+            let snapChefError = SnapChefError.syncError(errorMessage)
+            ErrorAnalytics.logError(snapChefError, context: "user_preferences_sync_unexpected")
+            throw snapChefError
         }
     }
 
@@ -70,9 +79,12 @@ final class CloudKitDataManager: ObservableObject {
         query.sortDescriptors = [NSSortDescriptor(key: "lastUpdated", ascending: false)]
 
         do {
-            let (matchResults, _) = try await privateDB.records(matching: query)
+            let (matchResults, _) = try await fetchRecordsWithRetry(query: query, database: privateDB, maxRetries: 2)
             guard let recordResult = matchResults.first?.1,
-                  let record = try? recordResult.get() else { return nil }
+                  let record = try? recordResult.get() else { 
+                print("No preferences found in CloudKit, returning local cache")
+                return loadLocalPreferences()
+            }
 
             let preferences = FoodPreferences(
                 dietaryRestrictions: record["dietaryRestrictions"] as? [String] ?? [],
@@ -89,8 +101,16 @@ final class CloudKitDataManager: ObservableObject {
             saveLocalPreferences(preferences)
 
             return preferences
+        } catch let error as CKError {
+            let snapChefError = CloudKitErrorHandler.snapChefError(from: error)
+            print("❌ Failed to fetch preferences: \(snapChefError.userFriendlyMessage)")
+            ErrorAnalytics.logError(snapChefError, context: "user_preferences_fetch")
+            // Return cached version on CloudKit errors
+            return loadLocalPreferences()
         } catch {
-            print("❌ Failed to fetch preferences: \(error)")
+            print("❌ Failed to fetch preferences: \(error.localizedDescription)")
+            let snapChefError = SnapChefError.syncError("Failed to fetch preferences: \(error.localizedDescription)")
+            ErrorAnalytics.logError(snapChefError, context: "user_preferences_fetch_unexpected")
             // Return cached version
             return loadLocalPreferences()
         }
@@ -369,6 +389,103 @@ final class CloudKitDataManager: ObservableObject {
         UserDefaults.standard.set(preferences.preferredCookTime, forKey: "preferredCookTime")
         UserDefaults.standard.set(preferences.kitchenTools, forKey: "kitchenTools")
         UserDefaults.standard.set(preferences.mealPlanningGoals, forKey: "mealPlanningGoals")
+    }
+    
+    // MARK: - CloudKit Retry Helpers
+    
+    /// Retry helper for CloudKit record saves
+    private func saveRecordWithRetry(record: CKRecord, database: CKDatabase, maxRetries: Int) async throws {
+        var lastError: Error?
+        
+        for attempt in 0..<maxRetries {
+            do {
+                _ = try await database.save(record)
+                if attempt > 0 {
+                    print("✅ CloudKit data save succeeded on attempt \(attempt + 1)")
+                }
+                return
+            } catch let error as CKError {
+                lastError = error
+                
+                // Don't retry on certain errors
+                switch error.code {
+                case .notAuthenticated, .permissionFailure, .quotaExceeded:
+                    throw error
+                case .zoneBusy, .serviceUnavailable, .requestRateLimited:
+                    // These are retryable
+                    if attempt < maxRetries - 1 {
+                        let delay = calculateDataBackoffDelay(attempt: attempt)
+                        print("⏳ CloudKit data save failed (attempt \(attempt + 1)), retrying in \(delay)s: \(error.localizedDescription)")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    }
+                    throw error
+                default:
+                    // For other errors, retry once
+                    if attempt < maxRetries - 1 {
+                        let delay = calculateDataBackoffDelay(attempt: attempt)
+                        print("⏳ CloudKit data save error (attempt \(attempt + 1)), retrying in \(delay)s: \(error.localizedDescription)")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    }
+                    throw error
+                }
+            } catch {
+                lastError = error
+                // Non-CloudKit errors generally shouldn't be retried
+                throw error
+            }
+        }
+        
+        throw lastError ?? SnapChefError.syncError("CloudKit data save failed after all retries")
+    }
+    
+    /// Retry helper for CloudKit record fetches
+    private func fetchRecordsWithRetry(query: CKQuery, database: CKDatabase, maxRetries: Int) async throws -> (matchResults: [(CKRecord.ID, Result<CKRecord, Error>)], queryCursor: CKQueryOperation.Cursor?) {
+        var lastError: Error?
+        
+        for attempt in 0..<maxRetries {
+            do {
+                let result = try await database.records(matching: query)
+                if attempt > 0 {
+                    print("✅ CloudKit data fetch succeeded on attempt \(attempt + 1)")
+                }
+                return result
+            } catch let error as CKError {
+                lastError = error
+                
+                // Don't retry on certain errors
+                switch error.code {
+                case .notAuthenticated, .permissionFailure:
+                    throw error
+                case .zoneBusy, .serviceUnavailable, .requestRateLimited, .networkFailure:
+                    // These are retryable
+                    if attempt < maxRetries - 1 {
+                        let delay = calculateDataBackoffDelay(attempt: attempt)
+                        print("⏳ CloudKit data fetch failed (attempt \(attempt + 1)), retrying in \(delay)s: \(error.localizedDescription)")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    }
+                    throw error
+                default:
+                    throw error
+                }
+            } catch {
+                lastError = error
+                throw error
+            }
+        }
+        
+        throw lastError ?? SnapChefError.syncError("CloudKit data fetch failed after all retries")
+    }
+    
+    /// Calculate exponential backoff delay for data operations
+    private func calculateDataBackoffDelay(attempt: Int) -> TimeInterval {
+        let baseDelay: TimeInterval = 0.5
+        let exponentialDelay = baseDelay * pow(2.0, Double(attempt))
+        let jitter = Double.random(in: 0.1...0.2) * exponentialDelay
+        let maxDelay: TimeInterval = 8.0 // Cap at 8 seconds for data operations
+        return min(exponentialDelay + jitter, maxDelay)
     }
 }
 

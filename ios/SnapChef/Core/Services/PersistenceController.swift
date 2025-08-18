@@ -26,7 +26,11 @@ struct PersistenceController {
         container = NSPersistentCloudKitContainer(name: "ChallengeModels")
 
         if inMemory {
-            container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
+            guard let firstStoreDescription = container.persistentStoreDescriptions.first else {
+                print("Warning: No persistent store descriptions found")
+                return
+            }
+            firstStoreDescription.url = URL(fileURLWithPath: "/dev/null")
         } else {
             // Configure for CloudKit
             container.persistentStoreDescriptions.forEach { storeDescription in

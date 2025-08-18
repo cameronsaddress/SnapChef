@@ -261,7 +261,7 @@ final class UsageTracker: ObservableObject {
         return limits.recipes
     }
 
-    private func getCurrentVideoLimit() -> Int {
+    func getCurrentVideoLimit() -> Int {
         // Get dynamic limits from UserLifecycleManager
         let limits = UserLifecycleManager.shared.getDailyLimits()
         return limits.videos

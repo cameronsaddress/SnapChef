@@ -13,7 +13,13 @@ import time
 from pathlib import Path
 
 # Configure Gemini
-API_KEY = "AIzaSyCQqj1-T7Ha8G9k9c0cdnlC4YeXw0VH7dM"
+API_KEY = os.getenv("GOOGLE_GENERATIVE_AI_API_KEY")
+if not API_KEY:
+    print("ERROR: GOOGLE_GENERATIVE_AI_API_KEY environment variable not set!")
+    print("Please set your Google AI API key as an environment variable:")
+    print("export GOOGLE_GENERATIVE_AI_API_KEY='your-api-key-here'")
+    sys.exit(1)
+    
 genai.configure(api_key=API_KEY)
 
 # File extensions to include

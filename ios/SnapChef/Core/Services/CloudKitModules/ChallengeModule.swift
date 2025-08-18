@@ -355,7 +355,7 @@ final class ChallengeModule: ObservableObject {
     
     private func generateInviteCode() -> String {
         let letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        return String((0..<6).map { _ in letters.randomElement()! })
+        return String((0..<6).compactMap { _ in letters.randomElement() })
     }
     
     private func calculateRarity(type: String) -> String {

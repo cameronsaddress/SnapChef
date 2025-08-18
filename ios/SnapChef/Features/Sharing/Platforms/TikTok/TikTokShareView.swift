@@ -3,6 +3,8 @@ import AVKit
 import Photos
 import UIKit
 
+// MARK: - Supporting Types
+
 // MARK: - Posting Method Enum
 enum PostingMethod: String, CaseIterable {
     case shareKit = "shareKit"
@@ -43,7 +45,7 @@ struct TikTokShareView: View {
     @StateObject private var engine = ViralVideoEngine()
     @StateObject private var contentAPI = TikTokContentPostingAPI.shared
     @StateObject private var authTrigger = AuthPromptTrigger.shared
-    @StateObject private var usageTracker = UsageTracker.shared
+    @ObservedObject private var usageTracker = UsageTracker.shared
     @StateObject private var paywallTrigger = PaywallTriggerManager.shared
     private let template: ViralTemplate = .kineticTextSteps
     @State private var isGenerating = false
@@ -184,7 +186,7 @@ struct TikTokShareView: View {
                 showLimitReached = false
             }
         } message: {
-            Text("You've reached your daily limit of \(usageTracker.dailyVideoLimit ?? 0) videos. Upgrade to Premium for unlimited video creation!")
+            Text("You've reached your daily limit of \(usageTracker.getCurrentVideoLimit()) videos. Upgrade to Premium for unlimited video creation!")
         }
     }
 
@@ -529,8 +531,8 @@ struct TikTokShareView: View {
 
                 // Usage counter for videos
                 UsageCounterView.videos(
-                    current: usageTracker.dailyVideoCount,
-                    limit: usageTracker.dailyVideoLimit
+                    current: usageTracker.todaysUsage.videoCount,
+                    limit: usageTracker.getRemainingVideos() == -1 ? nil : usageTracker.getCurrentVideoLimit()
                 )
             }
 
@@ -674,9 +676,9 @@ struct TikTokShareView: View {
 
     private func generate() {
         // Check if user has reached daily video limit
-        if usageTracker.hasReachedLimit(for: .videos) {
+        if usageTracker.hasReachedVideoLimit() {
             // Show paywall if limit reached
-            if paywallTrigger.shouldShowPaywall(for: .limitReached) {
+            if paywallTrigger.shouldShowPaywall(for: .videoLimitReached) {
                 // Show limit reached message and paywall
                 showLimitReached = true
                 return
@@ -694,7 +696,7 @@ struct TikTokShareView: View {
 
         await MainActor.run {
             // Track video generation for usage limits
-            usageTracker.trackVideoGenerated()
+            usageTracker.trackVideoCreated()
             UserLifecycleManager.shared.trackVideoShared()
 
             // Haptic feedback
@@ -922,7 +924,7 @@ struct TikTokShareView: View {
                     .foregroundColor(.white)
                 } else {
                     VStack(spacing: 4) {
-                        if usageTracker.hasReachedLimit(for: .videos) {
+                        if usageTracker.hasReachedVideoLimit() {
                             HStack(spacing: 8) {
                                 Image(systemName: "lock.fill")
                                     .font(.system(size: 16, weight: .bold))
@@ -959,7 +961,7 @@ struct TikTokShareView: View {
                 }
             }
         }
-        .disabled(isGenerating || showSuccess || (postingMethod == .directPost && !contentAPI.hasValidToken) || selectedHashtags.isEmpty || usageTracker.hasReachedLimit(for: .videos))
+        .disabled(isGenerating || showSuccess || (postingMethod == .directPost && !contentAPI.hasValidToken) || selectedHashtags.isEmpty || usageTracker.hasReachedVideoLimit())
         .scaleEffect(isGenerating ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isGenerating)
         .modifier(ShakeEffect(shakeNumber: buttonShake ? 2 : 0))

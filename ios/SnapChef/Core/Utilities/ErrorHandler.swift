@@ -403,7 +403,9 @@ struct ErrorAnalytics {
     
     private static func getAvailableStorage() -> Int64 {
         do {
-            let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            guard let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                return 0
+            }
             let values = try documentDirectory.resourceValues(forKeys: [.volumeAvailableCapacityKey])
             return Int64(values.volumeAvailableCapacity ?? 0)
         } catch {
@@ -822,7 +824,7 @@ class RetryManager: ObservableObject {
         
         retryAttempts[operationId] = currentAttempt + 1
         
-        let delay = currentAttempt < retryDelays.count ? retryDelays[currentAttempt] : retryDelays.last!
+        let delay = currentAttempt < retryDelays.count ? retryDelays[currentAttempt] : (retryDelays.last ?? 5.0)
         
         Task {
             if currentAttempt > 0 {

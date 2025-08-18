@@ -135,11 +135,16 @@ public final class MemoryOptimizer: @unchecked Sendable {
     /// Force memory cleanup when needed with emergency protocols
     public func forceMemoryCleanup() {
         autoreleasepool {
+            let beforeMemory = getCurrentMemoryUsage()
+            
             // Clear pixel buffer pools with thread-safe lock
             poolsLock.lock()
             let poolCount = pixelBufferPools.count
             pixelBufferPools.removeAll()
             poolsLock.unlock()
+            
+            // CRITICAL FIX: Clear CI context cache more aggressively
+            clearCIContextCache()
             
             // Cancel active tasks if memory is critical
             let currentMemory = getCurrentMemoryUsage()
@@ -147,15 +152,28 @@ public final class MemoryOptimizer: @unchecked Sendable {
                 cancelAllActiveTasks(reason: "Critical memory pressure")
             }
 
-            // Force garbage collection
-            CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0, false)
+            // ENHANCED: Multiple garbage collection cycles for better cleanup
+            for _ in 0..<3 {
+                CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0, false)
+                usleep(5_000) // 5ms between cycles
+            }
             
             // Additional cleanup for iOS
             if #available(iOS 13.0, *) {
                 URLCache.shared.removeAllCachedResponses()
             }
+            
+            // CRITICAL FIX: Clear any remaining autorelease pools
+            DispatchQueue.main.async {
+                autoreleasepool {
+                    // Trigger UI cleanup on main thread
+                }
+            }
+            
+            let afterMemory = getCurrentMemoryUsage()
+            let memoryFreed = beforeMemory > afterMemory ? beforeMemory - afterMemory : 0
 
-            logger.info("Forced memory cleanup completed - cleared \(poolCount) pools, memory: \(currentMemory / (1024*1024))MB")
+            logger.info("Forced memory cleanup completed - cleared \(poolCount) pools, freed \(memoryFreed / (1024*1024))MB, memory: \(afterMemory / (1024*1024))MB")
         }
     }
     
@@ -188,6 +206,16 @@ public final class MemoryOptimizer: @unchecked Sendable {
     // MARK: - CIContext Management
     public func getCIContext() -> CIContext {
         return sharedCIContext
+    }
+    
+    /// CRITICAL FIX: Clear CIContext cache for memory management
+    private func clearCIContextCache() {
+        // Force the CIContext to clear its internal caches
+        // We do this by creating a minimal image and rendering it
+        autoreleasepool {
+            let clearImage = CIImage(color: .clear).cropped(to: CGRect(x: 0, y: 0, width: 1, height: 1))
+            _ = sharedCIContext.createCGImage(clearImage, from: clearImage.extent)
+        }
     }
 
     // MARK: - Image Optimization
@@ -322,6 +350,9 @@ public final class MemoryOptimizer: @unchecked Sendable {
 
     // MARK: - Cancellation Token Support
     
+    // Instance variable for tracking warning start time
+    private var warningStartTime: Date?
+    
     /// Register a new task for cancellation tracking
     public func registerTask() -> UUID {
         let taskId = UUID()
@@ -346,11 +377,33 @@ public final class MemoryOptimizer: @unchecked Sendable {
         let exists = activeTasks.contains(taskId)
         tasksLock.unlock()
         
-        // Check memory pressure
+        // Check memory pressure with enhanced detection
         let currentMemory = getCurrentMemoryUsage()
         if currentMemory > criticalMemoryThreshold {
             logger.warning("Task \(taskId) should cancel due to memory pressure: \(currentMemory / (1024*1024))MB")
+            
+            // CRITICAL FIX: Trigger immediate cleanup when cancelling tasks
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                self?.forceMemoryCleanup()
+            }
+            
             return true
+        }
+        
+        // ENHANCED: Also check for extended memory pressure (above warning threshold for too long)
+        if currentMemory > warningMemoryThreshold {
+            // Use instance variable instead of static
+            if warningStartTime == nil {
+                warningStartTime = Date()
+            } else if let startTime = warningStartTime,
+                     Date().timeIntervalSince(startTime) > 10.0 { // 10 seconds in warning state
+                logger.warning("Task \(taskId) cancelled due to extended memory warning: \(currentMemory / (1024*1024))MB")
+                warningStartTime = nil
+                return true
+            }
+        } else {
+            // Reset warning timer when memory is normal
+            warningStartTime = nil
         }
         
         return !exists
@@ -407,7 +460,7 @@ public final class MemoryOptimizer: @unchecked Sendable {
     /// Enable Metal-accelerated rendering for premium features
     public func enableMetalAcceleration() -> Bool {
         // Check if Metal is available and configure for optimal performance
-        guard let device = MTLCreateSystemDefaultDevice() else {
+        guard MTLCreateSystemDefaultDevice() != nil else {
             logger.warning("Metal acceleration unavailable - falling back to CPU")
             return false
         }
@@ -426,7 +479,7 @@ public final class MemoryOptimizer: @unchecked Sendable {
         // Process segments in parallel using TaskGroup for Swift 6 compliance
         try await withThrowingTaskGroup(of: Void.self) { group in
             for segment in segments {
-                group.addTask {
+                group.addTask { @Sendable in
                     try await processingBlock(segment)
                 }
             }
@@ -586,12 +639,99 @@ public final class MemoryOptimizer: @unchecked Sendable {
             poolsLock.lock()
             pixelBufferPools.removeAll()
             poolsLock.unlock()
+            
+            // Cancel all active tasks before cleanup
+            cancelAllActiveTasks(reason: "Resource cleanup")
 
             // Clear any cached data in CIContext
-            // Note: CIContext doesn't have a public clear method, but releasing it forces cleanup
+            clearCIContextCache()
+            
+            // CRITICAL FIX: Multiple cleanup cycles for thorough resource release
+            for _ in 0..<3 {
+                _ = autoreleasepool {
+                    CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0, false)
+                }
+                usleep(10_000) // 10ms between cycles
+            }
 
             logger.info("All resources cleaned up")
         }
+    }
+    
+    // MARK: - Enhanced Memory Monitoring and Recovery
+    
+    /// CRITICAL FIX: Monitor memory during heavy operations
+    public func withMemoryMonitoring<T>(
+        operation: String,
+        warningHandler: (() -> Void)? = nil,
+        block: () throws -> T
+    ) rethrows -> T {
+        let startMemory = getCurrentMemoryUsage()
+        let startTime = Date()
+        
+        logger.debug("Starting memory-monitored operation: \(operation) - initial memory: \(startMemory / (1024*1024))MB")
+        
+        defer {
+            autoreleasepool {
+                let endMemory = getCurrentMemoryUsage()
+                let duration = Date().timeIntervalSince(startTime)
+                let memoryDelta = Int64(endMemory) - Int64(startMemory)
+                
+                logger.debug("Completed operation: \(operation) - duration: \(String(format: "%.3f", duration))s, memory delta: \(memoryDelta / (1024*1024))MB, final: \(endMemory / (1024*1024))MB")
+                
+                // Trigger warning if memory increased significantly
+                if memoryDelta > 50 * 1024 * 1024 { // 50MB increase
+                    logger.warning("High memory increase detected in \(operation): \(memoryDelta / (1024*1024))MB")
+                    warningHandler?()
+                }
+                
+                // Auto-cleanup if we're approaching limits
+                if endMemory > warningMemoryThreshold {
+                    forceMemoryCleanup()
+                }
+            }
+        }
+        
+        return try block()
+    }
+    
+    /// CRITICAL FIX: Async version of memory monitoring
+    public func withMemoryMonitoring<T>(
+        operation: String,
+        warningHandler: (@Sendable () async -> Void)? = nil,
+        block: @Sendable () async throws -> T
+    ) async rethrows -> T {
+        let startMemory = getCurrentMemoryUsage()
+        let startTime = Date()
+        
+        logger.debug("Starting async memory-monitored operation: \(operation) - initial memory: \(startMemory / (1024*1024))MB")
+        
+        defer {
+            Task {
+                autoreleasepool {
+                    let endMemory = getCurrentMemoryUsage()
+                    let duration = Date().timeIntervalSince(startTime)
+                    let memoryDelta = Int64(endMemory) - Int64(startMemory)
+                    
+                    logger.debug("Completed async operation: \(operation) - duration: \(String(format: "%.3f", duration))s, memory delta: \(memoryDelta / (1024*1024))MB, final: \(endMemory / (1024*1024))MB")
+                    
+                    // Trigger warning if memory increased significantly
+                    if memoryDelta > 50 * 1024 * 1024 { // 50MB increase
+                        logger.warning("High memory increase detected in \(operation): \(memoryDelta / (1024*1024))MB")
+                        Task {
+                            await warningHandler?()
+                        }
+                    }
+                    
+                    // Auto-cleanup if we're approaching limits
+                    if endMemory > warningMemoryThreshold {
+                        forceMemoryCleanup()
+                    }
+                }
+            }
+        }
+        
+        return try await block()
     }
 }
 

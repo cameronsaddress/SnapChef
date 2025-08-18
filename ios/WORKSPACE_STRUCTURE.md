@@ -84,7 +84,7 @@ git push origin main
 
 ### Environment Variables:
 - `GROK_API_KEY` - API key for Grok Vision
-- `APP_API_KEY` - Authentication key for iOS app (5380e4b60818cf237678fccfd4b8f767d1c94)
+- `APP_API_KEY` - Authentication key for iOS app (configure securely, not in code)
 
 ### API Endpoint:
 - Production: https://snapchef-server.onrender.com

@@ -11,8 +11,7 @@ import Security
 
 /// Secure storage manager for anonymous user profiles using iOS Keychain
 /// Handles persistence, encryption, and migration of user data
-@MainActor
-final class KeychainProfileManager: @unchecked Sendable {
+actor KeychainProfileManager {
     // MARK: - Singleton
 
     static let shared = KeychainProfileManager()
@@ -32,7 +31,7 @@ final class KeychainProfileManager: @unchecked Sendable {
     /// Saves an anonymous user profile to the Keychain
     /// - Parameter profile: The profile to save
     /// - Returns: True if save was successful, false otherwise
-    func saveProfile(_ profile: AnonymousUserProfile) -> Bool {
+    nonisolated func saveProfile(_ profile: AnonymousUserProfile) -> Bool {
         do {
             // Encode profile to JSON data
             let profileData = try JSONEncoder().encode(profile)
@@ -74,7 +73,7 @@ final class KeychainProfileManager: @unchecked Sendable {
 
     /// Loads the anonymous user profile from the Keychain
     /// - Returns: The stored profile, or nil if none exists or error occurred
-    func loadProfile() -> AnonymousUserProfile? {
+    nonisolated func loadProfile() -> AnonymousUserProfile? {
         let query = createKeychainQuery()
         var queryResult: AnyObject?
 
@@ -140,7 +139,7 @@ final class KeychainProfileManager: @unchecked Sendable {
 
     /// Creates the base Keychain query dictionary
     /// - Returns: Dictionary with Keychain query parameters
-    private func createKeychainQuery() -> [String: Any] {
+    nonisolated private func createKeychainQuery() -> [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
@@ -158,7 +157,7 @@ final class KeychainProfileManager: @unchecked Sendable {
 
     /// Checks if a Keychain item already exists
     /// - Returns: True if item exists, false otherwise
-    private func keychainItemExists() -> Bool {
+    nonisolated private func keychainItemExists() -> Bool {
         let query = createKeychainQuery()
         let status = SecItemCopyMatching(query as CFDictionary, nil)
         return status == errSecSuccess
@@ -183,7 +182,7 @@ extension KeychainProfileManager {
     /// Updates specific profile metrics safely
     /// - Parameter updater: Closure that modifies the profile
     /// - Returns: True if update was successful
-    func updateProfile(_ updater: (inout AnonymousUserProfile) -> Void) -> Bool {
+    nonisolated func updateProfile(_ updater: (inout AnonymousUserProfile) -> Void) -> Bool {
         guard var profile = loadProfile() else {
             return false
         }
@@ -195,7 +194,7 @@ extension KeychainProfileManager {
     /// Safely increments a counter in the profile
     /// - Parameter keyPath: KeyPath to the counter to increment
     /// - Returns: True if increment was successful
-    func incrementCounter(_ keyPath: WritableKeyPath<AnonymousUserProfile, Int>) -> Bool {
+    nonisolated func incrementCounter(_ keyPath: WritableKeyPath<AnonymousUserProfile, Int>) -> Bool {
         return updateProfile { profile in
             profile[keyPath: keyPath] += 1
             profile.updateLastActive()

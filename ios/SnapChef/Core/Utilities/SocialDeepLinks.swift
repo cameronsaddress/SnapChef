@@ -138,7 +138,8 @@ class SocialDeepLinks {
             if let url = URL(string: urlString),
                UIApplication.shared.canOpenURL(url) {
                 availableOptions.append(url)
-            } else if let webURL = URL(string: platform.webURL + text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!) {
+            } else if let encodedText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                      let webURL = URL(string: platform.webURL + encodedText) {
                 availableOptions.append(webURL)
             }
         }

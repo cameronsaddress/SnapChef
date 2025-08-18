@@ -269,16 +269,49 @@ Update: [Brief description of what was updated]
 ```
 
 ## Project Overview
-SnapChef is an iOS app that transforms fridge/pantry photos into personalized recipes using AI (Grok Vision API), with built-in social sharing and gamification features.
+SnapChef is an iOS app that transforms fridge/pantry photos into personalized recipes using AI (Grok Vision API & Gemini), featuring dual authentication systems (Traditional + CloudKit), progressive premium tiers, intelligent photo storage, TikTok video generation, and comprehensive gamification with challenges and rewards.
 
-## 🏗️ APP ARCHITECTURE - AGENTS MUST UNDERSTAND
+## 🏗️ CURRENT APP ARCHITECTURE - AGENTS MUST UNDERSTAND
+
+### Authentication System (DUAL APPROACH)
+- **Progressive Authentication**: Anonymous users tracked via Keychain (KeychainProfileManager)
+- **Traditional Authentication**: Sign in with Apple/Google/Facebook/TikTok (CloudKitAuthManager)
+- **3-Phase User Lifecycle**: Honeymoon (7 days unlimited) → Trial (14 days, 10/day) → Standard (5/day)
+- **Smart Auth Prompts**: Context-aware prompts at optimal engagement moments
+
+### Premium Strategy (PROGRESSIVE)
+- **UserLifecycleManager**: Tracks user phase and subscription status
+- **UsageTracker**: Monitors daily recipe/video limits with reset logic
+- **Dynamic Limits**: Usage limits based on user phase and subscription tier
+- **StoreKit 2**: Monthly ($4.99) and yearly ($29.99) subscription options
+
+### Photo Management (INTELLIGENT)
+- **PhotoStorageManager**: Single source of truth for all photos
+- **Automatic Cleanup**: LRU eviction with 100 photo memory limit
+- **CloudKit Sync**: Before/after photos stored as CKAssets
+- **Background Processing**: Memory management during video generation
+
+### AI Processing (DUAL PROVIDER)
+- **Default Provider**: Gemini (higher quality, more reliable)
+- **Fallback Provider**: Grok Vision API (user selectable)
+- **Dual Image Support**: Fridge + pantry photo processing
+- **Smart Prompting**: Context-aware recipe generation with duplicate prevention
+
+### TikTok Integration (VIRAL)
+- **ViralVideoEngine**: Professional video generation pipeline
+- **Beat-Synced Animations**: 80 BPM with Ken Burns effects
+- **Premium Templates**: 15-second videos with CTA overlays
+- **OAuth Integration**: Direct TikTok posting with pre-filled captions
+- **Hashtag Intelligence**: Trending and niche hashtag combinations
 
 ### Core Views (DO NOT CREATE NEW ONES WITHOUT PERMISSION):
-1. **ContentView.swift** - Main tab navigation controller
-2. **CameraView.swift** - Photo capture and recipe generation
-3. **RecipeBookView.swift** - Saved recipes display
-4. **FeedView.swift** - Social feed and following
-5. **ProfileView.swift** - User profile and settings
+1. **ContentView.swift** - Main tab navigation controller (5 tabs)
+2. **HomeView.swift** - Landing page with CTA, challenges, and trending content
+3. **CameraView.swift** - Dual photo capture (fridge + pantry) with AI processing
+4. **RecipeResultsView.swift** - Recipe display with enhanced cards and sharing
+5. **RecipeBookView.swift** - Saved recipes with CloudKit sync
+6. **FeedView.swift** - Social feed and user following
+7. **ProfileView.swift** - User profile, settings, and subscription management
 
 ### Feature Modules (MODIFY EXISTING, DON'T CREATE NEW):
 - **Features/Camera/** - Camera capture and processing
@@ -289,17 +322,25 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 - **Features/Social/** - Following, feed, activity
 
 ### Core Services (NEVER DUPLICATE):
-- **SnapChefAPIManager** - Backend API communication
-- **CloudKitRecipeManager** - CloudKit recipe sync
-- **CloudKitAuthManager** - Authentication services
-- **PhotoStorageManager** - Centralized photo storage
-- **GamificationManager** - Points and badges
-- **DeviceManager** - Device info and settings
+- **SnapChefAPIManager** - Backend API communication (Grok/Gemini)
+- **CloudKitAuthManager** - Unified authentication (Apple/Google/Facebook/TikTok)
+- **PhotoStorageManager** - Centralized photo storage with automatic cleanup
+- **UserLifecycleManager** - Progressive premium user phase tracking
+- **UsageTracker** - Daily limits and usage monitoring
+- **KeychainProfileManager** - Anonymous user persistence
+- **GamificationManager** - Points, badges, and challenges
+- **StoreKit** - Subscription management (monthly/yearly)
+- **TikTokAuthManager** - TikTok OAuth integration
+- **ViralVideoEngine** - TikTok video generation pipeline
+- **ErrorHandler** - Comprehensive error handling system
 
 ### Data Models (USE EXISTING):
-- **Recipe** - Core recipe model
-- **User** - User profile model
-- **Challenge** - Gamification challenges
+- **Recipe** - Core recipe model with CloudKit integration
+- **User** - User profile model with authentication state
+- **Challenge** - Gamification challenges with 365-day system
+- **AnonymousUserProfile** - Anonymous tracking via Keychain
+- **SavedRecipe** - Recipe with before/after photos
+- **DailyLimits** - Progressive premium usage limits
 - **Activity** - Social activity feed
 
 ### CRITICAL: Before modifying ANY file:
@@ -313,6 +354,32 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 1. **Start Here**: [AI_DEVELOPER_GUIDE.md](AI_DEVELOPER_GUIDE.md) - Comprehensive guide for AI assistants
 2. **Code Flow**: [COMPLETE_CODE_TRACE.md](COMPLETE_CODE_TRACE.md) - Full app flow analysis  
 3. **File Status**: [FILE_USAGE_ANALYSIS.md](FILE_USAGE_ANALYSIS.md) - What's used/unused
+
+### Latest Updates (Aug 18, 2025) - Part 35 - DOCUMENTATION UPDATE
+- **UPDATED: CLAUDE.md Comprehensive Documentation Refresh**
+  - **Project Overview**: Updated to reflect current dual authentication and progressive premium implementation
+  - **Architecture Section**: Comprehensive update with current system components
+    - ✅ Dual Authentication System (Anonymous + Traditional)
+    - ✅ Progressive Premium Strategy (3-phase user lifecycle)
+    - ✅ Intelligent Photo Management (PhotoStorageManager)
+    - ✅ AI Processing (Gemini default, Grok fallback)
+    - ✅ TikTok Viral Video Integration (complete pipeline)
+    - ✅ Tab Navigation (5-tab system)
+    - ✅ Core Data + CloudKit hybrid storage
+    - ✅ StoreKit 2 subscription management
+  - **Core Services**: Updated with all current managers and services
+    - KeychainProfileManager, UserLifecycleManager, UsageTracker
+    - TikTokAuthManager, ViralVideoEngine, ErrorHandler
+    - PhotoStorageManager with automatic cleanup
+  - **Data Models**: Updated with progressive premium and anonymous tracking models
+  - **Technical Implementation Details**:
+    - 3-phase user lifecycle with dynamic daily limits
+    - Anonymous user tracking via secure Keychain persistence
+    - CloudKit sync intelligence (only missing data)
+    - Professional TikTok video generation with beat sync
+    - Comprehensive error handling with recovery strategies
+  - **Preserved All Agent Instructions**: Maintained complete orchestrator workflow
+  - **Current Status**: Documentation now accurately reflects production codebase
 
 ### Latest Updates (Aug 17, 2025) - Part 34 - COMPREHENSIVE ERROR HANDLING SYSTEM
 - **IMPLEMENTED: Unified Error Handling Infrastructure**

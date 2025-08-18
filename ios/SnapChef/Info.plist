@@ -103,7 +103,7 @@
     <key>TikTokClientKey</key>
     <string>sbawj0946ft24i4wjv</string>
     <key>TikTokClientSecret</key>
-    <string>1BsqJsVa6bKjzlt2BvJgrapjgfNw7Ewk</string>
+    <string>$(TIKTOK_CLIENT_SECRET)</string>
     <key>GOOGLE_CLIENT_ID</key>
     <string>YOUR_GOOGLE_CLIENT_ID</string>
     <key>API_BASE_URL</key>

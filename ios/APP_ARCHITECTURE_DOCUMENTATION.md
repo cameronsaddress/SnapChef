@@ -31,21 +31,30 @@ SnapChef is an AI-powered iOS app that transforms photos of ingredients into per
 
 ## App Architecture
 
+### Core Architecture Pattern
+SnapChef uses **MVVM (Model-View-ViewModel)** architecture with:
+- **SwiftUI** for declarative UI
+- **Combine** for reactive programming
+- **Swift 6 concurrency** with async/await and actors
+- **Dual authentication system** (Anonymous + CloudKit)
+- **Hybrid data layer** (Local storage + CloudKit sync)
+- **Progressive Premium** lifecycle management
+
 ### Directory Structure
 ```
 ios/
 ├── SnapChef/
 │   ├── App/                      # App entry point and main views
-│   │   ├── SnapChefApp.swift    # App configuration
-│   │   ├── ContentView.swift    # Main tab navigation
-│   │   └── HomeView.swift       # Enhanced home screen
+│   │   ├── SnapChefApp.swift    # App configuration & dependency injection
+│   │   ├── ContentView.swift    # 5-tab navigation controller
+│   │   └── HomeView.swift       # Enhanced home screen with challenges
 │   │
 │   ├── Core/                     # Shared functionality
-│   │   ├── Models/              # Data models
-│   │   ├── Networking/          # API integration
-│   │   ├── Services/            # Business logic
-│   │   ├── Utilities/           # Helper functions
-│   │   └── ViewModels/          # Global state management
+│   │   ├── Models/              # Data models (Recipe, User, Challenge)
+│   │   ├── Networking/          # SnapChefAPIManager, CloudKit integration
+│   │   ├── Services/            # KeychainProfileManager, business logic
+│   │   ├── Utilities/           # Helper functions, extensions
+│   │   └── ViewModels/          # AppState with nested ViewModels
 │   │
 │   ├── Design/                   # UI components and styling
 │   │   ├── AnimationConstants.swift
@@ -54,11 +63,12 @@ ios/
 │   │   └── WhimsicalAnimations.swift
 │   │
 │   └── Features/                 # Feature modules
+│       ├── Authentication/      # Progressive auth system
 │       ├── Camera/              # Photo capture and processing
-│       ├── Gamification/        # Points, badges, challenges
+│       ├── Gamification/        # 365-day challenge system
 │       ├── Profile/             # User settings and preferences
 │       ├── Recipes/             # Recipe display and interaction
-│       └── Sharing/             # Social media integration
+│       └── Sharing/             # Multi-platform social sharing
 ```
 
 ## Core Components
@@ -68,10 +78,14 @@ ios/
 @main
 struct SnapChefApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
+    // Core state management
     @StateObject private var appState = AppState()
     @StateObject private var authManager = AuthenticationManager()
     @StateObject private var deviceManager = DeviceManager()
     @StateObject private var gamificationManager = GamificationManager()
+    
+    // Shared singleton services
     @StateObject private var socialShareManager = SocialShareManager.shared
     @StateObject private var cloudKitSyncService = CloudKitSyncService.shared
     @StateObject private var cloudKitDataManager = CloudKitDataManager.shared
@@ -86,23 +100,28 @@ struct SnapChefApp: App {
                 .environmentObject(socialShareManager)
                 .environmentObject(cloudKitSyncService)
                 .environmentObject(cloudKitDataManager)
-                .onOpenURL { url in
-                    handleIncomingURL(url)
+                .preferredColorScheme(.dark)
+                .onAppear { setupApp() }
+                .onOpenURL { url in handleIncomingURL(url) }
+                .sheet(isPresented: $socialShareManager.showRecipeFromDeepLink) {
+                    DeepLinkRecipeView()
                 }
         }
     }
 }
 ```
-- Initializes all global state managers
-- Sets up SDK integrations (TikTok, Google, Facebook)
-- Handles deep linking and URL schemes
-- Manages CloudKit synchronization
-- Configures app lifecycle events
+**Key Features:**
+- Dependency injection for all core services
+- TikTok SDK integration via AppDelegate
+- Deep linking with recipe sharing support
+- CloudKit session management
+- Progressive authentication setup
+- Dark mode enforcement
 
 ### 2. Navigation (`ContentView.swift`)
 ```swift
 struct ContentView: View {
-    @State private var selectedTab = 0
+    @EnvironmentObject var appState: AppState
     @State private var showingLaunchAnimation = true
     
     var body: some View {
@@ -111,90 +130,124 @@ struct ContentView: View {
                 LaunchAnimationView()
             } else {
                 MagicalBackground()
-                MainTabView(selectedTab: $selectedTab)
+                Group {
+                    if appState.isFirstLaunch {
+                        OnboardingView()
+                    } else {
+                        MainTabView()
+                    }
+                }
             }
         }
     }
 }
 
 struct MainTabView: View {
-    @Binding var selectedTab: Int
+    @State private var selectedTab = 0
     
     var body: some View {
         NavigationStack {
             Group {
                 switch selectedTab {
-                case 0: HomeView()
-                case 1: CameraView(selectedTab: $selectedTab)
-                case 2: RecipesView()
-                case 3: SocialFeedView()
-                case 4: ProfileView()
+                case 0: HomeView()                    // Home with challenges
+                case 1: CameraView(selectedTab: $selectedTab) // Full-screen camera
+                case 2: RecipesView()                 // Recipe library
+                case 3: SocialFeedView()              // Social feed & discovery
+                case 4: ProfileView()                 // User profile & settings
                 default: HomeView()
                 }
             }
-            MorphingTabBar(selectedTab: $selectedTab) // Custom animated tab bar
+            // Custom morphing tab bar (hidden during camera use)
+            if selectedTab != 1 {
+                MorphingTabBar(selectedTab: $selectedTab)
+            }
         }
     }
 }
 ```
-- Launch animation on app start
-- Custom morphing tab bar with 5 tabs
-- NavigationStack for proper navigation
-- Camera tab hides tab bar when active
-            
-            ProfileView()
-                .tabItem { Label("Profile", systemImage: "person.fill") }
-                .tag(2)
-        }
-    }
-}
-```
-- Tab-based navigation with custom morphing tab bar
-- Camera presented as full-screen modal
-- Gamification center accessible from home
+**Navigation Features:**
+- Launch animation with app state routing
+- Onboarding flow for first-time users
+- 5-tab structure with custom morphing tab bar
+- Single NavigationStack at root level
+- Camera tab presents full-screen (hides tab bar)
+- Animated tab transitions
 
 ### 3. State Management (`AppState.swift`)
+**Modern MVVM with Nested ViewModels:**
 ```swift
-class AppState: ObservableObject {
-    @Published var currentChef: ChefPersona
-    @Published var snapsTaken: Int
-    @Published var allRecipes: [Recipe]
-    @Published var savedRecipes: [Recipe]
-    @Published var recentRecipes: [Recipe]
+@MainActor
+final class AppState: ObservableObject {
+    // Focused ViewModels for better performance
+    @Published var recipesViewModel = RecipesViewModel()
+    @Published var authViewModel = AuthViewModel()
+    @Published var gamificationViewModel = GamificationViewModel()
     
-    // Methods for state updates
-    func incrementSnapsTaken()
-    func addRecentRecipe(_ recipe: Recipe)
-    func saveRecipeWithPhotos(_ recipe: Recipe, beforePhoto: UIImage?, afterPhoto: UIImage?)
+    // Computed properties for backward compatibility
+    var isFirstLaunch: Bool { authViewModel.isFirstLaunch }
+    var currentUser: User? { authViewModel.currentUser }
+    var recentRecipes: [Recipe] { recipesViewModel.recentRecipes }
+    var allRecipes: [Recipe] { recipesViewModel.allRecipes }
+    var savedRecipes: [Recipe] { recipesViewModel.savedRecipes }
+    
+    // Direct access to managers
+    var subscriptionManager: SubscriptionManager { gamificationViewModel.subscriptionManager }
+    var gamificationManager: GamificationManager { gamificationViewModel.gamificationManager }
+    var cloudKitAuthManager: CloudKitAuthManager { authViewModel.cloudKitAuthManager }
 }
 ```
-- Central source of truth for app data
-- Persists data using UserDefaults/Core Data
-- Publishes changes to update UI
+**Key Features:**
+- Nested ViewModels for separation of concerns
+- Progressive Premium integration
+- Dual authentication state management
+- Challenge system integration
+- CloudKit sync coordination
 
 ## Feature Modules
+
+### Authentication Module (`Features/Authentication/`)
+
+**Dual Authentication System:**
+1. **Anonymous Mode**: Full app functionality without signup
+2. **CloudKit Authentication**: Sign in with Apple/TikTok for sync
+
+#### Progressive Authentication Components:
+- **KeychainProfileManager**: Secure anonymous profile storage
+- **AuthPromptTrigger**: Context-aware auth prompting
+- **ProgressiveAuthPrompt**: Beautiful slide-up auth UI
+- **AnonymousUserProfile**: Tracks engagement without signup
+- **CloudKitAuthManager**: Handles authenticated user state
+
+#### Authentication Strategy:
+```swift
+// Anonymous users get full functionality
+- Recipe generation: ✅ (with daily limits)
+- Video creation: ✅ (with daily limits) 
+- Challenge participation: ✅
+- Social features: ✅ (local only)
+
+// Authenticated users get enhanced features
+- Unlimited recipe generation: ✅
+- Cross-device sync: ✅
+- Social sharing: ✅
+- Premium challenges: ✅
+```
 
 ### Camera Module (`Features/Camera/`)
 
 #### CameraView.swift
-Main camera interface with real-time preview and capture functionality:
-- **Camera Setup**: Configures AVCaptureSession for photo capture
-- **UI Overlay**: Scanning animation, AI status indicator
-- **Photo Processing**: Captures image and sends to API
-- **Game Integration**: Shows emoji flick game during processing
+Main camera interface with full-screen capture:
+- **AVCaptureSession**: Professional camera setup
+- **Real-time Preview**: Live camera feed with overlays
+- **Smart Capture**: AI-optimized photo processing
+- **Haptic Feedback**: Enhanced user experience
+- **Usage Tracking**: Integration with Progressive Premium
 
 #### Key Components:
-1. **CameraModel**: Manages AVFoundation camera session
-2. **CameraPreview**: SwiftUI UIViewRepresentable for camera feed
-3. **ScanningOverlay**: Animated corner brackets and scan line
-4. **CaptureButton**: Custom button with haptic feedback
-
-#### EmojiFlickGame.swift
-Mini-game played during AI processing:
-- **Physics Engine**: Custom physics for falling emojis
-- **Touch Handling**: Flick gestures to launch emojis
-- **Score System**: Points for successful hits
-- **Background**: Semi-transparent fridge image (opacity: 0.375)
+1. **CameraModel**: Thread-safe camera session management
+2. **CameraPreview**: SwiftUI-wrapped AVCaptureVideoPreviewLayer
+3. **ScanningOverlay**: Animated scanning UI elements
+4. **CaptureButton**: Custom button with visual feedback
 
 ### Recipe Module (`Features/Recipes/`)
 
@@ -337,8 +390,9 @@ struct ShareGeneratorView: View {
 
 ### Gamification Module (`Features/Gamification/`)
 
-#### GamificationManager.swift
-Central hub for all gamification features:
+#### 365-Day Challenge System
+**Comprehensive gamification with local-first approach:**
+
 ```swift
 @MainActor
 class GamificationManager: ObservableObject {
@@ -348,31 +402,39 @@ class GamificationManager: ObservableObject {
     @Published var weeklyLeaderboard: [LeaderboardEntry]
     @Published var globalLeaderboard: [LeaderboardEntry]
     @Published var unlockedBadges: [GameBadge]
-    @Published var hasCheckedInToday: Bool
+    @Published var currentStreak: Int
+    @Published var chefCoins: Int
     
-    // Point System:
-    // - Recipe created: 10 points + quality bonus
-    // - Challenge completed: Variable (100-2000 points)
-    // - Daily check-in: 50 points
-    // - Streak bonuses: 50-500 points
-    // - Perfect recipe: 50 points
+    // Progressive Point System:
+    // - Recipe created: 10-50 points (quality-based)
+    // - Challenge completed: 100-2000 points (difficulty-based)
+    // - Daily check-in: 50 points + streak bonus
+    // - Social sharing: 25 points
+    // - Perfect recipe rating: 100 bonus points
 }
 ```
 
-#### Challenge System Components
+#### Core Challenge Architecture
 
-##### Core Services
-1. **Local Challenge System** - 365 pre-loaded challenges (no server needed)
-   - Winter challenges (Holiday, New Year, Valentine's)
-   - Spring challenges (Easter, St. Patrick's, Picnics)
-   - Summer challenges (BBQ, July 4th, Beach)
-   - Fall challenges (Halloween, Thanksgiving, Harvest)
-   - Viral challenges (TikTok trends, Internet famous)
-   - Weekend specials (Game day, Movie night, Brunch)
-2. **ChallengeProgressTracker** - Real-time progress monitoring
-3. **ChallengeService** - Core Data persistence
-4. **ChefCoinsManager** - Virtual currency system
-5. **ChallengeAnalytics** - Engagement tracking
+**1. Local Challenge Database (365 Days):**
+- **ChallengeDatabase**: 365 pre-seeded challenges
+- **Seasonal Rotation**: Winter, Spring, Summer, Fall themes
+- **Special Events**: Holidays, viral trends, weekend specials
+- **Difficulty Tiers**: Easy (100pts) → Expert (2000pts)
+- **No Server Dependency**: Fully offline-capable
+
+**2. Challenge Management Services:**
+- **ChallengeGenerator**: Creates daily/weekly challenges
+- **ChallengeProgressTracker**: Real-time progress monitoring
+- **ChallengeService**: Local persistence with CloudKit sync
+- **PremiumChallengeManager**: Exclusive premium challenges
+- **ChallengeNotificationManager**: Daily reminder system
+
+**3. Reward & Currency System:**
+- **ChefCoinsManager**: Virtual currency (earn/spend)
+- **RewardSystem**: Points, badges, titles, themes
+- **StreakManager**: Daily check-in streak tracking
+- **UnlockablesStore**: Themes, recipe packs, features
 
 ##### Challenge Types
 ```swift
@@ -419,36 +481,70 @@ struct GameBadge {
 
 ## Data Flow
 
-### 1. Photo Capture Flow
+### 1. Photo Capture & Recipe Generation Flow
 ```
-User → CameraView → CapturePhoto → CameraModel
-                                        ↓
-                                   Process Image
-                                        ↓
-API ← SnapChefAPIManager ← Format Request
- ↓
-Response → Parse → Convert Models → Update State
-                    ↓                    ↓
-         ChallengeProgressTracker   RecipeResultsView
-                    ↓
-         Update Challenge Progress
+User Taps Camera → CameraView (Full-Screen)
+        ↓
+AVCaptureSession → Capture UIImage → Compress (80% JPEG)
+        ↓
+UsageTracker.canCreateRecipe() → Check Daily Limits
+        ↓
+SnapChefAPIManager.analyzeImage() → POST /analyze_fridge_image
+        ↓
+Grok Vision API → Parse Ingredients → Generate Recipes
+        ↓
+APIResponse → RecipeAPI[] → Convert to Recipe[]
+        ↓
+RecipeResultsView → Display → User Selects Recipe
+        ↓
+AppState.addRecentRecipe() → ChallengeProgressTracker.trackRecipeCreated()
+        ↓
+Update Challenge Progress → Award Points/Badges → CloudKit Sync
 ```
 
-### 2. Challenge System Flow
+### 2. Authentication Flow (Progressive)
 ```
-User Action → ChallengeProgressTracker → Track Progress
-                                              ↓
-                                    Check Challenge Rules
-                                              ↓
-                            Update Progress → Notify Manager
-                                              ↓
-                                    Complete Challenge?
-                                         ↓         ↓
-                                       Yes        No
-                                        ↓         ↓
-                                Award Rewards  Continue
-                                        ↓
-                                Update Stats/Badges
+App Launch → KeychainProfileManager.getOrCreateProfile()
+        ↓
+AnonymousUserProfile → Track Actions (recipes, videos, social)
+        ↓
+AuthPromptTrigger.checkTriggerConditions() → Context Analysis
+        ↓
+Optimal Moment Detected → ProgressiveAuthPrompt.show()
+        ↓
+User Signs In (Apple/TikTok) → CloudKitAuthManager.authenticate()
+        ↓
+Migrate Anonymous Data → Enable CloudKit Sync → Premium Features
+```
+
+### 3. Challenge System Flow (365-Day)
+```
+Daily Timer → ChallengeGenerator.refreshChallenges()
+        ↓
+ChallengeDatabase.getChallengesForDate() → Filter by Season/Events
+        ↓
+User Action (Recipe/Video) → ChallengeProgressTracker.update()
+        ↓
+Check Challenge Requirements → Calculate Progress
+        ↓
+Challenge Complete? → RewardSystem.awardRewards()
+        ↓
+ChefCoinsManager.add() + GamificationManager.awardBadge()
+        ↓
+CloudKit Sync (if authenticated) → Update Global Leaderboard
+```
+
+### 4. Data Persistence Flow (Hybrid)
+```
+Local Storage (Anonymous):
+UserDefaults → Recipe Lists, Preferences, Stats
+Keychain → AnonymousUserProfile, API Keys
+Documents → Recipe Photos, Cached Data
+
+CloudKit Sync (Authenticated):
+CKRecord → User Profile, Saved Recipes, Challenge Progress
+CKAsset → Recipe Photos, Generated Videos
+CKSubscription → Real-time Social Updates
 ```
 
 ### 2. API Request Structure
@@ -486,20 +582,47 @@ IngredientAPI → Used directly for display
 
 ## User Journey
 
-### First-Time User
-1. **Launch**: Welcome animation with confetti
-2. **Home**: See "Yay! This will be fun!" message
-3. **Camera**: Permission request → Tutorial overlay
-4. **Capture**: Take photo → Play emoji game
-5. **Results**: View recipes → Earn first badge
-6. **Share**: Create first post → Unlock achievement
+### Anonymous User (Full Functionality)
+1. **Launch**: Animated splash → HomeView with challenges
+2. **First Recipe**: Camera → Generate recipes (no signup required)
+3. **Daily Limits**: 5 recipes/day → Progressive Premium hints
+4. **Challenge Participation**: Join daily challenges → Earn points
+5. **Social Features**: View community content (read-only)
+6. **Video Creation**: Generate TikTok videos (2/day limit)
 
-### Returning User
-1. **Home**: See snap count, recent recipes
-2. **Quick Actions**: One-tap camera access
-3. **Gamification**: Check daily quests
-4. **Profile**: Adjust preferences
-5. **Social**: View leaderboard position
+### Progressive Authentication Triggers
+- **First Recipe Success** (Day 1): "Love this recipe? Save it forever!"
+- **Daily Limit Reached** (Day 3-5): "Ready for unlimited recipes?"
+- **Challenge Interest** (Day 7): "Climb the leaderboard with friends!"
+- **Viral Content Created** (Week 2): "Share your viral recipe!"
+- **High Engagement** (Week 4): "Join the SnapChef community!"
+
+### Authenticated User (Premium Experience)
+1. **Cross-Device Sync**: Recipes available on all devices
+2. **Unlimited Creation**: No daily recipe/video limits
+3. **Social Features**: Follow chefs, share recipes, compete
+4. **Premium Challenges**: Exclusive high-reward challenges
+5. **Advanced Analytics**: Detailed cooking stats and trends
+6. **Cloud Storage**: Unlimited recipe and photo storage
+
+### 3-Phase Premium Strategy
+**Phase 1: Anonymous (Days 1-7)**
+- 5 recipes/day, 2 videos/day
+- Local storage only
+- Basic challenges
+- Read-only social
+
+**Phase 2: Engaged (Days 8-30)**
+- Auth prompts at optimal moments
+- Preview of premium features
+- Increased daily limits
+- Social teasers
+
+**Phase 3: Premium (Day 30+)**
+- Unlimited everything
+- Full social features
+- Exclusive content
+- Advanced analytics
 
 ## API Integration
 
@@ -716,40 +839,46 @@ rm -rf ~/Library/Developer/Xcode/DerivedData
 4. Code review required
 5. Squash and merge
 
-## Recent Updates (February 2025)
+## Recent Updates (January 2025)
 
-### Local Challenge System (February 1, 2025)
-- **365 Days of Content**: Full year of challenges embedded locally
-- **Dynamic Scheduling**: Challenges rotate based on current date
-- **Seasonal Variety**: Winter, Spring, Summer, Fall themes
-- **Viral Challenges**: TikTok trends and internet famous recipes
-- **Weekend Specials**: Game day, movie night, brunch challenges
-- **Automatic Refresh**: Hourly updates to active challenge list
+### Progressive Authentication System (January 16, 2025)
+- **Dual Authentication**: Anonymous + CloudKit hybrid approach
+- **KeychainProfileManager**: Secure anonymous profile storage
+- **Context-Aware Prompts**: Strategic auth prompting system
+- **No Signup Required**: Full app functionality without barriers
+- **Seamless Migration**: Anonymous data transfers to authenticated state
 
-### Challenge System Implementation (Completed)
-- **Phase 1**: Database foundation with Core Data
-- **Phase 2**: Complete UI with Challenge Hub and leaderboards
-- **Phase 3**: Full integration with recipe creation and social features
-- **Phase 4**: Local challenge system with 365 days of content
+### 365-Day Challenge System (January 14, 2025)
+- **Local-First Architecture**: No server dependency for core challenges
+- **Seasonal Content**: 365 unique challenges across all seasons
+- **Viral Integration**: TikTok trends and internet-famous recipes
+- **Progressive Rewards**: Points, badges, coins, unlockables
+- **Real-Time Tracking**: Live progress monitoring and notifications
 
-### Build Status
-- ✅ All compilation errors fixed
-- ✅ Challenge system fully integrated
-- ✅ Local challenges working without CloudKit
-- ⚠️ Minor warnings remain (unused variables, Core Data resources)
+### Enhanced Navigation & UI (January 18, 2025)
+- **5-Tab Structure**: Home, Camera, Recipes, Social, Profile
+- **Custom Morphing Tab Bar**: Animated tab transitions
+- **Full-Screen Camera**: Immersive capture experience
+- **Challenge Integration**: Daily challenges prominently featured on home
+- **Social Feed**: Community activity and chef discovery
 
-### Known Issues
-1. **Build Warnings**:
-   - Core Data generated files in Copy Bundle Resources
-   - Unused variables: statusCode, transaction, feature
+### Current Architecture Status
+- ✅ MVVM with nested ViewModels implemented
+- ✅ Swift 6 concurrency throughout codebase
+- ✅ Progressive authentication fully functional
+- ✅ 365-day challenge system operational
+- ✅ Hybrid data layer (Local + CloudKit) working
+- ✅ Multi-platform sharing system integrated
+- ⚠️ TikTok video generation optimizations ongoing
 
-2. **Pending Tasks**:
-   - Test subscription flow in iOS Simulator
-   - Add server-side receipt validation
-   - Complete App Store Connect agreements
-   - Add localizations to subscription products
+### Active Development Focus
+1. **Premium Strategy**: 3-phase lifecycle optimization
+2. **Social Features**: Enhanced community interactions
+3. **Performance**: TikTok video rendering improvements
+4. **Analytics**: User engagement tracking refinement
 
 ---
 
-Last Updated: February 1, 2025
-Version: 1.1.1
+**Last Updated: January 18, 2025**  
+**Version: 2.0.0**  
+**Architecture: MVVM + SwiftUI + Swift 6**

@@ -668,8 +668,10 @@ final class CloudKitSyncService: ObservableObject {
         var updates = UserStatUpdates()
 
         if let currentUser = CloudKitAuthManager.shared.currentUser {
-            updates.totalPoints = currentUser.totalPoints + challenge.points
-            updates.coinBalance = currentUser.coinBalance + challenge.coins
+            // Note: CloudKitAuthManager.currentUser uses experiencePoints instead of totalPoints
+            // and doesn't have coinBalance property
+            updates.experiencePoints = currentUser.experiencePoints + challenge.points
+            // Coin balance functionality not available in current CloudKitAuthManager user model
             updates.challengesCompleted = currentUser.challengesCompleted + 1
 
             do {

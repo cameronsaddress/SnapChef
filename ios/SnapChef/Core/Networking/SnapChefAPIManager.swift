@@ -201,7 +201,10 @@ final class SnapChefAPIManager {
                 print("Failed to serialize dietary restrictions")
                 throw APIError.invalidRequestData
             }
-            let restrictionsString = String(data: restrictionsData, encoding: .utf8)!
+            guard let restrictionsString = String(data: restrictionsData, encoding: .utf8) else {
+                print("Failed to convert dietary restrictions to string")
+                throw APIError.invalidRequestData
+            }
             appendFormField(name: "dietary_restrictions", value: restrictionsString)
         } else {
             // Send an empty JSON array string if no restrictions, to match FastAPI's default
@@ -237,7 +240,10 @@ final class SnapChefAPIManager {
                 print("Failed to serialize existing recipe names")
                 throw APIError.invalidRequestData
             }
-            let existingRecipesString = String(data: existingRecipesData, encoding: .utf8)!
+            guard let existingRecipesString = String(data: existingRecipesData, encoding: .utf8) else {
+                print("Failed to convert existing recipes to string")
+                throw APIError.invalidRequestData
+            }
             appendFormField(name: "existing_recipe_names", value: existingRecipesString)
         }
 
@@ -247,7 +253,10 @@ final class SnapChefAPIManager {
                 print("Failed to serialize food preferences")
                 throw APIError.invalidRequestData
             }
-            let preferencesString = String(data: preferencesData, encoding: .utf8)!
+            guard let preferencesString = String(data: preferencesData, encoding: .utf8) else {
+                print("Failed to convert food preferences to string")
+                throw APIError.invalidRequestData
+            }
             appendFormField(name: "food_preferences", value: preferencesString)
         }
 
@@ -552,7 +561,10 @@ final class SnapChefAPIManager {
                 print("Failed to serialize dietary restrictions")
                 throw APIError.invalidRequestData
             }
-            let restrictionsString = String(data: restrictionsData, encoding: .utf8)!
+            guard let restrictionsString = String(data: restrictionsData, encoding: .utf8) else {
+                print("Failed to convert dietary restrictions to string")
+                throw APIError.invalidRequestData
+            }
             appendFormField(name: "dietary_restrictions", value: restrictionsString)
         } else {
             // Send an empty JSON array string if no restrictions, to match FastAPI's default
@@ -588,7 +600,10 @@ final class SnapChefAPIManager {
                 print("Failed to serialize existing recipe names")
                 throw APIError.invalidRequestData
             }
-            let existingRecipesString = String(data: existingRecipesData, encoding: .utf8)!
+            guard let existingRecipesString = String(data: existingRecipesData, encoding: .utf8) else {
+                print("Failed to convert existing recipes to string")
+                throw APIError.invalidRequestData
+            }
             appendFormField(name: "existing_recipe_names", value: existingRecipesString)
         }
 
@@ -598,7 +613,10 @@ final class SnapChefAPIManager {
                 print("Failed to serialize food preferences")
                 throw APIError.invalidRequestData
             }
-            let preferencesString = String(data: preferencesData, encoding: .utf8)!
+            guard let preferencesString = String(data: preferencesData, encoding: .utf8) else {
+                print("Failed to convert food preferences to string")
+                throw APIError.invalidRequestData
+            }
             appendFormField(name: "food_preferences", value: preferencesString)
         }
 
@@ -647,13 +665,162 @@ final class SnapChefAPIManager {
         return request
     }
 
+    /// Enhanced API request with comprehensive error handling and retry logic
+    private func performAPIRequest<T: Codable & Sendable>(
+        request: URLRequest,
+        responseType: T.Type,
+        maxRetries: Int = 3,
+        baseDelay: TimeInterval = 1.0
+    ) async throws -> T {
+        let operationId = "api_\(UUID().uuidString.prefix(8))"
+        
+        return try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                try await self.executeRequestWithRetry(
+                    request: request,
+                    responseType: responseType,
+                    operationId: operationId,
+                    maxRetries: maxRetries,
+                    baseDelay: baseDelay
+                )
+            }
+            
+            for try await result in group {
+                group.cancelAll()
+                return result
+            }
+            
+            throw SnapChefError.unknown("Request group completed without result")
+        }
+    }
+    
+    /// Execute request with exponential backoff retry logic
+    private func executeRequestWithRetry<T: Codable>(
+        request: URLRequest,
+        responseType: T.Type,
+        operationId: String,
+        maxRetries: Int,
+        baseDelay: TimeInterval
+    ) async throws -> T {
+        var lastError: Error?
+        
+        for attempt in 0..<maxRetries {
+            do {
+                let (data, response) = try await session.data(for: request)
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw SnapChefError.networkError("Invalid response type")
+                }
+                
+                // Handle HTTP errors with enhanced status code mapping
+                if let error = handleHTTPStatusCode(httpResponse.statusCode, data: data) {
+                    
+                    // Don't retry on certain errors
+                    if case .authenticationError = error,
+                       case .unauthorizedError = error,
+                       case .validationError = error {
+                        throw error
+                    }
+                    
+                    // For retryable errors, store and continue to retry logic
+                    lastError = error
+                    
+                    // Log retry attempt
+                    ErrorAnalytics.logError(error, context: "api_retry_attempt_\(attempt + 1)_\(operationId)")
+                    
+                    if attempt < maxRetries - 1 {
+                        let delay = calculateBackoffDelay(attempt: attempt, baseDelay: baseDelay)
+                        print("[API] Retrying in \(delay)s (attempt \(attempt + 1)/\(maxRetries))")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    } else {
+                        throw error
+                    }
+                }
+                
+                // Success case - decode response
+                do {
+                    let decoded = try JSONDecoder().decode(responseType, from: data)
+                    print("[API] Request succeeded on attempt \(attempt + 1)")
+                    return decoded
+                } catch {
+                    let decodingError = SnapChefError.apiError(
+                        "Failed to parse server response: \(error.localizedDescription)",
+                        statusCode: httpResponse.statusCode,
+                        recovery: .retry
+                    )
+                    throw decodingError
+                }
+                
+            } catch {
+                lastError = error
+                
+                // Handle network-level errors
+                if let nsError = error as NSError? {
+                    let snapChefError: SnapChefError
+                    
+                    switch nsError.code {
+                    case NSURLErrorTimedOut:
+                        snapChefError = .timeoutError("Request timed out. Please check your connection.")
+                    case NSURLErrorNotConnectedToInternet:
+                        snapChefError = .networkError("No internet connection. Please check your network.")
+                    case NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost:
+                        snapChefError = .networkError("Cannot reach server. Please try again later.")
+                    case NSURLErrorNetworkConnectionLost:
+                        snapChefError = .networkError("Network connection lost. Please try again.")
+                    default:
+                        snapChefError = .networkError("Network error: \(error.localizedDescription)")
+                    }
+                    
+                    ErrorAnalytics.logError(snapChefError, context: "network_error_attempt_\(attempt + 1)_\(operationId)")
+                    
+                    // Don't retry on certain network errors
+                    if nsError.code == NSURLErrorNotConnectedToInternet {
+                        throw snapChefError
+                    }
+                    
+                    if attempt < maxRetries - 1 {
+                        let delay = calculateBackoffDelay(attempt: attempt, baseDelay: baseDelay)
+                        print("[API] Network error, retrying in \(delay)s (attempt \(attempt + 1)/\(maxRetries))")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    } else {
+                        throw snapChefError
+                    }
+                } else {
+                    // Other errors (e.g., SnapChefError already)
+                    if attempt < maxRetries - 1 {
+                        let delay = calculateBackoffDelay(attempt: attempt, baseDelay: baseDelay)
+                        print("[API] Error, retrying in \(delay)s (attempt \(attempt + 1)/\(maxRetries))")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    } else {
+                        throw error
+                    }
+                }
+            }
+        }
+        
+        // If we get here, all retries failed
+        throw lastError ?? SnapChefError.unknown("All retry attempts failed")
+    }
+    
+    /// Calculate exponential backoff delay with jitter
+    private func calculateBackoffDelay(attempt: Int, baseDelay: TimeInterval) -> TimeInterval {
+        let exponentialDelay = baseDelay * pow(2.0, Double(attempt))
+        let jitter = Double.random(in: 0.1...0.3) * exponentialDelay
+        let maxDelay: TimeInterval = 30.0 // Cap at 30 seconds
+        return min(exponentialDelay + jitter, maxDelay)
+    }
+    
     /// Handles HTTP status codes and returns appropriate SnapChef errors
     private func handleHTTPStatusCode(_ statusCode: Int, data: Data?) -> SnapChefError? {
         switch statusCode {
         case 200...299:
             return nil // Success
         case 400:
-            return .validationError("Invalid request. Please check your input.", fields: [])
+            let message = extractErrorMessage(from: data) ?? "Invalid request. Please check your input."
+            return .validationError(message, fields: [])
         case 401:
             return .authenticationError("Authentication failed. Please sign in again.")
         case 403:
@@ -664,14 +831,23 @@ final class SnapChefAPIManager {
             return .apiError("Conflict detected. Please refresh and try again.", statusCode: statusCode, recovery: .retry)
         case 413:
             return .validationError("Image file is too large. Please use a smaller image.", fields: ["image"])
+        case 422:
+            let message = extractErrorMessage(from: data) ?? "Invalid data provided."
+            return .validationError(message, fields: [])
         case 429:
-            return .rateLimitError("Too many requests. Please wait a moment before trying again.", retryAfter: 60)
-        case 500...502:
-            return .apiError("Server is temporarily unavailable. Please try again.", statusCode: statusCode, recovery: .retry)
+            let retryAfter = extractRetryAfter(from: data) ?? 60
+            return .rateLimitError("Too many requests. Please wait a moment before trying again.", retryAfter: retryAfter)
+        case 500:
+            return .apiError("Internal server error. Our team has been notified.", statusCode: statusCode, recovery: .retry)
+        case 501:
+            return .apiError("Feature not implemented. Please contact support.", statusCode: statusCode, recovery: .contactSupport)
+        case 502:
+            return .apiError("Bad gateway. Please try again in a moment.", statusCode: statusCode, recovery: .retry)
         case 503:
-            return .apiError("Service temporarily unavailable for maintenance.", statusCode: statusCode, recovery: .retryAfter(300))
+            let retryAfter = extractRetryAfter(from: data) ?? 300
+            return .apiError("Service temporarily unavailable for maintenance.", statusCode: statusCode, recovery: .retryAfter(TimeInterval(retryAfter)))
         case 504:
-            return .timeoutError("Server response timeout. Please try again.")
+            return .timeoutError("Gateway timeout. Please try again.")
         default:
             let message: String
             if let data = data, let responseString = String(data: data, encoding: .utf8) {
@@ -682,7 +858,80 @@ final class SnapChefAPIManager {
             return .apiError(message, statusCode: statusCode, recovery: .retry)
         }
     }
+    
+    /// Extract error message from response data
+    private func extractErrorMessage(from data: Data?) -> String? {
+        guard let data = data else { return nil }
+        
+        do {
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                // Try common error message fields
+                if let message = json["message"] as? String { return message }
+                if let error = json["error"] as? String { return error }
+                if let detail = json["detail"] as? String { return detail }
+                
+                // Handle FastAPI validation errors
+                if let validationErrors = json["detail"] as? [[String: Any]] {
+                    let messages = validationErrors.compactMap { error in
+                        if let msg = error["msg"] as? String,
+                           let loc = error["loc"] as? [Any] {
+                            let location = loc.compactMap { "\($0)" }.joined(separator: ".")
+                            return "\(location): \(msg)"
+                        }
+                        return error["msg"] as? String
+                    }
+                    if !messages.isEmpty {
+                        return messages.joined(separator: "; ")
+                    }
+                }
+            }
+        } catch {
+            // If JSON parsing fails, return raw string if readable
+            return String(data: data, encoding: .utf8)
+        }
+        
+        return nil
+    }
+    
+    /// Extract retry-after value from response data
+    private func extractRetryAfter(from data: Data?) -> TimeInterval? {
+        guard let data = data else { return nil }
+        
+        do {
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let retryAfter = json["retry_after"] as? TimeInterval { return retryAfter }
+                if let retryAfter = json["retryAfter"] as? TimeInterval { return retryAfter }
+                if let retryAfter = json["retry-after"] as? TimeInterval { return retryAfter }
+            }
+        } catch {
+            // Ignore JSON parsing errors
+        }
+        
+        return nil
+    }
 
+    /// Convert SnapChefError to APIError for backward compatibility
+    private func convertSnapChefErrorToAPIError(_ snapChefError: SnapChefError) -> APIError {
+        switch snapChefError {
+        case .networkError(let message, _):
+            return APIError.serverError(statusCode: -1, message: message)
+        case .apiError(let message, let statusCode, _):
+            return APIError.serverError(statusCode: statusCode ?? 500, message: message)
+        case .timeoutError(let message, _):
+            return APIError.serverError(statusCode: 408, message: message)
+        case .authenticationError(_, _):
+            return APIError.authenticationError
+        case .unauthorizedError(let message, _):
+            return APIError.unauthorized(message)
+        case .validationError(let message, _):
+            return APIError.decodingError(message)
+        case .rateLimitError(let message, _):
+            return APIError.serverError(statusCode: 429, message: message)
+        default:
+            return APIError.serverError(statusCode: 500, message: snapChefError.errorDescription ?? "Unknown error")
+        }
+    }
+    
     /// Converts API Recipe model to app's Recipe model
     func convertAPIRecipeToAppRecipe(_ apiRecipe: RecipeAPI) -> Recipe {
         // Convert ingredients

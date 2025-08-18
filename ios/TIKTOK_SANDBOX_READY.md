@@ -4,9 +4,11 @@
 
 ```
 Client Key: sbawj0946ft24i4wjv
-Client Secret: 1BsqJsVa6bKjzlt2BvJgrapjgfNw7Ewk
+Client Secret: [REDACTED - Configure securely via KeychainManager]
 Environment: SANDBOX (Testing)
 ```
+
+⚠️ **SECURITY NOTE:** The client secret has been removed from documentation for security. Use `KeychainManager.shared.storeTikTokClientSecret("your-secret")` to configure securely.
 
 ## 🎯 What This Means:
 

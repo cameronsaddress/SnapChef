@@ -12,9 +12,11 @@ import UIKit
 final class TikTokSDKBridge: NSObject {
     static let shared = TikTokSDKBridge()
 
-    // Sandbox credentials
+    // Sandbox credentials - REMOVED: Use secure KeychainManager instead
     private let clientKey = "sbawj0946ft24i4wjv"
-    private let clientSecret = "1BsqJsVa6bKjzlt2BvJgrapjgfNw7Ewk"
+    private var clientSecret: String? {
+        return KeychainManager.shared.getTikTokClientSecret()
+    }
 
     private var currentCompletion: ((Bool, String?) -> Void)?
 

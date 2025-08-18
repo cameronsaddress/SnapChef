@@ -166,7 +166,14 @@ class SocialShareManager: ObservableObject {
         } else {
             urlString = "\(baseURL)/\(recipe.id.uuidString)"
         }
-        return URL(string: urlString) ?? URL(string: baseURL)!
+        if let url = URL(string: urlString) {
+            return url
+        } else if let fallbackURL = URL(string: baseURL) {
+            return fallbackURL
+        } else {
+            // Final fallback to snapchef.com
+            return URL(string: "https://snapchef.com")!
+        }
     }
     
     private func saveImageToPhotoLibrary(_ image: UIImage) async throws {

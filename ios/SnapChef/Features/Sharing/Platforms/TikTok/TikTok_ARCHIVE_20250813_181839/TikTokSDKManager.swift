@@ -13,9 +13,11 @@ import Photos
 final class TikTokSDKManager: SocialShareSDKProtocol {
     // MARK: - Properties
 
-    // Sandbox credentials for testing
+    // Sandbox credentials for testing - REMOVED: Use secure KeychainManager instead
     private let clientKey = "sbawj0946ft24i4wjv"
-    private let clientSecret = "1BsqJsVa6bKjzlt2BvJgrapjgfNw7Ewk"
+    private var clientSecret: String? {
+        return KeychainManager.shared.getTikTokClientSecret()
+    }
     private let redirectURI = "snapchef://tiktok/callback"
 
     // TikTok URL schemes for different regions/versions

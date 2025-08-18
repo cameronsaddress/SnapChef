@@ -114,7 +114,7 @@ shareRequest.send { response in
 ## Sandbox Credentials
 
 - **Client Key**: `sbawj0946ft24i4wjv`
-- **Client Secret**: `1BsqJsVa6bKjzlt2BvJgrapjgfNw7Ewk`
+- **Client Secret**: `[REDACTED - Use KeychainManager]`
 - **Status**: Configured in Info.plist
 
 ## Future Improvements

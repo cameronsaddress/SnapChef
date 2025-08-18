@@ -52,7 +52,7 @@ final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionPro
 
 // MARK: - CI Filter Compositor
 
-@objc final class CIFilterCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
+@objc final class CIFilterCompositor: NSObject, AVVideoCompositing, Sendable {
     // CRITICAL FIX: Remove force unwraps to prevent EXC_BREAKPOINT crashes
     nonisolated(unsafe) private let ciContext: CIContext = {
         let sRGBColorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
@@ -306,7 +306,7 @@ final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionPro
 
 // MARK: - Renderer Pro
 
-public final class ViralVideoRendererPro: @unchecked Sendable {
+public final class ViralVideoRendererPro: Sendable {
     private let memoryOptimizer = MemoryOptimizer.shared
 
     public init() {}
@@ -500,7 +500,7 @@ public final class ViralVideoRendererPro: @unchecked Sendable {
         let exportStartTime = Date()
 
         // Add progress monitoring
-        let progressTask = Task { @MainActor in
+        let progressTask = Task { @Sendable in
             while exportSession.status == .exporting {
                 let progress = exportSession.progress
                 let elapsed = Date().timeIntervalSince(exportStartTime)
