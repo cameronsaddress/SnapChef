@@ -75,8 +75,8 @@ struct DetectiveView: View {
                     reason: .premiumFeature("Recipe Detective")
                 )
             }
-            .onChange(of: capturedImage) { oldValue, newValue in
-                if let newImage = newValue {
+            .onChange(of: capturedImage) { newImage in
+                if let newImage = newImage {
                     Task {
                         await analyzeImage(newImage)
                     }
@@ -515,43 +515,38 @@ struct DetectiveView: View {
         isAnalyzing = true
         errorMessage = nil
         
-        do {
-            // TODO: Implement detective analysis once API is ready
-            // For now, create a mock response to avoid compilation errors
-            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 second delay to simulate processing
-            
-            // Create a mock detective recipe for testing
-            let mockRecipe = DetectiveRecipe(
-                name: "Mock Restaurant Dish Recreation",
-                description: "A recreation of your photographed restaurant dish.",
-                ingredients: [
-                    Ingredient(id: UUID(), name: "Main ingredient", quantity: "1 cup", unit: nil, isAvailable: true),
-                    Ingredient(id: UUID(), name: "Secondary ingredient", quantity: "2 tbsp", unit: nil, isAvailable: true)
-                ],
-                instructions: [
-                    "This is a mock recipe created for testing purposes.",
-                    "The actual detective analysis feature is coming soon!",
-                    "Once implemented, this will analyze your restaurant meal photo and provide a recreation recipe."
-                ],
-                cookTime: 30,
-                prepTime: 15,
-                servings: 4,
-                difficulty: .medium,
-                nutrition: Nutrition(calories: 350, protein: 15, carbs: 45, fat: 12, fiber: nil, sugar: nil, sodium: nil),
-                imageURL: nil,
-                createdAt: Date(),
-                tags: ["Mock", "Coming Soon"],
-                dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
-                confidenceScore: 75.0,
-                originalDishName: "Restaurant Dish",
-                restaurantStyle: "American"
-            )
-            
-            detectiveRecipe = mockRecipe
-            
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        // TODO: Implement detective analysis once API is ready
+        // For now, create a mock response to avoid compilation errors
+        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 second delay to simulate processing
+        
+        // Create a mock detective recipe for testing
+        let mockRecipe = DetectiveRecipe(
+            name: "Mock Restaurant Dish Recreation",
+            description: "A recreation of your photographed restaurant dish.",
+            ingredients: [
+                Ingredient(id: UUID(), name: "Main ingredient", quantity: "1 cup", unit: nil, isAvailable: true),
+                Ingredient(id: UUID(), name: "Secondary ingredient", quantity: "2 tbsp", unit: nil, isAvailable: true)
+            ],
+            instructions: [
+                "This is a mock recipe created for testing purposes.",
+                "The actual detective analysis feature is coming soon!",
+                "Once implemented, this will analyze your restaurant meal photo and provide a recreation recipe."
+            ],
+            cookTime: 30,
+            prepTime: 15,
+            servings: 4,
+            difficulty: .medium,
+            nutrition: Nutrition(calories: 350, protein: 15, carbs: 45, fat: 12, fiber: nil, sugar: nil, sodium: nil),
+            imageURL: nil,
+            createdAt: Date(),
+            tags: ["Mock", "Coming Soon"],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
+            confidenceScore: 75.0,
+            originalDishName: "Restaurant Dish",
+            restaurantStyle: "American"
+        )
+        
+        detectiveRecipe = mockRecipe
         
         isAnalyzing = false
     }
