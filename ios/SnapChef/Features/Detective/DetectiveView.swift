@@ -190,6 +190,32 @@ struct DetectiveView: View {
                     .lineLimit(3)
             }
             
+            // MARK: - TEST BUTTON (Remove in production)
+            Button(action: {
+                // Bypass premium check for testing
+                showingCamera = true
+            }) {
+                HStack(spacing: 12) {
+                    Image(systemName: "hammer.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                    
+                    Text("TEST: Bypass Premium")
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        colors: [Color.orange, Color.red],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(16)
+            }
+            .padding(.bottom, 8)
+            
             Button(action: {
                 if canUseDetectiveFeature() {
                     showingCamera = true
