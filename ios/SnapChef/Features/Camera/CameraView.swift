@@ -126,7 +126,7 @@ struct CameraView: View {
                 MagicalBackground()
                     .ignoresSafeArea()
                     .overlay(
-                        PhysicsLoadingOverlay()
+                        MagicalProcessingOverlay(capturedImage: capturedImage)
                     )
             }
             
@@ -135,34 +135,88 @@ struct CameraView: View {
                 ZStack {
                     Color.black.ignoresSafeArea()
                     
+                    // Full screen photo with proper aspect ratio
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .ignoresSafeArea()
+                    
+                    // Button overlay at bottom with backdrop
                     VStack {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        Spacer()
                         
-                        HStack(spacing: 20) {
-                            Button("Retake") {
-                                showingPreview = false
-                                capturedImage = nil
-                            }
-                            .foregroundColor(.white)
-                            
-                            Button("Confirm") {
-                                showingPreview = false
-                                if captureMode == .fridge {
-                                    fridgePhoto = capturedImage
-                                    captureMode = .pantry
-                                    showPantryStep = true
-                                } else {
-                                    if let fridgeImage = fridgePhoto {
-                                        processBothImages(fridgeImage: fridgeImage, pantryImage: capturedImage!)
+                        // Button container with backdrop
+                        VStack(spacing: 20) {
+                            HStack(spacing: 40) {
+                                // Retake button
+                                Button("Retake") {
+                                    showingPreview = false
+                                    capturedImage = nil
+                                }
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 32)
+                                .padding(.vertical, 16)
+                                .background(
+                                    Capsule()
+                                        .fill(.ultraThinMaterial)
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                        )
+                                )
+                                .shadow(color: Color.black.opacity(0.2), radius: 8, y: 4)
+                                
+                                // Confirm button with green checkmark design
+                                VStack(spacing: 8) {
+                                    Text("Looks Good!")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    
+                                    Button(action: {
+                                        showingPreview = false
+                                        if captureMode == .fridge {
+                                            fridgePhoto = capturedImage
+                                            captureMode = .pantry
+                                            showPantryStep = true
+                                        } else {
+                                            if let fridgeImage = fridgePhoto {
+                                                processBothImages(fridgeImage: fridgeImage, pantryImage: capturedImage!)
+                                            }
+                                        }
+                                    }) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(Color.green)
+                                                .frame(width: 70, height: 70)
+                                                .shadow(color: Color.green.opacity(0.4), radius: 12, y: 6)
+                                            
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 28, weight: .bold))
+                                                .foregroundColor(.white)
+                                        }
                                     }
                                 }
                             }
-                            .foregroundColor(.white)
                         }
-                        .padding()
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 30)
+                        .background(
+                            Rectangle()
+                                .fill(.ultraThinMaterial)
+                                .mask(
+                                    LinearGradient(
+                                        gradient: Gradient(stops: [
+                                            .init(color: .clear, location: 0),
+                                            .init(color: .black, location: 0.3),
+                                            .init(color: .black, location: 1)
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .ignoresSafeArea(edges: .bottom)
+                        )
                     }
                 }
             }
@@ -204,6 +258,11 @@ struct CameraView: View {
             // Handle retry for network errors
             if case .networkError = currentError {
                 // Retry last action
+            }
+        } onRetry: {
+            // Handle retry action - re-process the last captured image
+            if let image = capturedImage {
+                processImage(image)
             }
         }
         .overlay(
@@ -576,13 +635,23 @@ struct CameraView: View {
                     case .failure(let error):
                         self.isProcessing = false
 
-                        // Convert API errors to user-friendly errors
+                        // Convert API errors to user-friendly SnapChef errors with appropriate recovery strategies
                         if case APIError.authenticationError = error {
-                            self.currentError = .authenticationError("Authentication failed")
+                            // API auth error - this is about the backend API key, not user auth
+                            self.currentError = .apiError("Server authentication failed. Please try again later.", recovery: .retry)
+                        } else if case APIError.notFoodImage(let message) = error {
+                            // Use imageProcessingError for non-food images with retry recovery
+                            self.currentError = .imageProcessingError(message, recovery: .retry)
+                        } else if case APIError.noIngredientsDetected(let message) = error {
+                            // Use recipeGenerationError for ingredient detection issues with retry recovery
+                            self.currentError = .recipeGenerationError(message, recovery: .retry)
                         } else if case APIError.serverError(_, let message) = error {
-                            self.currentError = .apiError("Server error: \(message)")
+                            self.currentError = .apiError("Server error: \(message)", recovery: .retry)
+                        } else if case APIError.unauthorized(let message) = error {
+                            // This is about missing API key in the app, not user authentication
+                            self.currentError = .apiError(message, recovery: .retry)
                         } else {
-                            self.currentError = .unknown(error.localizedDescription)
+                            self.currentError = .unknown(error.localizedDescription, recovery: .retry)
                         }
 
                         // Restart camera session on error
@@ -852,13 +921,23 @@ struct CameraView: View {
                     case .failure(let error):
                         self.isProcessing = false
 
-                        // Convert API errors to user-friendly errors
+                        // Convert API errors to user-friendly SnapChef errors with appropriate recovery strategies
                         if case APIError.authenticationError = error {
-                            self.currentError = .authenticationError("Authentication failed")
+                            // API auth error - this is about the backend API key, not user auth
+                            self.currentError = .apiError("Server authentication failed. Please try again later.", recovery: .retry)
+                        } else if case APIError.notFoodImage(let message) = error {
+                            // Use imageProcessingError for non-food images with retry recovery
+                            self.currentError = .imageProcessingError(message, recovery: .retry)
+                        } else if case APIError.noIngredientsDetected(let message) = error {
+                            // Use recipeGenerationError for ingredient detection issues with retry recovery
+                            self.currentError = .recipeGenerationError(message, recovery: .retry)
                         } else if case APIError.serverError(_, let message) = error {
-                            self.currentError = .apiError("Server error: \(message)")
+                            self.currentError = .apiError("Server error: \(message)", recovery: .retry)
+                        } else if case APIError.unauthorized(let message) = error {
+                            // This is about missing API key in the app, not user authentication
+                            self.currentError = .apiError(message, recovery: .retry)
                         } else {
-                            self.currentError = .unknown(error.localizedDescription)
+                            self.currentError = .unknown(error.localizedDescription, recovery: .retry)
                         }
 
                         // Restart camera session on error
@@ -952,7 +1031,7 @@ struct PantryStepOverlay: View {
                 // Fridge photo preview
                 if let fridgeImage = fridgePhoto {
                     VStack(spacing: 16) {
-                        Text("Great shot! 📸")
+                        Text("Great shot!")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
 

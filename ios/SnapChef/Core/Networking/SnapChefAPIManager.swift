@@ -49,6 +49,8 @@ enum APIError: Error, LocalizedError {
     case decodingError(String)
     case authenticationError // For 401 Unauthorized
     case unauthorized(String) // For missing API key
+    case notFoodImage(String) // For non-fridge/pantry photos
+    case noIngredientsDetected(String) // For food images with no detectable ingredients
 
     var errorDescription: String? {
         switch self {
@@ -59,6 +61,8 @@ enum APIError: Error, LocalizedError {
         case .decodingError(let details): return "Failed to decode server response: \(details)"
         case .authenticationError: return "Authentication failed. Please check your app's API key."
         case .unauthorized(let message): return message
+        case .notFoodImage(let message): return message
+        case .noIngredientsDetected(let message): return message
         }
     }
 }
@@ -179,7 +183,8 @@ final class SnapChefAPIManager {
             throw APIError.unauthorized("API key not found. Please reinstall the app.")
         }
         request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
-
+        print("🔑 API Key being sent in header: \(apiKey.prefix(10))...")
+        
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
 
@@ -311,7 +316,9 @@ final class SnapChefAPIManager {
         }
 
         print("📡 API Request to: \(url.absoluteString)")
-        print("📡 API Key: \(KeychainManager.shared.getAPIKey() != nil ? "[REDACTED]" : "Not found")")
+        let apiKey = KeychainManager.shared.getAPIKey()
+        print("📡 API Key: \(apiKey != nil ? "[Found - \(apiKey!.prefix(10))...]" : "Not found")")
+        print("📡 API Key Length: \(apiKey?.count ?? 0) characters")
 
         let request: URLRequest
         do {
@@ -337,6 +344,7 @@ final class SnapChefAPIManager {
 
         print("📡 Sending request with session ID: \(sessionId)")
         print("📡 Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        print("📡 Request body size: \(request.httpBody?.count ?? 0) bytes")
 
         let startTime = Date()
         session.dataTask(with: request) { data, response, error in
@@ -344,8 +352,10 @@ final class SnapChefAPIManager {
             print("📡 Request completed in \(String(format: "%.2f", elapsed)) seconds")
 
             if let error = error {
-                print("❌ API Error: \(error.localizedDescription)")
+                print("❌ API Network Error: \(error.localizedDescription)")
                 print("❌ Error details: \(error)")
+                print("❌ Error domain: \((error as NSError).domain)")
+                print("❌ Error code: \((error as NSError).code)")
 
                 // Check if it's a timeout error
                 if (error as NSError).code == NSURLErrorTimedOut {
@@ -386,8 +396,31 @@ final class SnapChefAPIManager {
             do {
                 let apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
                 print("✅ Successfully decoded API response")
+                print("✅ Image analysis - is_food_image: \(apiResponse.data.image_analysis.is_food_image), confidence: \(apiResponse.data.image_analysis.confidence)")
                 print("✅ Found \(apiResponse.data.recipes.count) recipes")
                 print("✅ Found \(apiResponse.data.ingredients.count) ingredients")
+                
+                // Check if the image analysis indicates this is not a food image
+                if !apiResponse.data.image_analysis.is_food_image {
+                    let friendlyMessage = "Hmm, this doesn't look like a fridge or pantry photo. Let's try again with a clear shot of your ingredients! 📸"
+                    completion(.failure(APIError.notFoodImage(friendlyMessage)))
+                    return
+                }
+                
+                // Check if we detected ingredients but got no recipes
+                if apiResponse.data.ingredients.isEmpty {
+                    let friendlyMessage = "I couldn't spot any ingredients in this photo. Try taking a clearer shot of your fridge or pantry with better lighting! 💡"
+                    completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
+                    return
+                }
+                
+                // Check if we have ingredients but no recipes (another edge case)
+                if !apiResponse.data.ingredients.isEmpty && apiResponse.data.recipes.isEmpty {
+                    let friendlyMessage = "I found some ingredients but couldn't create recipes. This might be due to very limited ingredients or dietary restrictions being too specific. Try with more ingredients or adjust your preferences! 🥘"
+                    completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
+                    return
+                }
+                
                 completion(.success(apiResponse))
             } catch {
                 print("❌ Decoding Error: \(error)")
@@ -424,7 +457,9 @@ final class SnapChefAPIManager {
         }
 
         print("📡 API Request to: \(url.absoluteString)")
-        print("📡 API Key: \(KeychainManager.shared.getAPIKey() != nil ? "[REDACTED]" : "Not found")")
+        let apiKey = KeychainManager.shared.getAPIKey()
+        print("📡 API Key: \(apiKey != nil ? "[Found - \(apiKey!.prefix(10))...]" : "Not found")")
+        print("📡 API Key Length: \(apiKey?.count ?? 0) characters")
         print("📡 Sending both fridge and pantry images")
 
         let request: URLRequest
@@ -452,6 +487,7 @@ final class SnapChefAPIManager {
 
         print("📡 Sending request with session ID: \(sessionId)")
         print("📡 Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        print("📡 Request body size: \(request.httpBody?.count ?? 0) bytes")
 
         let startTime = Date()
         session.dataTask(with: request) { data, response, error in
@@ -459,8 +495,10 @@ final class SnapChefAPIManager {
             print("📡 Request completed in \(String(format: "%.2f", elapsed)) seconds")
 
             if let error = error {
-                print("❌ API Error: \(error.localizedDescription)")
+                print("❌ API Network Error: \(error.localizedDescription)")
                 print("❌ Error details: \(error)")
+                print("❌ Error domain: \((error as NSError).domain)")
+                print("❌ Error code: \((error as NSError).code)")
 
                 // Check if it's a timeout error
                 if (error as NSError).code == NSURLErrorTimedOut {
@@ -500,9 +538,32 @@ final class SnapChefAPIManager {
 
             do {
                 let apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
-                print("✅ Successfully decoded API response")
+                print("✅ Successfully decoded API response for both images")
+                print("✅ Image analysis - is_food_image: \(apiResponse.data.image_analysis.is_food_image), confidence: \(apiResponse.data.image_analysis.confidence)")
                 print("✅ Found \(apiResponse.data.recipes.count) recipes")
                 print("✅ Found \(apiResponse.data.ingredients.count) ingredients")
+                
+                // Check if the image analysis indicates this is not a food image
+                if !apiResponse.data.image_analysis.is_food_image {
+                    let friendlyMessage = "Hmm, one or both of these photos don't look like fridge or pantry shots. Let's try again with clear photos of your ingredients! 📸"
+                    completion(.failure(APIError.notFoodImage(friendlyMessage)))
+                    return
+                }
+                
+                // Check if we detected ingredients but got no recipes
+                if apiResponse.data.ingredients.isEmpty {
+                    let friendlyMessage = "I couldn't spot any ingredients in these photos. Try taking clearer shots of your fridge and pantry with better lighting! 💡"
+                    completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
+                    return
+                }
+                
+                // Check if we have ingredients but no recipes
+                if !apiResponse.data.ingredients.isEmpty && apiResponse.data.recipes.isEmpty {
+                    let friendlyMessage = "I found some ingredients but couldn't create recipes. This might be due to very limited ingredients or dietary restrictions being too specific. Try with more ingredients or adjust your preferences! 🥘"
+                    completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
+                    return
+                }
+                
                 completion(.success(apiResponse))
             } catch {
                 print("❌ Decoding Error: \(error)")
@@ -539,7 +600,8 @@ final class SnapChefAPIManager {
             throw APIError.unauthorized("API key not found. Please reinstall the app.")
         }
         request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
-
+        print("🔑 API Key being sent in header: \(apiKey.prefix(10))...")
+        
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
 
@@ -822,7 +884,7 @@ final class SnapChefAPIManager {
             let message = extractErrorMessage(from: data) ?? "Invalid request. Please check your input."
             return .validationError(message, fields: [])
         case 401:
-            return .authenticationError("Authentication failed. Please sign in again.")
+            return .authenticationError("Server authentication failed. The app's API key may be incorrect.")
         case 403:
             return .unauthorizedError("Access denied. Please check your permissions.")
         case 404:
@@ -927,6 +989,10 @@ final class SnapChefAPIManager {
             return APIError.decodingError(message)
         case .rateLimitError(let message, _):
             return APIError.serverError(statusCode: 429, message: message)
+        case .imageProcessingError(let message, _):
+            return APIError.notFoodImage(message)
+        case .recipeGenerationError(let message, _):
+            return APIError.noIngredientsDetected(message)
         default:
             return APIError.serverError(statusCode: 500, message: snapChefError.errorDescription ?? "Unknown error")
         }

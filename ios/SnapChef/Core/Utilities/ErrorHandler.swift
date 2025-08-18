@@ -166,7 +166,7 @@ enum SnapChefError: LocalizedError, Equatable {
         case .imageProcessingError(_, _):
             return "We couldn't process your image. Please try with a different photo."
         case .recipeGenerationError(_, _):
-            return "We couldn't generate recipes from your photo. Please try with a clearer image."
+            return "We couldn't generate recipes from your photo. Please try with a clearer image of your fridge or pantry ingredients."
         case .videoGenerationError(_, _):
             return "We couldn't create your video. Please try again."
         case .sharingError(_, let platform, _):

@@ -16,33 +16,28 @@ class KeychainManager {
 
     /// Stores the API key in the keychain
     func storeAPIKey(_ key: String) {
+        print("🔐 KeychainManager: Storing API key with length \(key.count)")
         let data = key.data(using: .utf8)!
-
-        // First, try to update if it exists
-        let updateQuery: [String: Any] = [
+        
+        // First delete any existing item to ensure clean state
+        deleteAPIKey()
+        
+        // Now add the new key
+        let addQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: apiKeyIdentifier,
-            kSecValueData as String: data
+            kSecAttrService as String: "com.snapchef.app", // Add service identifier
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
-
-        let updateStatus = SecItemUpdate(
-            [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrAccount as String: apiKeyIdentifier
-            ] as CFDictionary,
-            updateQuery as CFDictionary
-        )
-
-        // If update failed (item doesn't exist), add it
-        if updateStatus == errSecItemNotFound {
-            let addQuery: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrAccount as String: apiKeyIdentifier,
-                kSecValueData as String: data,
-                kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-            ]
-
-            SecItemAdd(addQuery as CFDictionary, nil)
+        
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        print("🔐 KeychainManager: Add status = \(addStatus)")
+        
+        if addStatus == noErr {
+            print("✅ API key successfully stored in keychain")
+        } else {
+            print("❌ Failed to store API key, error code: \(addStatus)")
         }
     }
 
@@ -51,20 +46,25 @@ class KeychainManager {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: apiKeyIdentifier,
+            kSecAttrService as String: "com.snapchef.app", // Match service identifier
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
 
         var dataTypeRef: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
+        
+        print("🔐 KeychainManager: Get API key status = \(status)")
 
         if status == noErr {
             if let data = dataTypeRef as? Data,
                let key = String(data: data, encoding: .utf8) {
+                print("🔐 KeychainManager: Retrieved API key with length \(key.count)")
                 return key
             }
         }
-
+        
+        print("🔐 KeychainManager: No API key found in keychain")
         return nil
     }
 
@@ -72,10 +72,18 @@ class KeychainManager {
     func deleteAPIKey() {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: apiKeyIdentifier
+            kSecAttrAccount as String: apiKeyIdentifier,
+            kSecAttrService as String: "com.snapchef.app" // Match service identifier
         ]
 
-        SecItemDelete(query as CFDictionary)
+        let deleteStatus = SecItemDelete(query as CFDictionary)
+        if deleteStatus == noErr {
+            print("🔐 KeychainManager: Successfully deleted API key")
+        } else if deleteStatus == errSecItemNotFound {
+            print("🔐 KeychainManager: No API key to delete")
+        } else {
+            print("🔐 KeychainManager: Delete status = \(deleteStatus)")
+        }
     }
 
     /// Ensures the API key is available from secure configuration

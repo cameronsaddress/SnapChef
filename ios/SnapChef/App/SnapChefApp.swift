@@ -87,6 +87,11 @@ struct SnapChefApp: App {
         SDKInitializer.initializeSDKs()
         SDKInitializer.verifyURLSchemes()
 
+        // Configure API key for development/production
+        print("🚀 App initialization: Setting up API key...")
+        setupAPIKeyIfNeeded()
+        print("🚀 App initialization: API key setup complete")
+        
         KeychainManager.shared.ensureAPIKeyExists()
         NetworkManager.shared.configure()
         deviceManager.checkDeviceStatus()
@@ -180,6 +185,30 @@ struct SnapChefApp: App {
         }
 
         print("✅ CloudKit photo sync completed")
+    }
+    
+    // MARK: - API Key Configuration
+    
+    private func setupAPIKeyIfNeeded() {
+        // Force update the API key to ensure we have the correct one
+        // The storeAPIKey function now handles deletion internally
+        
+        // For production app, we need a secure API key that matches the server's APP_API_KEY
+        // This key should be coordinated with the server deployment
+        // Using the correct API key for the render server
+        let apiKey = "5380e4b60818cf237678fccfd4b8f767d1c94"
+        
+        // Store the API key securely in Keychain
+        KeychainManager.shared.storeAPIKey(apiKey)
+        print("🔑 API key configured and stored in Keychain: \(apiKey.prefix(10))...")
+        print("🔑 API key length: \(apiKey.count) characters")
+        
+        // Verify it was stored successfully
+        if let storedKey = KeychainManager.shared.getAPIKey() {
+            print("✅ API key verification successful")
+        } else {
+            print("❌ Failed to verify API key storage")
+        }
     }
 }
 
