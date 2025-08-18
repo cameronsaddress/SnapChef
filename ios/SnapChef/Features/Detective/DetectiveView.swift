@@ -16,6 +16,18 @@ struct DetectiveView: View {
     @State private var showingPremiumPrompt = false
     @State private var analysisProgress: Double = 0.0
     
+    // MARK: - Computed Properties for Type Inference
+    private var gridColumns: [GridItem] {
+        [
+            GridItem(.flexible()),
+            GridItem(.flexible())
+        ]
+    }
+    
+    private var recentRecipes: [DetectiveRecipe] {
+        Array(appState.detectiveRecipes.suffix(4))
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -259,9 +271,7 @@ struct DetectiveView: View {
                 )
         )
         .onAppear {
-            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: false)) {
-                analysisProgress = 1.0
-            }
+            startProgressAnimation()
         }
     }
     
@@ -433,11 +443,8 @@ struct DetectiveView: View {
                 .fontWeight(.bold)
                 .foregroundColor(.white)
             
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 16) {
-                ForEach(appState.detectiveRecipes.suffix(4), id: \.id) { recipe in
+            LazyVGrid(columns: gridColumns, spacing: 16) {
+                ForEach(recentRecipes, id: \.id) { recipe in
                     NavigationLink(destination: DetectiveRecipeDetailView(recipe: recipe)) {
                         detectiveHistoryCard(recipe: recipe)
                     }
@@ -490,6 +497,12 @@ struct DetectiveView: View {
     }
     
     // MARK: - Helper Functions
+    private func startProgressAnimation() {
+        withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: false)) {
+            analysisProgress = 1.0
+        }
+    }
+    
     private func canUseDetectiveFeature() -> Bool {
         // Check if user has premium or is in trial/honeymoon phase
         return cloudKitAuth.isAuthenticated && userLifecycle.currentPhase == .premium
