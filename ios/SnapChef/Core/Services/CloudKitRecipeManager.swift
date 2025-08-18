@@ -28,6 +28,13 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Upload a recipe to CloudKit (creates single master record)
     func uploadRecipe(_ recipe: Recipe, fromLLM: Bool = false, beforePhoto: UIImage? = nil) async throws -> String {
+        // Only upload to CloudKit if user is authenticated
+        guard CloudKitAuthManager.shared.isAuthenticated else {
+            print("📱 User not authenticated - skipping CloudKit upload")
+            // Return a local ID for the recipe
+            return recipe.id
+        }
+        
         // Check if recipe already exists
         if let existingID = await checkRecipeExists(recipe.name, recipe.description) {
             print("✅ Recipe already exists with ID: \(existingID)")
@@ -648,6 +655,12 @@ class CloudKitRecipeManager: ObservableObject {
     /// Load user's recipe references
     func loadUserRecipeReferences() {
         Task {
+            // Only load CloudKit data if authenticated
+            guard CloudKitAuthManager.shared.isAuthenticated else {
+                print("📱 User not authenticated - skipping CloudKit recipe references")
+                return
+            }
+            
             guard let userID = getCurrentUserID() else { return }
 
             do {
@@ -673,6 +686,12 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Get user's saved recipes (optimized)
     func getUserSavedRecipes() async throws -> [Recipe] {
+        // Check if user is authenticated with Apple/Google/Facebook
+        guard CloudKitAuthManager.shared.isAuthenticated else {
+            print("📱 User not authenticated - returning empty saved recipes")
+            return []
+        }
+        
         print("📖 Getting user's saved recipes...")
 
         // Ensure references are loaded first
@@ -714,6 +733,12 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Get user's created recipes (optimized)
     func getUserCreatedRecipes() async throws -> [Recipe] {
+        // Check if user is authenticated with Apple/Google/Facebook
+        guard CloudKitAuthManager.shared.isAuthenticated else {
+            print("📱 User not authenticated - returning empty created recipes")
+            return []
+        }
+        
         print("🍳 Getting user's created recipes...")
 
         // Ensure references are loaded first
@@ -922,6 +947,11 @@ class CloudKitRecipeManager: ObservableObject {
     // MARK: - Helper Methods
 
     private func getCurrentUserID() -> String? {
+        // Only return user ID if authenticated
+        guard CloudKitAuthManager.shared.isAuthenticated else {
+            return nil
+        }
+        
         // Try both keys for compatibility
         if let userID = UserDefaults.standard.string(forKey: "currentUserID") {
             return userID
@@ -1117,6 +1147,12 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Fetch photos for a recipe
     func fetchRecipePhotos(for recipeID: String) async throws -> (before: UIImage?, after: UIImage?) {
+        // Only fetch photos if authenticated
+        guard CloudKitAuthManager.shared.isAuthenticated else {
+            print("📱 User not authenticated - skipping CloudKit photo fetch")
+            return (nil, nil)
+        }
+        
         let recordID = CKRecord.ID(recordName: recipeID)
 
         print("🔍 CloudKit: Fetching photos for recipe ID: \(recipeID)")
