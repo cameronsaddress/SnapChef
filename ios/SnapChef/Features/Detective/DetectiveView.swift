@@ -790,7 +790,7 @@ struct CameraDetectiveView: View {
                     }
                     
                     // Main capture button
-                    DetectiveCaptureButton {
+                    DetectiveCameraCaptureButton {
                         capturePhoto()
                     }
                 }
@@ -825,8 +825,8 @@ struct CameraDetectiveView: View {
     }
 }
 
-// MARK: - Detective Capture Button
-struct DetectiveCaptureButton: View {
+// MARK: - Detective Camera Capture Button
+struct DetectiveCameraCaptureButton: View {
     let action: () -> Void
     @State private var isPressed = false
     @State private var pulseScale: CGFloat = 1
