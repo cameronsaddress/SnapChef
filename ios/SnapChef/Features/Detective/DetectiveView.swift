@@ -46,6 +46,8 @@ struct DetectiveView: View {
                             detectiveResultCard(recipe: recipe)
                         } else if isAnalyzing {
                             analysisProgressView
+                        } else if let error = errorMessage {
+                            errorDisplayCard(error: error)
                         } else {
                             detectivePromptCard
                         }
@@ -190,7 +192,7 @@ struct DetectiveView: View {
                     .lineLimit(3)
             }
             
-            // MARK: - TEST BUTTON (Remove in production)
+            // MARK: - TEST BUTTONS (Remove in production)
             Button(action: {
                 // Bypass premium check for testing
                 showingCamera = true
@@ -200,6 +202,36 @@ struct DetectiveView: View {
                         .font(.system(size: 18, weight: .semibold))
                     
                     Text("TEST: Bypass Premium")
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        colors: [Color.orange, Color.red],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(16)
+            }
+            .padding(.bottom, 8)
+            
+            Button(action: {
+                // Use sample meal photo for testing
+                showingCamera = false
+                Task {
+                    if let testImage = UIImage(named: "meal1") {
+                        await analyzeImage(testImage)
+                    }
+                }
+            }) {
+                HStack(spacing: 12) {
+                    Text("🍔")
+                        .font(.system(size: 18))
+                    
+                    Text("TEST: Sample Meal Photo")
                         .font(.system(size: 18, weight: .semibold))
                 }
                 .foregroundColor(.white)
@@ -302,6 +334,83 @@ struct DetectiveView: View {
         .onAppear {
             startProgressAnimation()
         }
+    }
+    
+    // MARK: - Error Display Card
+    private func errorDisplayCard(error: String) -> some View {
+        VStack(spacing: 20) {
+            // Error icon
+            ZStack {
+                Circle()
+                    .fill(Color.red.opacity(0.2))
+                    .frame(width: 80, height: 80)
+                
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundColor(.red)
+            }
+            
+            VStack(spacing: 12) {
+                Text("Analysis Failed")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                
+                Text(error)
+                    .font(.body)
+                    .foregroundColor(.white.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(4)
+            }
+            
+            // Action buttons
+            HStack(spacing: 12) {
+                Button(action: {
+                    // Try again
+                    errorMessage = nil
+                    capturedImage = nil
+                    showingCamera = true
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "camera.fill")
+                        Text("Try Again")
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color(hex: "#9b59b6"))
+                    .cornerRadius(12)
+                }
+                
+                Button(action: {
+                    // Clear error and go back to prompt
+                    errorMessage = nil
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.left")
+                        Text("Back")
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.2))
+                    .cornerRadius(12)
+                }
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color.white.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(Color.red.opacity(0.5), lineWidth: 2)
+                )
+        )
     }
     
     // MARK: - Detective Result Card
@@ -557,8 +666,8 @@ struct DetectiveView: View {
                 // Convert API recipe to our DetectiveRecipe model
                 detectiveRecipe = SnapChefAPIManager.shared.convertAPIDetectiveRecipeToDetectiveRecipe(apiRecipe)
                 
-                // Save to recipes if we have a valid recipe
-                if let recipe = detectiveRecipe {
+                // Save to recipes if we have a valid recipe with decent confidence
+                if let recipe = detectiveRecipe, recipe.confidenceScore > 0 {
                     // Convert DetectiveRecipe to regular Recipe and add to saved recipes
                     let regularRecipe = recipe.toBaseRecipe()
                     appState.savedRecipes.append(regularRecipe)
@@ -566,7 +675,12 @@ struct DetectiveView: View {
                     print("✅ Confidence: \(recipe.confidenceScore)%")
                 }
             } else {
-                errorMessage = response.message.isEmpty ? "Failed to analyze the meal photo" : response.message
+                // Handle the case where no dish was detected (confidence_score: 0)
+                if response.data.recipe_reconstruction.confidence_score == 0 {
+                    errorMessage = "I couldn't identify this as a recognizable dish. Try taking a clearer photo of a prepared meal or dish!"
+                } else {
+                    errorMessage = response.message.isEmpty ? "Failed to analyze the meal photo" : response.message
+                }
                 print("❌ Detective analysis failed: \(errorMessage ?? "Unknown error")")
             }
         } catch {
