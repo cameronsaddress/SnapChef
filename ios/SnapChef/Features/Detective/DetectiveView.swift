@@ -78,9 +78,7 @@ struct DetectiveView: View {
                 )
             }
             .onChange(of: capturedImage) { newImage in
-                print("🔍 onChange triggered, capturedImage: \(newImage != nil ? "Set" : "Nil")")
                 if let newImage = newImage {
-                    print("🔍 Starting analysis of captured image")
                     Task {
                         await analyzeImage(newImage)
                     }
@@ -794,16 +792,12 @@ struct CameraDetectiveView: View {
                         let testImage = UIImage(named: "meal1") ?? UIImage(named: "meal1.jpg")
                         
                         if let image = testImage {
-                            print("🔍 TEST: Successfully loaded meal1.jpg test image")
                             capturedImage = image
-                            print("🔍 TEST: Image set, dismissing camera")
                             
                             // Force dismiss after a slight delay to ensure binding updates
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                 presentationMode.wrappedValue.dismiss()
                             }
-                        } else {
-                            print("❌ TEST: Could not load meal1 image from bundle")
                         }
                     }) {
                         HStack(spacing: 12) {
