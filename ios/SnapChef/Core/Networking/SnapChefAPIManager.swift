@@ -1001,7 +1001,7 @@ final class SnapChefAPIManager {
     // MARK: - Recipe Detective API
     
     /// Analyzes a restaurant meal photo to reverse-engineer the recipe
-    /* func analyzeRestaurantMeal(
+    func analyzeRestaurantMeal(
         image: UIImage,
         sessionID: String,
         llmProvider: LLMProvider = .gemini
@@ -1142,7 +1142,7 @@ final class SnapChefAPIManager {
         request.httpBody = httpBody
         
         return request
-    } */
+    }
     
     /// Converts DetectiveRecipeAPI to DetectiveRecipe model
     func convertAPIDetectiveRecipeToDetectiveRecipe(_ apiRecipe: DetectiveRecipeAPI) -> DetectiveRecipe {

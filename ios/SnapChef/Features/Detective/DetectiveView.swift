@@ -541,38 +541,40 @@ struct DetectiveView: View {
         isAnalyzing = true
         errorMessage = nil
         
-        // TODO: Implement detective analysis once API is ready
-        // For now, create a mock response to avoid compilation errors
-        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 second delay to simulate processing
-        
-        // Create a mock detective recipe for testing
-        let mockRecipe = DetectiveRecipe(
-            name: "Mock Restaurant Dish Recreation",
-            description: "A recreation of your photographed restaurant dish.",
-            ingredients: [
-                Ingredient(id: UUID(), name: "Main ingredient", quantity: "1 cup", unit: nil, isAvailable: true),
-                Ingredient(id: UUID(), name: "Secondary ingredient", quantity: "2 tbsp", unit: nil, isAvailable: true)
-            ],
-            instructions: [
-                "This is a mock recipe created for testing purposes.",
-                "The actual detective analysis feature is coming soon!",
-                "Once implemented, this will analyze your restaurant meal photo and provide a recreation recipe."
-            ],
-            cookTime: 30,
-            prepTime: 15,
-            servings: 4,
-            difficulty: .medium,
-            nutrition: Nutrition(calories: 350, protein: 15, carbs: 45, fat: 12, fiber: nil, sugar: nil, sodium: nil),
-            imageURL: nil,
-            createdAt: Date(),
-            tags: ["Mock", "Coming Soon"],
-            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
-            confidenceScore: 75.0,
-            originalDishName: "Restaurant Dish",
-            restaurantStyle: "American"
-        )
-        
-        detectiveRecipe = mockRecipe
+        do {
+            // Create a session ID for this analysis
+            let sessionID = UUID().uuidString
+            print("🔍 Starting detective analysis with session ID: \(sessionID)")
+            
+            // Call the actual API
+            let response = try await apiManager.analyzeRestaurantMeal(
+                image: image,
+                sessionID: sessionID,
+                llmProvider: .grok // Using Grok for detective analysis
+            )
+            
+            if response.success, let apiRecipe = response.detectiveRecipe {
+                // Convert API recipe to our DetectiveRecipe model
+                detectiveRecipe = apiManager.convertAPIDetectiveRecipeToDetectiveRecipe(apiRecipe)
+                
+                // Save to recipes if we have a valid recipe
+                if let recipe = detectiveRecipe {
+                    if var currentRecipes = appState.recipes {
+                        let regularRecipe = recipe.toRegularRecipe()
+                        currentRecipes.append(regularRecipe)
+                        appState.recipes = currentRecipes
+                    }
+                    print("✅ Detective analysis successful: \(recipe.name)")
+                    print("✅ Confidence: \(recipe.confidenceScore)%")
+                }
+            } else {
+                errorMessage = response.error ?? "Failed to analyze the meal photo"
+                print("❌ Detective analysis failed: \(errorMessage ?? "Unknown error")")
+            }
+        } catch {
+            errorMessage = "Failed to analyze image: \(error.localizedDescription)"
+            print("❌ Detective analysis error: \(error)")
+        }
         
         isAnalyzing = false
     }
