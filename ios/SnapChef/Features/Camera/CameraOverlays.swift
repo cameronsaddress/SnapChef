@@ -11,12 +11,13 @@ struct CameraOverlays: View {
     // Callbacks
     let onRetake: () -> Void
     let onConfirm: () -> Void
+    var onCloseProcessing: (() -> Void)? = nil
     
     var body: some View {
         ZStack {
             // Processing overlay
             if isProcessing {
-                MagicalProcessingOverlay(capturedImage: capturedImage)
+                MagicalProcessingOverlay(capturedImage: capturedImage, onClose: onCloseProcessing)
             }
 
             // Captured image preview

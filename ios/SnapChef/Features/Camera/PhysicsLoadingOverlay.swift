@@ -208,6 +208,7 @@ struct EmojiFlickGameOverlay: View {
 // MARK: - Integration with MagicalProcessingOverlay
 struct MagicalProcessingOverlay: View {
     let capturedImage: UIImage?
+    var onClose: (() -> Void)? = nil
     @State private var useGameMode = true
     @State private var showAIProcessingView = true
 
@@ -219,7 +220,7 @@ struct MagicalProcessingOverlay: View {
                     withAnimation(.easeOut(duration: 0.3)) {
                         showAIProcessingView = false
                     }
-                })
+                }, onClose: onClose)
             } else {
                 EmojiFlickGameOverlay(capturedImage: capturedImage)
             }

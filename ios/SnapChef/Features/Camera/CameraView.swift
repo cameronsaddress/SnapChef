@@ -102,7 +102,13 @@ struct CameraView: View {
                     // Top controls (CameraTopControls temporarily commented out)
                     // TODO: Implement CameraTopControls
                     CameraTopBar(onClose: {
-                        dismiss()
+                        // If we have a selectedTab binding, go back to home tab
+                        if $selectedTab.wrappedValue != 0 {
+                            $selectedTab.wrappedValue = 0
+                        } else {
+                            // Otherwise, dismiss the view
+                            dismiss()
+                        }
                     })
                     
                     Spacer()
@@ -126,13 +132,28 @@ struct CameraView: View {
                 MagicalBackground()
                     .ignoresSafeArea()
                     .overlay(
-                        MagicalProcessingOverlay(capturedImage: capturedImage)
+                        MagicalProcessingOverlay(capturedImage: capturedImage, onClose: {
+                            // Stop processing and go back
+                            isProcessing = false
+                            capturedImage = nil
+                            fridgePhoto = nil
+                            captureMode = .fridge
+                            showPantryStep = false
+                            
+                            // Navigate back to home if from tab
+                            if $selectedTab.wrappedValue != 0 {
+                                $selectedTab.wrappedValue = 0
+                            } else {
+                                dismiss()
+                            }
+                        })
                     )
             }
             
             // Preview overlay
             if showingPreview, let image = capturedImage {
                 ZStack {
+                    // Black background
                     Color.black.ignoresSafeArea()
                     
                     // Full screen photo with proper aspect ratio
@@ -141,82 +162,66 @@ struct CameraView: View {
                         .aspectRatio(contentMode: .fit)
                         .ignoresSafeArea()
                     
-                    // Button overlay at bottom with backdrop
+                    // Buttons overlaying directly on image
                     VStack {
                         Spacer()
                         
-                        // Button container with backdrop
-                        VStack(spacing: 20) {
-                            HStack(spacing: 40) {
-                                // Retake button
-                                Button("Retake") {
+                        // Buttons positioned at bottom
+                        HStack(spacing: 60) {
+                            // Retake button
+                            Button(action: {
+                                showingPreview = false
+                                capturedImage = nil
+                            }) {
+                                Text("Retake")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 32)
+                                    .padding(.vertical, 16)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.black.opacity(0.5))
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                                            )
+                                    )
+                                    .shadow(color: Color.black.opacity(0.5), radius: 8, y: 4)
+                            }
+                            
+                            // Confirm button with green checkmark
+                            VStack(spacing: 8) {
+                                Button(action: {
                                     showingPreview = false
-                                    capturedImage = nil
-                                }
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 32)
-                                .padding(.vertical, 16)
-                                .background(
-                                    Capsule()
-                                        .fill(.ultraThinMaterial)
-                                        .overlay(
-                                            Capsule()
-                                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                        )
-                                )
-                                .shadow(color: Color.black.opacity(0.2), radius: 8, y: 4)
-                                
-                                // Confirm button with green checkmark design
-                                VStack(spacing: 8) {
-                                    Text("Looks Good!")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(.white)
-                                    
-                                    Button(action: {
-                                        showingPreview = false
-                                        if captureMode == .fridge {
-                                            fridgePhoto = capturedImage
-                                            captureMode = .pantry
-                                            showPantryStep = true
-                                        } else {
-                                            if let fridgeImage = fridgePhoto {
-                                                processBothImages(fridgeImage: fridgeImage, pantryImage: capturedImage!)
-                                            }
-                                        }
-                                    }) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(Color.green)
-                                                .frame(width: 70, height: 70)
-                                                .shadow(color: Color.green.opacity(0.4), radius: 12, y: 6)
-                                            
-                                            Image(systemName: "checkmark")
-                                                .font(.system(size: 28, weight: .bold))
-                                                .foregroundColor(.white)
+                                    if captureMode == .fridge {
+                                        fridgePhoto = capturedImage
+                                        captureMode = .pantry
+                                        showPantryStep = true
+                                    } else {
+                                        if let fridgeImage = fridgePhoto {
+                                            processBothImages(fridgeImage: fridgeImage, pantryImage: capturedImage!)
                                         }
                                     }
+                                }) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.green)
+                                            .frame(width: 70, height: 70)
+                                            .shadow(color: Color.green.opacity(0.6), radius: 12, y: 6)
+                                        
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 28, weight: .bold))
+                                            .foregroundColor(.white)
+                                    }
                                 }
+                                
+                                Text("Looks Good!")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .shadow(color: Color.black.opacity(0.5), radius: 2, x: 0, y: 1)
                             }
                         }
-                        .padding(.horizontal, 40)
-                        .padding(.vertical, 30)
-                        .background(
-                            Rectangle()
-                                .fill(.ultraThinMaterial)
-                                .mask(
-                                    LinearGradient(
-                                        gradient: Gradient(stops: [
-                                            .init(color: .clear, location: 0),
-                                            .init(color: .black, location: 0.3),
-                                            .init(color: .black, location: 1)
-                                        ]),
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                                .ignoresSafeArea(edges: .bottom)
-                        )
+                        .padding(.bottom, 60)
                     }
                 }
             }

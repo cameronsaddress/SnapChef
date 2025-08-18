@@ -11,8 +11,9 @@ struct AIProcessingView: View {
     let fridgeImage: UIImage?
     let pantryImage: UIImage?
 
-    // Callback for when user taps play game button
+    // Callbacks
     var onPlayGameTapped: (() -> Void)?
+    var onClose: (() -> Void)?
 
     // Computed property to determine if we have both photos
     private var hasBothPhotos: Bool {
@@ -25,6 +26,33 @@ struct AIProcessingView: View {
             Color.black.opacity(0.85)
                 .ignoresSafeArea()
 
+            // Close button at top left
+            VStack {
+                HStack {
+                    if let onClose = onClose {
+                        Button(action: onClose) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black.opacity(0.5))
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                    )
+                                    .frame(width: 44, height: 44)
+                                
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .padding(.leading, 20)
+                        .padding(.top, 60)
+                    }
+                    Spacer()
+                }
+                Spacer()
+            }
+            
             VStack(spacing: 40) {
                 Spacer()
 
