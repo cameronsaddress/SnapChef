@@ -998,6 +998,220 @@ final class SnapChefAPIManager {
         }
     }
     
+    // MARK: - Recipe Detective API
+    
+    /// Analyzes a restaurant meal photo to reverse-engineer the recipe
+    /* func analyzeRestaurantMeal(
+        image: UIImage,
+        sessionID: String,
+        llmProvider: LLMProvider = .gemini
+    ) async throws -> DetectiveRecipeResponse {
+        guard let url = URL(string: "\(serverBaseURL)/analyze_meal_photo") else {
+            throw APIError.invalidURL
+        }
+        
+        print("🔍 Detective API Request to: \(url.absoluteString)")
+        print("🔍 Using LLM Provider: \(llmProvider.rawValue)")
+        
+        let request = try createDetectiveMultipartRequest(
+            url: url,
+            image: image,
+            sessionID: sessionID,
+            llmProvider: llmProvider
+        )
+        
+        print("🔍 Sending detective analysis request with session ID: \(sessionID)")
+        print("🔍 Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        print("🔍 Request body size: \(request.httpBody?.count ?? 0) bytes")
+        
+        let startTime = Date()
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            session.dataTask(with: request) { data, response, error in
+                let elapsed = Date().timeIntervalSince(startTime)
+                print("🔍 Detective request completed in \(String(format: "%.2f", elapsed)) seconds")
+                
+                if let error = error {
+                    print("❌ Detective API Network Error: \(error.localizedDescription)")
+                    continuation.resume(throwing: error)
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    print("❌ Invalid response type")
+                    continuation.resume(throwing: APIError.noData)
+                    return
+                }
+                
+                print("🔍 Detective response status code: \(httpResponse.statusCode)")
+                
+                // Handle authentication failure
+                if httpResponse.statusCode == 401 {
+                    continuation.resume(throwing: APIError.authenticationError)
+                    return
+                }
+                
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    let responseData = data.map { String(data: $0, encoding: .utf8) ?? "" } ?? "N/A"
+                    continuation.resume(throwing: APIError.serverError(statusCode: httpResponse.statusCode, message: responseData))
+                    return
+                }
+                
+                guard let data = data else {
+                    continuation.resume(throwing: APIError.noData)
+                    return
+                }
+                
+                do {
+                    let detectiveResponse = try JSONDecoder().decode(DetectiveRecipeResponse.self, from: data)
+                    print("✅ Successfully decoded detective response")
+                    print("✅ Success: \(detectiveResponse.success)")
+                    
+                    if let recipe = detectiveResponse.detectiveRecipe {
+                        print("✅ Recipe: \(recipe.name)")
+                        print("✅ Confidence: \(recipe.confidence_score)%")
+                        print("✅ Original dish: \(recipe.original_dish_name)")
+                    }
+                    
+                    continuation.resume(returning: detectiveResponse)
+                } catch {
+                    print("❌ Detective Decoding Error: \(error)")
+                    if let responseString = String(data: data, encoding: .utf8) {
+                        print("❌ Raw response: \(responseString)")
+                    }
+                    continuation.resume(throwing: APIError.decodingError(error.localizedDescription))
+                }
+            }.resume()
+        }
+    }
+    
+    /// Create multipart request for detective analysis
+    private func createDetectiveMultipartRequest(
+        url: URL,
+        image: UIImage,
+        sessionID: String,
+        llmProvider: LLMProvider
+    ) throws -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        // Set the authentication header
+        guard let apiKey = KeychainManager.shared.getAPIKey() else {
+            throw APIError.unauthorized("API key not found. Please reinstall the app.")
+        }
+        request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
+        print("🔑 Detective API Key being sent: \(apiKey.prefix(10))...")
+        
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        var httpBody = Data()
+        
+        // Helper to append form fields
+        func appendFormField(name: String, value: String) {
+            httpBody.append("--\(boundary)\r\n")
+            httpBody.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n")
+            httpBody.append("\(value)\r\n")
+        }
+        
+        // Required fields for detective analysis
+        appendFormField(name: "session_id", value: sessionID)
+        appendFormField(name: "analysis_type", value: "detective")
+        appendFormField(name: "llm_provider", value: llmProvider.rawValue)
+        
+        // Resize image to optimize for analysis
+        let resizedImage = image.resized(withMaxDimension: 2_048)
+        print("🔍 Detective image - Original: \(image.size.width)x\(image.size.height), Resized: \(resizedImage.size.width)x\(resizedImage.size.height)")
+        
+        // Append image file with high quality for better analysis
+        guard let imageData = resizedImage.jpegData(compressionQuality: 0.9) else {
+            throw APIError.invalidRequestData
+        }
+        
+        let fileSizeMB = Double(imageData.count) / (1_024 * 1_024)
+        print("🔍 Detective image file size: \(String(format: "%.2f", fileSizeMB)) MB")
+        
+        httpBody.append("--\(boundary)\r\n")
+        httpBody.append("Content-Disposition: form-data; name=\"meal_image\"; filename=\"meal.jpg\"\r\n")
+        httpBody.append("Content-Type: image/jpeg\r\n\r\n")
+        httpBody.append(imageData)
+        httpBody.append("\r\n")
+        
+        // Final boundary
+        httpBody.append("--\(boundary)--\r\n")
+        request.httpBody = httpBody
+        
+        return request
+    } */
+    
+    /// Converts DetectiveRecipeAPI to DetectiveRecipe model
+    func convertAPIDetectiveRecipeToDetectiveRecipe(_ apiRecipe: DetectiveRecipeAPI) -> DetectiveRecipe {
+        // Convert ingredients
+        let ingredients = (apiRecipe.ingredients_used ?? []).map { ingredientUsed in
+            Ingredient(
+                id: UUID(),
+                name: ingredientUsed.name,
+                quantity: ingredientUsed.amount,
+                unit: nil,
+                isAvailable: true
+            )
+        }
+        
+        // Convert nutrition
+        let nutrition = Nutrition(
+            calories: apiRecipe.nutrition?.calories ?? 0,
+            protein: apiRecipe.nutrition?.protein ?? 0,
+            carbs: apiRecipe.nutrition?.carbs ?? 0,
+            fat: apiRecipe.nutrition?.fat ?? 0,
+            fiber: apiRecipe.nutrition?.fiber,
+            sugar: apiRecipe.nutrition?.sugar,
+            sodium: apiRecipe.nutrition?.sodium
+        )
+        
+        // Convert difficulty
+        let difficulty: Recipe.Difficulty
+        switch apiRecipe.difficulty.lowercased() {
+        case "easy":
+            difficulty = .easy
+        case "medium":
+            difficulty = .medium
+        case "hard":
+            difficulty = .hard
+        default:
+            difficulty = .medium
+        }
+        
+        // Extract dietary info from tags
+        let tags = apiRecipe.tags ?? []
+        let dietaryInfo = DietaryInfo(
+            isVegetarian: tags.contains { $0.lowercased().contains("vegetarian") },
+            isVegan: tags.contains { $0.lowercased().contains("vegan") },
+            isGlutenFree: tags.contains { $0.lowercased().contains("gluten-free") || $0.lowercased().contains("gluten free") },
+            isDairyFree: tags.contains { $0.lowercased().contains("dairy-free") || $0.lowercased().contains("dairy free") }
+        )
+        
+        return DetectiveRecipe(
+            id: UUID(uuidString: apiRecipe.id) ?? UUID(),
+            name: apiRecipe.name,
+            description: apiRecipe.description,
+            ingredients: ingredients,
+            instructions: apiRecipe.instructions,
+            cookTime: apiRecipe.cook_time ?? 0,
+            prepTime: apiRecipe.prep_time ?? 0,
+            servings: apiRecipe.servings ?? 4,
+            difficulty: difficulty,
+            nutrition: nutrition,
+            imageURL: nil,
+            createdAt: Date(),
+            tags: tags,
+            dietaryInfo: dietaryInfo,
+            confidenceScore: apiRecipe.confidence_score,
+            originalDishName: apiRecipe.original_dish_name,
+            restaurantStyle: apiRecipe.restaurant_style,
+            analyzedAt: Date()
+        )
+    }
+
     /// Converts API Recipe model to app's Recipe model
     func convertAPIRecipeToAppRecipe(_ apiRecipe: RecipeAPI) -> Recipe {
         // Convert ingredients
@@ -1060,5 +1274,23 @@ final class SnapChefAPIManager {
             tags: tags,
             dietaryInfo: dietaryInfo
         )
+    }
+}
+
+// MARK: - LLM Provider Enum
+enum LLMProvider: String, CaseIterable, Sendable {
+    case gemini = "gemini"
+    case grok = "grok"
+    case openai = "openai"
+    
+    var displayName: String {
+        switch self {
+        case .gemini:
+            return "Gemini"
+        case .grok:
+            return "Grok"
+        case .openai:
+            return "OpenAI"
+        }
     }
 }

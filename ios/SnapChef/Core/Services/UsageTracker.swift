@@ -42,6 +42,8 @@ final class UsageTracker: ObservableObject {
     // MARK: - Published Properties
     @Published private(set) var todaysUsage = DailyUsageData()
     @Published private(set) var usageHistory: [DailyUsageData] = []
+    @Published private(set) var detectiveAnalysesUsed: Int = 0
+    @Published private(set) var totalDetectiveAnalyses: Int = 0
 
     // MARK: - Private Properties
     private let userDefaults = UserDefaults.standard
@@ -52,6 +54,15 @@ final class UsageTracker: ObservableObject {
         static let todaysUsage = "usage_tracker_todays_usage"
         static let usageHistory = "usage_tracker_usage_history"
         static let lastResetDate = "usage_tracker_last_reset_date"
+        static let detectiveAnalysesUsedToday = "detectiveAnalysesUsedToday"
+        static let totalDetectiveAnalyses = "totalDetectiveAnalyses"
+        static let lastDetectiveResetDate = "lastDetectiveResetDate"
+    }
+    
+    // Detective Feature Limits
+    private enum DetectiveLimits {
+        static let DETECTIVE_LIFETIME_LIMIT_FREE = 10  // 10 lifetime uses for free users
+        static let DETECTIVE_DAILY_LIMIT_PREMIUM = -1  // Unlimited for premium users
     }
 
     // MARK: - Initialization
@@ -149,6 +160,62 @@ final class UsageTracker: ObservableObject {
         return hasReachedLimit(for: feature) ? 1.0 : 0.0
     }
 
+    // MARK: - Recipe Detective Methods
+    
+    /// Check if user can use Recipe Detective feature
+    func canUseDetective() -> Bool {
+        if isPremiumUser() {
+            return true  // Premium users have unlimited access
+        }
+        
+        // Free users have lifetime limit
+        return totalDetectiveAnalyses < DetectiveLimits.DETECTIVE_LIFETIME_LIMIT_FREE
+    }
+    
+    /// Increment detective usage counter
+    func incrementDetectiveUse() {
+        detectiveAnalysesUsed += 1
+        totalDetectiveAnalyses += 1
+        saveDetectiveData()
+        
+        // Analytics tracking
+        trackAnalyticsEvent("detective_analysis_used", metadata: [
+            "lifetime_count": totalDetectiveAnalyses,
+            "date": Date().timeIntervalSince1970,
+            "is_premium": isPremiumUser()
+        ])
+    }
+    
+    /// Get remaining detective uses for free users (-1 for unlimited)
+    func getDetectiveUsesRemaining() -> Int {
+        if isPremiumUser() {
+            return -1  // Unlimited
+        }
+        
+        return max(0, DetectiveLimits.DETECTIVE_LIFETIME_LIMIT_FREE - totalDetectiveAnalyses)
+    }
+    
+    /// Reset detective daily counter (called at midnight)
+    func resetDetectiveDaily() {
+        detectiveAnalysesUsed = 0
+        saveDetectiveData()
+        
+        // Update last reset date
+        userDefaults.set(Date(), forKey: Keys.lastDetectiveResetDate)
+        
+        logMessage("Detective daily counter reset")
+    }
+    
+    /// Check if user should see detective premium prompt
+    func shouldShowDetectivePremiumPrompt() -> Bool {
+        if isPremiumUser() {
+            return false
+        }
+        
+        // Show prompt when user hits the limit
+        return totalDetectiveAnalyses >= DetectiveLimits.DETECTIVE_LIFETIME_LIMIT_FREE
+    }
+
     /// Get analytics data for the last 30 days
     func getAnalyticsData(days: Int = 30) -> [DailyUsageData] {
         let cutoffDate = calendar.date(byAdding: .day, value: -days, to: Date()) ?? Date()
@@ -164,6 +231,9 @@ final class UsageTracker: ObservableObject {
 
         // Create new usage data for today
         todaysUsage = DailyUsageData()
+        
+        // Reset detective daily counter (but not total)
+        resetDetectiveDaily()
 
         // Clean up old history (keep last 30 days)
         cleanupOldHistory()
@@ -198,12 +268,15 @@ final class UsageTracker: ObservableObject {
            let decoded = try? JSONDecoder().decode([DailyUsageData].self, from: data) {
             usageHistory = decoded
         }
+        
+        // Load detective data
+        loadDetectiveData()
 
         // Check if we need to reset based on date change
         checkForDateChange()
 
         // Log the data loading (replacing print statement)
-        logMessage("Loaded data - Recipes: \(todaysUsage.recipeCount), Videos: \(todaysUsage.videoCount)")
+        logMessage("Loaded data - Recipes: \(todaysUsage.recipeCount), Videos: \(todaysUsage.videoCount), Detective: \(totalDetectiveAnalyses)")
     }
 
     private func saveData() {
@@ -292,6 +365,34 @@ final class UsageTracker: ObservableObject {
         logMessage("📊 Analytics: \(eventName) - \(eventData)")
     }
 
+    private func loadDetectiveData() {
+        detectiveAnalysesUsed = userDefaults.integer(forKey: Keys.detectiveAnalysesUsedToday)
+        totalDetectiveAnalyses = userDefaults.integer(forKey: Keys.totalDetectiveAnalyses)
+        
+        // Check if we need to reset daily detective count based on date change
+        checkForDetectiveDateChange()
+    }
+    
+    private func saveDetectiveData() {
+        userDefaults.set(detectiveAnalysesUsed, forKey: Keys.detectiveAnalysesUsedToday)
+        userDefaults.set(totalDetectiveAnalyses, forKey: Keys.totalDetectiveAnalyses)
+    }
+    
+    private func checkForDetectiveDateChange() {
+        let lastResetDate = userDefaults.object(forKey: Keys.lastDetectiveResetDate) as? Date
+        let today = Date()
+        
+        // If no last reset date or it's a new day, reset daily counter
+        if let lastReset = lastResetDate {
+            if !calendar.isDate(lastReset, inSameDayAs: today) {
+                resetDetectiveDaily()
+            }
+        } else {
+            // First time setup
+            userDefaults.set(today, forKey: Keys.lastDetectiveResetDate)
+        }
+    }
+
     private func logMessage(_ message: String) {
         // Use NSLog for proper logging instead of print
         NSLog("📊 UsageTracker: \(message)")
@@ -327,6 +428,20 @@ extension UsageTracker {
     /// Get a user-friendly usage status string for tracker features
     func getUsageStatusText(for feature: TrackerFeature) -> String {
         return isPremiumUser() ? "✅ Available" : "🔒 Premium only"
+    }
+    
+    /// Get a user-friendly usage status string for Recipe Detective
+    func getDetectiveStatusText() -> String {
+        if isPremiumUser() {
+            return "♾️ Unlimited"
+        }
+        
+        let remaining = getDetectiveUsesRemaining()
+        if remaining == 0 {
+            return "🚫 Limit reached"
+        } else {
+            return "\(remaining) left (lifetime)"
+        }
     }
 
     /// Get color for recipe usage status UI
@@ -364,6 +479,27 @@ extension UsageTracker {
         let percentage = getUsagePercentage(for: feature)
 
         if hasReachedLimit(for: feature) {
+            return .red
+        } else if percentage > 0.8 {
+            return .orange
+        } else if percentage > 0.5 {
+            return .yellow
+        } else {
+            return .green
+        }
+    }
+    
+    /// Get color for Recipe Detective usage status UI
+    func getDetectiveStatusColor() -> Color {
+        if isPremiumUser() {
+            return .green
+        }
+        
+        let remaining = getDetectiveUsesRemaining()
+        let total = DetectiveLimits.DETECTIVE_LIFETIME_LIMIT_FREE
+        let percentage = Double(total - remaining) / Double(total)
+        
+        if remaining == 0 {
             return .red
         } else if percentage > 0.8 {
             return .orange

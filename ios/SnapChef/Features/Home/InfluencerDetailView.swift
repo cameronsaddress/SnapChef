@@ -228,7 +228,7 @@ struct InfluencerDetailView: View {
         }
         .sheet(isPresented: $showShareSheet) {
             if let shareText = generateShareText() {
-                ShareSheet(items: [shareText])
+                InfluencerShareSheet(items: [shareText])
             }
         }
         .alert("Recipe Saved!", isPresented: $showingSavedAlert) {
@@ -521,6 +521,17 @@ struct InfoBadge: View {
                 .fill(color.opacity(0.2))
         )
     }
+}
+
+// Share sheet helper
+struct InfluencerShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #Preview {

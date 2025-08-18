@@ -93,6 +93,11 @@ struct HomeView: View {
                             .padding(.horizontal, 30)
                             .padding(.top, 20)
 
+                        // Recipe Detective Tile
+                        RecipeDetectiveTile()
+                            .padding(.horizontal, 30)
+                            .padding(.top, 20)
+
                         // Viral Section (Today's Challenges)
                         ViralChallengeSection()
                             .padding(.top, 20)
@@ -1121,6 +1126,182 @@ final class FallingFoodManager: ObservableObject {
             return emojiBottom >= buttonFrame.minY && emojiBottom <= buttonFrame.minY + 20 && emoji.velocity.dy > 0
         }
         return false
+    }
+}
+
+// MARK: - Recipe Detective Tile
+struct RecipeDetectiveTile: View {
+    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var deviceManager: DeviceManager
+    @State private var showingDetectiveView = false
+    @State private var isAnimating = false
+    @State private var mysteryGlow = false
+    
+    var body: some View {
+        Button(action: {
+            showingDetectiveView = true
+        }) {
+            HStack(spacing: 16) {
+                // Detective magnifying glass with mystery animation
+                ZStack {
+                    // Dark mysterious glow
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(hex: "#1a0033").opacity(mysteryGlow ? 0.8 : 0.4),
+                                    Color(hex: "#330066").opacity(mysteryGlow ? 0.6 : 0.3),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 40
+                            )
+                        )
+                        .frame(width: 80, height: 80)
+                        .scaleEffect(mysteryGlow ? 1.2 : 1)
+                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: mysteryGlow)
+                    
+                    // Magnifying glass icon with premium styling
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#2d1b69"),
+                                        Color(hex: "#11052c")
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 60, height: 60)
+                            .overlay(
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [Color(hex: "#ffd700"), Color(hex: "#ffed4e")],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 2
+                                    )
+                            )
+                        
+                        Image(systemName: "magnifyingglass.circle.fill")
+                            .font(.system(size: 32, weight: .medium))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color(hex: "#ffd700"), Color(hex: "#ffed4e")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .scaleEffect(isAnimating ? 1.1 : 1)
+                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isAnimating)
+                    }
+                    
+                    // Premium lock badge if needed
+                    if !deviceManager.hasUnlimitedAccess {
+                        VStack {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(6)
+                                    .background(
+                                        Circle()
+                                            .fill(Color(hex: "#ffd700"))
+                                    )
+                                    .offset(x: 8, y: -8)
+                            }
+                            Spacer()
+                        }
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recipe Detective")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#ffd700"),
+                                    Color(hex: "#ffed4e")
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    
+                    Text("Cook your favorites at home")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .multilineTextAlignment(.leading)
+                }
+                
+                Spacer()
+                
+                // Arrow with mystery styling
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color(hex: "#ffd700"), Color(hex: "#ffed4e")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .scaleEffect(isAnimating ? 1.1 : 1)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#0f0625").opacity(0.9),
+                                Color(hex: "#1a0033").opacity(0.8)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#ffd700").opacity(0.6),
+                                        Color(hex: "#2d1b69").opacity(0.4)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(.ultraThinMaterial.opacity(0.3))
+                    )
+            )
+            .shadow(
+                color: Color(hex: "#ffd700").opacity(0.3),
+                radius: mysteryGlow ? 20 : 10,
+                y: mysteryGlow ? 8 : 4
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onAppear {
+            isAnimating = true
+            mysteryGlow = true
+        }
+        .fullScreenCover(isPresented: $showingDetectiveView) {
+            RecipeDetectiveView()
+        }
     }
 }
 

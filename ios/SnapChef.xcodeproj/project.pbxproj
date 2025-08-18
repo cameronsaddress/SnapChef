@@ -51,6 +51,7 @@
 		4216BA8B5F8388FEC0C2E9A6 /* StreakManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 082579B6D9AC4CAB13C199E4 /* StreakManager.swift */; };
 		42CEBEFA20690FEC6D298B55 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D196EE678D8EF55E9771CC8F /* AppState.swift */; };
 		4331F19544C3A0B0ECAA9528 /* ViralVideoDataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C81B57363B69016C83BF757 /* ViralVideoDataModels.swift */; };
+		4377AF2DA6523984CA00617C /* DetectiveRecipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5669D883AE8383EB297D28EB /* DetectiveRecipe.swift */; };
 		46E291AE1F4B2262295DE565 /* CloudKitModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D04AFD20AB4905F391B03625 /* CloudKitModels.swift */; };
 		4C0A412E093372045DA6780D /* PhotoValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C47C69B07E98066C905012E /* PhotoValidator.swift */; };
 		4CBB7EF066474FE25E98F68F /* ChallengeDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94485059EDFCCAB264B0D728 /* ChallengeDatabase.swift */; };
@@ -63,6 +64,7 @@
 		550DACB0343DCB43E2555692 /* AuthenticationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5C0A42EA6865AC0A0E520C /* AuthenticationManager.swift */; };
 		55D45942E079AE7B0264F5EA /* InstagramTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86ABA89E269FAC5C70AB6BC0 /* InstagramTemplates.swift */; };
 		55FCAC2180C248434210D0DE /* TikTokAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A297D6A1F5C990A76FD3E125 /* TikTokAuthManager.swift */; };
+		56BCA1D7299AC579E62CE524 /* DetectiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4843389F63DB15F0F38E0E30 /* DetectiveView.swift */; };
 		56E3EB5DC2EB662A9C6C3F59 /* RewardSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79D60B603855BD2E41D0CFA /* RewardSystem.swift */; };
 		57A353FC46B94AC45DD9FD34 /* PremiumUpgradePrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB84A651E63FD43617AD03E0 /* PremiumUpgradePrompt.swift */; };
 		588722A57F6F8FB4733B9E2D /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13C669CCD49BD9E3C3961EBE /* SubscriptionManager.swift */; };
@@ -83,6 +85,7 @@
 		7BBE4481D9C08B38B01C33E7 /* LeaderboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4976D3BAC7409CD3C09ED36E /* LeaderboardViewModel.swift */; };
 		7E8464B6ABF815644BDE5E62 /* fridge3.jpg in Resources */ = {isa = PBXBuildFile; fileRef = ADDE0057FDAB5264593D3360 /* fridge3.jpg */; };
 		7E892022DF7D0A8AB02BDE3E /* TikTokShareUsageExample.swift in Sources */ = {isa = PBXBuildFile; fileRef = 325036D3E0AF488BB84AE92B /* TikTokShareUsageExample.swift */; };
+		7ECD1F2D94D98BFC1FE60727 /* DetectiveResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3AE9B8880A745516A49FAE0 /* DetectiveResultsView.swift */; };
 		7EDFE5B28963A0D26F355023 /* ActivityFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E87A2C28C6D3131BBBAA4407 /* ActivityFeedView.swift */; };
 		82D78AABA6981CF8A4898C6F /* HoneymoonBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABEA35CC964BAB418F87AB4F /* HoneymoonBanner.swift */; };
 		8B7E8A3AFC2C41A88807A95E /* CloudKitAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE10EDDC2438467DBDDE607B /* CloudKitAuthView.swift */; };
@@ -133,6 +136,7 @@
 		B779654B4D028F23A7B210DB /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D763DE380F1DB760696FA722 /* HomeView.swift */; };
 		BAE2DDC8774AE62C070431AC /* CloudKitRecipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60199635F2175797D9C53234 /* CloudKitRecipe.swift */; };
 		BBD555AEE700D84C8A49E6D7 /* RecipesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898A29268D6481A4D584E4CB /* RecipesView.swift */; };
+		BBF8101179869331BF667416 /* RecipeDetectiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C1DD52C76950A2A553354F /* RecipeDetectiveView.swift */; };
 		BCE0D5E073AA5CEB4EA01A8B /* UsageCounterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172F522781378B61F86E7FD3 /* UsageCounterView.swift */; };
 		BE359C9C549AD94CB90E4DB0 /* ShareService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE202DAE23E874A006903A6E /* ShareService.swift */; };
 		C0FC0B81E7A3BAB9C4EEF295 /* AchievementGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6894D4A002027CFDEEBB5AA /* AchievementGalleryView.swift */; };
@@ -249,6 +253,7 @@
 		406D3E4D2BA159476E4CA2A1 /* ShareSheetPresenter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShareSheetPresenter.swift; path = SnapChef/Features/Sharing/Utilities/ShareSheetPresenter.swift; sourceTree = "<group>"; };
 		4538A20809A0F4F689F7F5B1 /* meal2.jpg */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.jpeg; name = meal2.jpg; path = SnapChef/Resources/meal2.jpg; sourceTree = "<group>"; };
 		466ADFE357674E7DE0695A45 /* ChallengesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengesView.swift; path = SnapChef/Features/Gamification/ChallengesView.swift; sourceTree = "<group>"; };
+		4843389F63DB15F0F38E0E30 /* DetectiveView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DetectiveView.swift; path = SnapChef/Features/Detective/DetectiveView.swift; sourceTree = "<group>"; };
 		4976D3BAC7409CD3C09ED36E /* LeaderboardViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LeaderboardViewModel.swift; path = SnapChef/Features/Gamification/ViewModels/LeaderboardViewModel.swift; sourceTree = "<group>"; };
 		4AC9B83A23805AF72F7FA1CC /* PersistenceController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PersistenceController.swift; path = SnapChef/Core/Services/PersistenceController.swift; sourceTree = "<group>"; };
 		4C81B57363B69016C83BF757 /* ViralVideoDataModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ViralVideoDataModels.swift; path = SnapChef/Features/Sharing/Platforms/TikTok/ViralVideoDataModels.swift; sourceTree = "<group>"; };
@@ -258,6 +263,7 @@
 		54C3A058766E816CC5E046EE /* SimpleMediaBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SimpleMediaBundle.swift; path = SnapChef/Features/Sharing/Platforms/TikTok/SimpleMediaBundle.swift; sourceTree = "<group>"; };
 		550B45DBD4B749D6AF020AA2 /* UsageTracker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UsageTracker.swift; path = SnapChef/Core/Services/UsageTracker.swift; sourceTree = "<group>"; };
 		551177DC825C128B2758E6F7 /* OnboardingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OnboardingView.swift; path = SnapChef/Features/Authentication/OnboardingView.swift; sourceTree = "<group>"; };
+		5669D883AE8383EB297D28EB /* DetectiveRecipe.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DetectiveRecipe.swift; path = SnapChef/Core/Models/DetectiveRecipe.swift; sourceTree = "<group>"; };
 		56B4E5C4FB1000CD95A465BD /* InstagramShareView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InstagramShareView.swift; path = SnapChef/Features/Sharing/Platforms/Instagram/InstagramShareView.swift; sourceTree = "<group>"; };
 		56DF24D3280D9F5229B2C67C /* MockDataProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MockDataProvider.swift; path = SnapChef/Core/Utilities/MockDataProvider.swift; sourceTree = "<group>"; };
 		573B84C17E0DAF8D9FB6BF07 /* meal5.jpg */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.jpeg; name = meal5.jpg; path = SnapChef/Resources/meal5.jpg; sourceTree = "<group>"; };
@@ -339,6 +345,7 @@
 		C07A7B624E9CEDDD6FAD0A36 /* ProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ProfileView.swift; path = SnapChef/Features/Profile/ProfileView.swift; sourceTree = "<group>"; };
 		C18EBEBBC731F955270272E7 /* PremiumChallengeManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PremiumChallengeManager.swift; path = SnapChef/Features/Gamification/PremiumChallengeManager.swift; sourceTree = "<group>"; };
 		C397E25A597838EAC47C347C /* UserProfileViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserProfileViewModel.swift; path = SnapChef/Features/Social/UserProfileViewModel.swift; sourceTree = "<group>"; };
+		C3AE9B8880A745516A49FAE0 /* DetectiveResultsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DetectiveResultsView.swift; path = SnapChef/Features/Detective/DetectiveResultsView.swift; sourceTree = "<group>"; };
 		C3EE797F94908AFA8D7BA233 /* SnapChef.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = SnapChef.entitlements; path = SnapChef/SnapChef.entitlements; sourceTree = "<group>"; };
 		C4F86BA371D3D52CF301892C /* ColorExtensions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ColorExtensions.swift; path = SnapChef/Design/ColorExtensions.swift; sourceTree = "<group>"; };
 		C504739CCB31A8A2850CF28C /* FoodPreferencesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FoodPreferencesView.swift; path = SnapChef/Features/Profile/FoodPreferencesView.swift; sourceTree = "<group>"; };
@@ -353,6 +360,7 @@
 		DFBF9C08DA973B611D990FBF /* PhotoLibraryHelper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PhotoLibraryHelper.swift; path = SnapChef/Features/Sharing/Core/PhotoLibraryHelper.swift; sourceTree = "<group>"; };
 		E1DABDD7D58B482E9F2F9D14 /* CloudKitUsernameView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitUsernameView.swift; path = SnapChef/Features/Authentication/CloudKitUsernameView.swift; sourceTree = "<group>"; };
 		E39D96ACCF5D46EE6F4094CA /* MysteryMealView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MysteryMealView.swift; path = SnapChef/Features/AIPersonality/MysteryMealView.swift; sourceTree = "<group>"; };
+		E3C1DD52C76950A2A553354F /* RecipeDetectiveView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RecipeDetectiveView.swift; path = SnapChef/Features/Detective/RecipeDetectiveView.swift; sourceTree = "<group>"; };
 		E4C4CDE71E399F7520469E0E /* User.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = User.swift; path = SnapChef/Core/Models/User.swift; sourceTree = "<group>"; };
 		E4F9C285D07CBD89E2776441 /* ChallengeAnalytics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeAnalytics.swift; path = SnapChef/Core/Services/ChallengeAnalytics.swift; sourceTree = "<group>"; };
 		E6894D4A002027CFDEEBB5AA /* AchievementGalleryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AchievementGalleryView.swift; path = SnapChef/Features/Gamification/Views/AchievementGalleryView.swift; sourceTree = "<group>"; };
@@ -701,6 +709,7 @@
 				0C1EAE7C78408DBB5C40E055 /* StreakModels.swift */,
 				7277C6115C864186E65992B9 /* AnonymousUserProfile.swift */,
 				739D1F76E83CB505BBE5E8AF /* UserLifecycle.swift */,
+				5669D883AE8383EB297D28EB /* DetectiveRecipe.swift */,
 			);
 			name = Models;
 			sourceTree = "<group>";
@@ -814,6 +823,8 @@
 				10108D23AB38AF9352D7F3D1 /* AIPersonality */,
 				8499F7BD6142674F3B02BA8B /* Subscription */,
 				5200CA7931E7CDAB410264CE /* Social */,
+				CC944985313AA49FD1485F4E /* Detective */,
+				D2D318862F998474C90CF8EF /* Detective */,
 			);
 			name = Features;
 			sourceTree = "<group>";
@@ -927,12 +938,29 @@
 			name = UsernameSetupView.swift;
 			sourceTree = "<group>";
 		};
+		CC944985313AA49FD1485F4E /* Detective */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Detective;
+			sourceTree = "<group>";
+		};
 		CCC2412DBCBB32B0EFA78F84 /* Camera */ = {
 			isa = PBXGroup;
 			children = (
 				94373B9CA1417FC8E7C430F9 /* PantryCaptureView.swift */,
 			);
 			name = Camera;
+			sourceTree = "<group>";
+		};
+		D2D318862F998474C90CF8EF /* Detective */ = {
+			isa = PBXGroup;
+			children = (
+				C3AE9B8880A745516A49FAE0 /* DetectiveResultsView.swift */,
+				4843389F63DB15F0F38E0E30 /* DetectiveView.swift */,
+				E3C1DD52C76950A2A553354F /* RecipeDetectiveView.swift */,
+			);
+			name = Detective;
 			sourceTree = "<group>";
 		};
 		D45E8C5FF8F5F38555BF7393 /* Messages */ = {
@@ -1312,6 +1340,10 @@
 				BCE0D5E073AA5CEB4EA01A8B /* UsageCounterView.swift in Sources */,
 				82D78AABA6981CF8A4898C6F /* HoneymoonBanner.swift in Sources */,
 				F4BDC9F4687E1C060E1C4822 /* PaywallTriggerManager.swift in Sources */,
+				4377AF2DA6523984CA00617C /* DetectiveRecipe.swift in Sources */,
+				7ECD1F2D94D98BFC1FE60727 /* DetectiveResultsView.swift in Sources */,
+				56BCA1D7299AC579E62CE524 /* DetectiveView.swift in Sources */,
+				BBF8101179869331BF667416 /* RecipeDetectiveView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

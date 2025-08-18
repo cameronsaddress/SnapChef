@@ -61,18 +61,24 @@ struct MainTabView: View {
                                 removal: .opacity.combined(with: .scale(scale: 1.02))
                             ))
                     case 2:
-                        RecipesView()
+                        DetectiveView()
                             .transition(.asymmetric(
                                 insertion: .opacity.combined(with: .scale(scale: 0.98)),
                                 removal: .opacity.combined(with: .scale(scale: 1.02))
                             ))
                     case 3:
-                        SocialFeedView()
+                        RecipesView()
                             .transition(.asymmetric(
                                 insertion: .opacity.combined(with: .scale(scale: 0.98)),
                                 removal: .opacity.combined(with: .scale(scale: 1.02))
                             ))
                     case 4:
+                        SocialFeedView()
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                                removal: .opacity.combined(with: .scale(scale: 1.02))
+                            ))
+                    case 5:
                         ProfileView()
                             .transition(.asymmetric(
                                 insertion: .opacity.combined(with: .scale(scale: 0.98)),

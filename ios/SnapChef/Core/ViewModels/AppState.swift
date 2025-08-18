@@ -63,6 +63,11 @@ final class AppState: ObservableObject {
         set { recipesViewModel.favoritedRecipeIds = newValue }
     }
     
+    // var detectiveRecipes: [DetectiveRecipe] {
+    //     get { recipesViewModel.detectiveRecipes }
+    //     set { recipesViewModel.detectiveRecipes = newValue }
+    // }
+    
     var activeChallenge: Challenge? {
         get { gamificationViewModel.activeChallenge }
         set { gamificationViewModel.activeChallenge = newValue }
@@ -270,6 +275,7 @@ final class RecipesViewModel: ObservableObject {
     @Published var savedRecipes: [Recipe] = []
     @Published var savedRecipesWithPhotos: [SavedRecipe] = []
     @Published var favoritedRecipeIds: Set<UUID> = []
+    // @Published var detectiveRecipes: [DetectiveRecipe] = []
     @Published var isProcessing: Bool = false
     
     private let userDefaults = UserDefaults.standard

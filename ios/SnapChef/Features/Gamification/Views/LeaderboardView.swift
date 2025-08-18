@@ -171,7 +171,7 @@ struct LeaderboardView: View {
             }
         }
         .sheet(isPresented: $showShareSheet) {
-            ShareSheet(items: [generateShareText()])
+            LeaderboardShareSheet(items: [generateShareText()])
         }
         .onAppear {
             loadLeaderboard()
@@ -573,6 +573,17 @@ struct LeaderboardRow: View {
             }
         }
     }
+}
+
+// Share sheet helper
+struct LeaderboardShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #Preview {

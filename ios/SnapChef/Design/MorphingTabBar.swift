@@ -7,6 +7,7 @@ struct MorphingTabBar: View {
     let tabs = [
         ("house.fill", "Home", Color(hex: "#667eea")),
         ("camera.fill", "Snap", Color(hex: "#f093fb")),
+        ("magnifyingglass", "Detective", Color(hex: "#9b59b6")),
         ("book.fill", "Recipes", Color(hex: "#4facfe")),
         ("heart.text.square.fill", "Feed", Color(hex: "#f77062")),
         ("person.fill", "Profile", Color(hex: "#43e97b"))

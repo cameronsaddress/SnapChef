@@ -94,7 +94,7 @@ struct ShareGeneratorView: View {
         }
         .sheet(isPresented: $shareSheet) {
             if let image = generatedImage {
-                ShareSheet(items: buildShareItems(image: image))
+                GeneratorShareSheet(items: buildShareItems(image: image))
             }
         }
         .fullScreenCover(isPresented: $showingCamera) {
@@ -675,7 +675,7 @@ struct StyleOptionCard: View {
 }
 
 // MARK: - Share Sheet
-struct ShareSheet: UIViewControllerRepresentable {
+struct GeneratorShareSheet: UIViewControllerRepresentable {
     let items: [Any]
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
