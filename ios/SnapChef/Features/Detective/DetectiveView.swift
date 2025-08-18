@@ -566,7 +566,7 @@ struct DetectiveView: View {
                     print("✅ Confidence: \(recipe.confidenceScore)%")
                 }
             } else {
-                errorMessage = response.error ?? "Failed to analyze the meal photo"
+                errorMessage = response.message.isEmpty ? "Failed to analyze the meal photo" : response.message
                 print("❌ Detective analysis failed: \(errorMessage ?? "Unknown error")")
             }
         } catch {
