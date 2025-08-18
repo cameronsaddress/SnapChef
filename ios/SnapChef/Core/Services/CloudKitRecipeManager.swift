@@ -32,7 +32,7 @@ class CloudKitRecipeManager: ObservableObject {
         guard CloudKitAuthManager.shared.isAuthenticated else {
             print("📱 User not authenticated - skipping CloudKit upload")
             // Return a local ID for the recipe
-            return recipe.id
+            return recipe.id.uuidString
         }
         
         // Check if recipe already exists
@@ -320,11 +320,17 @@ class CloudKitRecipeManager: ObservableObject {
         print("📸 Optimized photo sync completed: processed \(recipesToSync.count) recipes")
     }
 
-    /// Get all recipe IDs from CloudKit (lightweight query)
+    /// Get all recipe IDs from CloudKit (lightweight query) - FILTERED BY CURRENT USER
     private func fetchAllRecipeIDs() async throws -> Set<String> {
-        print("🔍 Fetching all recipe IDs from CloudKit...")
-
-        let predicate = NSPredicate(value: true) // Get all recipes
+        print("🔍 Fetching recipe IDs for current user from CloudKit...")
+        
+        // CRITICAL PRIVACY FIX: Only fetch current user's recipes
+        guard let currentUserID = getCurrentUserID() else {
+            print("⚠️ No authenticated user - returning empty recipe set")
+            return Set<String>()
+        }
+        
+        let predicate = NSPredicate(format: "ownerID == %@", currentUserID)
         let query = CKQuery(recordType: "Recipe", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
 
@@ -421,7 +427,7 @@ class CloudKitRecipeManager: ObservableObject {
             print("⚠️ Failed to fetch public recipes: \(error)")
         }
 
-        print("✅ Total recipe IDs found: \(allRecipeIDs.count)")
+        print("✅ Total recipe IDs found for user \(currentUserID): \(allRecipeIDs.count)")
         return allRecipeIDs
     }
 
@@ -466,7 +472,7 @@ class CloudKitRecipeManager: ObservableObject {
             cachedRecipes[recipeID] = recipe
             print("☁️ Recipe fetched from private CloudKit: \(recipeID)")
             return recipe
-        } catch let error as CKError {
+        } catch _ as CKError {
             // If not in private, try public database
             do {
                 let record = try await fetchRecordWithRetry(recordID: recordID, database: publicDB, maxRetries: 2)
@@ -844,12 +850,26 @@ class CloudKitRecipeManager: ObservableObject {
 
     // MARK: - Recipe Search
 
-    /// Search for recipes by query
+    /// Search for recipes by query - FILTERED BY CURRENT USER AND PUBLIC RECIPES
     func searchRecipes(query: String, limit: Int = 20) async throws -> [Recipe] {
-        let predicate = NSPredicate(format: "title CONTAINS[cd] %@ OR description CONTAINS[cd] %@", query, query)
+        // CRITICAL PRIVACY FIX: Only search user's own recipes and explicitly public recipes
+        guard let currentUserID = getCurrentUserID() else {
+            print("⚠️ No authenticated user - searching only public recipes")
+            let predicate = NSPredicate(format: "(title CONTAINS[cd] %@ OR description CONTAINS[cd] %@) AND isPublic == 1", query, query)
+            let ckQuery = CKQuery(recordType: "Recipe", predicate: predicate)
+            ckQuery.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+            return try await performSearchQuery(ckQuery, limit: limit)
+        }
+        
+        let predicate = NSPredicate(format: "(title CONTAINS[cd] %@ OR description CONTAINS[cd] %@) AND (ownerID == %@ OR isPublic == 1)", query, query, currentUserID)
         let ckQuery = CKQuery(recordType: "Recipe", predicate: predicate)
         ckQuery.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
-
+        
+        return try await performSearchQuery(ckQuery, limit: limit)
+    }
+    
+    /// Helper method to perform search queries with consistent handling
+    private func performSearchQuery(_ ckQuery: CKQuery, limit: Int) async throws -> [Recipe] {
         let (matchResults, _) = try await publicDB.records(matching: ckQuery, resultsLimit: limit)
 
         var recipes: [Recipe] = []
@@ -863,6 +883,19 @@ class CloudKitRecipeManager: ObservableObject {
             }
         }
 
+        return recipes
+    }
+    
+    /// Fetch public recipes that are explicitly shared (separate from user's own recipes)
+    func fetchPublicRecipes(limit: Int = 20) async throws -> [Recipe] {
+        print("🌐 Fetching public recipes...")
+        
+        let predicate = NSPredicate(format: "isPublic == 1")
+        let ckQuery = CKQuery(recordType: "Recipe", predicate: predicate)
+        ckQuery.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        
+        let recipes = try await performSearchQuery(ckQuery, limit: limit)
+        print("🌐 Found \(recipes.count) public recipes")
         return recipes
     }
 
@@ -961,13 +994,20 @@ class CloudKitRecipeManager: ObservableObject {
     }
 
     private func checkRecipeExists(_ name: String, _ description: String) async -> String? {
-        // Only use title for query since description is not queryable
-        let predicate = NSPredicate(format: "title == %@", name)
+        // CRITICAL PRIVACY FIX: Only check current user's recipes for duplicates
+        guard let currentUserID = getCurrentUserID() else {
+            print("⚠️ No authenticated user - skipping duplicate check")
+            return nil
+        }
+        
+        // Only use title for query since description is not queryable, but filter by ownerID
+        let predicate = NSPredicate(format: "title == %@ AND ownerID == %@", name, currentUserID)
         let query = CKQuery(recordType: "Recipe", predicate: predicate)
 
         do {
-            let (matchResults, _) = try await publicDB.records(matching: query, resultsLimit: 1)
+            let (matchResults, _) = try await privateDB.records(matching: query, resultsLimit: 1)
             if let record = try? matchResults.first?.1.get() {
+                print("✅ Found existing recipe by same user: \(name)")
                 return record["id"] as? String
             }
         } catch {
