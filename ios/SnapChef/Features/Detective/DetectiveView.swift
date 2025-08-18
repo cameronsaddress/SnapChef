@@ -8,6 +8,7 @@ struct DetectiveView: View {
     @StateObject private var cameraModel = CameraModel()
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @StateObject private var userLifecycle = UserLifecycleManager.shared
+    @StateObject private var networkManager = NetworkManager.shared
     
     @State private var showingCamera = false
     @State private var capturedImage: UIImage?
@@ -546,24 +547,22 @@ struct DetectiveView: View {
             let sessionID = UUID().uuidString
             print("🔍 Starting detective analysis with session ID: \(sessionID)")
             
-            // Call the actual API
-            let response = try await apiManager.analyzeRestaurantMeal(
+            // Call the actual API through NetworkManager
+            let response = try await networkManager.analyzeRestaurantMeal(
                 image: image,
                 sessionID: sessionID,
-                llmProvider: .grok // Using Grok for detective analysis
+                llmProvider: "grok" // Using Grok for detective analysis
             )
             
             if response.success, let apiRecipe = response.detectiveRecipe {
                 // Convert API recipe to our DetectiveRecipe model
-                detectiveRecipe = apiManager.convertAPIDetectiveRecipeToDetectiveRecipe(apiRecipe)
+                detectiveRecipe = networkManager.convertAPIDetectiveRecipeToDetectiveRecipe(apiRecipe)
                 
                 // Save to recipes if we have a valid recipe
                 if let recipe = detectiveRecipe {
-                    if var currentRecipes = appState.recipes {
-                        let regularRecipe = recipe.toRegularRecipe()
-                        currentRecipes.append(regularRecipe)
-                        appState.recipes = currentRecipes
-                    }
+                    // Convert DetectiveRecipe to regular Recipe and add to saved recipes
+                    let regularRecipe = recipe.toBaseRecipe()
+                    appState.savedRecipes.append(regularRecipe)
                     print("✅ Detective analysis successful: \(recipe.name)")
                     print("✅ Confidence: \(recipe.confidenceScore)%")
                 }
