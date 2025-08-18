@@ -192,61 +192,6 @@ struct DetectiveView: View {
                     .lineLimit(3)
             }
             
-            // MARK: - TEST BUTTONS (Remove in production)
-            Button(action: {
-                // Bypass premium check for testing
-                showingCamera = true
-            }) {
-                HStack(spacing: 12) {
-                    Image(systemName: "hammer.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                    
-                    Text("TEST: Bypass Premium")
-                        .font(.system(size: 18, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    LinearGradient(
-                        colors: [Color.orange, Color.red],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(16)
-            }
-            .padding(.bottom, 8)
-            
-            Button(action: {
-                // Use sample meal photo for testing
-                showingCamera = false
-                Task {
-                    if let testImage = UIImage(named: "meal1") {
-                        await analyzeImage(testImage)
-                    }
-                }
-            }) {
-                HStack(spacing: 12) {
-                    Text("🍔")
-                        .font(.system(size: 18))
-                    
-                    Text("TEST: Sample Meal Photo")
-                        .font(.system(size: 18, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    LinearGradient(
-                        colors: [Color.orange, Color.red],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(16)
-            }
-            .padding(.bottom, 8)
             
             Button(action: {
                 if canUseDetectiveFeature() {
@@ -721,42 +666,338 @@ struct DetectiveRecipeDetailView: View {
 }
 
 // MARK: - Camera Detective View
-struct CameraDetectiveView: UIViewControllerRepresentable {
+struct CameraDetectiveView: View {
     @Binding var capturedImage: UIImage?
     @Binding var isAnalyzing: Bool
     @Environment(\.presentationMode) var presentationMode
+    @StateObject private var cameraModel = CameraModel()
     
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.delegate = context.coordinator
-        picker.sourceType = .camera
-        picker.cameraDevice = .rear
-        return picker
-    }
-    
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: CameraDetectiveView
-        
-        init(_ parent: CameraDetectiveView) {
-            self.parent = parent
-        }
-        
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let image = info[.originalImage] as? UIImage {
-                parent.capturedImage = image
+    var body: some View {
+        ZStack {
+            // Camera preview background
+            if cameraModel.isCameraAuthorized {
+                CameraPreview(cameraModel: cameraModel)
+                    .ignoresSafeArea()
+                    .opacity(cameraModel.isSessionReady ? 1 : 0)
+                    .animation(.easeIn(duration: 0.3), value: cameraModel.isSessionReady)
+            } else {
+                // Fallback background when camera not available
+                LinearGradient(
+                    colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                .overlay(Color.black.opacity(0.3))
             }
-            parent.presentationMode.wrappedValue.dismiss()
+            
+            // Camera controls overlay
+            VStack {
+                // Top bar with close button
+                HStack {
+                    Button(action: {
+                        presentationMode.wrappedValue.dismiss()
+                    }) {
+                        ZStack {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .frame(width: 44, height: 44)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                )
+                            
+                            Image(systemName: "xmark")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Detective indicator
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("Detective Mode")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color(hex: "#9b59b6").opacity(0.6), lineWidth: 1)
+                            )
+                    )
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 60)
+                
+                Spacer()
+                
+                // Instructions
+                if cameraModel.isSessionReady {
+                    Text("Point your camera at the restaurant dish")
+                        .font(.system(size: 18, weight: .medium, design: .rounded))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 16)
+                        .background(
+                            Capsule()
+                                .fill(.ultraThinMaterial)
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                )
+                        )
+                        .padding(.bottom, 30)
+                }
+                
+                // Bottom controls
+                VStack(spacing: 16) {
+                    // Test button
+                    Button(action: {
+                        // Load test image and dismiss
+                        if let testImage = UIImage(named: "meal1") {
+                            capturedImage = testImage
+                            presentationMode.wrappedValue.dismiss()
+                        }
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "fork.knife")
+                                .font(.system(size: 16, weight: .semibold))
+                            
+                            Text("TEST: Sample Meal")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.orange, Color.red],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(25)
+                        .shadow(color: Color.orange.opacity(0.4), radius: 8, y: 4)
+                    }
+                    
+                    // Main capture button
+                    DetectiveCaptureButton {
+                        capturePhoto()
+                    }
+                }
+                .padding(.bottom, 50)
+            }
+            
+            // Scanning overlay for visual feedback
+            if cameraModel.isSessionReady {
+                DetectiveScanningOverlay()
+                    .ignoresSafeArea()
+            }
+        }
+        .onAppear {
+            cameraModel.requestCameraPermission()
+        }
+        .onDisappear {
+            cameraModel.stopSession()
+        }
+        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+    }
+    
+    private func capturePhoto() {
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .heavy)
+        generator.impactOccurred()
+        
+        cameraModel.capturePhoto { image in
+            capturedImage = image
+            presentationMode.wrappedValue.dismiss()
+        }
+    }
+}
+
+// MARK: - Detective Capture Button
+struct DetectiveCaptureButton: View {
+    let action: () -> Void
+    @State private var isPressed = false
+    @State private var pulseScale: CGFloat = 1
+    
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                // Outer ring with detective purple gradient
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#9b59b6"),
+                                Color(hex: "#8e44ad")
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 4
+                    )
+                    .frame(width: 90, height: 90)
+                    .scaleEffect(pulseScale)
+                
+                // Inner circle
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white,
+                                Color.white.opacity(0.9)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 75, height: 75)
+                    .scaleEffect(isPressed ? 0.9 : 1)
+                    .shadow(color: Color.black.opacity(0.2), radius: 5, y: 3)
+                
+                // Center magnifying glass icon
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundColor(Color(hex: "#9b59b6"))
+            }
+        }
+        .scaleEffect(isPressed ? 0.95 : 1)
+        .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = pressing
+            }
+        }, perform: {})
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                pulseScale = 1.1
+            }
+        }
+    }
+}
+
+// MARK: - Detective Scanning Overlay
+struct DetectiveScanningOverlay: View {
+    @State private var scanLineOffset: CGFloat = -200
+    @State private var cornerAnimation = false
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Corner brackets with detective purple
+                ForEach(0..<4) { index in
+                    DetectiveCornerBracket(corner: index)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#9b59b6"),
+                                    Color(hex: "#8e44ad")
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 3
+                        )
+                        .frame(width: 60, height: 60)
+                        .position(cornerPosition(for: index, in: geometry.size))
+                        .scaleEffect(cornerAnimation ? 1.1 : 1)
+                        .opacity(cornerAnimation ? 0.8 : 1)
+                }
+                
+                // Scanning line
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.clear,
+                                Color(hex: "#9b59b6").opacity(0.5),
+                                Color(hex: "#8e44ad"),
+                                Color(hex: "#9b59b6").opacity(0.5),
+                                Color.clear
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 2)
+                    .blur(radius: 1)
+                    .offset(y: scanLineOffset)
+                
+                // Center focus with food icon
+                VStack(spacing: 8) {
+                    Image(systemName: "fork.knife.circle")
+                        .font(.system(size: 40, weight: .light))
+                        .foregroundColor(Color.white.opacity(0.3))
+                    
+                    Text("Analyzing dish...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.6))
+                }
+            }
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 2).repeatForever(autoreverses: true)) {
+                scanLineOffset = 200
+            }
+            
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                cornerAnimation = true
+            }
+        }
+    }
+    
+    private func cornerPosition(for index: Int, in size: CGSize) -> CGPoint {
+        let padding: CGFloat = 80
+        switch index {
+        case 0: return CGPoint(x: padding, y: padding)
+        case 1: return CGPoint(x: size.width - padding, y: padding)
+        case 2: return CGPoint(x: padding, y: size.height - padding)
+        case 3: return CGPoint(x: size.width - padding, y: size.height - padding)
+        default: return .zero
+        }
+    }
+}
+
+// MARK: - Detective Corner Bracket
+struct DetectiveCornerBracket: Shape {
+    let corner: Int
+    
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let length: CGFloat = 20
+        
+        switch corner {
+        case 0: // Top left
+            path.move(to: CGPoint(x: 0, y: length))
+            path.addLine(to: CGPoint(x: 0, y: 0))
+            path.addLine(to: CGPoint(x: length, y: 0))
+        case 1: // Top right
+            path.move(to: CGPoint(x: rect.width - length, y: 0))
+            path.addLine(to: CGPoint(x: rect.width, y: 0))
+            path.addLine(to: CGPoint(x: rect.width, y: length))
+        case 2: // Bottom left
+            path.move(to: CGPoint(x: 0, y: rect.height - length))
+            path.addLine(to: CGPoint(x: 0, y: rect.height))
+            path.addLine(to: CGPoint(x: length, y: rect.height))
+        case 3: // Bottom right
+            path.move(to: CGPoint(x: rect.width - length, y: rect.height))
+            path.addLine(to: CGPoint(x: rect.width, y: rect.height))
+            path.addLine(to: CGPoint(x: rect.width, y: rect.height - length))
+        default:
+            break
         }
         
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.presentationMode.wrappedValue.dismiss()
-        }
+        return path
     }
 }
 
