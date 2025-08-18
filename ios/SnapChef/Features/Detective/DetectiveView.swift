@@ -550,7 +550,7 @@ struct DetectiveView: View {
             let response = try await SnapChefAPIManager.shared.analyzeRestaurantMeal(
                 image: image,
                 sessionID: sessionID,
-                llmProvider: .grok // Using Grok for detective analysis
+                llmProvider: .gemini // Using Gemini for detective analysis (default provider)
             )
             
             if response.success, let apiRecipe = response.detectiveRecipe {
