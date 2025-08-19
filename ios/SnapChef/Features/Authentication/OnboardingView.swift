@@ -37,7 +37,7 @@ struct OnboardingFoodPreferencesView: View {
     
     var buttonText: String {
         if selectedCuisines.count >= 3 {
-            return "Start Creating!"
+            return "Let's Cook!"
         } else {
             return "Select \(3 - selectedCuisines.count) more to continue"
         }
