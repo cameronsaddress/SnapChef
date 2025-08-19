@@ -383,7 +383,8 @@ struct RecipeDetectiveView: View {
                                 isVegan: false,
                                 isGlutenFree: false,
                                 isDairyFree: false
-                            )
+                            ),
+                            isDetectiveRecipe: true
                         )
                     )
                     

@@ -27,6 +27,12 @@ public struct DetectiveRecipe: Identifiable, Codable, Sendable {
     let originalDishName: String
     let restaurantStyle: String?
     let analyzedAt: Date
+    let cookingTechniques: [String]
+    let flavorProfile: DetectiveFlavorProfile?
+    let secretIngredients: [String]
+    let proTips: [String]
+    let visualClues: [String]
+    let shareCaption: String?
 
     /// Initialize DetectiveRecipe from base Recipe with detective-specific data
     init(
@@ -56,6 +62,12 @@ public struct DetectiveRecipe: Identifiable, Codable, Sendable {
         self.originalDishName = originalDishName
         self.restaurantStyle = restaurantStyle
         self.analyzedAt = Date()
+        self.cookingTechniques = []
+        self.flavorProfile = nil
+        self.secretIngredients = []
+        self.proTips = []
+        self.visualClues = []
+        self.shareCaption = nil
     }
 
     /// Direct initializer for complete control
@@ -77,7 +89,13 @@ public struct DetectiveRecipe: Identifiable, Codable, Sendable {
         confidenceScore: Double,
         originalDishName: String,
         restaurantStyle: String? = nil,
-        analyzedAt: Date = Date()
+        analyzedAt: Date = Date(),
+        cookingTechniques: [String] = [],
+        flavorProfile: DetectiveFlavorProfile? = nil,
+        secretIngredients: [String] = [],
+        proTips: [String] = [],
+        visualClues: [String] = [],
+        shareCaption: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -98,6 +116,12 @@ public struct DetectiveRecipe: Identifiable, Codable, Sendable {
         self.originalDishName = originalDishName
         self.restaurantStyle = restaurantStyle
         self.analyzedAt = analyzedAt
+        self.cookingTechniques = cookingTechniques
+        self.flavorProfile = flavorProfile
+        self.secretIngredients = secretIngredients
+        self.proTips = proTips
+        self.visualClues = visualClues
+        self.shareCaption = shareCaption
     }
 }
 
@@ -119,7 +143,8 @@ extension DetectiveRecipe {
             imageURL: self.imageURL,
             createdAt: self.createdAt,
             tags: self.tags,
-            dietaryInfo: self.dietaryInfo
+            dietaryInfo: self.dietaryInfo,
+            isDetectiveRecipe: true
         )
     }
 
@@ -190,138 +215,97 @@ enum ConfidenceLevel: String, Codable, CaseIterable, Sendable {
     case veryHigh = "Very High"
 }
 
+// MARK: - Detective Flavor Profile
+struct DetectiveFlavorProfile: Codable, Sendable {
+    let sweet: Int      // 1-10 scale
+    let salty: Int      // 1-10 scale
+    let sour: Int       // 1-10 scale
+    let bitter: Int     // 1-10 scale
+    let umami: Int      // 1-10 scale
+}
+
 // MARK: - API Response Model
 struct DetectiveRecipeResponse: Codable, Sendable {
-    let data: DetectiveRecipeData
+    let success: Bool
+    let detectiveRecipe: DetectiveRecipeAPI?
     let message: String
     
-    // Computed properties for backward compatibility
-    var success: Bool {
-        // Consider successful if we have valid recipe data and confidence > 0
-        return data.recipe_reconstruction.confidence_score > 0
-    }
-    
-    var detectiveRecipe: DetectiveRecipeAPI? {
-        // Convert the server response structure to our expected API structure
-        guard data.recipe_reconstruction.confidence_score > 0 else { return nil }
-        
-        return DetectiveRecipeAPI(
-            id: UUID().uuidString,
-            name: data.recipe_reconstruction.name,
-            description: data.recipe_reconstruction.description,
-            main_dish: data.dish_analysis.dish_name,
-            side_dish: nil,
-            total_time: data.recipe_reconstruction.total_time,
-            prep_time: data.recipe_reconstruction.prep_time,
-            cook_time: data.recipe_reconstruction.cook_time,
-            servings: data.recipe_reconstruction.servings,
-            difficulty: data.recipe_reconstruction.difficulty,
-            ingredients_used: data.recipe_reconstruction.ingredients.map { ingredient in
-                IngredientUsed(name: ingredient.name, amount: ingredient.quantity)
-            },
-            instructions: data.recipe_reconstruction.instructions,
-            nutrition: data.recipe_reconstruction.nutrition,
-            tips: data.recipe_reconstruction.cooking_tips?.joined(separator: "\n"),
-            tags: data.flavor_profile.cuisine_type.map { [$0] } ?? [],
-            share_caption: nil,
-            confidence_score: data.recipe_reconstruction.confidence_score,
-            original_dish_name: data.dish_analysis.dish_name,
-            restaurant_style: data.flavor_profile.cuisine_type,
-            analysis_details: DetectiveRecipeAPI.AnalysisDetails(
-                visual_features: data.visual_evidence.key_visual_elements,
-                flavor_profile: [data.flavor_profile.flavor_notes],
-                cooking_techniques: data.recipe_reconstruction.cooking_techniques,
-                ingredient_substitutions: data.recipe_reconstruction.ingredient_substitutions
-            )
-        )
+    enum CodingKeys: String, CodingKey {
+        case success
+        case detectiveRecipe = "detective_recipe"
+        case message
     }
 }
 
-// MARK: - Server Response Data Structures
-struct DetectiveRecipeData: Codable, Sendable {
-    let dish_analysis: DishAnalysis
-    let visual_evidence: VisualEvidence
-    let flavor_profile: FlavorProfile
-    let recipe_reconstruction: RecipeReconstruction
-}
-
-struct DishAnalysis: Codable, Sendable {
-    let dish_name: String
-    let cuisine_style: String?
-    let dish_type: String?
-    let complexity_level: String?
-    let confidence_score: Double
-}
-
-struct VisualEvidence: Codable, Sendable {
-    let key_visual_elements: [String]
-    let cooking_method_indicators: [String]?
-    let ingredient_visibility: [String]?
-}
-
-struct FlavorProfile: Codable, Sendable {
-    let cuisine_type: String?
-    let flavor_notes: String
-    let spice_level: String?
-    let dietary_considerations: [String]?
-}
-
-struct RecipeReconstruction: Codable, Sendable {
-    let name: String
-    let description: String
-    let confidence_score: Double
-    let ingredients: [RecipeIngredient]
-    let instructions: [String]
-    let cooking_techniques: [String]?
-    let cooking_tips: [String]?
-    let prep_time: Int?
-    let cook_time: Int?
-    let total_time: Int?
-    let servings: Int?
-    let difficulty: String
-    let nutrition: NutritionAPI?
-    let ingredient_substitutions: [String: String]?
-}
-
-struct RecipeIngredient: Codable, Sendable {
-    let name: String
-    let quantity: String
-    let unit: String?
-    let notes: String?
-}
-
+// MARK: - Detective Recipe API Model (matches server exactly)
 struct DetectiveRecipeAPI: Codable, Sendable {
-    // Base recipe data (matches RecipeAPI structure)
     let id: String
+    let originalDishName: String
+    let restaurantStyle: String
+    let confidenceScore: Int
     let name: String
     let description: String
-    let main_dish: String?
-    let side_dish: String?
-    let total_time: Int?
-    let prep_time: Int?
-    let cook_time: Int?
-    let servings: Int?
-    let difficulty: String
-    let ingredients_used: [IngredientUsed]?
+    let ingredients: [DetectiveIngredientAPI]
     let instructions: [String]
-    let nutrition: NutritionAPI?
-    let tips: String?
-    let tags: [String]?
-    let share_caption: String?
-
-    // Detective-specific API fields
-    let confidence_score: Double
-    let original_dish_name: String
-    let restaurant_style: String?
-    let analysis_details: DetectiveRecipeAPI.AnalysisDetails?
-
-    struct AnalysisDetails: Codable, Sendable {
-        let visual_features: [String]?
-        let flavor_profile: [String]?
-        let cooking_techniques: [String]?
-        let ingredient_substitutions: [String: String]?
+    let prepTime: Int
+    let cookTime: Int
+    let servings: Int
+    let difficulty: String
+    let nutrition: DetectiveNutritionAPI
+    let cookingTechniques: [String]
+    let flavorProfile: DetectiveFlavorProfileAPI
+    let secretIngredients: [String]
+    let proTips: [String]
+    let visualClues: [String]
+    let tags: [String]
+    let shareCaption: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case originalDishName = "original_dish_name"
+        case restaurantStyle = "restaurant_style"
+        case confidenceScore = "confidence_score"
+        case name
+        case description
+        case ingredients
+        case instructions
+        case prepTime = "prep_time"
+        case cookTime = "cook_time"
+        case servings
+        case difficulty
+        case nutrition
+        case cookingTechniques = "cooking_techniques"
+        case flavorProfile = "flavor_profile"
+        case secretIngredients = "secret_ingredients"
+        case proTips = "pro_tips"
+        case visualClues = "visual_clues"
+        case tags
+        case shareCaption = "share_caption"
     }
 }
+
+// MARK: - Supporting API Models
+struct DetectiveIngredientAPI: Codable, Sendable {
+    let name: String
+    let amount: String
+    let preparation: String
+}
+
+struct DetectiveNutritionAPI: Codable, Sendable {
+    let calories: Int
+    let protein: Int
+    let carbs: Int
+    let fat: Int
+}
+
+struct DetectiveFlavorProfileAPI: Codable, Sendable {
+    let sweet: Int
+    let salty: Int
+    let sour: Int
+    let bitter: Int
+    let umami: Int
+}
+
 
 // MARK: - Error Types
 enum DetectiveRecipeError: Error, LocalizedError {

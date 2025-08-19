@@ -60,7 +60,8 @@ class MockDataProvider {
                     isVegan: false,
                     isGlutenFree: true,
                     isDairyFree: false
-                )
+                ),
+                isDetectiveRecipe: false
             ),
             Recipe(
                 id: UUID(),
@@ -107,7 +108,8 @@ class MockDataProvider {
                     isVegan: false,
                     isGlutenFree: false,
                     isDairyFree: true
-                )
+                ),
+                isDetectiveRecipe: false
             ),
             Recipe(
                 id: UUID(),
@@ -156,7 +158,8 @@ class MockDataProvider {
                     isVegan: true,
                     isGlutenFree: false,
                     isDairyFree: true
-                )
+                ),
+                isDetectiveRecipe: false
             )
         ]
 
@@ -244,7 +247,8 @@ class MockDataProvider {
                 isVegan: false,
                 isGlutenFree: true,
                 isDairyFree: false
-            )
+            ),
+            isDetectiveRecipe: false
         )
     }
 }

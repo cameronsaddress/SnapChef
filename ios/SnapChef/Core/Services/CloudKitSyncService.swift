@@ -149,7 +149,8 @@ final class CloudKitSyncService: ObservableObject {
             imageURL: nil,
             createdAt: record[CKField.Recipe.createdAt] as? Date ?? Date(),
             tags: [],
-            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false)
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
+            isDetectiveRecipe: false
         )
     }
 

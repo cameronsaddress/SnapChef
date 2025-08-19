@@ -250,7 +250,8 @@ struct MysteryMealView: View {
                     imageURL: recipe.imageURL,
                     createdAt: recipe.createdAt,
                     tags: recipe.tags,
-                    dietaryInfo: recipe.dietaryInfo
+                    dietaryInfo: recipe.dietaryInfo,
+                    isDetectiveRecipe: false
                 )
             }
         case .medium:
@@ -270,7 +271,8 @@ struct MysteryMealView: View {
                     imageURL: recipe.imageURL,
                     createdAt: recipe.createdAt,
                     tags: recipe.tags,
-                    dietaryInfo: recipe.dietaryInfo
+                    dietaryInfo: recipe.dietaryInfo,
+                    isDetectiveRecipe: false
                 )
             }
         case .wild:
@@ -290,7 +292,8 @@ struct MysteryMealView: View {
                     imageURL: recipe.imageURL,
                     createdAt: recipe.createdAt,
                     tags: recipe.tags,
-                    dietaryInfo: recipe.dietaryInfo
+                    dietaryInfo: recipe.dietaryInfo,
+                    isDetectiveRecipe: false
                 )
             }
         case .insane:
@@ -310,7 +313,8 @@ struct MysteryMealView: View {
                     imageURL: recipe.imageURL,
                     createdAt: recipe.createdAt,
                     tags: recipe.tags,
-                    dietaryInfo: recipe.dietaryInfo
+                    dietaryInfo: recipe.dietaryInfo,
+                    isDetectiveRecipe: false
                 )
             }
         }

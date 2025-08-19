@@ -16,6 +16,11 @@ struct DetectiveView: View {
     @State private var errorMessage: String?
     @State private var showingPremiumPrompt = false
     @State private var analysisProgress: Double = 0.0
+    @State private var showingSharePopup = false
+    @State private var savedRecipeIds: Set<UUID> = []
+    @State private var showingAfterPhotoCapture = false
+    @State private var selectedRecipeForPhoto: DetectiveRecipe?
+    @State private var afterPhoto: UIImage?
     
     // MARK: - Computed Properties for Type Inference
     private var gridColumns: [GridItem] {
@@ -77,12 +82,48 @@ struct DetectiveView: View {
                     reason: .premiumFeature("Recipe Detective")
                 )
             }
+            .sheet(isPresented: $showingSharePopup) {
+                if let recipe = detectiveRecipe {
+                    BrandedSharePopup(
+                        content: ShareContent(
+                            type: .recipe(recipe.toBaseRecipe()),
+                            beforeImage: getBeforePhotoForDetectiveRecipe(),
+                            afterImage: getAfterPhotoForDetectiveRecipe()
+                        )
+                    )
+                }
+            }
+            .fullScreenCover(isPresented: $showingAfterPhotoCapture) {
+                if let recipe = selectedRecipeForPhoto {
+                    AfterPhotoCaptureView(
+                        afterPhoto: $afterPhoto,
+                        recipeID: recipe.id.uuidString
+                    )
+                    .onDisappear {
+                        if let photo = afterPhoto {
+                            // Save the after photo to PhotoStorageManager (single source of truth)
+                            PhotoStorageManager.shared.storeMealPhoto(photo, for: recipe.id)
+                            
+                            // Also update appState for backwards compatibility
+                            let baseRecipe = recipe.toBaseRecipe()
+                            appState.updateAfterPhoto(for: baseRecipe.id, afterPhoto: photo)
+                            
+                            print("📸 Detective: After photo saved for recipe \(recipe.name)")
+                        }
+                    }
+                }
+            }
             .onChange(of: capturedImage) { newImage in
                 if let newImage = newImage {
                     Task {
                         await analyzeImage(newImage)
                     }
                 }
+            }
+            .onAppear {
+                // Initialize saved recipe IDs from appState
+                savedRecipeIds = Set(appState.savedRecipes.map { $0.id })
+                print("🔍 DetectiveView: Loaded \(savedRecipeIds.count) saved recipes")
             }
         }
     }
@@ -386,6 +427,12 @@ struct DetectiveView: View {
     // MARK: - Detective Result Card
     private func detectiveResultCard(recipe: DetectiveRecipe) -> some View {
         VStack(spacing: 20) {
+            // Before/After Photo Container
+            detectivePhotoContainer(recipe: recipe)
+                .frame(height: 150)
+                .padding(.horizontal, -24) // Extend to card edges
+                .padding(.top, -24)
+            
             // Confidence indicator
             HStack {
                 Text(recipe.confidenceEmoji)
@@ -478,26 +525,25 @@ struct DetectiveView: View {
             // Action buttons
             HStack(spacing: 12) {
                 Button(action: {
-                    // Save recipe
-                    let baseRecipe = recipe.toBaseRecipe()
-                    appState.savedRecipes.append(baseRecipe)
-                    // TODO: Add detectiveRecipes support back when AppState is updated
+                    // Save recipe to recipe book
+                    saveDetectiveRecipe(recipe)
                 }) {
                     HStack(spacing: 8) {
-                        Image(systemName: "heart")
-                        Text("Save")
+                        Image(systemName: isSaved(recipe) ? "heart.fill" : "heart")
+                        Text(isSaved(recipe) ? "Saved" : "Save")
                     }
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color.white.opacity(0.2))
+                    .background(isSaved(recipe) ? Color(hex: "#4CAF50").opacity(0.3) : Color.white.opacity(0.2))
                     .cornerRadius(12)
                 }
                 
                 Button(action: {
-                    // Share functionality
+                    print("🔍 Share button tapped")
+                    showingSharePopup = true
                 }) {
                     HStack(spacing: 8) {
                         Image(systemName: "square.and.arrow.up")
@@ -513,10 +559,8 @@ struct DetectiveView: View {
                 }
                 
                 Button(action: {
-                    // Try again
-                    detectiveRecipe = nil
-                    capturedImage = nil
-                    showingCamera = true
+                    // Try again - reset everything
+                    resetDetectiveAnalysis()
                 }) {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.clockwise")
@@ -636,21 +680,14 @@ struct DetectiveView: View {
                 // Convert API recipe to our DetectiveRecipe model
                 detectiveRecipe = SnapChefAPIManager.shared.convertAPIDetectiveRecipeToDetectiveRecipe(apiRecipe)
                 
-                // Save to recipes if we have a valid recipe with decent confidence
+                // Log success but don't auto-save (user should explicitly save)
                 if let recipe = detectiveRecipe, recipe.confidenceScore > 0 {
-                    // Convert DetectiveRecipe to regular Recipe and add to saved recipes
-                    let regularRecipe = recipe.toBaseRecipe()
-                    appState.savedRecipes.append(regularRecipe)
                     print("✅ Detective analysis successful: \(recipe.name)")
                     print("✅ Confidence: \(recipe.confidenceScore)%")
                 }
             } else {
-                // Handle the case where no dish was detected (confidence_score: 0)
-                if response.data.recipe_reconstruction.confidence_score == 0 {
-                    errorMessage = "I couldn't identify this as a recognizable dish. Try taking a clearer photo of a prepared meal or dish!"
-                } else {
-                    errorMessage = response.message.isEmpty ? "Failed to analyze the meal photo" : response.message
-                }
+                // Handle the case where no dish was detected
+                errorMessage = response.message.isEmpty ? "Failed to analyze the meal photo" : response.message
                 print("❌ Detective analysis failed: \(errorMessage ?? "Unknown error")")
             }
         } catch {
@@ -675,18 +712,890 @@ struct DetectiveView: View {
             return "Just now"
         }
     }
+    
+    // MARK: - Helper Functions for Actions
+    
+    private func saveDetectiveRecipe(_ recipe: DetectiveRecipe) {
+        let baseRecipe = recipe.toBaseRecipe()
+        
+        print("🔍 Save button tapped for recipe: \(recipe.name)")
+        print("🔍 Recipe ID: \(recipe.id)")
+        print("🔍 Currently saved IDs: \(savedRecipeIds)")
+        
+        // Toggle save state
+        if savedRecipeIds.contains(recipe.id) {
+            // Already saved - remove it
+            savedRecipeIds.remove(recipe.id)
+            
+            // Remove from saved recipes
+            if let index = appState.savedRecipes.firstIndex(where: { $0.id == baseRecipe.id }) {
+                appState.savedRecipes.remove(at: index)
+                print("✅ Recipe removed from saved recipes")
+            }
+            
+            // Remove from recent recipes
+            if let index = appState.recentRecipes.firstIndex(where: { $0.id == baseRecipe.id }) {
+                appState.recentRecipes.remove(at: index)
+                print("✅ Recipe removed from recent recipes")
+            }
+            
+            // Remove from savedRecipesWithPhotos
+            appState.savedRecipesWithPhotos.removeAll { $0.recipe.id == baseRecipe.id }
+            
+            // Remove photos from PhotoStorageManager
+            PhotoStorageManager.shared.removePhotos(for: [recipe.id])
+            print("📸 Photos removed from storage")
+            
+            // Remove from CloudKit if authenticated
+            if cloudKitAuth.isAuthenticated {
+                Task {
+                    try? await CloudKitRecipeManager.shared.removeRecipeFromUserProfile(
+                        baseRecipe.id.uuidString,
+                        type: .saved
+                    )
+                    print("☁️ Recipe removed from CloudKit")
+                }
+            }
+            
+            // Haptic feedback for unsave
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+        } else {
+            // Not saved - add it
+            savedRecipeIds.insert(recipe.id)
+            
+            // Add to saved recipes
+            if !appState.savedRecipes.contains(where: { $0.id == baseRecipe.id }) {
+                appState.savedRecipes.append(baseRecipe)
+                print("✅ Recipe added to saved recipes")
+            }
+            
+            // Add to recent recipes so it appears in the recipe book
+            if !appState.recentRecipes.contains(where: { $0.id == baseRecipe.id }) {
+                appState.addRecentRecipe(baseRecipe)
+                print("✅ Recipe added to recent recipes")
+            }
+            
+            // Save with photos - use captured image as before photo
+            let beforePhoto = capturedImage
+            appState.saveRecipeWithPhotos(baseRecipe, beforePhoto: beforePhoto, afterPhoto: nil)
+            
+            // Store photos in PhotoStorageManager for future access
+            PhotoStorageManager.shared.storePhotos(
+                fridgePhoto: beforePhoto,
+                mealPhoto: nil,
+                for: recipe.id
+            )
+            print("📸 Photos stored: before=\(beforePhoto != nil), after=nil")
+            
+            // Save to CloudKit if authenticated (will sync later if not)
+            if cloudKitAuth.isAuthenticated {
+                Task {
+                    _ = try? await CloudKitRecipeManager.shared.uploadRecipe(
+                        baseRecipe,
+                        fromLLM: true,
+                        beforePhoto: beforePhoto
+                    )
+                    print("☁️ Recipe uploaded to CloudKit with photos")
+                }
+            }
+            
+            // Haptic feedback for save
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+        }
+        
+        print("🔍 Updated saved IDs: \(savedRecipeIds)")
+    }
+    
+    private func isSaved(_ recipe: DetectiveRecipe) -> Bool {
+        let saved = savedRecipeIds.contains(recipe.id)
+        print("🔍 Checking if recipe is saved: \(recipe.name) - Result: \(saved)")
+        return saved
+    }
+    
+    private func getBeforePhotoForDetectiveRecipe() -> UIImage? {
+        // First try to use the captured image from the current session
+        if let capturedImage = capturedImage {
+            return capturedImage
+        }
+        
+        // Then check PhotoStorageManager
+        if let recipe = detectiveRecipe {
+            let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+            return photos?.fridgePhoto
+        }
+        
+        return nil
+    }
+    
+    private func getAfterPhotoForDetectiveRecipe() -> UIImage? {
+        // Check PhotoStorageManager for after photo
+        if let recipe = detectiveRecipe {
+            let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+            return photos?.mealPhoto ?? afterPhoto
+        }
+        
+        return afterPhoto
+    }
+    
+    // MARK: - Detective Photo Container
+    private func detectivePhotoContainer(recipe: DetectiveRecipe) -> some View {
+        ZStack {
+            // Background gradient
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#667eea"),
+                            Color(hex: "#764ba2")
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            
+            HStack(spacing: 0) {
+                // Before Photo (Left Side)
+                Group {
+                    if let beforePhoto = getBeforePhotoForRecipe(recipe) {
+                        Image(uiImage: beforePhoto)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        VStack {
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.system(size: 30))
+                                .foregroundColor(.white.opacity(0.5))
+                            Text("Original")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black.opacity(0.2))
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .overlay(
+                    VStack {
+                        Spacer()
+                        if getBeforePhotoForRecipe(recipe) != nil {
+                            Text("BEFORE")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.6))
+                                )
+                                .padding(.bottom, 4)
+                        }
+                    }
+                )
+                
+                // Divider
+                Rectangle()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 1)
+                
+                // After Photo (Right Side) - Clickable
+                Button(action: {
+                    selectedRecipeForPhoto = recipe
+                    showingAfterPhotoCapture = true
+                }) {
+                    Group {
+                        if let afterPhoto = getAfterPhotoForRecipe(recipe) {
+                            Image(uiImage: afterPhoto)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            VStack(spacing: 4) {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.white.opacity(0.7))
+                                Text("Take Photo")
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Color.white.opacity(0.1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 0)
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                    .scaleEffect(1.02)
+                                    .opacity(0.5)
+                                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: UUID())
+                            )
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .overlay(
+                        VStack {
+                            Spacer()
+                            Text("AFTER")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.6))
+                                )
+                                .padding(.bottom, 4)
+                        }
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+    }
+    
+    private func getBeforePhotoForRecipe(_ recipe: DetectiveRecipe) -> UIImage? {
+        // First try the captured image from current session
+        if let capturedImage = capturedImage, recipe.id == detectiveRecipe?.id {
+            return capturedImage
+        }
+        
+        // Then check PhotoStorageManager
+        let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+        return photos?.fridgePhoto
+    }
+    
+    private func getAfterPhotoForRecipe(_ recipe: DetectiveRecipe) -> UIImage? {
+        // Check if we have a temporary after photo for this recipe
+        if recipe.id == selectedRecipeForPhoto?.id {
+            if let afterPhoto = afterPhoto {
+                return afterPhoto
+            }
+        }
+        
+        // Check PhotoStorageManager
+        let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+        return photos?.mealPhoto
+    }
+    
+    private func resetDetectiveAnalysis() {
+        // Reset all state
+        detectiveRecipe = nil
+        capturedImage = nil
+        errorMessage = nil
+        analysisProgress = 0.0
+        
+        // Show camera again
+        showingCamera = true
+    }
 }
 
 // MARK: - Detective Recipe Detail View
 struct DetectiveRecipeDetailView: View {
     let recipe: DetectiveRecipe
+    @EnvironmentObject var appState: AppState
+    @State private var showingSharePopup = false
+    @State private var shareContent: ShareContent?
+    @State private var capturedImage: UIImage?
     
     var body: some View {
-        // TODO: Implement detailed recipe view
-        // This would show the full recipe with confidence analysis,
-        // ingredient breakdown, and step-by-step instructions
-        Text("Detective Recipe Detail")
-            .navigationTitle(recipe.name)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Hero Section with Confidence
+                detectiveHeroSection
+                
+                // Quick Stats
+                quickStatsSection
+                
+                // Description
+                descriptionSection
+                
+                // Ingredients Section
+                ingredientsSection
+                
+                // Instructions Section
+                instructionsSection
+                
+                // Pro Tips Section
+                if !recipe.proTips.isEmpty {
+                    proTipsSection
+                }
+                
+                // Secret Ingredients Section
+                if !recipe.secretIngredients.isEmpty {
+                    secretIngredientsSection
+                }
+                
+                // Cooking Techniques Section
+                if !recipe.cookingTechniques.isEmpty {
+                    cookingTechniquesSection
+                }
+                
+                // Flavor Profile Section
+                if let flavorProfile = recipe.flavorProfile {
+                    flavorProfileSection(flavorProfile)
+                }
+                
+                // Visual Clues Section
+                if !recipe.visualClues.isEmpty {
+                    visualCluesSection
+                }
+                
+                // Nutrition Section
+                nutritionSection
+                
+                // Action Buttons
+                actionButtonsSection
+                
+                // Bottom padding for tab bar
+                Color.clear.frame(height: 100)
+            }
+            .padding(.horizontal)
+        }
+        .background(MagicalBackground())
+        .navigationTitle(recipe.name)
+        .navigationBarTitleDisplayMode(.large)
+        .sheet(isPresented: $showingSharePopup) {
+            if let shareContent = shareContent {
+                BrandedSharePopup(content: shareContent)
+            }
+        }
+    }
+    
+    // MARK: - View Components
+    
+    private var detectiveHeroSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Confidence Badge
+            HStack {
+                Text(recipe.confidenceEmoji)
+                    .font(.system(size: 32))
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Confidence: \(Int(recipe.confidenceScore))%")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    
+                    Text(recipe.confidenceDescription)
+                        .font(.caption)
+                        .foregroundColor(recipe.confidenceColor)
+                }
+                
+                Spacer()
+                
+                // Confidence meter
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 100, height: 8)
+                    
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(recipe.confidenceColor)
+                        .frame(width: CGFloat(recipe.confidenceScore), height: 8)
+                }
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(recipe.confidenceColor.opacity(0.5), lineWidth: 1)
+                    )
+            )
+            
+            // Original Dish Info
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Original Dish", systemImage: "fork.knife")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                
+                Text(recipe.originalDishName)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                
+                if let style = recipe.restaurantStyle {
+                    Text(style)
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color(hex: "#9b59b6").opacity(0.3))
+                        )
+                }
+            }
+        }
+    }
+    
+    private var quickStatsSection: some View {
+        HStack(spacing: 16) {
+            DetectiveStatCard(icon: "clock", title: "Time", value: "\(recipe.prepTime + recipe.cookTime) min")
+            DetectiveStatCard(icon: "person.2", title: "Servings", value: "\(recipe.servings)")
+            DetectiveStatCard(icon: "chart.bar", title: "Difficulty", value: recipe.difficulty.rawValue.capitalized)
+        }
+    }
+    
+    private var descriptionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Description")
+                .font(.headline)
+                .foregroundColor(.white)
+            
+            Text(recipe.description)
+                .font(.body)
+                .foregroundColor(.white.opacity(0.9))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+        )
+    }
+    
+    private var ingredientsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Ingredients")
+                .font(.headline)
+                .foregroundColor(.white)
+            
+            ForEach(recipe.ingredients, id: \.id) { ingredient in
+                HStack {
+                    Circle()
+                        .fill(Color(hex: "#9b59b6").opacity(0.3))
+                        .frame(width: 8, height: 8)
+                    
+                    Text(ingredient.name)
+                        .font(.body)
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    if !ingredient.quantity.isEmpty {
+                        Text(ingredient.quantity)
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+        )
+    }
+    
+    private var instructionsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Instructions")
+                .font(.headline)
+                .foregroundColor(.white)
+            
+            ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
+                HStack(alignment: .top, spacing: 12) {
+                    Text("\(index + 1)")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .frame(width: 24, height: 24)
+                        .background(
+                            Circle()
+                                .fill(Color(hex: "#9b59b6").opacity(0.5))
+                        )
+                    
+                    Text(instruction)
+                        .font(.body)
+                        .foregroundColor(.white.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+        )
+    }
+    
+    private var proTipsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundColor(.yellow)
+                Text("Pro Tips")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            
+            ForEach(recipe.proTips, id: \.self) { tip in
+                HStack(alignment: .top, spacing: 8) {
+                    Text("•")
+                        .foregroundColor(Color.yellow.opacity(0.8))
+                    Text(tip)
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.yellow.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+    
+    private var secretIngredientsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "lock.open.fill")
+                    .foregroundColor(Color(hex: "#9b59b6"))
+                Text("Secret Ingredients")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            
+            ForEach(recipe.secretIngredients, id: \.self) { secret in
+                HStack {
+                    Image(systemName: "sparkle")
+                        .font(.caption)
+                        .foregroundColor(Color(hex: "#9b59b6").opacity(0.8))
+                    Text(secret)
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.9))
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(hex: "#9b59b6").opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color(hex: "#9b59b6").opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+    
+    private var cookingTechniquesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "flame.fill")
+                    .foregroundColor(.orange)
+                Text("Cooking Techniques")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            
+            ForEach(recipe.cookingTechniques, id: \.self) { technique in
+                HStack {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.orange.opacity(0.8))
+                    Text(technique)
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.9))
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.orange.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+    
+    private func flavorProfileSection(_ profile: DetectiveFlavorProfile) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .foregroundColor(Color(hex: "#3498db"))
+                Text("Flavor Profile")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            
+            VStack(spacing: 8) {
+                FlavorBar(label: "Sweet", value: profile.sweet, color: .pink)
+                FlavorBar(label: "Salty", value: profile.salty, color: .blue)
+                FlavorBar(label: "Sour", value: profile.sour, color: .green)
+                FlavorBar(label: "Bitter", value: profile.bitter, color: .brown)
+                FlavorBar(label: "Umami", value: profile.umami, color: .orange)
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(hex: "#3498db").opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color(hex: "#3498db").opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+    
+    private var visualCluesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "eye.fill")
+                    .foregroundColor(Color(hex: "#2ecc71"))
+                Text("Visual Clues")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            
+            ForEach(recipe.visualClues, id: \.self) { clue in
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(Color(hex: "#2ecc71").opacity(0.8))
+                    Text(clue)
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(hex: "#2ecc71").opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color(hex: "#2ecc71").opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+    
+    private var nutritionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Nutrition")
+                .font(.headline)
+                .foregroundColor(.white)
+            
+            HStack(spacing: 16) {
+                NutritionCard(label: "Calories", value: "\(recipe.nutrition.calories)", unit: "cal")
+                NutritionCard(label: "Protein", value: "\(recipe.nutrition.protein)", unit: "g")
+                NutritionCard(label: "Carbs", value: "\(recipe.nutrition.carbs)", unit: "g")
+                NutritionCard(label: "Fat", value: "\(recipe.nutrition.fat)", unit: "g")
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+        )
+    }
+    
+    private var actionButtonsSection: some View {
+        HStack(spacing: 12) {
+            Button(action: {
+                saveRecipe()
+            }) {
+                HStack {
+                    Image(systemName: isSaved() ? "heart.fill" : "heart")
+                    Text(isSaved() ? "Saved" : "Save")
+                }
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    LinearGradient(
+                        colors: isSaved() ? [Color(hex: "#4CAF50"), Color(hex: "#45a049")] : [Color(hex: "#9b59b6"), Color(hex: "#8e44ad")],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
+            }
+            
+            Button(action: {
+                prepareShareContent()
+                showingSharePopup = true
+            }) {
+                HStack {
+                    Image(systemName: "square.and.arrow.up")
+                    Text("Share")
+                }
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    LinearGradient(
+                        colors: [Color(hex: "#3498db"), Color(hex: "#2980b9")],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
+            }
+        }
+        .padding(.vertical)
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func saveRecipe() {
+        let baseRecipe = recipe.toBaseRecipe()
+        
+        // Toggle save state
+        if let index = appState.savedRecipes.firstIndex(where: { $0.id == baseRecipe.id }) {
+            // Already saved - remove it
+            appState.savedRecipes.remove(at: index)
+            
+            // Remove from CloudKit if authenticated
+            if CloudKitAuthManager.shared.isAuthenticated {
+                Task {
+                    try? await CloudKitRecipeManager.shared.removeRecipeFromUserProfile(
+                        baseRecipe.id.uuidString,
+                        type: .saved
+                    )
+                }
+            }
+            
+            // Haptic feedback for unsave
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+        } else {
+            // Not saved - add it
+            appState.savedRecipes.append(baseRecipe)
+            
+            // Save to CloudKit if authenticated (will sync later if not)
+            if CloudKitAuthManager.shared.isAuthenticated {
+                Task {
+                    _ = try? await CloudKitRecipeManager.shared.uploadRecipe(baseRecipe)
+                }
+            }
+            
+            // Haptic feedback for save
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+        }
+    }
+    
+    private func isSaved() -> Bool {
+        return appState.savedRecipes.contains(where: { $0.id == recipe.id })
+    }
+    
+    private func prepareShareContent() {
+        // Get photos from PhotoStorageManager
+        // Get photos from PhotoStorageManager
+        let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+        let beforePhoto = capturedImage ?? photos?.fridgePhoto
+        let afterPhoto = photos?.mealPhoto
+        
+        // Create share content
+        shareContent = ShareContent(
+            type: .recipe(recipe.toBaseRecipe()),
+            beforeImage: beforePhoto,
+            afterImage: afterPhoto
+        )
+    }
+}
+
+// MARK: - Supporting Views
+
+struct DetectiveStatCard: View {
+    let icon: String
+    let title: String
+    let value: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundColor(Color(hex: "#9b59b6"))
+            
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.7))
+            
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.1))
+        )
+    }
+}
+
+struct FlavorBar: View {
+    let label: String
+    let value: Int
+    let color: Color
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.8))
+                .frame(width: 60, alignment: .leading)
+            
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.white.opacity(0.1))
+                        .frame(height: 8)
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(color)
+                        .frame(width: geometry.size.width * CGFloat(value) / 10, height: 8)
+                }
+            }
+            .frame(height: 8)
+            
+            Text("\(value)")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.8))
+                .frame(width: 20, alignment: .trailing)
+        }
+    }
+}
+
+struct NutritionCard: View {
+    let label: String
+    let value: String
+    let unit: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.6))
+            
+            HStack(spacing: 2) {
+                Text(value)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                
+                Text(unit)
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

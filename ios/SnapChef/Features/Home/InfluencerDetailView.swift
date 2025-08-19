@@ -261,7 +261,8 @@ struct InfluencerDetailView: View {
             imageURL: originalRecipe.imageURL,
             createdAt: Date(), // Current date for when it's saved
             tags: originalRecipe.tags,
-            dietaryInfo: originalRecipe.dietaryInfo
+            dietaryInfo: originalRecipe.dietaryInfo,
+            isDetectiveRecipe: false
         )
 
         // Save the recipe

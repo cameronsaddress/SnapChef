@@ -1069,8 +1069,8 @@ final class SnapChefAPIManager {
                     
                     if let recipe = detectiveResponse.detectiveRecipe {
                         print("✅ Recipe: \(recipe.name)")
-                        print("✅ Confidence: \(recipe.confidence_score)%")
-                        print("✅ Original dish: \(recipe.original_dish_name)")
+                        print("✅ Confidence: \(recipe.confidenceScore)%")
+                        print("✅ Original dish: \(recipe.originalDishName)")
                     }
                     
                     continuation.resume(returning: detectiveResponse)
@@ -1146,26 +1146,26 @@ final class SnapChefAPIManager {
     
     /// Converts DetectiveRecipeAPI to DetectiveRecipe model
     func convertAPIDetectiveRecipeToDetectiveRecipe(_ apiRecipe: DetectiveRecipeAPI) -> DetectiveRecipe {
-        // Convert ingredients
-        let ingredients = (apiRecipe.ingredients_used ?? []).map { ingredientUsed in
+        // Convert ingredients from new API structure
+        let ingredients = apiRecipe.ingredients.map { ingredient in
             Ingredient(
                 id: UUID(),
-                name: ingredientUsed.name,
-                quantity: ingredientUsed.amount,
-                unit: nil,
+                name: ingredient.name,
+                quantity: ingredient.amount,
+                unit: ingredient.preparation,
                 isAvailable: true
             )
         }
         
-        // Convert nutrition
+        // Convert nutrition from new API structure
         let nutrition = Nutrition(
-            calories: apiRecipe.nutrition?.calories ?? 0,
-            protein: apiRecipe.nutrition?.protein ?? 0,
-            carbs: apiRecipe.nutrition?.carbs ?? 0,
-            fat: apiRecipe.nutrition?.fat ?? 0,
-            fiber: apiRecipe.nutrition?.fiber,
-            sugar: apiRecipe.nutrition?.sugar,
-            sodium: apiRecipe.nutrition?.sodium
+            calories: apiRecipe.nutrition.calories,
+            protein: apiRecipe.nutrition.protein,
+            carbs: apiRecipe.nutrition.carbs,
+            fat: apiRecipe.nutrition.fat,
+            fiber: nil,
+            sugar: nil,
+            sodium: nil
         )
         
         // Convert difficulty
@@ -1182,12 +1182,21 @@ final class SnapChefAPIManager {
         }
         
         // Extract dietary info from tags
-        let tags = apiRecipe.tags ?? []
+        let tags = apiRecipe.tags
         let dietaryInfo = DietaryInfo(
             isVegetarian: tags.contains { $0.lowercased().contains("vegetarian") },
             isVegan: tags.contains { $0.lowercased().contains("vegan") },
             isGlutenFree: tags.contains { $0.lowercased().contains("gluten-free") || $0.lowercased().contains("gluten free") },
             isDairyFree: tags.contains { $0.lowercased().contains("dairy-free") || $0.lowercased().contains("dairy free") }
+        )
+        
+        // Convert flavor profile
+        let flavorProfile = DetectiveFlavorProfile(
+            sweet: apiRecipe.flavorProfile.sweet,
+            salty: apiRecipe.flavorProfile.salty,
+            sour: apiRecipe.flavorProfile.sour,
+            bitter: apiRecipe.flavorProfile.bitter,
+            umami: apiRecipe.flavorProfile.umami
         )
         
         return DetectiveRecipe(
@@ -1196,19 +1205,25 @@ final class SnapChefAPIManager {
             description: apiRecipe.description,
             ingredients: ingredients,
             instructions: apiRecipe.instructions,
-            cookTime: apiRecipe.cook_time ?? 0,
-            prepTime: apiRecipe.prep_time ?? 0,
-            servings: apiRecipe.servings ?? 4,
+            cookTime: apiRecipe.cookTime,
+            prepTime: apiRecipe.prepTime,
+            servings: apiRecipe.servings,
             difficulty: difficulty,
             nutrition: nutrition,
             imageURL: nil,
             createdAt: Date(),
             tags: tags,
             dietaryInfo: dietaryInfo,
-            confidenceScore: apiRecipe.confidence_score,
-            originalDishName: apiRecipe.original_dish_name,
-            restaurantStyle: apiRecipe.restaurant_style,
-            analyzedAt: Date()
+            confidenceScore: Double(apiRecipe.confidenceScore),
+            originalDishName: apiRecipe.originalDishName,
+            restaurantStyle: apiRecipe.restaurantStyle,
+            analyzedAt: Date(),
+            cookingTechniques: apiRecipe.cookingTechniques,
+            flavorProfile: flavorProfile,
+            secretIngredients: apiRecipe.secretIngredients,
+            proTips: apiRecipe.proTips,
+            visualClues: apiRecipe.visualClues,
+            shareCaption: apiRecipe.shareCaption
         )
     }
 
@@ -1272,7 +1287,8 @@ final class SnapChefAPIManager {
             imageURL: nil,
             createdAt: Date(),
             tags: tags,
-            dietaryInfo: dietaryInfo
+            dietaryInfo: dietaryInfo,
+            isDetectiveRecipe: false
         )
     }
 }

@@ -605,25 +605,74 @@ struct RecipeGridCard: View {
 
     var body: some View {
         // Base card with tap gesture for viewing details
-        GlassmorphicCard {
-            VStack(alignment: .leading, spacing: 8) {
-                // Recipe before/after photos
-                ZStack {
-                    RecipePhotoView(
-                        recipe: recipe,
-                        width: UIScreen.main.bounds.width / 2 - 44, // Account for padding
-                        height: 120,
-                        showLabels: true
+        ZStack {
+            // Detective recipe gradient border
+            if recipe.isFromDetective {
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#FF6B35"),
+                                Color(hex: "#FF1493"),
+                                Color(hex: "#FF6B35")
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 3
                     )
-                    .frame(height: 120) // Ensure consistent height
-                    .clipped()
-                    .allowsHitTesting(false) // Allow scroll to pass through
-
-                    // Difficulty badge and favorite button overlay
-                    VStack {
+                    .padding(1)
+            }
+            
+            GlassmorphicCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Detective badge above photo (if detective recipe)
+                    if recipe.isFromDetective {
                         HStack {
-                            // Favorite button - as overlay button that captures its own taps
-                            Button(action: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 12, weight: .bold))
+                                Text("Detective")
+                                    .font(.system(size: 12, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(hex: "#9b59b6"), Color(hex: "#8e44ad")],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(8)
+                            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
+                    }
+                    
+                    // Recipe before/after photos
+                    ZStack {
+                        RecipePhotoView(
+                            recipe: recipe,
+                            width: UIScreen.main.bounds.width / 2 - 44, // Account for padding
+                            height: 120,
+                            showLabels: true
+                        )
+                        .frame(height: 120) // Ensure consistent height
+                        .clipped()
+                        .allowsHitTesting(false) // Allow scroll to pass through
+
+
+                        // Difficulty badge and favorite button overlay
+                        VStack {
+                            HStack {
+                                // Favorite button - as overlay button that captures its own taps
+                                Button(action: {
                                 appState.toggleFavorite(recipe.id)
                                 let generator = UIImpactFeedbackGenerator(style: .light)
                                 generator.impactOccurred()
@@ -645,6 +694,7 @@ struct RecipeGridCard: View {
                         .padding(8)
                         Spacer()
                     }
+                    .padding(.top, recipe.isFromDetective ? 0 : 8)
                 }
 
                 // Content
@@ -718,6 +768,7 @@ struct RecipeGridCard: View {
                 }
             }
             .padding(12)
+        }
         }
         .frame(height: 280) // Ensure consistent card height
         .clipped() // Prevent content overflow

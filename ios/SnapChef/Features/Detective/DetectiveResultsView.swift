@@ -477,7 +477,8 @@ struct DetectiveResultsView: View {
             imageURL: detectedRecipe.reconstructedRecipe.imageURL,
             createdAt: detectedRecipe.reconstructedRecipe.createdAt,
             tags: detectedRecipe.reconstructedRecipe.tags + ["Detective"],
-            dietaryInfo: detectedRecipe.reconstructedRecipe.dietaryInfo
+            dietaryInfo: detectedRecipe.reconstructedRecipe.dietaryInfo,
+            isDetectiveRecipe: true
         )
         
         appState.savedRecipes.append(recipeWithBadge)
@@ -607,7 +608,8 @@ struct DetectiveShareSheet: UIViewControllerRepresentable {
                     isVegan: false,
                     isGlutenFree: false,
                     isDairyFree: false
-                )
+                ),
+                isDetectiveRecipe: true
             )
         )
     )

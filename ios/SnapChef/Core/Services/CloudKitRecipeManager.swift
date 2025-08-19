@@ -1070,7 +1070,8 @@ class CloudKitRecipeManager: ObservableObject {
             imageURL: nil,
             createdAt: record["createdAt"] as? Date ?? Date(),
             tags: record["tags"] as? [String] ?? [],
-            dietaryInfo: dietaryInfo
+            dietaryInfo: dietaryInfo,
+            isDetectiveRecipe: false
         )
 
         return recipe

@@ -16,6 +16,7 @@ public struct Recipe: Identifiable, Codable, Sendable {
     let createdAt: Date
     let tags: [String]
     let dietaryInfo: DietaryInfo
+    let isDetectiveRecipe: Bool? // Optional to maintain backward compatibility
     enum Difficulty: String, Codable, CaseIterable, Sendable {
         case easy = "Easy"
         case medium = "Medium"
@@ -43,6 +44,13 @@ public struct Recipe: Identifiable, Codable, Sendable {
             case .hard: return Color(hex: "#ef5350")
             }
         }
+    }
+}
+
+// Extension to provide default value for existing recipes
+extension Recipe {
+    var isFromDetective: Bool {
+        return isDetectiveRecipe ?? false
     }
 }
 

@@ -83,7 +83,8 @@ extension InfluencerRecipe {
                         isVegan: false,
                         isGlutenFree: true,
                         isDairyFree: false
-                    )
+                    ),
+                    isDetectiveRecipe: false
                 ),
                 cuisine: "Healthy",
                 tags: ["gluten-free", "vegetarian", "kid-friendly", "no-cook"],
@@ -160,7 +161,8 @@ extension InfluencerRecipe {
                         isVegan: true,
                         isGlutenFree: false,
                         isDairyFree: true
-                    )
+                    ),
+                    isDetectiveRecipe: false
                 ),
                 cuisine: "Thai",
                 tags: ["asian", "lettuce-wraps", "quick", "kid-friendly"],
@@ -236,7 +238,8 @@ extension InfluencerRecipe {
                         isVegan: false,
                         isGlutenFree: false,
                         isDairyFree: false
-                    )
+                    ),
+                    isDetectiveRecipe: false
                 ),
                 cuisine: "Healthy",
                 tags: ["gluten-free", "vegetarian", "bowls", "harvest"],
@@ -310,7 +313,8 @@ extension InfluencerRecipe {
                         isVegan: false,
                         isGlutenFree: true,
                         isDairyFree: true
-                    )
+                    ),
+                    isDetectiveRecipe: false
                 ),
                 cuisine: "Southern",
                 tags: ["breakfast", "smoothie-bowl", "peach", "healthy"],
@@ -386,7 +390,8 @@ extension InfluencerRecipe {
                         isVegan: false,
                         isGlutenFree: false,
                         isDairyFree: false
-                    )
+                    ),
+                    isDetectiveRecipe: false
                 ),
                 cuisine: "Vegan",
                 tags: ["no-bake", "vegan", "energy-balls", "snack"],

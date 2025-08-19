@@ -74,7 +74,8 @@ struct CloudKitRecipe {
             imageURL: record[CKField.Recipe.imageURL] as? String,
             createdAt: record[CKField.Recipe.createdAt] as? Date ?? Date(),
             tags: [],
-            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false)
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
+            isDetectiveRecipe: false
         )
 
         // Extract CloudKit metadata
