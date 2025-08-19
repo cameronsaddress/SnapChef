@@ -391,43 +391,22 @@ struct DetectiveView: View {
                     .lineLimit(4)
             }
             
-            // Action buttons
-            HStack(spacing: 12) {
-                Button(action: {
-                    // Try again
-                    errorMessage = nil
-                    capturedImage = nil
-                    showingCamera = true
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "camera.fill")
-                        Text("Try Again")
-                    }
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color(hex: "#9b59b6"))
-                    .cornerRadius(12)
+            // Action button
+            Button(action: {
+                // Clear error and go back to prompt
+                errorMessage = nil
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.left")
+                    Text("Back")
                 }
-                
-                Button(action: {
-                    // Clear error and go back to prompt
-                    errorMessage = nil
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.left")
-                        Text("Back")
-                    }
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.white.opacity(0.2))
-                    .cornerRadius(12)
-                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.white.opacity(0.2))
+                .cornerRadius(12)
             }
         }
         .padding(24)
@@ -565,23 +544,6 @@ struct DetectiveView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "square.and.arrow.up")
                         Text("Share")
-                    }
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.white.opacity(0.2))
-                    .cornerRadius(12)
-                }
-                
-                Button(action: {
-                    // Try again - reset everything
-                    resetDetectiveAnalysis()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.clockwise")
-                        Text("Try Again")
                     }
                     .font(.subheadline)
                     .fontWeight(.medium)
@@ -999,16 +961,6 @@ struct DetectiveView: View {
         return photos?.mealPhoto
     }
     
-    private func resetDetectiveAnalysis() {
-        // Reset all state
-        detectiveRecipe = nil
-        capturedImage = nil
-        errorMessage = nil
-        analysisProgress = 0.0
-        
-        // Show camera again
-        showingCamera = true
-    }
 }
 
 // MARK: - Detective Recipe Detail View
