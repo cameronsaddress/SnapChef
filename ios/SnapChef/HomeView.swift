@@ -194,7 +194,6 @@ struct HomeView: View {
         }
         .fullScreenCover(isPresented: $showingDetective) {
             DetectiveView()
-                .environment(\.dismiss, DismissAction { showingDetective = false })
         }
     }
 
@@ -1426,7 +1425,6 @@ struct DetectiveFeatureTile: View {
         }
         .fullScreenCover(isPresented: $showingDetective) {
             DetectiveView()
-                .environment(\.dismiss, DismissAction { showingDetective = false })
         }
     }
 }
