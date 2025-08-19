@@ -193,9 +193,8 @@ struct HomeView: View {
                 .environmentObject(deviceManager)
         }
         .fullScreenCover(isPresented: $showingDetective) {
-            NavigationStack {
-                DetectiveView()
-            }
+            DetectiveView()
+                .environment(\.dismiss, DismissAction { showingDetective = false })
         }
     }
 
@@ -1305,108 +1304,129 @@ struct RecipeDetectiveTile: View {
 // MARK: - Detective Feature Tile
 struct DetectiveFeatureTile: View {
     @State private var showingDetective = false
+    @State private var isAnimating = false
     @StateObject private var userLifecycle = UserLifecycleManager.shared
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     
+    // Track detective uses (10 for testing, should be 3 for production)
+    @AppStorage("detectiveFeatureUses") private var detectiveUses: Int = 0
+    private let freeUsesLimit = 10 // TODO: Change to 3 for production
+    
     private var isPremiumLocked: Bool {
-        !cloudKitAuth.isAuthenticated || userLifecycle.currentPhase == .standard
+        detectiveUses >= freeUsesLimit && (!cloudKitAuth.isAuthenticated || userLifecycle.currentPhase == .standard)
     }
     
     var body: some View {
         Button(action: {
             showingDetective = true
         }) {
-            ZStack {
-                // Background with gradient matching DetectiveView
-                LinearGradient(
-                    colors: [
-                        Color(hex: "#9b59b6"),  // Purple theme
-                        Color(hex: "#8e44ad")
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                
-                // Content
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        // Detective icon and title
-                        HStack(spacing: 12) {
-                            Image(systemName: "magnifyingglass.circle.fill")
-                                .font(.system(size: 36))
-                                .foregroundColor(.white)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Recipe Detective")
-                                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                
-                                Text("Reverse-engineer any dish")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.9))
-                            }
-                        }
-                        
-                        Spacer()
-                        
-                        // Premium lock icon if needed
-                        if isPremiumLocked {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(.white.opacity(0.8))
-                                .padding(8)
-                                .background(
-                                    Circle()
-                                        .fill(Color.black.opacity(0.2))
-                                )
-                        }
-                    }
-                    
-                    // Description
-                    Text("Take a photo of any restaurant dish and get the recipe instantly")
-                        .font(.system(size: 13))
-                        .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                    
-                    // Bottom row with confidence indicator
-                    HStack {
-                        HStack(spacing: 6) {
-                            Image(systemName: "chart.line.uptrend.xyaxis")
-                                .font(.system(size: 12))
-                            Text("AI-Powered Analysis")
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        .foregroundColor(.white.opacity(0.7))
-                        
-                        Spacer()
-                        
-                        Text("Premium Feature")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(Color.white.opacity(0.2))
+            HStack(spacing: 16) {
+                // Animated detective icon
+                ZStack {
+                    // Glow effect
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(hex: "#9b59b6").opacity(0.3),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 30
                             )
-                    }
+                        )
+                        .frame(width: 60, height: 60)
+                        .scaleEffect(isAnimating ? 1.2 : 1)
+                    
+                    Image(systemName: "magnifyingglass.circle.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#9b59b6"),
+                                    Color(hex: "#8e44ad")
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .scaleEffect(isAnimating ? 1.1 : 1)
                 }
-                .padding(20)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Recipe Detective")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#9b59b6"),
+                                    Color(hex: "#8e44ad")
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    
+                    Text("Reverse-engineer any dish")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+                Spacer()
+                
+                // Show lock or arrow based on uses
+                if isPremiumLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(Color(hex: "#9b59b6"))
+                        .padding(8)
+                        .background(
+                            Circle()
+                                .fill(Color(hex: "#9b59b6").opacity(0.1))
+                        )
+                } else {
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(Color(hex: "#9b59b6"))
+                        .offset(x: isAnimating ? 5 : 0)
+                }
             }
-            .frame(height: 160)
-            .cornerRadius(20)
-            .overlay(
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#9b59b6").opacity(0.5),
+                                        Color(hex: "#8e44ad").opacity(0.5)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                    )
             )
-            .shadow(color: Color(hex: "#9b59b6").opacity(0.3), radius: 10, x: 0, y: 5)
+            .shadow(
+                color: Color(hex: "#9b59b6").opacity(0.3),
+                radius: isAnimating ? 20 : 10,
+                y: isAnimating ? 10 : 5
+            )
         }
         .buttonStyle(PlainButtonStyle())
-        .fullScreenCover(isPresented: $showingDetective) {
-            NavigationStack {
-                DetectiveView()
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                isAnimating = true
             }
+        }
+        .fullScreenCover(isPresented: $showingDetective) {
+            DetectiveView()
+                .environment(\.dismiss, DismissAction { showingDetective = false })
         }
     }
 }

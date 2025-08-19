@@ -8,6 +8,7 @@ struct DetectiveView: View {
     @StateObject private var cameraModel = CameraModel()
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @StateObject private var userLifecycle = UserLifecycleManager.shared
+    @Environment(\.dismiss) private var dismiss
     
     @State private var showingCamera = false
     @State private var capturedImage: UIImage?
@@ -21,6 +22,9 @@ struct DetectiveView: View {
     @State private var showingAfterPhotoCapture = false
     @State private var selectedRecipeForPhoto: DetectiveRecipe?
     @State private var afterPhoto: UIImage?
+    
+    // Track detective uses for premium limit
+    @AppStorage("detectiveFeatureUses") private var detectiveUses: Int = 0
     
     // MARK: - Computed Properties for Type Inference
     private var gridColumns: [GridItem] {
@@ -70,6 +74,21 @@ struct DetectiveView: View {
             }
             .navigationTitle("Recipe Detective")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white.opacity(0.7))
+                            .background(
+                                Circle()
+                                    .fill(Color.black.opacity(0.2))
+                            )
+                    }
+                }
+            }
             .sheet(isPresented: $showingCamera) {
                 CameraDetectiveView(
                     capturedImage: $capturedImage,
@@ -684,6 +703,10 @@ struct DetectiveView: View {
                 if let recipe = detectiveRecipe, recipe.confidenceScore > 0 {
                     print("✅ Detective analysis successful: \(recipe.name)")
                     print("✅ Confidence: \(recipe.confidenceScore)%")
+                    
+                    // Increment detective uses counter
+                    detectiveUses += 1
+                    print("📊 Detective uses: \(detectiveUses)")
                 }
             } else {
                 // Handle the case where no dish was detected

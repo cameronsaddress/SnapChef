@@ -53,25 +53,21 @@ struct ProfileView: View {
                     EnhancedProfileHeader(user: authManager.currentUser)
                         .scaleEffect(profileImageScale)
 
-                    // Gamification Stats
-                    GamificationStatsView()
-                        .staggeredFade(index: 0, isShowing: contentVisible)
-
                     // Streak Summary
                     StreakSummaryCard()
-                        .staggeredFade(index: 1, isShowing: contentVisible)
+                        .staggeredFade(index: 0, isShowing: contentVisible)
 
                     // Collection Progress
                     CollectionProgressView()
-                        .staggeredFade(index: 2, isShowing: contentVisible)
+                        .staggeredFade(index: 1, isShowing: contentVisible)
 
                     // Active Challenges
                     ActiveChallengesSection()
-                        .staggeredFade(index: 3, isShowing: contentVisible)
+                        .staggeredFade(index: 2, isShowing: contentVisible)
 
                     // Achievement Gallery
                     ProfileAchievementGalleryView()
-                        .staggeredFade(index: 4, isShowing: contentVisible)
+                        .staggeredFade(index: 3, isShowing: contentVisible)
 
                     // Subscription Status Enhanced
                     EnhancedSubscriptionCard(
@@ -80,18 +76,14 @@ struct ProfileView: View {
                             showingSubscriptionView = true
                         }
                     )
-                    .staggeredFade(index: 5, isShowing: contentVisible)
-
-                    // Settings Section Enhanced
-                    EnhancedSettingsSection()
-                        .staggeredFade(index: 6, isShowing: contentVisible)
+                    .staggeredFade(index: 4, isShowing: contentVisible)
 
                     // Sign Out Button (only if authenticated)
                     if cloudKitAuthManager.isAuthenticated {
                         EnhancedSignOutButton(action: {
                             cloudKitAuthManager.signOut()
                         })
-                        .staggeredFade(index: 7, isShowing: contentVisible)
+                        .staggeredFade(index: 5, isShowing: contentVisible)
                         .padding(.top, 20)
                     }
                 }
@@ -485,115 +477,6 @@ struct StatusPill: View {
     }
 }
 
-// MARK: - Gamification Stats
-struct GamificationStatsView: View {
-    @EnvironmentObject var appState: AppState
-    @EnvironmentObject var deviceManager: DeviceManager
-    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
-    @State private var animateValues = false
-    @State private var showingRecipes = false
-    @State private var showingFavorites = false
-
-    private func getTotalRecipeCount() -> Int {
-        // Combine local recipes with CloudKit recipes
-        let localRecipeCount = appState.allRecipes.count
-        let cloudKitSavedCount = cloudKitRecipeManager.userSavedRecipeIDs.count
-        let cloudKitCreatedCount = cloudKitRecipeManager.userCreatedRecipeIDs.count
-
-        // Return the sum of local and CloudKit recipes
-        // Note: CloudKit includes both saved and created recipes
-        return localRecipeCount + cloudKitSavedCount + cloudKitCreatedCount
-    }
-
-    private func getTotalFavoritesCount() -> Int {
-        // Combine local favorites with CloudKit favorites
-        let localFavoritesCount = appState.favoritedRecipeIds.count
-        let cloudKitFavoritesCount = cloudKitRecipeManager.userFavoritedRecipeIDs.count
-
-        // Return the max to avoid duplicates (CloudKit likely includes all favorites)
-        return max(localFavoritesCount, cloudKitFavoritesCount)
-    }
-
-    var body: some View {
-        VStack(spacing: 20) {
-            HStack {
-                Text("Your Epic Stats")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                Spacer()
-                Text("🏆")
-                    .font(.system(size: 24))
-            }
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                AnimatedStatCard(
-                    title: "Your Recipes",
-                    value: animateValues ? getTotalRecipeCount() : 0,
-                    icon: "sparkles",
-                    color: Color(hex: "#667eea"),
-                    suffix: "",
-                    action: {
-                        showingRecipes = true
-                    }
-                )
-
-                AnimatedStatCard(
-                    title: "Snaps Taken",
-                    value: animateValues ? appState.totalSnapsTaken : 0,
-                    icon: "camera.fill",
-                    color: Color(hex: "#f093fb"),
-                    suffix: ""
-                )
-
-                AnimatedStatCard(
-                    title: "Favorites",
-                    value: animateValues ? getTotalFavoritesCount() : 0,
-                    icon: "heart.fill",
-                    color: Color(hex: "#4facfe"),
-                    suffix: "",
-                    action: {
-                        showingFavorites = true
-                    }
-                )
-
-                AnimatedStatCard(
-                    title: "Days Active",
-                    value: animateValues ? Calendar.current.dateComponents([.day], from: appState.userJoinDate, to: Date()).day ?? 0 : 0,
-                    icon: "flame.fill",
-                    color: Color(hex: "#43e97b"),
-                    suffix: ""
-                )
-            }
-        }
-        .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.3)) {
-                animateValues = true
-            }
-            // Load CloudKit recipe references to ensure counts are accurate
-            cloudKitRecipeManager.loadUserRecipeReferences()
-        }
-        .sheet(isPresented: $showingRecipes) {
-            NavigationStack {
-                RecipesView()
-                    .navigationTitle("Your Recipes")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .navigationBarItems(trailing: Button("Done") {
-                        showingRecipes = false
-                    })
-            }
-        }
-        .sheet(isPresented: $showingFavorites) {
-            NavigationStack {
-                FavoritesView()
-                    .navigationTitle("Favorites")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .navigationBarItems(trailing: Button("Done") {
-                        showingFavorites = false
-                    })
-            }
-        }
-    }
-}
 
 // MARK: - Animated Stat Card
 struct AnimatedStatCard: View {
@@ -850,39 +733,10 @@ struct UpgradePrompt: View {
 
 // MARK: - Enhanced Settings Section
 struct EnhancedSettingsSection: View {
-    @State private var showingAISettings = false
-    @State private var showingPerformanceSettings = false
-
-    let settings = [
-        ("sparkles", "AI Preferences", Color(hex: "#667eea")),
-        ("speedometer", "Performance", Color(hex: "#43e97b"))
-    ]
-
     var body: some View {
-        VStack(spacing: 12) {
-            ForEach(0..<settings.count, id: \.self) { index in
-                EnhancedSettingsRow(
-                    icon: settings[index].0,
-                    title: settings[index].1,
-                    color: settings[index].2,
-                    action: {
-                        if index == 0 {
-                            showingAISettings = true
-                        } else if index == 1 {
-                            showingPerformanceSettings = true
-                        }
-                    }
-                )
-            }
-        }
-        .sheet(isPresented: $showingAISettings) {
-            AISettingsView()
-        }
-        .sheet(isPresented: $showingPerformanceSettings) {
-            // TODO: Implement PerformanceSettingsView
-            Text("Performance Settings")
-                .foregroundColor(.secondary)
-        }
+        // Empty settings section - tiles removed per request
+        // Gemini remains as default AI provider
+        EmptyView()
     }
 }
 
