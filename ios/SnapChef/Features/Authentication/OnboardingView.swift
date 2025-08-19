@@ -167,80 +167,37 @@ struct CuisineGridItem: View {
     let action: () -> Void
     
     @State private var isPressed = false
-    @State private var hoverEffect = false
-    @State private var shimmerPhase: CGFloat = 0
     
     // MARK: - Helper Properties
     
-    private var selectedGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+    private var selectedColor: Color {
+        Color(hex: "#667eea").opacity(0.3)
     }
     
     private var unselectedColor: Color {
-        Color.white.opacity(hoverEffect ? 0.15 : 0.1)
+        Color.white.opacity(0.1)
     }
     
-    private var shimmerGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color.clear, Color.white.opacity(0.3), Color.clear],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
+    private var borderSelectedColor: Color {
+        Color(hex: "#667eea")
     }
     
-    private var borderSelectedGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-    
-    private var borderUnselectedGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color.white.opacity(hoverEffect ? 0.4 : 0.2)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+    private var borderUnselectedColor: Color {
+        Color.white.opacity(0.2)
     }
     
     // MARK: - Computed Views
     
     @ViewBuilder
     private var backgroundView: some View {
-        ZStack {
-            // Base background
-            if isSelected {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(selectedGradient.opacity(0.4))
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(unselectedColor)
-            }
-            
-            // Shimmer effect for selected items
-            if isSelected {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(shimmerGradient)
-                    .offset(x: shimmerPhase * 100 - 50)
-                    .clipped()
-            }
-        }
+        RoundedRectangle(cornerRadius: 12)
+            .fill(isSelected ? selectedColor : unselectedColor)
     }
     
     @ViewBuilder
     private var overlayBorder: some View {
-        if isSelected {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(borderSelectedGradient, lineWidth: 3)
-        } else {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(borderUnselectedGradient, lineWidth: 1.5)
-        }
+        RoundedRectangle(cornerRadius: 12)
+            .stroke(isSelected ? borderSelectedColor : borderUnselectedColor, lineWidth: isSelected ? 2 : 1)
     }
     
     var body: some View {
@@ -269,7 +226,6 @@ struct CuisineGridItem: View {
                     Text(emoji)
                         .font(.system(size: 32))
                         .scaleEffect(isPressed ? 1.3 : 1.0)
-                        .rotationEffect(.degrees(isSelected ? (Foundation.sin(shimmerPhase) * 5) : 0))
                     
                     // Animated checkmark with scale effect and proper positioning
                     if isSelected {
@@ -321,27 +277,6 @@ struct CuisineGridItem: View {
         }
         .disabled(!canSelect)
         .opacity(canSelect ? 1.0 : 0.5)
-        .onAppear {
-            if isSelected {
-                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                    shimmerPhase = 1.0
-                }
-            }
-        }
-        .onChange(of: isSelected) { newValue in
-            if newValue {
-                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                    shimmerPhase = 1.0
-                }
-            } else {
-                shimmerPhase = 0
-            }
-        }
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                hoverEffect = pressing
-            }
-        }, perform: {})
     }
 }
 
