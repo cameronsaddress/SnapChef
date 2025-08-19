@@ -174,9 +174,14 @@ struct DetectiveView: View {
                 
                 Spacer()
                 
-                // Check if user doesn't have premium access
-                if !cloudKitAuth.isAuthenticated || userLifecycle.currentPhase == .standard {
-                    premiumBadge
+                // Show usage remaining for non-premium users
+                if !SubscriptionManager.shared.isPremium {
+                    let remaining = UsageTracker.shared.getDetectiveUsesRemaining()
+                    if remaining > 0 {
+                        detectiveUsageCounter(remaining: remaining)
+                    } else {
+                        premiumBadge
+                    }
                 }
             }
         }
@@ -206,6 +211,24 @@ struct DetectiveView: View {
         .background(
             Capsule()
                 .fill(Color(hex: "#9b59b6").opacity(0.8))
+        )
+    }
+    
+    // MARK: - Detective Usage Counter
+    private func detectiveUsageCounter(remaining: Int) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12))
+            Text("\(remaining) left")
+                .font(.caption)
+                .fontWeight(.semibold)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(remaining > 5 ? Color.green.opacity(0.8) : remaining > 2 ? Color.orange.opacity(0.8) : Color.red.opacity(0.8))
         )
     }
     
@@ -252,36 +275,11 @@ struct DetectiveView: View {
                     .lineLimit(3)
             }
             
-            // TEST: Bypass Premium Button
-            Button(action: {
-                // Bypass premium check for testing
-                showingCamera = true
-            }) {
-                HStack(spacing: 12) {
-                    Image(systemName: "hammer.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                    
-                    Text("TEST: Bypass Premium")
-                        .font(.system(size: 18, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    LinearGradient(
-                        colors: [Color.orange, Color.red],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(16)
-            }
-            .padding(.bottom, 8)
-            
             Button(action: {
                 if canUseDetectiveFeature() {
                     showingCamera = true
                 } else {
+                    // Show premium prompt when detective limit is reached
                     showingPremiumPrompt = true
                 }
             }) {
@@ -675,8 +673,8 @@ struct DetectiveView: View {
     }
     
     private func canUseDetectiveFeature() -> Bool {
-        // Check if user has premium access or is in honeymoon/trial phase
-        return cloudKitAuth.isAuthenticated && userLifecycle.currentPhase != .standard
+        // Use the actual UsageTracker to check detective limits
+        return UsageTracker.shared.canUseDetective()
     }
     
     private func analyzeImage(_ image: UIImage) async {
@@ -704,9 +702,9 @@ struct DetectiveView: View {
                     print("✅ Detective analysis successful: \(recipe.name)")
                     print("✅ Confidence: \(recipe.confidenceScore)%")
                     
-                    // Increment detective uses counter
-                    detectiveUses += 1
-                    print("📊 Detective uses: \(detectiveUses)")
+                    // Increment detective uses counter in UsageTracker
+                    UsageTracker.shared.incrementDetectiveUse()
+                    print("📊 Detective analysis completed successfully")
                 }
             } else {
                 // Handle the case where no dish was detected

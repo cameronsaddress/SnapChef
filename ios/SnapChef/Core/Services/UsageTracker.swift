@@ -61,7 +61,7 @@ final class UsageTracker: ObservableObject {
     
     // Detective Feature Limits
     private enum DetectiveLimits {
-        static let DETECTIVE_LIFETIME_LIMIT_FREE = 10  // 10 lifetime uses for free users
+        static let DETECTIVE_LIFETIME_LIMIT_FREE = 3  // 3 lifetime uses for free users
         static let DETECTIVE_DAILY_LIMIT_PREMIUM = -1  // Unlimited for premium users
     }
 
