@@ -115,13 +115,37 @@ struct CameraView: View {
                     
                     // Bottom controls (CameraBottomControls temporarily commented out)
                     // TODO: Implement CameraBottomControls
-                    VStack {
+                    VStack(spacing: 20) {
                         CaptureButtonEnhanced(
                             action: capturePhoto,
                             isDisabled: isProcessing,
                             triggerAnimation: $captureAnimation
                         )
-                        .padding(.bottom, 50)
+                        
+                        // Test button for development - sends test fridge image
+                        Button(action: sendTestFridgeImage) {
+                            HStack {
+                                Image(systemName: "photo.on.rectangle")
+                                    .font(.system(size: 16, weight: .medium))
+                                Text("Test Fridge")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                Capsule()
+                                    .fill(Color.blue.opacity(0.8))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                            .shadow(color: Color.blue.opacity(0.3), radius: 8, y: 4)
+                        }
+                        .disabled(isProcessing)
+                        .opacity(isProcessing ? 0.5 : 1.0)
+                        .padding(.bottom, 30)
                     }
                 }
             }
@@ -367,6 +391,35 @@ struct CameraView: View {
             Task {
                 await StreakManager.shared.recordActivity(for: .dailySnap)
             }
+        }
+    }
+    
+    // Test function for development - sends a test fridge image
+    private func sendTestFridgeImage() {
+        // List of available test images
+        let testImages = ["fridge", "fridge1", "fridge2", "fridge4", "fridge5"]
+        let randomImage = testImages.randomElement() ?? "fridge"
+        
+        // Try to load the test image
+        guard let testImage = UIImage(named: randomImage) else {
+            print("❌ Test image '\(randomImage)' not found")
+            currentError = .imageProcessingError("Test image '\(randomImage)' not found in resources")
+            return
+        }
+        
+        print("📸 Using test image: \(randomImage).jpg")
+        
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        
+        // Process the test image directly
+        capturedImage = testImage
+        processImage(testImage)
+        
+        // Track as test snap (not daily snap)
+        Task {
+            print("🧪 Test mode: Processing test fridge image")
         }
     }
 
