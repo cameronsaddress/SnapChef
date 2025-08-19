@@ -7,16 +7,13 @@ final class AppState: ObservableObject {
     // Core app state
     @Published var isLoading: Bool = false
     
+    // Direct @Published properties for UI state
+    @Published var isFirstLaunch: Bool = false
+    
     // Focused ViewModels for better performance
     @Published var recipesViewModel = RecipesViewModel()
     @Published var authViewModel = AuthViewModel()
     @Published var gamificationViewModel = GamificationViewModel()
-    
-    // Convenience computed properties for backward compatibility
-    var isFirstLaunch: Bool {
-        get { authViewModel.isFirstLaunch }
-        set { authViewModel.isFirstLaunch = newValue }
-    }
     
     var currentUser: User? {
         get { authViewModel.currentUser }
@@ -124,7 +121,8 @@ final class AppState: ObservableObject {
     var unifiedAuthManager: CloudKitAuthManager { authViewModel.unifiedAuthManager }
 
     init() {
-        // ViewModels are already initialized with @Published
+        // Initialize isFirstLaunch from authViewModel after view models are initialized
+        self.isFirstLaunch = authViewModel.isFirstLaunch
         
         // DEBUG: Clear recipes for testing - remove this in production
         #if DEBUG
@@ -137,7 +135,12 @@ final class AppState: ObservableObject {
     // MARK: - Delegated Methods
     
     func completeOnboarding() {
-        authViewModel.completeOnboarding()
+        Task { @MainActor in
+            authViewModel.completeOnboarding()
+            
+            // Update our own @Published property to trigger UI update
+            self.isFirstLaunch = authViewModel.isFirstLaunch
+        }
     }
 
     func updateFreeUses(_ remaining: Int) {
