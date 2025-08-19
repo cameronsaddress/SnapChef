@@ -478,7 +478,13 @@ struct DetectiveResultsView: View {
             createdAt: detectedRecipe.reconstructedRecipe.createdAt,
             tags: detectedRecipe.reconstructedRecipe.tags + ["Detective"],
             dietaryInfo: detectedRecipe.reconstructedRecipe.dietaryInfo,
-            isDetectiveRecipe: true
+            isDetectiveRecipe: true,
+            cookingTechniques: detectedRecipe.reconstructedRecipe.cookingTechniques,
+            flavorProfile: detectedRecipe.reconstructedRecipe.flavorProfile,
+            secretIngredients: detectedRecipe.reconstructedRecipe.secretIngredients,
+            proTips: detectedRecipe.reconstructedRecipe.proTips,
+            visualClues: detectedRecipe.reconstructedRecipe.visualClues,
+            shareCaption: detectedRecipe.reconstructedRecipe.shareCaption
         )
         
         appState.savedRecipes.append(recipeWithBadge)
@@ -609,7 +615,13 @@ struct DetectiveShareSheet: UIViewControllerRepresentable {
                     isGlutenFree: false,
                     isDairyFree: false
                 ),
-                isDetectiveRecipe: true
+                isDetectiveRecipe: true,
+                cookingTechniques: ["breading", "baking"],
+                flavorProfile: FlavorProfile(sweet: 3, salty: 7, sour: 2, bitter: 1, umami: 6),
+                secretIngredients: ["Italian seasoning blend"],
+                proTips: ["Pound chicken evenly for consistent cooking"],
+                visualClues: ["Golden brown crust", "Melted cheese topping"],
+                shareCaption: "Homemade Chicken Parmesan! 🍗🧀 #ChickenParmesan #Homemade"
             )
         )
     )

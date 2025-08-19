@@ -454,7 +454,13 @@ final class RecipeTests: XCTestCase {
             imageURL: nil,
             createdAt: Date(),
             tags: ["test"],
-            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false)
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
     }
 }

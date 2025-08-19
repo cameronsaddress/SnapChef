@@ -118,6 +118,37 @@ After completing the setup:
 
 ### Required Record Types
 
+#### Recipe (UPDATED - Enhanced Fields for ALL Recipe Sources)
+- `id` (String) - Recipe UUID
+- `title` (String) - Recipe name
+- `description` (String) - Brief description
+- `ingredients` (String) - JSON encoded array of ingredients
+- `instructions` (String) - JSON encoded array of instructions (now with detailed steps, temperatures, timing)
+- `nutrition` (String) - JSON encoded nutrition object
+- `tags` (List<String>) - Recipe tags
+- `cookingTime` (Int64) - Cook time in minutes
+- `prepTime` (Int64) - Prep time in minutes
+- `servings` (Int64) - Number of servings
+- `difficulty` (String) - easy/medium/hard
+- `cuisine` (String) - Cuisine type
+- `mealType` (String) - Meal type
+- `createdAt` (Date) - Creation timestamp
+- `isPublic` (Int64) - 1 for public, 0 for private
+- `fromLLM` (Int64) - 1 if AI generated (both Fridge Snap and Detective)
+- `likeCount` (Int64) - Number of likes
+- `viewCount` (Int64) - View count
+- `shareCount` (Int64) - Share count
+- `beforePhotoAsset` (Asset) - Fridge/pantry photo (Fridge Snap) or original dish photo (Detective)
+- `afterPhotoAsset` (Asset) - Completed meal photo
+- **ENHANCED FIELDS (Used by BOTH Fridge Snap and Detective):**
+- `isDetectiveRecipe` (Int64) - 1 if from Detective feature, 0 for Fridge Snap
+- `cookingTechniques` (List<String>) - Array of cooking methods used (e.g., ["sautéing", "braising", "roasting"])
+- `flavorProfile` (String) - JSON encoded flavor profile object with sweet/salty/sour/bitter/umami (1-10 scale)
+- `secretIngredients` (List<String>) - Hidden ingredients that enhance flavor (e.g., ["fish sauce", "butter", "MSG"])
+- `proTips` (List<String>) - Professional cooking tips for restaurant-quality results
+- `visualClues` (List<String>) - Visual indicators for doneness (e.g., ["golden brown", "bubbling edges"])
+- `shareCaption` (String) - Pre-written social media caption with emojis and hashtags
+
 #### Challenge
 - `id` (String)
 - `title` (String)

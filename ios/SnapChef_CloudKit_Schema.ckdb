@@ -268,6 +268,15 @@ DEFINE SCHEMA
         imageAsset        ASSET,
         beforePhotoAsset  ASSET,
         afterPhotoAsset   ASSET,
+        -- ENHANCED FIELDS FOR ALL RECIPES (Fridge Snap & Detective)
+        isDetectiveRecipe INT64,         -- 1 for Detective, 0 for Fridge Snap
+        cookingTechniques LIST<STRING>,  -- Professional cooking methods
+        flavorProfile     STRING,         -- JSON: sweet/salty/sour/bitter/umami (1-10)
+        secretIngredients LIST<STRING>,  -- Hidden flavor enhancers
+        proTips           LIST<STRING>,  -- Restaurant-quality techniques
+        visualClues       LIST<STRING>,  -- Doneness indicators
+        shareCaption      STRING,         -- Social media ready caption
+        fromLLM           INT64,          -- 1 if AI generated
         -- Future: Multiple food photos after moderation
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"

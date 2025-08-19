@@ -55,12 +55,12 @@ struct TikTokShareView: View {
                     }
                 }
 
-                // Confetti overlay
-                if showConfetti {
-                    ConfettiView()
-                        .allowsHitTesting(false)
-                        .animation(.easeInOut(duration: 0.5), value: showConfetti)
-                }
+                // Confetti overlay - TODO: Implement ConfettiView
+                // if showConfetti {
+                //     ConfettiView()
+                //         .allowsHitTesting(false)
+                //         .animation(.easeInOut(duration: 0.5), value: showConfetti)
+                // }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)

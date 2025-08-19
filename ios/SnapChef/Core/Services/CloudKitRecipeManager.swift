@@ -68,6 +68,15 @@ class CloudKitRecipeManager: ObservableObject {
         record["difficulty"] = recipe.difficulty.rawValue
         record["cuisine"] = ""  // Recipe doesn't have cuisine field
         record["mealType"] = "" // Recipe doesn't have mealType field
+        
+        // Detective recipe fields
+        record["isDetectiveRecipe"] = recipe.isDetectiveRecipe == true ? 1 : 0
+        record["cookingTechniques"] = recipe.cookingTechniques
+        record["flavorProfile"] = recipe.flavorProfile != nil ? try encodeToJSON(recipe.flavorProfile!) : nil
+        record["secretIngredients"] = recipe.secretIngredients
+        record["proTips"] = recipe.proTips
+        record["visualClues"] = recipe.visualClues
+        record["shareCaption"] = recipe.shareCaption
 
         // Initial counts
         record["likeCount"] = Int64(0)
@@ -1055,6 +1064,20 @@ class CloudKitRecipeManager: ObservableObject {
             isGlutenFree: false,
             isDairyFree: false
         )
+        
+        // Parse Detective recipe fields
+        let isDetectiveRecipe = (record["isDetectiveRecipe"] as? Int64 ?? 0) == 1
+        let cookingTechniques = record["cookingTechniques"] as? [String] ?? []
+        let flavorProfile: FlavorProfile? = {
+            if let flavorProfileString = record["flavorProfile"] as? String {
+                return try? decodeFromJSON(flavorProfileString)
+            }
+            return nil
+        }()
+        let secretIngredients = record["secretIngredients"] as? [String] ?? []
+        let proTips = record["proTips"] as? [String] ?? []
+        let visualClues = record["visualClues"] as? [String] ?? []
+        let shareCaption = record["shareCaption"] as? String ?? ""
 
         let recipe = Recipe(
             id: UUID(uuidString: id) ?? UUID(),
@@ -1071,7 +1094,13 @@ class CloudKitRecipeManager: ObservableObject {
             createdAt: record["createdAt"] as? Date ?? Date(),
             tags: record["tags"] as? [String] ?? [],
             dietaryInfo: dietaryInfo,
-            isDetectiveRecipe: false
+            isDetectiveRecipe: isDetectiveRecipe,
+            cookingTechniques: cookingTechniques,
+            flavorProfile: flavorProfile,
+            secretIngredients: secretIngredients,
+            proTips: proTips,
+            visualClues: visualClues,
+            shareCaption: shareCaption
         )
 
         return recipe

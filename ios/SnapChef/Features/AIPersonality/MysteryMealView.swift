@@ -251,7 +251,13 @@ struct MysteryMealView: View {
                     createdAt: recipe.createdAt,
                     tags: recipe.tags,
                     dietaryInfo: recipe.dietaryInfo,
-                    isDetectiveRecipe: false
+                    isDetectiveRecipe: false,
+                    cookingTechniques: recipe.cookingTechniques,
+                    flavorProfile: recipe.flavorProfile,
+                    secretIngredients: recipe.secretIngredients,
+                    proTips: recipe.proTips,
+                    visualClues: recipe.visualClues,
+                    shareCaption: recipe.shareCaption
                 )
             }
         case .medium:
@@ -272,7 +278,13 @@ struct MysteryMealView: View {
                     createdAt: recipe.createdAt,
                     tags: recipe.tags,
                     dietaryInfo: recipe.dietaryInfo,
-                    isDetectiveRecipe: false
+                    isDetectiveRecipe: false,
+                    cookingTechniques: recipe.cookingTechniques,
+                    flavorProfile: recipe.flavorProfile,
+                    secretIngredients: recipe.secretIngredients,
+                    proTips: recipe.proTips,
+                    visualClues: recipe.visualClues,
+                    shareCaption: recipe.shareCaption
                 )
             }
         case .wild:
@@ -293,7 +305,13 @@ struct MysteryMealView: View {
                     createdAt: recipe.createdAt,
                     tags: recipe.tags,
                     dietaryInfo: recipe.dietaryInfo,
-                    isDetectiveRecipe: false
+                    isDetectiveRecipe: false,
+                    cookingTechniques: recipe.cookingTechniques,
+                    flavorProfile: recipe.flavorProfile,
+                    secretIngredients: recipe.secretIngredients,
+                    proTips: recipe.proTips,
+                    visualClues: recipe.visualClues,
+                    shareCaption: recipe.shareCaption
                 )
             }
         case .insane:
@@ -314,7 +332,13 @@ struct MysteryMealView: View {
                     createdAt: recipe.createdAt,
                     tags: recipe.tags,
                     dietaryInfo: recipe.dietaryInfo,
-                    isDetectiveRecipe: false
+                    isDetectiveRecipe: false,
+                    cookingTechniques: recipe.cookingTechniques,
+                    flavorProfile: recipe.flavorProfile,
+                    secretIngredients: recipe.secretIngredients,
+                    proTips: recipe.proTips,
+                    visualClues: recipe.visualClues,
+                    shareCaption: recipe.shareCaption
                 )
             }
         }

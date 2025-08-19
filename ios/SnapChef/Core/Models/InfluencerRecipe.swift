@@ -84,7 +84,13 @@ extension InfluencerRecipe {
                         isGlutenFree: true,
                         isDairyFree: false
                     ),
-                    isDetectiveRecipe: false
+                    isDetectiveRecipe: false,
+                    cookingTechniques: ["wrapping"],
+                    flavorProfile: FlavorProfile(sweet: 4, salty: 3, sour: 2, bitter: 1, umami: 3),
+                    secretIngredients: ["Special hummus blend"],
+                    proTips: ["Roll tightly to prevent ingredients from falling out"],
+                    visualClues: ["Colorful vegetable layers", "Neat wrap presentation"],
+                    shareCaption: "Rainbow veggie wraps that even kids love! 🌈🥗 #HealthyKids #GlutenFree"
                 ),
                 cuisine: "Healthy",
                 tags: ["gluten-free", "vegetarian", "kid-friendly", "no-cook"],
@@ -162,7 +168,13 @@ extension InfluencerRecipe {
                         isGlutenFree: false,
                         isDairyFree: true
                     ),
-                    isDetectiveRecipe: false
+                    isDetectiveRecipe: false,
+                    cookingTechniques: ["stir-frying", "chopping"],
+                    flavorProfile: FlavorProfile(sweet: 3, salty: 6, sour: 4, bitter: 2, umami: 8),
+                    secretIngredients: ["Thai fish sauce", "Fresh lime juice"],
+                    proTips: ["Cook chicken until just done to keep it tender"],
+                    visualClues: ["Fresh lettuce cups", "Colorful filling"],
+                    shareCaption: "Thai-inspired lettuce wraps! So fresh and flavorful 🥬🌶️ #ThaiFood #HealthyEating"
                 ),
                 cuisine: "Thai",
                 tags: ["asian", "lettuce-wraps", "quick", "kid-friendly"],
@@ -239,7 +251,13 @@ extension InfluencerRecipe {
                         isGlutenFree: false,
                         isDairyFree: false
                     ),
-                    isDetectiveRecipe: false
+                    isDetectiveRecipe: false,
+                    cookingTechniques: ["boiling", "mixing"],
+                    flavorProfile: FlavorProfile(sweet: 5, salty: 4, sour: 3, bitter: 1, umami: 6),
+                    secretIngredients: ["Fresh basil", "Good parmesan"],
+                    proTips: ["Cook pasta al dente for best texture"],
+                    visualClues: ["Creamy sauce coating", "Fresh herb garnish"],
+                    shareCaption: "Simple pasta perfection! 🍝✨ #PastaLove #ComfortFood"
                 ),
                 cuisine: "Healthy",
                 tags: ["gluten-free", "vegetarian", "bowls", "harvest"],
@@ -314,7 +332,13 @@ extension InfluencerRecipe {
                         isGlutenFree: true,
                         isDairyFree: true
                     ),
-                    isDetectiveRecipe: false
+                    isDetectiveRecipe: false,
+                    cookingTechniques: ["blending", "layering"],
+                    flavorProfile: FlavorProfile(sweet: 8, salty: 1, sour: 2, bitter: 1, umami: 2),
+                    secretIngredients: ["Coconut flakes", "Honey drizzle"],
+                    proTips: ["Freeze fruit for thicker texture"],
+                    visualClues: ["Beautiful fruit layers", "Colorful toppings"],
+                    shareCaption: "Southern peach smoothie bowl! 🍑🌞 #SmoothieBowl #HealthyBreakfast"
                 ),
                 cuisine: "Southern",
                 tags: ["breakfast", "smoothie-bowl", "peach", "healthy"],
@@ -391,7 +415,13 @@ extension InfluencerRecipe {
                         isGlutenFree: false,
                         isDairyFree: false
                     ),
-                    isDetectiveRecipe: false
+                    isDetectiveRecipe: false,
+                    cookingTechniques: ["mixing", "rolling"],
+                    flavorProfile: FlavorProfile(sweet: 7, salty: 2, sour: 1, bitter: 3, umami: 2),
+                    secretIngredients: ["Vanilla extract", "Sea salt"],
+                    proTips: ["Chill mixture before rolling for easier handling"],
+                    visualClues: ["Perfect sphere shapes", "Dusted with cocoa"],
+                    shareCaption: "Energy bites for busy days! 💪🍫 #EnergyBites #HealthySnacks"
                 ),
                 cuisine: "Vegan",
                 tags: ["no-bake", "vegan", "energy-balls", "snack"],

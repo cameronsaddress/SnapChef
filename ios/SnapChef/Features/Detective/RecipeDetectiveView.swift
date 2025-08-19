@@ -384,7 +384,13 @@ struct RecipeDetectiveView: View {
                                 isGlutenFree: false,
                                 isDairyFree: false
                             ),
-                            isDetectiveRecipe: true
+                            isDetectiveRecipe: true,
+                            cookingTechniques: ["breading", "baking"],
+                            flavorProfile: FlavorProfile(sweet: 3, salty: 7, sour: 2, bitter: 1, umami: 6),
+                            secretIngredients: ["Italian seasoning blend"],
+                            proTips: ["Pound chicken evenly for consistent cooking"],
+                            visualClues: ["Golden brown crust", "Melted cheese topping"],
+                            shareCaption: "Homemade Chicken Parmesan! 🍗🧀 #ChickenParmesan #Homemade"
                         )
                     )
                     

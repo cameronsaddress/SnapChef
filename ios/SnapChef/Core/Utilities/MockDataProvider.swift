@@ -61,7 +61,13 @@ class MockDataProvider {
                     isGlutenFree: true,
                     isDairyFree: false
                 ),
-                isDetectiveRecipe: false
+                isDetectiveRecipe: false,
+                cookingTechniques: ["chopping", "mixing"],
+                flavorProfile: FlavorProfile(sweet: 3, salty: 4, sour: 2, bitter: 1, umami: 3),
+                secretIngredients: ["Fresh herbs"],
+                proTips: ["Use crisp, fresh vegetables for best texture"],
+                visualClues: ["Vibrant colors", "Fresh appearance"],
+                shareCaption: "Fresh garden salad perfect for any meal! 🥗 #HealthyEating #FreshSalad"
             ),
             Recipe(
                 id: UUID(),
@@ -109,7 +115,13 @@ class MockDataProvider {
                     isGlutenFree: false,
                     isDairyFree: true
                 ),
-                isDetectiveRecipe: false
+                isDetectiveRecipe: false,
+                cookingTechniques: ["stir-frying", "slicing"],
+                flavorProfile: FlavorProfile(sweet: 3, salty: 6, sour: 2, bitter: 1, umami: 7),
+                secretIngredients: ["Fresh ginger", "Sesame oil"],
+                proTips: ["Keep vegetables crisp by not overcooking"],
+                visualClues: ["Colorful vegetables", "Steam rising"],
+                shareCaption: "Quick chicken stir-fry for busy weeknights! 🥢🍗 #StirFry #QuickDinner"
             ),
             Recipe(
                 id: UUID(),
@@ -159,7 +171,13 @@ class MockDataProvider {
                     isGlutenFree: false,
                     isDairyFree: true
                 ),
-                isDetectiveRecipe: false
+                isDetectiveRecipe: false,
+                cookingTechniques: ["chopping", "simmering"],
+                flavorProfile: FlavorProfile(sweet: 4, salty: 5, sour: 2, bitter: 1, umami: 5),
+                secretIngredients: ["Bay leaves", "Fresh herbs"],
+                proTips: ["Let soup simmer slowly for best flavor"],
+                visualClues: ["Rich golden color", "Aromatic steam"],
+                shareCaption: "Hearty vegetable soup to warm your soul! 🍲🥕 #VegetableSoup #ComfortFood"
             )
         ]
 
@@ -248,7 +266,13 @@ class MockDataProvider {
                 isGlutenFree: true,
                 isDairyFree: false
             ),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: ["chopping", "mixing"],
+            flavorProfile: FlavorProfile(sweet: 3, salty: 4, sour: 2, bitter: 1, umami: 3),
+            secretIngredients: ["Fresh herbs"],
+            proTips: ["Use crisp, fresh vegetables for best texture"],
+            visualClues: ["Vibrant colors", "Fresh appearance"],
+            shareCaption: "Fresh garden salad perfect for any meal! 🥗 #HealthyEating #FreshSalad"
         )
     }
 }

@@ -306,7 +306,13 @@ final class RecipeGenerationIntegrationTests: XCTestCase {
             imageURL: nil,
             createdAt: Date(),
             tags: ["test"],
-            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false)
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
     }
     
@@ -330,7 +336,12 @@ final class RecipeGenerationIntegrationTests: XCTestCase {
             nutrition: NutritionAPI(calories: 400, protein: 25, carbs: 45, fat: 12, fiber: 3, sugar: 8, sodium: 600),
             tips: "Cook thoroughly",
             tags: ["protein", "healthy"],
-            share_caption: "Delicious chicken and rice!"
+            share_caption: "Delicious chicken and rice!",
+            cooking_techniques: ["sautéing", "boiling"],
+            flavor_profile: FlavorProfileAPI(sweet: 3, salty: 6, sour: 2, bitter: 1, umami: 7),
+            secret_ingredients: ["bay leaves", "garlic powder"],
+            pro_tips: ["Season the chicken well", "Use jasmine rice for best flavor"],
+            visual_clues: ["Golden brown chicken", "Fluffy rice grains"]
         )
     }
 }

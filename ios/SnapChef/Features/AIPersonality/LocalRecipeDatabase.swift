@@ -41,7 +41,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["italian", "pasta", "classic"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         ),
         Recipe(
             id: UUID(),
@@ -58,7 +64,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["italian", "pizza", "vegetarian"],
             dietaryInfo: DietaryInfo(isVegetarian: true, isVegan: false, isGlutenFree: false, isDairyFree: false),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
         ]
     }
@@ -81,7 +93,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["mexican", "tacos", "spicy"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         ),
         Recipe(
             id: UUID(),
@@ -98,7 +116,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["mexican", "enchiladas", "spicy"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: false),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
         ]
     }
@@ -121,7 +145,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["chinese", "spicy", "nuts"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: true),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         ),
         Recipe(
             id: UUID(),
@@ -138,7 +168,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["chinese", "sweet", "pork"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: true),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
         ]
     }
@@ -161,7 +197,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["japanese", "teriyaki", "sweet"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: true),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         ),
         Recipe(
             id: UUID(),
@@ -178,7 +220,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["japanese", "beef", "rice"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
         ]
     }
@@ -201,7 +249,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["thai", "noodles", "seafood"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         ),
         Recipe(
             id: UUID(),
@@ -218,7 +272,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["thai", "curry", "spicy"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
         ]
     }
@@ -241,7 +301,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["indian", "curry", "creamy"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: false),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         ),
         Recipe(
             id: UUID(),
@@ -258,7 +324,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["indian", "vegetarian", "spinach"],
             dietaryInfo: DietaryInfo(isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
         ]
     }
@@ -281,7 +353,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["french", "braised", "wine"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         ),
         Recipe(
             id: UUID(),
@@ -298,7 +376,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["french", "brunch", "eggs"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
         ]
     }
@@ -321,7 +405,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["american", "burger", "comfort-food"],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         ),
         Recipe(
             id: UUID(),
@@ -338,7 +428,13 @@ struct LocalRecipeDatabase {
             createdAt: Date(),
             tags: ["american", "pasta", "comfort-food"],
             dietaryInfo: DietaryInfo(isVegetarian: true, isVegan: false, isGlutenFree: false, isDairyFree: false),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
         ]
     }

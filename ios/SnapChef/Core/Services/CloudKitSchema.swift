@@ -191,6 +191,13 @@ import CloudKit
  - cookingTime: Int64 // in minutes
  - difficulty: String // "easy", "medium", "hard"
  - cuisine: String (Indexed, Queryable)
+ - isDetectiveRecipe: Int64 // 0 or 1 (enhanced for Detective recipes)
+ - cookingTechniques: String List // Detective recipe enhancement
+ - flavorProfile: String (JSON) // Detective recipe enhancement
+ - secretIngredients: String List // Detective recipe enhancement
+ - proTips: String List // Detective recipe enhancement
+ - visualClues: String List // Detective recipe enhancement
+ - shareCaption: String // Detective recipe enhancement
  
  === SUBSCRIPTIONS TO CREATE ===
  1. Challenge Updates - Subscribe to Challenge record changes
@@ -407,6 +414,15 @@ struct CKField {
         static let cookingTime = "cookingTime"
         static let difficulty = "difficulty"
         static let cuisine = "cuisine"
+        
+        // Detective recipe enhancement fields
+        static let isDetectiveRecipe = "isDetectiveRecipe"
+        static let cookingTechniques = "cookingTechniques"
+        static let flavorProfile = "flavorProfile"
+        static let secretIngredients = "secretIngredients"
+        static let proTips = "proTips"
+        static let visualClues = "visualClues"
+        static let shareCaption = "shareCaption"
     }
 
     // Activity Fields

@@ -123,6 +123,13 @@ struct RecipeAPI: Codable, Identifiable {
     let tips: String? // Optional as per your Pydantic model
     let tags: [String]? // Optional as per your Pydantic model
     let share_caption: String? // Optional as per your Pydantic model
+    
+    // Detective fields for enhanced Fridge Snap results
+    let cooking_techniques: [String]?
+    let flavor_profile: FlavorProfileAPI?
+    let secret_ingredients: [String]?
+    let pro_tips: [String]?
+    let visual_clues: [String]?
 }
 
 struct IngredientUsed: Codable {
@@ -138,6 +145,14 @@ struct NutritionAPI: Codable {
     let fiber: Int?
     let sugar: Int?
     let sodium: Int?
+}
+
+struct FlavorProfileAPI: Codable {
+    let sweet: Int?
+    let salty: Int?
+    let sour: Int?
+    let bitter: Int?
+    let umami: Int?
 }
 
 // MARK: - SnapChefAPIManager
@@ -1273,6 +1288,20 @@ final class SnapChefAPIManager {
             isDairyFree: tags.contains { $0.lowercased().contains("dairy-free") || $0.lowercased().contains("dairy free") }
         )
 
+        // Convert flavor profile from API (optional)
+        let flavorProfile: FlavorProfile?
+        if let apiFlavorProfile = apiRecipe.flavor_profile {
+            flavorProfile = FlavorProfile(
+                sweet: apiFlavorProfile.sweet ?? 5,
+                salty: apiFlavorProfile.salty ?? 5,
+                sour: apiFlavorProfile.sour ?? 5,
+                bitter: apiFlavorProfile.bitter ?? 5,
+                umami: apiFlavorProfile.umami ?? 5
+            )
+        } else {
+            flavorProfile = nil
+        }
+
         return Recipe(
             id: UUID(uuidString: apiRecipe.id) ?? UUID(),
             name: apiRecipe.name,
@@ -1288,7 +1317,13 @@ final class SnapChefAPIManager {
             createdAt: Date(),
             tags: tags,
             dietaryInfo: dietaryInfo,
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false, // Fridge Snap recipes
+            cookingTechniques: apiRecipe.cooking_techniques ?? [],
+            flavorProfile: flavorProfile,
+            secretIngredients: apiRecipe.secret_ingredients ?? [],
+            proTips: apiRecipe.pro_tips ?? [],
+            visualClues: apiRecipe.visual_clues ?? [],
+            shareCaption: apiRecipe.share_caption ?? ""
         )
     }
 }

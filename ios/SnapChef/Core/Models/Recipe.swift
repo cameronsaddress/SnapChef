@@ -17,6 +17,14 @@ public struct Recipe: Identifiable, Codable, Sendable {
     let tags: [String]
     let dietaryInfo: DietaryInfo
     let isDetectiveRecipe: Bool? // Optional to maintain backward compatibility
+    
+    // Detective fields for enhanced Fridge Snap results
+    let cookingTechniques: [String]
+    let flavorProfile: FlavorProfile?
+    let secretIngredients: [String]
+    let proTips: [String]
+    let visualClues: [String]
+    var shareCaption: String
     enum Difficulty: String, Codable, CaseIterable, Sendable {
         case easy = "Easy"
         case medium = "Medium"
@@ -84,6 +92,14 @@ struct DietaryInfo: Codable, Sendable {
     let isVegan: Bool
     let isGlutenFree: Bool
     let isDairyFree: Bool
+}
+
+struct FlavorProfile: Codable, Sendable {
+    let sweet: Int
+    let salty: Int
+    let sour: Int
+    let bitter: Int
+    let umami: Int
 }
 
 struct RecipeGenerationResponse: Codable, Sendable {

@@ -59,6 +59,20 @@ struct CloudKitRecipe {
             instructions = instructionArray
         }
 
+        // Parse Detective recipe fields from CloudKit
+        let isDetectiveRecipe = (record[CKField.Recipe.isDetectiveRecipe] as? Int64 ?? 0) == 1
+        let cookingTechniques = record[CKField.Recipe.cookingTechniques] as? [String] ?? []
+        let flavorProfile: FlavorProfile? = {
+            if let flavorProfileString = record[CKField.Recipe.flavorProfile] as? String {
+                return try? JSONDecoder().decode(FlavorProfile.self, from: flavorProfileString.data(using: .utf8) ?? Data())
+            }
+            return nil
+        }()
+        let secretIngredients = record[CKField.Recipe.secretIngredients] as? [String] ?? []
+        let proTips = record[CKField.Recipe.proTips] as? [String] ?? []
+        let visualClues = record[CKField.Recipe.visualClues] as? [String] ?? []
+        let shareCaption = record[CKField.Recipe.shareCaption] as? String ?? ""
+        
         // Create Recipe object
         self.recipe = Recipe(
             id: id,
@@ -75,7 +89,13 @@ struct CloudKitRecipe {
             createdAt: record[CKField.Recipe.createdAt] as? Date ?? Date(),
             tags: [],
             dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
-            isDetectiveRecipe: false
+            isDetectiveRecipe: isDetectiveRecipe,
+            cookingTechniques: cookingTechniques,
+            flavorProfile: flavorProfile,
+            secretIngredients: secretIngredients,
+            proTips: proTips,
+            visualClues: visualClues,
+            shareCaption: shareCaption
         )
 
         // Extract CloudKit metadata

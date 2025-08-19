@@ -129,6 +129,20 @@ public struct DetectiveRecipe: Identifiable, Codable, Sendable {
 extension DetectiveRecipe {
     /// Convert DetectiveRecipe to base Recipe model for compatibility
     func toBaseRecipe() -> Recipe {
+        // Convert DetectiveFlavorProfile to FlavorProfile
+        let baseFlavorProfile: FlavorProfile?
+        if let detectiveProfile = self.flavorProfile {
+            baseFlavorProfile = FlavorProfile(
+                sweet: detectiveProfile.sweet,
+                salty: detectiveProfile.salty,
+                sour: detectiveProfile.sour,
+                bitter: detectiveProfile.bitter,
+                umami: detectiveProfile.umami
+            )
+        } else {
+            baseFlavorProfile = nil
+        }
+        
         return Recipe(
             id: self.id,
             name: self.name,
@@ -144,7 +158,13 @@ extension DetectiveRecipe {
             createdAt: self.createdAt,
             tags: self.tags,
             dietaryInfo: self.dietaryInfo,
-            isDetectiveRecipe: true
+            isDetectiveRecipe: true,
+            cookingTechniques: self.cookingTechniques,
+            flavorProfile: baseFlavorProfile,
+            secretIngredients: self.secretIngredients,
+            proTips: self.proTips,
+            visualClues: self.visualClues,
+            shareCaption: self.shareCaption ?? ""
         )
     }
 

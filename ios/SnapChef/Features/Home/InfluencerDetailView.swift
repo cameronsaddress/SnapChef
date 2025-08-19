@@ -262,7 +262,13 @@ struct InfluencerDetailView: View {
             createdAt: Date(), // Current date for when it's saved
             tags: originalRecipe.tags,
             dietaryInfo: originalRecipe.dietaryInfo,
-            isDetectiveRecipe: false
+            isDetectiveRecipe: false,
+            cookingTechniques: originalRecipe.cookingTechniques,
+            flavorProfile: originalRecipe.flavorProfile,
+            secretIngredients: originalRecipe.secretIngredients,
+            proTips: originalRecipe.proTips,
+            visualClues: originalRecipe.visualClues,
+            shareCaption: originalRecipe.shareCaption
         )
 
         // Save the recipe

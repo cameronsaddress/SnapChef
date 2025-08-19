@@ -361,7 +361,13 @@ final class PerformanceTests: XCTestCase {
             imageURL: nil,
             createdAt: Date(),
             tags: ["test", "performance"],
-            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false)
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
     }
     
@@ -387,7 +393,13 @@ final class PerformanceTests: XCTestCase {
                 isVegan: isVegan,
                 isGlutenFree: isGlutenFree,
                 isDairyFree: isDairyFree
-            )
+            ),
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
     }
     

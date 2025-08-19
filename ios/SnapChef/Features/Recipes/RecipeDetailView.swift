@@ -28,6 +28,308 @@ struct RecipeDetailView: View {
     // New states for branded share
     @State private var showBrandedShare = false
     @State private var shareContent: ShareContent?
+    
+    // MARK: - ViewBuilder Helper Functions
+    
+    @ViewBuilder
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Recipe title with like and share buttons
+            HStack(alignment: .top, spacing: 12) {
+                Text(recipe.name)
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                Spacer()
+                
+                shareButton
+                likeButton
+            }
+            
+            authorInfo
+            
+            Text(recipe.description)
+                .font(.system(size: 18))
+                .foregroundColor(.secondary)
+            
+            HStack(spacing: 20) {
+                Label("\(recipe.prepTime + recipe.cookTime)m", systemImage: "clock")
+                Label("\(recipe.servings) servings", systemImage: "person.2")
+                Label(recipe.difficulty.rawValue, systemImage: "star.fill")
+            }
+            .font(.system(size: 16, weight: .medium))
+            .foregroundColor(.secondary)
+        }
+    }
+    
+    @ViewBuilder
+    private var shareButton: some View {
+        Button(action: {
+            shareContent = ShareContent(
+                type: .recipe(recipe),
+                beforeImage: nil,
+                afterImage: nil
+            )
+            showBrandedShare = true
+        }) {
+            VStack(spacing: 4) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(.blue)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var likeButton: some View {
+        Button(action: toggleLike) {
+            VStack(spacing: 4) {
+                ZStack {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundColor(.pink)
+                        .scaleEffect(isLiked ? 1.1 : 0)
+                        .opacity(isLiked ? 1 : 0)
+                    
+                    Image(systemName: "heart")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundColor(.gray)
+                        .scaleEffect(isLiked ? 0 : 1.0)
+                        .opacity(isLiked ? 0 : 1)
+                }
+                .animation(.spring(response: 0.3, dampingFraction: 0.6, blendDuration: 0), value: isLiked)
+                
+                if likeCount > 0 {
+                    Text("\(likeCount)")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(isLiked ? .pink : .gray)
+                        .animation(.easeInOut(duration: 0.2), value: isLiked)
+                }
+            }
+        }
+        .disabled(isLoadingLike)
+        .opacity(isLoadingLike ? 0.6 : 1.0)
+    }
+    
+    @ViewBuilder
+    private var authorInfo: some View {
+        if let cloudKitRecipe = cloudKitRecipe, !cloudKitRecipe.ownerID.isEmpty {
+            Button(action: { showingUserProfile = true }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.blue)
+                    Text("by \(authorName.isEmpty ? "Chef" : authorName)")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.blue)
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+    }
+    
+    @ViewBuilder
+    private var ingredientsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Ingredients")
+                .font(.system(size: 24, weight: .bold))
+            
+            ForEach(recipe.ingredients) { ingredient in
+                HStack {
+                    Image(systemName: ingredient.isAvailable ? "checkmark.circle.fill" : "circle")
+                        .foregroundColor(ingredient.isAvailable ? .green : .gray)
+                    Text("\(ingredient.quantity) \(ingredient.unit ?? "") \(ingredient.name)")
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var instructionsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Instructions")
+                .font(.system(size: 24, weight: .bold))
+            
+            ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
+                HStack(alignment: .top) {
+                    Text("\(index + 1).")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.blue)
+                        .frame(width: 30)
+                    Text(instruction)
+                        .font(.system(size: 16))
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var optionalSections: some View {
+        Group {
+            cookingTechniquesSection
+            flavorProfileSection
+            secretIngredientsSection
+            proTipsSection
+            visualCluesSection
+        }
+    }
+    
+    @ViewBuilder
+    private var cookingTechniquesSection: some View {
+        if !recipe.cookingTechniques.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(Color(hex: "#ffd700"))
+                    
+                    Text("Cooking Techniques")
+                        .font(.system(size: 24, weight: .bold))
+                }
+                
+                ForEach(recipe.cookingTechniques, id: \.self) { technique in
+                    HStack {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(hex: "#ffd700"))
+                        Text(technique)
+                            .font(.system(size: 16, weight: .medium))
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var flavorProfileSection: some View {
+        if let flavorProfile = recipe.flavorProfile {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(Color(hex: "#ffd700"))
+                    
+                    Text("Flavor Profile")
+                        .font(.system(size: 24, weight: .bold))
+                }
+                
+                VStack(spacing: 8) {
+                    FlavorBar(label: "Sweet", value: flavorProfile.sweet, color: Color(hex: "#ff6b6b"))
+                    FlavorBar(label: "Salty", value: flavorProfile.salty, color: Color(hex: "#4ecdc4"))
+                    FlavorBar(label: "Sour", value: flavorProfile.sour, color: Color(hex: "#ffe66d"))
+                    FlavorBar(label: "Bitter", value: flavorProfile.bitter, color: Color(hex: "#95e77e"))
+                    FlavorBar(label: "Umami", value: flavorProfile.umami, color: Color(hex: "#a8e6cf"))
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var secretIngredientsSection: some View {
+        if !recipe.secretIngredients.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(Color(hex: "#ffd700"))
+                    
+                    Text("Secret Ingredients")
+                        .font(.system(size: 24, weight: .bold))
+                }
+                
+                ForEach(recipe.secretIngredients, id: \.self) { secret in
+                    HStack {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(hex: "#ffd700"))
+                        Text(secret)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var proTipsSection: some View {
+        if !recipe.proTips.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(Color(hex: "#ffd700"))
+                    
+                    Text("Pro Tips")
+                        .font(.system(size: 24, weight: .bold))
+                }
+                
+                ForEach(Array(recipe.proTips.enumerated()), id: \.offset) { index, tip in
+                    HStack(alignment: .top) {
+                        Text("\(index + 1).")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(Color(hex: "#ffd700"))
+                            .frame(width: 25)
+                        Text(tip)
+                            .font(.system(size: 16, weight: .medium))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                    }
+                    .padding(.vertical, 6)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var visualCluesSection: some View {
+        if !recipe.visualClues.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "eye.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(Color(hex: "#ffd700"))
+                    
+                    Text("Visual Clues")
+                        .font(.system(size: 24, weight: .bold))
+                }
+                
+                ForEach(recipe.visualClues, id: \.self) { clue in
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(hex: "#43e97b"))
+                        Text(clue)
+                            .font(.system(size: 16, weight: .medium))
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var nutritionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Nutrition Facts")
+                .font(.system(size: 24, weight: .bold))
+            
+            HStack(spacing: 16) {
+                RecipeDetailNutritionItem(label: "Calories", value: "\(recipe.nutrition.calories)")
+                RecipeDetailNutritionItem(label: "Protein", value: "\(recipe.nutrition.protein)g")
+                RecipeDetailNutritionItem(label: "Carbs", value: "\(recipe.nutrition.carbs)g")
+                RecipeDetailNutritionItem(label: "Fat", value: "\(recipe.nutrition.fat)g")
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -43,136 +345,19 @@ struct RecipeDetailView: View {
                     .padding(.horizontal, 20)
 
                     // Recipe Info
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Recipe title with like and share buttons
-                        HStack(alignment: .top, spacing: 12) {
-                            Text(recipe.name)
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .fixedSize(horizontal: false, vertical: true)
-
-                            Spacer()
-
-                            // Share button - opens branded popup directly
-                            Button(action: {
-                                // Use branded share popup with all platforms
-                                shareContent = ShareContent(
-                                    type: .recipe(recipe),
-                                    beforeImage: nil,
-                                    afterImage: nil
-                                )
-                                showBrandedShare = true
-                            }) {
-                                VStack(spacing: 4) {
-                                    Image(systemName: "square.and.arrow.up")
-                                        .font(.system(size: 24, weight: .medium))
-                                        .foregroundColor(.blue)
-                                }
-                            }
-
-                            // Like button
-                            Button(action: toggleLike) {
-                                VStack(spacing: 4) {
-                                    ZStack {
-                                        Image(systemName: "heart.fill")
-                                            .font(.system(size: 24, weight: .medium))
-                                            .foregroundColor(.pink)
-                                            .scaleEffect(isLiked ? 1.1 : 0)
-                                            .opacity(isLiked ? 1 : 0)
-
-                                        Image(systemName: "heart")
-                                            .font(.system(size: 24, weight: .medium))
-                                            .foregroundColor(.gray)
-                                            .scaleEffect(isLiked ? 0 : 1.0)
-                                            .opacity(isLiked ? 0 : 1)
-                                    }
-                                    .animation(.spring(response: 0.3, dampingFraction: 0.6, blendDuration: 0), value: isLiked)
-
-                                    if likeCount > 0 {
-                                        Text("\(likeCount)")
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundColor(isLiked ? .pink : .gray)
-                                            .animation(.easeInOut(duration: 0.2), value: isLiked)
-                                    }
-                                }
-                            }
-                            .disabled(isLoadingLike)
-                            .opacity(isLoadingLike ? 0.6 : 1.0)
-                        }
-
-                        // Author info (if available)
-                        if let cloudKitRecipe = cloudKitRecipe, !cloudKitRecipe.ownerID.isEmpty {
-                            Button(action: { showingUserProfile = true }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "person.circle.fill")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(.blue)
-                                    Text("by \(authorName.isEmpty ? "Chef" : authorName)")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-
-                        Text(recipe.description)
-                            .font(.system(size: 18))
-                            .foregroundColor(.secondary)
-
-                        HStack(spacing: 20) {
-                            Label("\(recipe.prepTime + recipe.cookTime)m", systemImage: "clock")
-                            Label("\(recipe.servings) servings", systemImage: "person.2")
-                            Label(recipe.difficulty.rawValue, systemImage: "star.fill")
-                        }
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.secondary)
-                    }
+                    headerSection
 
                     // Ingredients
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Ingredients")
-                            .font(.system(size: 24, weight: .bold))
-
-                        ForEach(recipe.ingredients) { ingredient in
-                            HStack {
-                                Image(systemName: ingredient.isAvailable ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(ingredient.isAvailable ? .green : .gray)
-                                Text("\(ingredient.quantity) \(ingredient.unit ?? "") \(ingredient.name)")
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
+                    ingredientsSection
 
                     // Instructions
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Instructions")
-                            .font(.system(size: 24, weight: .bold))
-
-                        ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
-                            HStack(alignment: .top) {
-                                Text("\(index + 1).")
-                                    .font(.system(size: 18, weight: .bold))
-                                    .foregroundColor(.blue)
-                                    .frame(width: 30)
-                                Text(instruction)
-                                    .font(.system(size: 16))
-                                Spacer()
-                            }
-                            .padding(.vertical, 8)
-                        }
-                    }
+                    instructionsSection
+                    
+                    // Optional sections (cooking techniques, flavor profile, etc.)
+                    optionalSections
 
                     // Nutrition
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Nutrition Facts")
-                            .font(.system(size: 24, weight: .bold))
-
-                        HStack(spacing: 16) {
-                            RecipeDetailNutritionItem(label: "Calories", value: "\(recipe.nutrition.calories)")
-                            RecipeDetailNutritionItem(label: "Protein", value: "\(recipe.nutrition.protein)g")
-                            RecipeDetailNutritionItem(label: "Carbs", value: "\(recipe.nutrition.carbs)g")
-                            RecipeDetailNutritionItem(label: "Fat", value: "\(recipe.nutrition.fat)g")
-                        }
-                    }
+                    nutritionSection
 
                     // Delete Recipe Button
                     Button(action: {
