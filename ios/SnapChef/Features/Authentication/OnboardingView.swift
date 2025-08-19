@@ -1,62 +1,18 @@
 import SwiftUI
+import Foundation
 
 struct OnboardingView: View {
     @EnvironmentObject var appState: AppState
-    @State private var currentPage = 0
     @State private var selectedCuisines: Set<String> = []
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                MagicalBackground()
-                    .ignoresSafeArea()
-                
-                TabView(selection: $currentPage) {
-                    // Screen 1: Welcome Screen
-                    Screen1View {
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            currentPage = 1
-                        }
-                    }
-                    .tag(0)
-                    
-                    // Screen 2: Food Preferences
-                    Screen2View(selectedCuisines: $selectedCuisines) {
-                        completeOnboarding()
-                    }
-                    .tag(1)
-                }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                .gesture(
-                    DragGesture()
-                        .onEnded { value in
-                            if value.translation.width > 50 && currentPage == 1 {
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    currentPage = 0
-                                }
-                            } else if value.translation.width < -50 && currentPage == 0 {
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    currentPage = 1
-                                }
-                            }
-                        }
-                )
-                
-                // Skip button (only on screen 1)
-                if currentPage == 0 {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Button("Skip") {
-                                completeOnboarding()
-                            }
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding()
-                        }
-                        .padding(.top, 50)
-                        Spacer()
-                    }
-                }
+        ZStack {
+            MagicalBackground()
+                .ignoresSafeArea()
+            
+            // Food Preferences Screen (full screen)
+            OnboardingFoodPreferencesView(selectedCuisines: $selectedCuisines) {
+                completeOnboarding()
             }
         }
     }
@@ -66,118 +22,17 @@ struct OnboardingView: View {
     }
 }
 
-// MARK: - Screen 1 View
-struct Screen1View: View {
-    let onContinue: () -> Void
-    @State private var animateElements = false
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            
-            // Headline
-            VStack(spacing: 8) {
-                Text("Turn Leftovers into")
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .scaleEffect(animateElements ? 1.0 : 0.8)
-                    .opacity(animateElements ? 1.0 : 0.0)
-                
-                Text("Chef-Level Meals!")
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .scaleEffect(animateElements ? 1.0 : 0.8)
-                    .opacity(animateElements ? 1.0 : 0.0)
-                
-                Text("Join 50K+ home chefs creating magic with AI")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 8)
-                    .scaleEffect(animateElements ? 1.0 : 0.8)
-                    .opacity(animateElements ? 1.0 : 0.0)
-            }
-            .padding(.horizontal, 20)
-            
-            Spacer()
-            
-            // Two simple panels side by side
-            HStack(spacing: 20) {
-                // Left Panel - SnapChef Mode
-                SimpleSnapChefPanel()
-                    .scaleEffect(animateElements ? 1.0 : 0.9)
-                    .opacity(animateElements ? 1.0 : 0.0)
-                
-                // Right Panel - Detective Mode  
-                SimpleDetectivePanel()
-                    .scaleEffect(animateElements ? 1.0 : 0.9)
-                    .opacity(animateElements ? 1.0 : 0.0)
-            }
-            .padding(.horizontal, 20)
-            
-            Spacer()
-            
-            // Three benefit pills
-            VStack(spacing: 12) {
-                BenefitPill(icon: "⚡", text: "Generate recipes in 30 seconds")
-                    .scaleEffect(animateElements ? 1.0 : 0.9)
-                    .opacity(animateElements ? 1.0 : 0.0)
-                
-                BenefitPill(icon: "🎯", text: "Use exactly what you have")
-                    .scaleEffect(animateElements ? 1.0 : 0.9)
-                    .opacity(animateElements ? 1.0 : 0.0)
-                
-                BenefitPill(icon: "✨", text: "AI-powered meal suggestions")
-                    .scaleEffect(animateElements ? 1.0 : 0.9)
-                    .opacity(animateElements ? 1.0 : 0.0)
-            }
-            .padding(.horizontal, 20)
-            
-            Spacer()
-            
-            // Let's Cook! gradient button
-            Button(action: onContinue) {
-                Text("Let's Cook!")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(
-                        LinearGradient(
-                            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                        .cornerRadius(30)
-                        .shadow(color: Color(hex: "#667eea").opacity(0.5), radius: 15, x: 0, y: 5)
-                    )
-            }
-            .padding(.horizontal, 40)
-            .padding(.bottom, 50)
-            .scaleEffect(animateElements ? 1.0 : 0.9)
-            .opacity(animateElements ? 1.0 : 0.0)
-        }
-        .onAppear {
-            withAnimation(.easeOut(duration: 1.0)) {
-                animateElements = true
-            }
-        }
-    }
-}
-
-// MARK: - Screen 2 View
-struct Screen2View: View {
+// MARK: - Food Preferences View
+struct OnboardingFoodPreferencesView: View {
     @Binding var selectedCuisines: Set<String>
     let onComplete: () -> Void
     
-    // Cuisine grid data as specified
+    // Cuisine grid data reordered from most popular to least popular
     let cuisineOptions = [
-        ("Italian", "🍝"), ("Mexican", "🌮"), ("Asian", "🥢"), ("Indian", "🍛"),
-        ("American", "🍔"), ("Healthy", "🥗"), ("Comfort", "🍲"), ("Mediterranean", "🥙"),
-        ("Vegan", "🌱"), ("Quick", "🚀"), ("Desserts", "🍰"), ("Seafood", "🦐"),
-        ("BBQ", "🔥"), ("Breakfast", "🥞"), ("Keto", "🥑"), ("Spicy", "🌶️")
+        ("Italian", "🍝"), ("Mexican", "🌮"), ("American", "🍔"), ("Asian", "🥢"), 
+        ("Mediterranean", "🥙"), ("Indian", "🍛"), ("Healthy", "🥗"), ("Comfort", "🍲"), 
+        ("Seafood", "🦐"), ("BBQ", "🔥"), ("Breakfast", "🥞"), ("Quick", "🚀"), 
+        ("Desserts", "🍰"), ("Vegan", "🌱"), ("Keto", "🥑"), ("Spicy", "🌶️")
     ]
     
     var buttonText: String {
@@ -201,105 +56,104 @@ struct Screen2View: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            
-            // Headline
-            VStack(spacing: 8) {
-                Text("What Makes You Hungry?")
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // Headline - compact at top
+                VStack(spacing: 4) {
+                    Text("What Makes You Hungry?")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                    
+                    Text("Pick 3+ favorites for recipes you'll actually crave")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 60)
+                .padding(.bottom, 20)
                 
-                Text("Pick 3+ favorites for recipes you'll actually crave")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 8)
-            }
-            .padding(.horizontal, 20)
-            
-            Spacer()
-            
-            // Counter pill
-            HStack {
-                Text(counterText)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(counterColor.opacity(0.3))
-                            .overlay(
-                                Capsule()
-                                    .stroke(counterColor, lineWidth: 1.5)
-                            )
-                    )
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
-            
-            // 4x4 grid of cuisine options
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
-                ForEach(cuisineOptions, id: \.0) { cuisine, emoji in
-                    CuisineGridItem(
-                        title: cuisine,
-                        emoji: emoji,
-                        isSelected: selectedCuisines.contains(cuisine),
-                        canSelect: selectedCuisines.count < 8 || selectedCuisines.contains(cuisine)
-                    ) {
-                        // Haptic feedback
-                        let generator = UIImpactFeedbackGenerator(style: .light)
-                        generator.impactOccurred()
-                        
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            if selectedCuisines.contains(cuisine) {
-                                selectedCuisines.remove(cuisine)
-                            } else if selectedCuisines.count < 8 {
-                                selectedCuisines.insert(cuisine)
+                // Counter pill
+                HStack {
+                    Text(counterText)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(counterColor.opacity(0.3))
+                                .overlay(
+                                    Capsule()
+                                        .stroke(counterColor, lineWidth: 1.5)
+                                )
+                        )
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+                
+                // 4x4 grid of cuisine options - taking up maximum space
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4), spacing: 4) {
+                    ForEach(cuisineOptions, id: \.0) { cuisine, emoji in
+                        CuisineGridItem(
+                            title: cuisine,
+                            emoji: emoji,
+                            isSelected: selectedCuisines.contains(cuisine),
+                            canSelect: selectedCuisines.count < 8 || selectedCuisines.contains(cuisine)
+                        ) {
+                            // Haptic feedback
+                            let generator = UIImpactFeedbackGenerator(style: .light)
+                            generator.impactOccurred()
+                            
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                if selectedCuisines.contains(cuisine) {
+                                    selectedCuisines.remove(cuisine)
+                                } else if selectedCuisines.count < 8 {
+                                    selectedCuisines.insert(cuisine)
+                                }
                             }
                         }
                     }
                 }
-            }
-            .padding(.horizontal, 20)
-            
-            Spacer()
-            
-            // Start Creating! button
-            Button(action: {
-                if selectedCuisines.count >= 3 {
-                    // Save to UserDefaults
-                    UserDefaults.standard.set(Array(selectedCuisines), forKey: "SelectedFoodPreferences")
-                    
-                    // Haptic feedback
-                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                    generator.impactOccurred()
-                    
-                    onComplete()
-                }
-            }) {
-                Text(buttonText)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(
-                        LinearGradient(
-                            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                            startPoint: .leading,
-                            endPoint: .trailing
+                .padding(.horizontal, 8)
+                .frame(maxHeight: .infinity)
+                
+                // Start Creating! button - compact at bottom
+                Button(action: {
+                    if selectedCuisines.count >= 3 {
+                        // Save to UserDefaults
+                        UserDefaults.standard.set(Array(selectedCuisines), forKey: "SelectedFoodPreferences")
+                        
+                        // Haptic feedback
+                        let generator = UIImpactFeedbackGenerator(style: .medium)
+                        generator.impactOccurred()
+                        
+                        // Complete onboarding and navigate to HomeView
+                        onComplete()
+                    }
+                }) {
+                    Text(buttonText)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .cornerRadius(25)
+                            .shadow(color: Color(hex: "#667eea").opacity(0.5), radius: 10, x: 0, y: 4)
                         )
-                        .cornerRadius(30)
-                        .shadow(color: Color(hex: "#667eea").opacity(0.5), radius: 15, x: 0, y: 5)
-                    )
+                }
+                .disabled(selectedCuisines.count < 3)
+                .opacity(selectedCuisines.count < 3 ? 0.6 : 1.0)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
             }
-            .disabled(selectedCuisines.count < 3)
-            .opacity(selectedCuisines.count < 3 ? 0.6 : 1.0)
-            .padding(.horizontal, 40)
-            .padding(.bottom, 50)
         }
     }
 }
@@ -312,28 +166,129 @@ struct CuisineGridItem: View {
     let canSelect: Bool
     let action: () -> Void
     
+    @State private var isPressed = false
+    @State private var hoverEffect = false
+    @State private var shimmerPhase: CGFloat = 0
+    
+    // MARK: - Helper Properties
+    
+    private var selectedGradient: LinearGradient {
+        LinearGradient(
+            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
+    private var unselectedColor: Color {
+        Color.white.opacity(hoverEffect ? 0.15 : 0.1)
+    }
+    
+    private var shimmerGradient: LinearGradient {
+        LinearGradient(
+            colors: [Color.clear, Color.white.opacity(0.3), Color.clear],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+    
+    private var borderSelectedGradient: LinearGradient {
+        LinearGradient(
+            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
+    private var borderUnselectedGradient: LinearGradient {
+        LinearGradient(
+            colors: [Color.white.opacity(hoverEffect ? 0.4 : 0.2)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
+    // MARK: - Computed Views
+    
+    @ViewBuilder
+    private var backgroundView: some View {
+        ZStack {
+            // Base background
+            if isSelected {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(selectedGradient.opacity(0.4))
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(unselectedColor)
+            }
+            
+            // Shimmer effect for selected items
+            if isSelected {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(shimmerGradient)
+                    .offset(x: shimmerPhase * 100 - 50)
+                    .clipped()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var overlayBorder: some View {
+        if isSelected {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(borderSelectedGradient, lineWidth: 3)
+        } else {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(borderUnselectedGradient, lineWidth: 1.5)
+        }
+    }
+    
     var body: some View {
         Button(action: {
             if canSelect {
+                // Haptic feedback with enhanced animation
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.impactOccurred()
+                
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) {
+                    isPressed = true
+                }
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                        isPressed = false
+                    }
+                }
+                
                 action()
             }
         }) {
             VStack(spacing: 6) {
                 ZStack {
+                    // Emoji with bounce animation
                     Text(emoji)
-                        .font(.system(size: 24))
+                        .font(.system(size: 32))
+                        .scaleEffect(isPressed ? 1.3 : 1.0)
+                        .rotationEffect(.degrees(isSelected ? (Foundation.sin(shimmerPhase) * 5) : 0))
                     
-                    // Checkmark in corner for selected items
+                    // Animated checkmark with scale effect and proper positioning
                     if isSelected {
                         VStack {
                             HStack {
                                 Spacer()
-                                Text("✓")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 16, height: 16)
-                                    .background(Color.green)
-                                    .clipShape(Circle())
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.green)
+                                        .frame(width: 16, height: 16)
+                                        .scaleEffect(isPressed ? 1.2 : 1.0)
+                                    
+                                    Text("✓")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
+                                .shadow(color: Color.green.opacity(0.5), radius: 4, x: 0, y: 2)
+                                .padding(.top, 4)
+                                .padding(.trailing, 4)
                             }
                             Spacer()
                         }
@@ -346,167 +301,53 @@ struct CuisineGridItem: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+                    .scaleEffect(isPressed ? 1.1 : 1.0)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 80)
+            .frame(height: 100)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        isSelected ?
-                        LinearGradient(
-                            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ).opacity(0.3) :
-                        Color.white.opacity(0.1)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(
-                                isSelected ?
-                                AnyShapeStyle(LinearGradient(
-                                    colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )) :
-                                AnyShapeStyle(Color.white.opacity(0.2)),
-                                lineWidth: isSelected ? 2 : 1.5
-                            )
-                    )
+                backgroundView
             )
-            .scaleEffect(isSelected ? 1.05 : 1.0)
+            .overlay(
+                overlayBorder
+            )
+            .scaleEffect(isSelected ? (isPressed ? 1.1 : 1.05) : (isPressed ? 0.95 : 1.0))
             .shadow(
-                color: isSelected ? Color(hex: "#667eea").opacity(0.4) : Color.clear,
-                radius: isSelected ? 8 : 0,
+                color: isSelected ? Color(hex: "#667eea").opacity(0.5) : Color.black.opacity(0.1),
+                radius: isSelected ? 12 : 4,
                 x: 0,
-                y: isSelected ? 4 : 0
+                y: isSelected ? 6 : 2
             )
         }
         .disabled(!canSelect)
         .opacity(canSelect ? 1.0 : 0.5)
-    }
-}
-
-// MARK: - Simple SnapChef Mode Panel
-struct SimpleSnapChefPanel: View {
-    @State private var animateIcon = false
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            Text("SnapChef Mode")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.white)
-            
-            ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.black.opacity(0.3))
-                    .frame(height: 200)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                    )
-                
-                VStack(spacing: 16) {
-                    // Simple fridge icon
-                    Text("🔥")
-                        .font(.system(size: 60))
-                        .scaleEffect(animateIcon ? 1.1 : 1.0)
-                    
-                    // Arrow down
-                    Text("↓")
-                        .font(.system(size: 20))
-                        .foregroundColor(.white.opacity(0.8))
-                    
-                    // Dish icon
-                    Text("🍝")
-                        .font(.system(size: 40))
-                        .scaleEffect(animateIcon ? 1.0 : 0.9)
+        .onAppear {
+            if isSelected {
+                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                    shimmerPhase = 1.0
                 }
             }
         }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                animateIcon = true
-            }
-        }
-    }
-}
-
-// MARK: - Simple Detective Mode Panel
-struct SimpleDetectivePanel: View {
-    @State private var animateIcon = false
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            Text("Detective Mode")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.white)
-            
-            ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.black.opacity(0.3))
-                    .frame(height: 200)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                    )
-                
-                VStack(spacing: 16) {
-                    // Simple camera icon
-                    Text("📱")
-                        .font(.system(size: 60))
-                        .scaleEffect(animateIcon ? 1.1 : 1.0)
-                    
-                    // Arrow down
-                    Text("↓")
-                        .font(.system(size: 20))
-                        .foregroundColor(.white.opacity(0.8))
-                    
-                    // Recipe cards
-                    Text("📄")
-                        .font(.system(size: 40))
-                        .scaleEffect(animateIcon ? 1.0 : 0.9)
+        .onChange(of: isSelected) { newValue in
+            if newValue {
+                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                    shimmerPhase = 1.0
                 }
+            } else {
+                shimmerPhase = 0
             }
         }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                animateIcon = true
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                hoverEffect = pressing
             }
-        }
+        }, perform: {})
     }
 }
 
-// MARK: - Benefit Pills
-struct BenefitPill: View {
-    let icon: String
-    let text: String
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Text(icon)
-                .font(.system(size: 20))
-            
-            Text(text)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white.opacity(0.9))
-            
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 25)
-                .fill(Color.black.opacity(0.3))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 25)
-                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                )
-        )
-    }
-}
 
 #Preview {
     OnboardingView()
         .environmentObject(AppState())
+        .environmentObject(DeviceManager())
 }
