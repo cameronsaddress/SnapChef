@@ -397,29 +397,63 @@ struct CameraView: View {
     // Test function for development - sends a test fridge image
     private func sendTestFridgeImage() {
         // List of available test images
-        let testImages = ["fridge", "fridge1", "fridge2", "fridge4", "fridge5"]
-        let randomImage = testImages.randomElement() ?? "fridge"
+        let testImages = ["fridge", "fridge1", "fridge2", "fridge3", "fridge4", "fridge5"]
+        let randomImage = testImages.randomElement() ?? "fridge2"
         
-        // Try to load the test image
-        guard let testImage = UIImage(named: randomImage) else {
-            print("❌ Test image '\(randomImage)' not found")
-            currentError = .imageProcessingError("Test image '\(randomImage)' not found in resources")
+        // Try multiple methods to load the test image
+        var testImage: UIImage?
+        
+        // Method 1: Try with .jpg extension
+        testImage = UIImage(named: "\(randomImage).jpg")
+        
+        // Method 2: Try without extension
+        if testImage == nil {
+            testImage = UIImage(named: randomImage)
+        }
+        
+        // Method 3: Try loading from bundle directly
+        if testImage == nil {
+            if let imagePath = Bundle.main.path(forResource: randomImage, ofType: "jpg") {
+                testImage = UIImage(contentsOfFile: imagePath)
+                print("✅ Loaded test image from bundle path: \(imagePath)")
+            }
+        }
+        
+        // If still no image, show error
+        guard let loadedImage = testImage else {
+            print("❌ Test image '\(randomImage)' not found in bundle")
+            print("📁 Trying to list available resources...")
+            
+            // Debug: Try to list what's actually available
+            if let resourcePath = Bundle.main.resourcePath {
+                do {
+                    let items = try FileManager.default.contentsOfDirectory(atPath: resourcePath)
+                    let jpgFiles = items.filter { $0.hasSuffix(".jpg") }
+                    print("📷 Available JPG files in bundle: \(jpgFiles)")
+                } catch {
+                    print("❌ Could not list bundle resources: \(error)")
+                }
+            }
+            
+            currentError = .imageProcessingError("Test image '\(randomImage)' not found. Please check Resources folder.")
             return
         }
         
-        print("📸 Using test image: \(randomImage).jpg")
+        print("📸 Successfully loaded test image: \(randomImage).jpg")
+        print("📐 Image size: \(loadedImage.size.width) x \(loadedImage.size.height)")
         
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
         
         // Process the test image directly
-        capturedImage = testImage
-        processImage(testImage)
+        capturedImage = loadedImage
+        processImage(loadedImage)
         
         // Track as test snap (not daily snap)
         Task {
-            print("🧪 Test mode: Processing test fridge image")
+            print("🧪 Test mode: Processing test fridge image '\(randomImage).jpg'")
+            print("📤 Sending to Render server for recipe generation...")
         }
     }
 
