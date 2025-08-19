@@ -368,31 +368,60 @@ struct EnhancedProfileHeader: View {
                     StatusPill(text: calculateUserStatus(), color: Color(hex: "#4facfe"))
                 }
 
-                // Sign in with Apple button if not authenticated
+                // Sign In button if not authenticated
                 if !cloudKitAuthManager.isAuthenticated {
                     Button(action: {
                         cloudKitAuthManager.showAuthSheet = true
                     }) {
                         HStack(spacing: 12) {
-                            Image(systemName: "apple.logo")
-                                .font(.system(size: 20, weight: .semibold))
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 22, weight: .bold))
                                 .foregroundColor(.white)
-
-                            Text("Sign in with Apple")
-                                .font(.system(size: 18, weight: .semibold))
+                            
+                            Text("Sign In!")
+                                .font(.system(size: 20, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 18, weight: .bold))
                                 .foregroundColor(.white)
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 14)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 16)
                         .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.black)
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(hex: "#667eea"),
+                                            Color(hex: "#764ba2")
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.3),
+                                                    Color.white.opacity(0.1)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1
+                                        )
                                 )
                         )
+                        .shadow(
+                            color: Color(hex: "#667eea").opacity(0.4),
+                            radius: 15,
+                            y: 8
+                        )
                     }
+                    .buttonStyle(PlainButtonStyle())
                     .padding(.top, 16)
                 }
 

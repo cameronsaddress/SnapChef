@@ -120,16 +120,6 @@ struct HomeView: View {
                             EnhancedRecipesSection(recipes: appState.recentRecipes)
                         }
 
-                        // Free uses indicator at bottom
-                        if !deviceManager.hasUnlimitedAccess {
-                            Button(action: { showingUpgrade = true }) {
-                                FreeUsesIndicatorEnhanced(remaining: deviceManager.freeUsesRemaining)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .padding(.horizontal, 30)
-                            .padding(.top, 20)
-                            .padding(.bottom, 40)
-                        }
                     }
                     .padding(.bottom, 100)
                 }
@@ -223,75 +213,6 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Free Uses Indicator Enhanced
-struct FreeUsesIndicatorEnhanced: View {
-    let remaining: Int
-    @State private var pulseScale: CGFloat = 1
-    @State private var showGlow = false
-
-    var body: some View {
-        GlassmorphicCard(content: {
-            HStack(spacing: 12) {
-                // Animated icon
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "#43e97b"),
-                                    Color(hex: "#38f9d7")
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 40, height: 40)
-                        .scaleEffect(pulseScale)
-
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.white)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(remaining) free snaps remaining")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-
-                    Text("Upgrade for unlimited magic")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.6))
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-        })
-        .shadow(color: Color(hex: "#43e97b").opacity(showGlow ? 0.6 : 0), radius: showGlow ? 20 : 0)
-        .shadow(color: Color.white.opacity(showGlow ? 0.4 : 0), radius: showGlow ? 15 : 0)
-        .animation(.easeInOut(duration: 0.8), value: showGlow)
-        .onAppear {
-            // Quick glow animation on appear
-            withAnimation(.easeIn(duration: 0.3)) {
-                showGlow = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                withAnimation(.easeOut(duration: 0.5)) {
-                    showGlow = false
-                }
-            }
-            // Subtle single pulse on appear
-            withAnimation(.easeInOut(duration: 0.8)) {
-                pulseScale = 1.05
-            }
-        }
-    }
-}
 
 // MARK: - Viral Challenge Section
 struct ViralChallengeSection: View {

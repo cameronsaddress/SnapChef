@@ -253,6 +253,20 @@ struct StreakSummaryCard: View {
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color(UIColor.secondarySystemBackground))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.orange.opacity(0.3),
+                                        Color.red.opacity(0.3)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.5
+                            )
+                    )
             )
         }
         .buttonStyle(PlainButtonStyle())
