@@ -542,7 +542,23 @@ struct RecipeDetailView: View {
                 Text("Are you sure you want to delete \"\(recipe.name)\"? This action cannot be undone.")
             }
             .onAppear {
-                print("🔍 DEBUG: RecipeDetailView appeared")
+                print("🔍 DEBUG: RecipeDetailView appeared for recipe: \(recipe.name)")
+                print("🔍 RECIPE ENHANCED FIELDS IN UI:")
+                print("🔍   - cookingTechniques: \(recipe.cookingTechniques.isEmpty ? "EMPTY" : "\(recipe.cookingTechniques)")")
+                print("🔍   - flavorProfile: \(recipe.flavorProfile != nil ? "PRESENT" : "NIL")")
+                if let fp = recipe.flavorProfile {
+                    print("🔍     • sweet: \(fp.sweet), salty: \(fp.salty), sour: \(fp.sour), bitter: \(fp.bitter), umami: \(fp.umami)")
+                }
+                print("🔍   - secretIngredients: \(recipe.secretIngredients.isEmpty ? "EMPTY" : "\(recipe.secretIngredients)")")
+                print("🔍   - proTips: \(recipe.proTips.isEmpty ? "EMPTY" : "\(recipe.proTips)")")
+                print("🔍   - visualClues: \(recipe.visualClues.isEmpty ? "EMPTY" : "\(recipe.visualClues)")")
+                print("🔍   - shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : "\"\(recipe.shareCaption)\"")")
+                print("🔍   - isDetectiveRecipe: \(recipe.isDetectiveRecipe)")
+                print("🔍 UI SECTIONS VISIBILITY:")
+                print("🔍   - cookingTechniquesSection will show: \(!recipe.cookingTechniques.isEmpty)")
+                print("🔍   - secretIngredientsSection will show: \(!recipe.secretIngredients.isEmpty)")
+                print("🔍   - proTipsSection will show: \(!recipe.proTips.isEmpty)")
+                print("🔍   - visualCluesSection will show: \(!recipe.visualClues.isEmpty)")
             }
             .task {
                 await loadLikeStatus()

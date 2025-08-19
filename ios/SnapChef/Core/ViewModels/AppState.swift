@@ -298,6 +298,15 @@ final class RecipesViewModel: ObservableObject {
     // MARK: - Recipe Management
     
     func addRecentRecipe(_ recipe: Recipe) {
+        // 🔍 DEBUG: Log when recipe is added to app state
+        print("🔍 DEBUG: Adding recipe '\(recipe.name)' to AppState")
+        print("🔍   - Enhanced fields at storage time:")
+        print("🔍     • cookingTechniques: \(recipe.cookingTechniques.isEmpty ? "EMPTY" : "\(recipe.cookingTechniques)")")
+        print("🔍     • secretIngredients: \(recipe.secretIngredients.isEmpty ? "EMPTY" : "\(recipe.secretIngredients)")")
+        print("🔍     • proTips: \(recipe.proTips.isEmpty ? "EMPTY" : "\(recipe.proTips)")")
+        print("🔍     • visualClues: \(recipe.visualClues.isEmpty ? "EMPTY" : "\(recipe.visualClues)")")
+        print("🔍     • shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : "\"\(recipe.shareCaption)\"")")
+        
         recentRecipes.insert(recipe, at: 0)
         if recentRecipes.count > 10 {
             recentRecipes.removeLast()

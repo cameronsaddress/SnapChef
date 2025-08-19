@@ -234,15 +234,21 @@ struct DetectiveRecipeCard: View {
     let onSave: () -> Void
     
     var body: some View {
-        DetectiveCard {
-            VStack(spacing: 0) {
-                // Photo container at top (full width, 150px height)
-                detectivePhotoContainer(recipe: recipe)
-                    .frame(height: 150)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                
-                // Content below photo
-                VStack(spacing: 20) {
+        // Custom card structure to allow photo to extend to edges
+        VStack(spacing: 0) {
+            // Photo container at top (full width, 150px height, no padding)
+            detectivePhotoContainer(recipe: recipe)
+                .frame(height: 150)
+                .clipped()
+                .clipShape(UnevenRoundedRectangle(
+                    topLeadingRadius: 16,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 16
+                ))
+            
+            // Content below photo
+            VStack(spacing: 20) {
                     // Confidence indicator (95% match for recipes)
                     HStack(spacing: 12) {
                     Text("🎯")
@@ -364,17 +370,73 @@ struct DetectiveRecipeCard: View {
                         .cornerRadius(12)
                     }
                 }
-                }
-                .padding(20)
             }
+            .padding(20)
+            .background(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 0,
+                    topTrailingRadius: 0,
+                    bottomLeadingRadius: 16,
+                    bottomTrailingRadius: 16
+                )
+                .fill(Color.white.opacity(0.1))
+                .overlay(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 0,
+                        topTrailingRadius: 0,
+                        bottomLeadingRadius: 16,
+                        bottomTrailingRadius: 16
+                    )
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#43e97b").opacity(0.4),
+                                Color(hex: "#2d1b69").opacity(0.3)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+                )
+                .background(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 0,
+                        topTrailingRadius: 0,
+                        bottomLeadingRadius: 16,
+                        bottomTrailingRadius: 16
+                    )
+                    .fill(.ultraThinMaterial.opacity(0.2))
+                )
+            )
         }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#43e97b").opacity(0.4),
+                                    Color(hex: "#2d1b69").opacity(0.3)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color.black.opacity(0.2), radius: 10, y: 5)
     }
     
     // Photo container exactly like DetectiveView
     private func detectivePhotoContainer(recipe: Recipe) -> some View {
         ZStack {
             // Background gradient
-            RoundedRectangle(cornerRadius: 16)
+            Rectangle()
                 .fill(
                     LinearGradient(
                         colors: [
@@ -460,7 +522,6 @@ struct DetectiveRecipeCard: View {
                 )
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
 

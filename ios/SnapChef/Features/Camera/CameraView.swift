@@ -560,6 +560,18 @@ struct CameraView: View {
                             SnapChefAPIManager.shared.convertAPIRecipeToAppRecipe(apiRecipe)
                         }
 
+                        // 🔍 DEBUG: Log converted recipes in CameraView (single image)
+                        print("🔍 DEBUG: CameraView - Converted \(recipes.count) recipes from API (single image)")
+                        for (index, recipe) in recipes.enumerated() {
+                            print("🔍 CAMERA RECIPE \(index + 1) FINAL STATE:")
+                            print("🔍   - name: \(recipe.name)")
+                            print("🔍   - cookingTechniques: \(recipe.cookingTechniques.isEmpty ? "EMPTY" : "\(recipe.cookingTechniques)")")
+                            print("🔍   - secretIngredients: \(recipe.secretIngredients.isEmpty ? "EMPTY" : "\(recipe.secretIngredients)")")
+                            print("🔍   - proTips: \(recipe.proTips.isEmpty ? "EMPTY" : "\(recipe.proTips)")")
+                            print("🔍   - visualClues: \(recipe.visualClues.isEmpty ? "EMPTY" : "\(recipe.visualClues)")")
+                            print("🔍   - shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : "\"\(recipe.shareCaption)\"")")
+                        }
+
                         // Update state
                         self.generatedRecipes = recipes
                         self.detectedIngredients = apiResponse.data.ingredients
@@ -853,6 +865,18 @@ struct CameraView: View {
                         // Convert API recipes to app recipes
                         let recipes = apiResponse.data.recipes.map { apiRecipe in
                             SnapChefAPIManager.shared.convertAPIRecipeToAppRecipe(apiRecipe)
+                        }
+
+                        // 🔍 DEBUG: Log converted recipes in CameraView (dual image)
+                        print("🔍 DEBUG: CameraView - Converted \(recipes.count) recipes from API (dual image)")
+                        for (index, recipe) in recipes.enumerated() {
+                            print("🔍 CAMERA RECIPE \(index + 1) FINAL STATE:")
+                            print("🔍   - name: \(recipe.name)")
+                            print("🔍   - cookingTechniques: \(recipe.cookingTechniques.isEmpty ? "EMPTY" : "\(recipe.cookingTechniques)")")
+                            print("🔍   - secretIngredients: \(recipe.secretIngredients.isEmpty ? "EMPTY" : "\(recipe.secretIngredients)")")
+                            print("🔍   - proTips: \(recipe.proTips.isEmpty ? "EMPTY" : "\(recipe.proTips)")")
+                            print("🔍   - visualClues: \(recipe.visualClues.isEmpty ? "EMPTY" : "\(recipe.visualClues)")")
+                            print("🔍   - shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : "\"\(recipe.shareCaption)\"")")
                         }
 
                         // Update state

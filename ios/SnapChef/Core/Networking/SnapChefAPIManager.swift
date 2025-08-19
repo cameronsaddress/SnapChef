@@ -415,6 +415,28 @@ final class SnapChefAPIManager {
                 print("✅ Found \(apiResponse.data.recipes.count) recipes")
                 print("✅ Found \(apiResponse.data.ingredients.count) ingredients")
                 
+                // 🔍 DEBUG: Log raw JSON response for enhanced fields analysis
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("🔍 RAW SERVER RESPONSE:")
+                    print("🔍 \(responseString)")
+                } else {
+                    print("🔍 Could not convert response data to string")
+                }
+                
+                // 🔍 DEBUG: Log enhanced fields in each recipe from server response
+                for (index, recipe) in apiResponse.data.recipes.enumerated() {
+                    print("🔍 RECIPE \(index + 1) ENHANCED FIELDS FROM SERVER:")
+                    print("🔍   - cooking_techniques: \(recipe.cooking_techniques?.isEmpty == false ? "\(recipe.cooking_techniques!)" : "EMPTY/NIL")")
+                    print("🔍   - flavor_profile: \(recipe.flavor_profile != nil ? "PRESENT" : "NIL")")
+                    if let fp = recipe.flavor_profile {
+                        print("🔍     • sweet: \(fp.sweet ?? -1), salty: \(fp.salty ?? -1), sour: \(fp.sour ?? -1), bitter: \(fp.bitter ?? -1), umami: \(fp.umami ?? -1)")
+                    }
+                    print("🔍   - secret_ingredients: \(recipe.secret_ingredients?.isEmpty == false ? "\(recipe.secret_ingredients!)" : "EMPTY/NIL")")
+                    print("🔍   - pro_tips: \(recipe.pro_tips?.isEmpty == false ? "\(recipe.pro_tips!)" : "EMPTY/NIL")")
+                    print("🔍   - visual_clues: \(recipe.visual_clues?.isEmpty == false ? "\(recipe.visual_clues!)" : "EMPTY/NIL")")
+                    print("🔍   - share_caption: \(recipe.share_caption?.isEmpty == false ? "\"\(recipe.share_caption!)\"" : "EMPTY/NIL")")
+                }
+                
                 // Check if the image analysis indicates this is not a food image
                 if !apiResponse.data.image_analysis.is_food_image {
                     let friendlyMessage = "Hmm, this doesn't look like a fridge or pantry photo. Let's try again with a clear shot of your ingredients! 📸"
@@ -1302,7 +1324,16 @@ final class SnapChefAPIManager {
             flavorProfile = nil
         }
 
-        return Recipe(
+        // 🔍 DEBUG: Log enhanced fields during conversion
+        print("🔍 CONVERTING API RECIPE '\(apiRecipe.name)' TO RECIPE MODEL:")
+        print("🔍   - Raw cooking_techniques from API: \(apiRecipe.cooking_techniques ?? [])")
+        print("🔍   - Raw secret_ingredients from API: \(apiRecipe.secret_ingredients ?? [])")
+        print("🔍   - Raw pro_tips from API: \(apiRecipe.pro_tips ?? [])")
+        print("🔍   - Raw visual_clues from API: \(apiRecipe.visual_clues ?? [])")
+        print("🔍   - Raw share_caption from API: \"\(apiRecipe.share_caption ?? "")\"")
+        print("🔍   - Converted flavor_profile: \(flavorProfile != nil ? "PRESENT" : "NIL")")
+
+        let convertedRecipe = Recipe(
             id: UUID(uuidString: apiRecipe.id) ?? UUID(),
             name: apiRecipe.name,
             description: apiRecipe.description,
@@ -1325,6 +1356,17 @@ final class SnapChefAPIManager {
             visualClues: apiRecipe.visual_clues ?? [],
             shareCaption: apiRecipe.share_caption ?? ""
         )
+        
+        // 🔍 DEBUG: Log the final converted Recipe model values
+        print("🔍 FINAL CONVERTED RECIPE MODEL VALUES:")
+        print("🔍   - cookingTechniques: \(convertedRecipe.cookingTechniques.isEmpty ? "EMPTY" : "\(convertedRecipe.cookingTechniques)")")
+        print("🔍   - flavorProfile: \(convertedRecipe.flavorProfile != nil ? "PRESENT" : "NIL")")
+        print("🔍   - secretIngredients: \(convertedRecipe.secretIngredients.isEmpty ? "EMPTY" : "\(convertedRecipe.secretIngredients)")")
+        print("🔍   - proTips: \(convertedRecipe.proTips.isEmpty ? "EMPTY" : "\(convertedRecipe.proTips)")")
+        print("🔍   - visualClues: \(convertedRecipe.visualClues.isEmpty ? "EMPTY" : "\(convertedRecipe.visualClues)")")
+        print("🔍   - shareCaption: \(convertedRecipe.shareCaption.isEmpty ? "EMPTY" : "\"\(convertedRecipe.shareCaption)\"")")
+        
+        return convertedRecipe
     }
 }
 
