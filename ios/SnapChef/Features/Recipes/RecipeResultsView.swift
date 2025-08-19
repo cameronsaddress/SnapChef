@@ -235,15 +235,16 @@ struct DetectiveRecipeCard: View {
     
     var body: some View {
         DetectiveCard {
-            VStack(spacing: 20) {
-                // Photo container at top (full width, 150px height) - EXACTLY like DetectiveView
+            VStack(spacing: 0) {
+                // Photo container at top (full width, 150px height)
                 detectivePhotoContainer(recipe: recipe)
                     .frame(height: 150)
-                    .padding(.horizontal, -20) // Extend to card edges
-                    .padding(.top, -20)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 
-                // Confidence indicator (95% match for recipes)
-                HStack(spacing: 12) {
+                // Content below photo
+                VStack(spacing: 20) {
+                    // Confidence indicator (95% match for recipes)
+                    HStack(spacing: 12) {
                     Text("🎯")
                         .font(.title2)
                     
@@ -363,8 +364,9 @@ struct DetectiveRecipeCard: View {
                         .cornerRadius(12)
                     }
                 }
+                }
+                .padding(20)
             }
-            .padding(20)
         }
     }
     
