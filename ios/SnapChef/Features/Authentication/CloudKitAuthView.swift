@@ -138,6 +138,9 @@ struct CloudKitAuthView: View {
             UsernameSetupView()
                 .interactiveDismissDisabled()
         }
+        .onAppear {
+            print("🔍 DEBUG: CloudKitAuthView appeared")
+        }
     }
 
     private func handleSignInWithApple(_ result: Result<ASAuthorization, Error>) {

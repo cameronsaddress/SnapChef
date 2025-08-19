@@ -219,6 +219,9 @@ struct MessagesShareView: View {
                 Text(error)
             }
         }
+        .onAppear {
+            print("🔍 DEBUG: MessagesShareView appeared")
+        }
     }
 
     private func generateMessageText() -> String {

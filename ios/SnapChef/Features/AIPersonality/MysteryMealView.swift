@@ -99,6 +99,9 @@ struct MysteryMealView: View {
             }
             .navigationBarHidden(true)
         }
+        .onAppear {
+            print("🔍 DEBUG: [MysteryMealView] appeared")
+        }
         .fullScreenCover(isPresented: $showingResults) {
             RecipeResultsView(
                 recipes: generatedRecipes,

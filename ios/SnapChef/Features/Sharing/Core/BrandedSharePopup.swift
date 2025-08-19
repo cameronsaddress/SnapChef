@@ -114,6 +114,7 @@ struct BrandedSharePopup: View {
             .scaleEffect(animationScale)
             .opacity(animationOpacity)
             .onAppear {
+                print("🔍 DEBUG: BrandedSharePopup appeared")
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                     animationScale = 1.0
                     animationOpacity = 1.0

@@ -104,6 +104,7 @@ struct ShareGeneratorView: View {
             )
         }
         .onAppear {
+            print("🔍 DEBUG: ShareGeneratorView appeared")
             // Fast spin that slows down to 30 degrees
             withAnimation(.easeOut(duration: 1.0)) {
                 animationPhase = 0.0833 // 30 degrees / 360 degrees = 0.0833

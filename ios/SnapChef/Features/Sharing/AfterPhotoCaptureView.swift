@@ -107,6 +107,9 @@ struct AfterPhotoCaptureView: View {
         .sheet(isPresented: $showPhotoLibrary) {
             AfterPhotoLibraryPicker(image: $afterPhoto)
         }
+        .onAppear {
+            print("🔍 DEBUG: [AfterPhotoCaptureView] appeared")
+        }
         .alert("Error", isPresented: .constant(uploadError != nil)) {
             Button("OK") {
                 uploadError = nil

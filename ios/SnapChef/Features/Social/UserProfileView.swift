@@ -66,6 +66,9 @@ struct UserProfileView: View {
                 }
             }
         }
+        .onAppear {
+            print("🔍 DEBUG: UserProfileView appeared")
+        }
         .task {
             await viewModel.loadUserProfile(userID: userID)
         }
@@ -526,6 +529,9 @@ struct FollowListView: View {
                     .foregroundColor(.white)
                 }
             }
+        }
+        .onAppear {
+            print("🔍 DEBUG: FollowListView appeared")
         }
         .task {
             await viewModel.loadUsers(userID: userID, mode: mode)

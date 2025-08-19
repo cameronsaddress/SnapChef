@@ -21,6 +21,11 @@ struct RecipeResultsView: View {
     @State private var showBrandedShare = false
     @State private var shareContent: ShareContent?
     
+    // Detective-style animation states
+    @State private var recipesDiscoveredAnimation = false
+    @State private var sparkleAnimation = false
+    @State private var cardEntranceAnimations = Array(repeating: false, count: 5)
+    
     enum ActiveSheet: Identifiable {
         case recipeDetail(Recipe)
         case shareGenerator(Recipe)
@@ -44,107 +49,80 @@ struct RecipeResultsView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Animated background
-                MagicalBackground()
-                    .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 30) {
-                        // Success header
-                        SuccessHeaderView()
-                            .staggeredFade(index: 0, isShowing: contentVisible)
-                        
-                        // In Your Fridge card
-                        if !ingredients.isEmpty {
-                            FridgeInventoryCard(
-                                ingredientCount: ingredients.count,
-                                onTap: {
-                                    activeSheet = .fridgeInventory
-                                }
-                            )
-                            .staggeredFade(index: 1, isShowing: contentVisible)
-                        }
-                        
-                        // Recipe cards
-                        ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
-                            MagicalRecipeCard(
-                                recipe: recipe,
-                                isSaved: savedRecipeIds.contains(recipe.id),
-                                onSelect: {
-                                    activeSheet = .recipeDetail(recipe)
-                                    confettiTrigger = true
-                                },
-                                onShare: {
-                                    // Use branded share popup instead
-                                    shareContent = ShareContent(
-                                        type: .recipe(recipe),
-                                        beforeImage: capturedImage,
-                                        afterImage: nil
+        ZStack {
+            // Dark detective background - exact same as DetectiveResultsView
+            LinearGradient(
+                colors: [
+                    Color(hex: "#0f0625"),
+                    Color(hex: "#1a0033"),
+                    Color(hex: "#0a051a")
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 30) {
+                    // Header with close button
+                    HStack {
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 28))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#9b59b6"), Color(hex: "#8e44ad")],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
                                     )
-                                    showBrandedShare = true
-                                },
-                                onSave: {
-                                    saveRecipe(recipe)
-                                }
-                            )
-                            .staggeredFade(index: index + (ingredients.isEmpty ? 1 : 2), isShowing: contentVisible)
+                                )
                         }
                         
-                        // Viral share prompt
-                        ViralSharePrompt(action: {
-                            if let firstRecipe = recipes.first {
-                                // Use branded share for viral prompt too
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    
+                    // Recipe Cards with Detective styling
+                    ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
+                        DetectiveRecipeCard(
+                            recipe: recipe,
+                            isSaved: savedRecipeIds.contains(recipe.id),
+                            capturedImage: capturedImage,
+                            onSelect: {
+                                activeSheet = .recipeDetail(recipe)
+                                confettiTrigger = true
+                            },
+                            onShare: {
                                 shareContent = ShareContent(
-                                    type: .recipe(firstRecipe),
+                                    type: .recipe(recipe),
                                     beforeImage: capturedImage,
                                     afterImage: nil
                                 )
                                 showBrandedShare = true
+                            },
+                            onSave: {
+                                saveRecipe(recipe)
                             }
-                        })
-                        .staggeredFade(index: recipes.count + (ingredients.isEmpty ? 1 : 2), isShowing: contentVisible)
-                        .padding(.top, 20)
+                        )
+                        .padding(.horizontal, 20)
+                        .opacity(cardEntranceAnimations[safe: index] == true ? 1 : 0)
+                        .scaleEffect(cardEntranceAnimations[safe: index] == true ? 1 : 0.8)
+                        .animation(
+                            .spring(response: 0.8, dampingFraction: 0.7)
+                                .delay(1.2 + Double(index) * 0.2),
+                            value: cardEntranceAnimations[safe: index]
+                        )
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 100)
+                    
+                    Spacer(minLength: 50)
                 }
-                
-                // Confetti effect - commented out as ConfettiView doesn't exist
-                // if confettiTrigger {
-                //     ConfettiView()
-                //         .allowsHitTesting(false)
-                // }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(content: {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { 
-                        if savedRecipeIds.isEmpty && !recipes.isEmpty {
-                            showingExitConfirmation = true
-                        } else {
-                            dismiss()
-                        }
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white)
-                            .background(Circle().fill(Color.black.opacity(0.2)))
-                    }
-                }
-                
-                ToolbarItem(placement: .principal) {
-                    Text("Your Recipes")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                }
-            })
         }
+        .navigationBarHidden(true)
         .onAppear {
-            withAnimation(.easeOut(duration: 0.5)) {
-                contentVisible = true
-            }
+            print("🔍 DEBUG: RecipeResultsView appeared")
+            startAnimations()
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
@@ -218,13 +196,278 @@ struct RecipeResultsView: View {
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
     }
+    
+    private func startAnimations() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            recipesDiscoveredAnimation = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            sparkleAnimation = true
+        }
+        
+        // Stagger card entrance animations
+        for i in 0..<min(recipes.count, 5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2 + Double(i) * 0.2) {
+                if i < cardEntranceAnimations.count {
+                    cardEntranceAnimations[i] = true
+                }
+            }
+        }
+    }
 }
 
-// MARK: - Success Header
+// MARK: - Array Safe Access Extension
+extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}
+
+// MARK: - Detective Recipe Card
+struct DetectiveRecipeCard: View {
+    let recipe: Recipe
+    let isSaved: Bool
+    let capturedImage: UIImage?
+    let onSelect: () -> Void
+    let onShare: () -> Void
+    let onSave: () -> Void
+    
+    var body: some View {
+        DetectiveCard {
+            VStack(spacing: 20) {
+                // Photo container at top (full width, 150px height) - EXACTLY like DetectiveView
+                detectivePhotoContainer(recipe: recipe)
+                    .frame(height: 150)
+                    .padding(.horizontal, -20) // Extend to card edges
+                    .padding(.top, -20)
+                
+                // Confidence indicator (95% match for recipes)
+                HStack(spacing: 12) {
+                    Text("🎯")
+                        .font(.title2)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Confidence: 95%")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        
+                        Text("Excellent match")
+                            .font(.caption)
+                            .foregroundColor(Color(hex: "#43e97b"))
+                    }
+                    
+                    Spacer()
+                    
+                    Text("95%")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(Color(hex: "#43e97b"))
+                }
+                
+                // Recipe info
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Generated Recipe")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                            
+                            Text(recipe.name)
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .lineLimit(2)
+                        }
+                        
+                        Spacer()
+                        
+                        // Difficulty badge
+                        Text(recipe.difficulty.rawValue.capitalized)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(Color(hex: "#9b59b6").opacity(0.3))
+                            )
+                    }
+                    
+                    Divider()
+                        .overlay(Color.white.opacity(0.3))
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Description")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                            
+                            Text(recipe.description)
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.9))
+                                .lineLimit(3)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: onSelect) {
+                            HStack(spacing: 6) {
+                                Text("View Recipe")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 12))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(Color(hex: "#9b59b6"))
+                            )
+                        }
+                    }
+                }
+                
+                // Action buttons at bottom - EXACTLY like DetectiveView
+                HStack(spacing: 12) {
+                    Button(action: onSave) {
+                        HStack(spacing: 8) {
+                            Image(systemName: isSaved ? "heart.fill" : "heart")
+                            Text(isSaved ? "Saved" : "Save")
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(isSaved ? Color(hex: "#4CAF50").opacity(0.3) : Color.white.opacity(0.2))
+                        .cornerRadius(12)
+                    }
+                    .disabled(isSaved)
+                    
+                    Button(action: onShare) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "square.and.arrow.up")
+                            Text("Share")
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.white.opacity(0.2))
+                        .cornerRadius(12)
+                    }
+                }
+            }
+            .padding(20)
+        }
+    }
+    
+    // Photo container exactly like DetectiveView
+    private func detectivePhotoContainer(recipe: Recipe) -> some View {
+        ZStack {
+            // Background gradient
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#667eea"),
+                            Color(hex: "#764ba2")
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            
+            HStack(spacing: 0) {
+                // Before Photo (Left Side) - Fridge image
+                Group {
+                    if let beforePhoto = capturedImage {
+                        Image(uiImage: beforePhoto)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        VStack {
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.system(size: 30))
+                                .foregroundColor(.white.opacity(0.5))
+                            Text("Original")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black.opacity(0.2))
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .overlay(
+                    VStack {
+                        Spacer()
+                        if capturedImage != nil {
+                            Text("BEFORE")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.6))
+                                )
+                                .padding(.bottom, 4)
+                        }
+                    }
+                )
+                
+                // Divider
+                Rectangle()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 1)
+                
+                // After Photo (Right Side) - Placeholder for cooked meal
+                VStack(spacing: 4) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.white.opacity(0.7))
+                    Text("Take Photo")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.white.opacity(0.1))
+                .clipped()
+                .overlay(
+                    VStack {
+                        Spacer()
+                        Text("AFTER")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(Color.black.opacity(0.6))
+                            )
+                            .padding(.bottom, 4)
+                    }
+                )
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+
+
+// MARK: - Success Header (Legacy - now using Detective style)
 struct SuccessHeaderView: View {
     var body: some View {
         VStack(spacing: 20) {
-            
             Text("Recipe Magic Complete!")
                 .font(.system(size: 28, weight: .bold, design: .rounded))
                 .foregroundStyle(
@@ -254,12 +497,12 @@ struct TimeIndicator: View {
                 .font(.system(size: 14, weight: .semibold))
                 .fixedSize() // Prevent text wrapping
         }
-        .foregroundColor(Color(hex: "#4facfe"))
+        .foregroundColor(.white)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
             Capsule()
-                .fill(Color(hex: "#4facfe").opacity(0.2))
+                .fill(Color.white.opacity(0.2))
         )
     }
 }
@@ -276,12 +519,12 @@ struct CalorieIndicator: View {
                 .font(.system(size: 14, weight: .semibold))
                 .frame(minWidth: 40)
         }
-        .foregroundColor(Color(hex: "#f093fb"))
+        .foregroundColor(.white)
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
         .background(
             Capsule()
-                .fill(Color(hex: "#f093fb").opacity(0.2))
+                .fill(Color.white.opacity(0.2))
         )
     }
 }
@@ -315,6 +558,7 @@ struct DifficultyBadge: View {
 struct MagicalRecipeCard: View {
     let recipe: Recipe
     let isSaved: Bool
+    let capturedImage: UIImage?
     let onSelect: () -> Void
     let onShare: () -> Void
     let onSave: () -> Void
@@ -325,36 +569,34 @@ struct MagicalRecipeCard: View {
     @State private var likeCount = 0
     @State private var isLoadingLike = false
     @StateObject private var cloudKitSync = CloudKitSyncService.shared
+    @EnvironmentObject var appState: AppState
     
     var body: some View {
         GlassmorphicCard(content: {
             VStack(alignment: .leading, spacing: 20) {
-                // Recipe title at top
+                // Recipe title at top - clickable
                 Text(recipe.name)
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onSelect()
+                    }
                 
-                // Header with image
+                // Header with before/after photos
                 HStack(spacing: 20) {
-                    // Recipe image placeholder
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#667eea"),
-                                        Color(hex: "#764ba2")
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 100, height: 100)
-                        
-                        Text(recipe.difficulty.emoji)
-                            .font(.system(size: 40))
+                    // Recipe photo view with before/after
+                    CustomRecipePhotoView(
+                        fridgeImage: capturedImage,
+                        width: 100,
+                        height: 100,
+                        showLabels: true
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onSelect()
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
@@ -370,12 +612,8 @@ struct MagicalRecipeCard: View {
                     
                     Spacer()
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    onSelect()
-                }
                 
-                // Description
+                // Description - clickable
                 Text(recipe.description)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white.opacity(0.8))
@@ -396,7 +634,7 @@ struct MagicalRecipeCard: View {
                     )
                     
                     ActionButton(
-                        title: isSaved ? "Saved" : "Save",
+                        title: isSaved ? "✓" : "Save",
                         icon: isSaved ? "checkmark.circle.fill" : "bookmark.fill",
                         color: isSaved ? Color(hex: "#43e97b") : Color(hex: "#667eea"),
                         action: onSave
@@ -404,16 +642,9 @@ struct MagicalRecipeCard: View {
                     .disabled(isSaved)
                     
                     ActionButton(
-                        title: "Cook",
-                        icon: "flame.fill",
-                        color: Color(hex: "#f093fb"),
-                        action: onSelect
-                    )
-                    
-                    ActionButton(
                         title: "Share",
                         icon: "square.and.arrow.up",
-                        color: Color(hex: "#4facfe"),
+                        color: Color(hex: "#9b59b6"),
                         action: onShare
                     )
                 }
@@ -434,38 +665,77 @@ struct MagicalRecipeCard: View {
     private func toggleLike() {
         guard !isLoadingLike else { return }
         
+        // Apply changes locally first for immediate feedback
+        let previousLiked = isLiked
+        let previousCount = likeCount
+        
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            isLiked.toggle()
+            likeCount = isLiked ? likeCount + 1 : max(0, likeCount - 1)
+        }
+        
+        // Store local like state
+        UserDefaults.standard.set(isLiked, forKey: "like_\(recipe.id.uuidString)")
+        UserDefaults.standard.set(likeCount, forKey: "likeCount_\(recipe.id.uuidString)")
+        
+        // Sync with CloudKit if authenticated
         Task {
             isLoadingLike = true
             defer { isLoadingLike = false }
             
             do {
-                if isLiked {
-                    try await cloudKitSync.unlikeRecipe(recipe.id.uuidString)
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        isLiked = false
-                        likeCount = max(0, likeCount - 1)
-                    }
-                } else {
-                    // For demo purposes, use current user ID as owner ID
-                    let ownerID = CloudKitAuthManager.shared.currentUser?.recordID ?? "anonymous"
-                    try await cloudKitSync.likeRecipe(recipe.id.uuidString, recipeOwnerID: ownerID)
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        isLiked = true
-                        likeCount += 1
+                if CloudKitAuthManager.shared.isAuthenticated {
+                    if previousLiked {
+                        try await cloudKitSync.unlikeRecipe(recipe.id.uuidString)
+                    } else {
+                        let ownerID = CloudKitAuthManager.shared.currentUser?.recordID ?? "anonymous"
+                        try await cloudKitSync.likeRecipe(recipe.id.uuidString, recipeOwnerID: ownerID)
                     }
                 }
             } catch {
-                print("Failed to toggle like: \(error)")
+                print("Failed to sync like with CloudKit: \(error)")
+                // Revert local changes on failure if authenticated
+                if CloudKitAuthManager.shared.isAuthenticated {
+                    await MainActor.run {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                            isLiked = previousLiked
+                            likeCount = previousCount
+                        }
+                        UserDefaults.standard.set(isLiked, forKey: "like_\(recipe.id.uuidString)")
+                        UserDefaults.standard.set(likeCount, forKey: "likeCount_\(recipe.id.uuidString)")
+                    }
+                }
             }
         }
     }
     
     private func loadLikeStatus() async {
-        do {
-            isLiked = try await cloudKitSync.isRecipeLiked(recipe.id.uuidString)
-            likeCount = try await cloudKitSync.getRecipeLikeCount(recipe.id.uuidString)
-        } catch {
-            print("Failed to load like status: \(error)")
+        // Load local like state first
+        let localLiked = UserDefaults.standard.bool(forKey: "like_\(recipe.id.uuidString)")
+        let localCount = UserDefaults.standard.integer(forKey: "likeCount_\(recipe.id.uuidString)")
+        
+        await MainActor.run {
+            self.isLiked = localLiked
+            self.likeCount = localCount
+        }
+        
+        // Try to sync with CloudKit if authenticated
+        if CloudKitAuthManager.shared.isAuthenticated {
+            do {
+                let cloudLiked = try await cloudKitSync.isRecipeLiked(recipe.id.uuidString)
+                let cloudCount = try await cloudKitSync.getRecipeLikeCount(recipe.id.uuidString)
+                
+                await MainActor.run {
+                    self.isLiked = cloudLiked
+                    self.likeCount = cloudCount
+                    // Update local storage with CloudKit data
+                    UserDefaults.standard.set(cloudLiked, forKey: "like_\(recipe.id.uuidString)")
+                    UserDefaults.standard.set(cloudCount, forKey: "likeCount_\(recipe.id.uuidString)")
+                }
+            } catch {
+                print("Failed to load like status from CloudKit: \(error)")
+                // Keep local state if CloudKit fails
+            }
         }
     }
 }
@@ -565,7 +835,7 @@ struct ViralSharePrompt: View {
         .background(
             GlassmorphicCard(content: {
                 Color.clear
-            }, glowColor: Color(hex: "#f093fb"))
+            }, glowColor: Color(hex: "#9b59b6"))
         )
         .onAppear {
             withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
@@ -783,6 +1053,138 @@ struct ActivityView: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - Custom Recipe Photo View for Results
+struct CustomRecipePhotoView: View {
+    let fridgeImage: UIImage?
+    let width: CGFloat
+    let height: CGFloat
+    let showLabels: Bool
+    
+    private var halfWidth: CGFloat {
+        width / 2
+    }
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // Before (Fridge) Photo - Left Side
+            beforePhotoView
+                .frame(width: halfWidth, height: height)
+                .clipped()
+                .overlay(beforeLabel)
+            
+            // Divider line
+            Rectangle()
+                .fill(Color.white.opacity(0.3))
+                .frame(width: 1)
+            
+            // After (Camera Icon) - Right Side
+            afterPhotoPlaceholder
+                .frame(width: halfWidth, height: height)
+                .clipped()
+                .overlay(afterLabel)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .frame(width: width, height: height)
+    }
+    
+    private var beforePhotoView: some View {
+        Group {
+            if let photo = fridgeImage {
+                Image(uiImage: photo)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .overlay(Color.black.opacity(0.2))
+            } else {
+                beforePhotoPlaceholder
+            }
+        }
+    }
+    
+    private var beforePhotoPlaceholder: some View {
+        VStack {
+            Image(systemName: "refrigerator")
+                .font(.system(size: height * 0.25))
+                .foregroundColor(.white.opacity(0.5))
+            if showLabels {
+                Text("Fridge")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(hex: "#667eea"),
+                    Color(hex: "#764ba2")
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+    }
+    
+    private var afterPhotoPlaceholder: some View {
+        VStack(spacing: 4) {
+            Image(systemName: "camera.fill")
+                .font(.system(size: height * 0.2))
+                .foregroundColor(.white.opacity(0.7))
+            if showLabels {
+                Text("After")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(hex: "#667eea"),
+                    Color(hex: "#764ba2")
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+    }
+    
+    private var beforeLabel: some View {
+        Group {
+            if showLabels && fridgeImage != nil {
+                VStack {
+                    Spacer()
+                    labelBadge(text: "BEFORE")
+                        .padding(.bottom, 4)
+                }
+            }
+        }
+    }
+    
+    private var afterLabel: some View {
+        Group {
+            if showLabels {
+                VStack {
+                    Spacer()
+                    labelBadge(text: "AFTER")
+                        .padding(.bottom, 4)
+                }
+            }
+        }
+    }
+    
+    private func labelBadge(text: String) -> some View {
+        Text(text)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.6))
+            )
+    }
 }
 
 #Preview {

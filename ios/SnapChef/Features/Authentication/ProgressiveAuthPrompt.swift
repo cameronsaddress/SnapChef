@@ -356,6 +356,7 @@ struct ProgressiveAuthPrompt: View {
             }
         }
         .onAppear {
+            print("🔍 DEBUG: ProgressiveAuthPrompt appeared")
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                 isVisible = true
             }

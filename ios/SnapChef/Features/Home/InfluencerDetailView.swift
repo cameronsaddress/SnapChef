@@ -221,6 +221,7 @@ struct InfluencerDetailView: View {
             }
         }
         .onAppear {
+            print("🔍 DEBUG: [InfluencerDetailView] appeared")
             withAnimation(.easeOut(duration: 0.5)) {
                 contentVisible = true
             }

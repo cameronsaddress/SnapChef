@@ -67,6 +67,9 @@ struct FeedView: View {
             DiscoverUsersView()
                 .environmentObject(appState)
         }
+        .onAppear {
+            print("🔍 DEBUG: FeedView appeared")
+        }
         .task {
             // Load initial data
             await refreshUserStats()

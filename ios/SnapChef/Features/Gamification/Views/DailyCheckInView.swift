@@ -53,6 +53,9 @@ struct DailyCheckInView: View {
                 }
             }
         }
+        .onAppear {
+            print("🔍 DEBUG: DailyCheckInView appeared")
+        }
     }
 
     // MARK: - Streak Counter

@@ -125,6 +125,7 @@ struct ChallengeHubView: View {
             }
         }
         .onAppear {
+            print("🔍 DEBUG: ChallengeHubView appeared")
             // Track that user viewed challenges for progressive auth
             appState.trackAnonymousAction(.challengeViewed)
 

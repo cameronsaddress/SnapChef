@@ -173,6 +173,7 @@ struct EmojiFlickGame: View {
             spawnEmoji()
         }
         .onAppear {
+            print("🔍 DEBUG: [EmojiFlickGame] appeared")
             spawnInitialEmojis()
             if deviceManager.shouldShowParticles {
                 createAmbientParticles()

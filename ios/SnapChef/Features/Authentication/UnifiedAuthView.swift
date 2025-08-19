@@ -153,6 +153,9 @@ struct UnifiedAuthView: View {
             UsernameSetupView()
                 .interactiveDismissDisabled()
         }
+        .onAppear {
+            print("🔍 DEBUG: [UnifiedAuthView] appeared")
+        }
         .onChange(of: authManager.isAuthenticated) { isAuth in
             if isAuth {
                 dismiss()

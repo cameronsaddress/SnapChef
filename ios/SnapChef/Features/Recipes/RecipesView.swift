@@ -122,6 +122,8 @@ struct RecipesView: View {
         .navigationBarHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear {
+            print("🔍 DEBUG: RecipesView appeared")
+            
             withAnimation(.easeOut(duration: 0.5)) {
                 contentVisible = true
             }

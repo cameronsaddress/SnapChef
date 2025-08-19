@@ -33,33 +33,39 @@ struct RecipeDetailView: View {
     
     @ViewBuilder
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Recipe title with like and share buttons
-            HStack(alignment: .top, spacing: 12) {
-                Text(recipe.name)
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .fixedSize(horizontal: false, vertical: true)
+        DetectiveCard {
+            VStack(alignment: .leading, spacing: 16) {
+                // Recipe title with like and share buttons
+                HStack(alignment: .top, spacing: 12) {
+                    Text(recipe.name)
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                    
+                    Spacer()
+                    
+                    shareButton
+                    likeButton
+                }
                 
-                Spacer()
+                authorInfo
                 
-                shareButton
-                likeButton
+                Text(recipe.description)
+                    .font(.system(size: 18))
+                    .foregroundColor(.white.opacity(0.9))
+                
+                HStack(spacing: 20) {
+                    Label("\(recipe.prepTime + recipe.cookTime)m", systemImage: "clock")
+                        .foregroundColor(Color(hex: "#9b59b6"))
+                    Label("\(recipe.servings) servings", systemImage: "person.2")
+                        .foregroundColor(Color(hex: "#9b59b6"))
+                    Label(recipe.difficulty.rawValue, systemImage: "star.fill")
+                        .foregroundColor(Color(hex: "#9b59b6"))
+                }
+                .font(.system(size: 16, weight: .medium))
             }
-            
-            authorInfo
-            
-            Text(recipe.description)
-                .font(.system(size: 18))
-                .foregroundColor(.secondary)
-            
-            HStack(spacing: 20) {
-                Label("\(recipe.prepTime + recipe.cookTime)m", systemImage: "clock")
-                Label("\(recipe.servings) servings", systemImage: "person.2")
-                Label(recipe.difficulty.rawValue, systemImage: "star.fill")
-            }
-            .font(.system(size: 16, weight: .medium))
-            .foregroundColor(.secondary)
         }
+        .padding(.horizontal, 20)
     }
     
     @ViewBuilder
@@ -75,7 +81,13 @@ struct RecipeDetailView: View {
             VStack(spacing: 4) {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(size: 24, weight: .medium))
-                    .foregroundColor(.blue)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color(hex: "#9b59b6"), Color(hex: "#8e44ad")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
         }
     }
@@ -87,13 +99,13 @@ struct RecipeDetailView: View {
                 ZStack {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(.pink)
+                        .foregroundColor(Color(hex: "#9b59b6"))
                         .scaleEffect(isLiked ? 1.1 : 0)
                         .opacity(isLiked ? 1 : 0)
                     
                     Image(systemName: "heart")
                         .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.white.opacity(0.6))
                         .scaleEffect(isLiked ? 0 : 1.0)
                         .opacity(isLiked ? 0 : 1)
                 }
@@ -102,7 +114,7 @@ struct RecipeDetailView: View {
                 if likeCount > 0 {
                     Text("\(likeCount)")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(isLiked ? .pink : .gray)
+                        .foregroundColor(isLiked ? Color(hex: "#9b59b6") : .white.opacity(0.6))
                         .animation(.easeInOut(duration: 0.2), value: isLiked)
                 }
             }
@@ -118,10 +130,10 @@ struct RecipeDetailView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 20))
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color(hex: "#9b59b6"))
                     Text("by \(authorName.isEmpty ? "Chef" : authorName)")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color(hex: "#9b59b6"))
                 }
             }
             .buttonStyle(PlainButtonStyle())
@@ -130,40 +142,68 @@ struct RecipeDetailView: View {
     
     @ViewBuilder
     private var ingredientsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Ingredients")
-                .font(.system(size: 24, weight: .bold))
-            
-            ForEach(recipe.ingredients) { ingredient in
+        DetectiveCard {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Image(systemName: ingredient.isAvailable ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(ingredient.isAvailable ? .green : .gray)
-                    Text("\(ingredient.quantity) \(ingredient.unit ?? "") \(ingredient.name)")
+                    Image(systemName: "list.bullet.circle.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(Color(hex: "#9b59b6"))
+                    
+                    Text("Ingredients")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
                 }
-                .padding(.vertical, 4)
+                
+                ForEach(recipe.ingredients) { ingredient in
+                    HStack {
+                        Image(systemName: ingredient.isAvailable ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(ingredient.isAvailable ? Color(hex: "#9b59b6") : .white.opacity(0.5))
+                        Text("\(ingredient.quantity) \(ingredient.unit ?? "") \(ingredient.name)")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.9))
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                }
             }
         }
+        .padding(.horizontal, 20)
     }
     
     @ViewBuilder
     private var instructionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Instructions")
-                .font(.system(size: 24, weight: .bold))
-            
-            ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
-                HStack(alignment: .top) {
-                    Text("\(index + 1).")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.blue)
-                        .frame(width: 30)
-                    Text(instruction)
-                        .font(.system(size: 16))
+        DetectiveCard {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "doc.text.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(Color(hex: "#9b59b6"))
+                    
+                    Text("Instructions")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                    
                     Spacer()
                 }
-                .padding(.vertical, 8)
+                
+                ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
+                    HStack(alignment: .top) {
+                        Text("\(index + 1).")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(Color(hex: "#9b59b6"))
+                            .frame(width: 30)
+                        Text(instruction)
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.9))
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                }
             }
         }
+        .padding(.horizontal, 20)
     }
     
     @ViewBuilder
@@ -180,161 +220,245 @@ struct RecipeDetailView: View {
     @ViewBuilder
     private var cookingTechniquesSection: some View {
         if !recipe.cookingTechniques.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#ffd700"))
-                    
-                    Text("Cooking Techniques")
-                        .font(.system(size: 24, weight: .bold))
-                }
-                
-                ForEach(recipe.cookingTechniques, id: \.self) { technique in
+            DetectiveCard {
+                VStack(alignment: .leading, spacing: 16) {
                     HStack {
-                        Image(systemName: "arrow.right.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color(hex: "#ffd700"))
-                        Text(technique)
-                            .font(.system(size: 16, weight: .medium))
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(Color(hex: "#9b59b6"))
+                        
+                        Text("Cooking Techniques")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        
                         Spacer()
                     }
-                    .padding(.vertical, 4)
+                    
+                    ForEach(recipe.cookingTechniques, id: \.self) { technique in
+                        HStack {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color(hex: "#9b59b6"))
+                            Text(technique)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.9))
+                            Spacer()
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
             }
+            .padding(.horizontal, 20)
         }
     }
     
     @ViewBuilder
     private var flavorProfileSection: some View {
-        if let flavorProfile = recipe.flavorProfile {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#ffd700"))
+        if let flavorProfile = recipe.flavorProfile,
+           (flavorProfile.sweet > 0 || flavorProfile.salty > 0 || flavorProfile.sour > 0 || 
+            flavorProfile.bitter > 0 || flavorProfile.umami > 0) {
+            DetectiveCard {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(Color(hex: "#9b59b6"))
+                        
+                        Text("Flavor Profile")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                    }
                     
-                    Text("Flavor Profile")
-                        .font(.system(size: 24, weight: .bold))
-                }
-                
-                VStack(spacing: 8) {
-                    FlavorBar(label: "Sweet", value: flavorProfile.sweet, color: Color(hex: "#ff6b6b"))
-                    FlavorBar(label: "Salty", value: flavorProfile.salty, color: Color(hex: "#4ecdc4"))
-                    FlavorBar(label: "Sour", value: flavorProfile.sour, color: Color(hex: "#ffe66d"))
-                    FlavorBar(label: "Bitter", value: flavorProfile.bitter, color: Color(hex: "#95e77e"))
-                    FlavorBar(label: "Umami", value: flavorProfile.umami, color: Color(hex: "#a8e6cf"))
+                    VStack(spacing: 12) {
+                        FlavorBar(label: "Sweet", value: flavorProfile.sweet, color: Color(hex: "#ff6b6b"))
+                        FlavorBar(label: "Salty", value: flavorProfile.salty, color: Color(hex: "#4ecdc4"))
+                        FlavorBar(label: "Sour", value: flavorProfile.sour, color: Color(hex: "#ffe66d"))
+                        FlavorBar(label: "Bitter", value: flavorProfile.bitter, color: Color(hex: "#95e77e"))
+                        FlavorBar(label: "Umami", value: flavorProfile.umami, color: Color(hex: "#a8e6cf"))
+                    }
                 }
             }
+            .padding(.horizontal, 20)
         }
     }
     
     @ViewBuilder
     private var secretIngredientsSection: some View {
         if !recipe.secretIngredients.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#ffd700"))
-                    
-                    Text("Secret Ingredients")
-                        .font(.system(size: 24, weight: .bold))
-                }
-                
-                ForEach(recipe.secretIngredients, id: \.self) { secret in
+            DetectiveCard {
+                VStack(alignment: .leading, spacing: 16) {
                     HStack {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color(hex: "#ffd700"))
-                        Text(secret)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.primary)
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(Color(hex: "#9b59b6"))
+                        
+                        Text("Secret Ingredients")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        
                         Spacer()
                     }
-                    .padding(.vertical, 4)
+                    
+                    ForEach(recipe.secretIngredients, id: \.self) { secret in
+                        HStack {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(Color(hex: "#9b59b6"))
+                            Text(secret)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.9))
+                            Spacer()
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
             }
+            .padding(.horizontal, 20)
         }
     }
     
     @ViewBuilder
     private var proTipsSection: some View {
         if !recipe.proTips.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#ffd700"))
-                    
-                    Text("Pro Tips")
-                        .font(.system(size: 24, weight: .bold))
-                }
-                
-                ForEach(Array(recipe.proTips.enumerated()), id: \.offset) { index, tip in
-                    HStack(alignment: .top) {
-                        Text("\(index + 1).")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(Color(hex: "#ffd700"))
-                            .frame(width: 25)
-                        Text(tip)
-                            .font(.system(size: 16, weight: .medium))
-                            .fixedSize(horizontal: false, vertical: true)
+            DetectiveCard {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Image(systemName: "lightbulb.fill")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(Color(hex: "#9b59b6"))
+                        
+                        Text("Pro Tips")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        
                         Spacer()
                     }
-                    .padding(.vertical, 6)
+                    
+                    ForEach(Array(recipe.proTips.enumerated()), id: \.offset) { index, tip in
+                        HStack(alignment: .top) {
+                            Text("\(index + 1).")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(Color(hex: "#9b59b6"))
+                                .frame(width: 25)
+                            Text(tip)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.9))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer()
+                        }
+                        .padding(.vertical, 6)
+                    }
                 }
             }
+            .padding(.horizontal, 20)
         }
     }
     
     @ViewBuilder
     private var visualCluesSection: some View {
         if !recipe.visualClues.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "eye.fill")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#ffd700"))
-                    
-                    Text("Visual Clues")
-                        .font(.system(size: 24, weight: .bold))
-                }
-                
-                ForEach(recipe.visualClues, id: \.self) { clue in
+            DetectiveCard {
+                VStack(alignment: .leading, spacing: 16) {
                     HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color(hex: "#43e97b"))
-                        Text(clue)
-                            .font(.system(size: 16, weight: .medium))
+                        Image(systemName: "eye.fill")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(Color(hex: "#9b59b6"))
+                        
+                        Text("Visual Clues")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        
                         Spacer()
                     }
-                    .padding(.vertical, 4)
+                    
+                    ForEach(recipe.visualClues, id: \.self) { clue in
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color(hex: "#43e97b"))
+                            Text(clue)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.9))
+                            Spacer()
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
             }
+            .padding(.horizontal, 20)
         }
     }
     
     @ViewBuilder
     private var nutritionSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Nutrition Facts")
-                .font(.system(size: 24, weight: .bold))
-            
-            HStack(spacing: 16) {
-                RecipeDetailNutritionItem(label: "Calories", value: "\(recipe.nutrition.calories)")
-                RecipeDetailNutritionItem(label: "Protein", value: "\(recipe.nutrition.protein)g")
-                RecipeDetailNutritionItem(label: "Carbs", value: "\(recipe.nutrition.carbs)g")
-                RecipeDetailNutritionItem(label: "Fat", value: "\(recipe.nutrition.fat)g")
+        DetectiveCard {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(Color(hex: "#9b59b6"))
+                    
+                    Text("Nutrition Facts")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                }
+                
+                HStack(spacing: 16) {
+                    RecipeDetailNutritionItem(label: "Calories", value: "\(recipe.nutrition.calories)")
+                    RecipeDetailNutritionItem(label: "Protein", value: "\(recipe.nutrition.protein)g")
+                    RecipeDetailNutritionItem(label: "Carbs", value: "\(recipe.nutrition.carbs)g")
+                    RecipeDetailNutritionItem(label: "Fat", value: "\(recipe.nutrition.fat)g")
+                }
             }
         }
+        .padding(.horizontal, 20)
     }
 
     var body: some View {
-        NavigationStack {
+        ZStack {
+            // Dark detective background
+            LinearGradient(
+                colors: [
+                    Color(hex: "#0f0625"),
+                    Color(hex: "#1a0033"),
+                    Color(hex: "#0a051a")
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(spacing: 30) {
+                    // Header with close button
+                    HStack {
+                        Button(action: { showingPrintView = true }) {
+                            Image(systemName: "printer")
+                                .font(.system(size: 28))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#9b59b6"), Color(hex: "#8e44ad")],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
+                        
+                        Spacer()
+                        
+                        Button("Done") {
+                            dismiss()
+                        }
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    
                     // Recipe before/after photos
                     RecipePhotoView(
                         recipe: recipe,
@@ -378,87 +502,14 @@ struct RecipeDetailView: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
 
-                    Divider()
-                        .padding(.horizontal, 20)
-
                     // Comments Section
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Text("Comments")
-                                .font(.system(size: 24, weight: .bold))
-                            Spacer()
-                            if !commentsViewModel.comments.isEmpty {
-                                Text("\(commentsViewModel.comments.count)")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-
-                        // Comment Input
-                        HStack(spacing: 12) {
-                            TextField("Add a comment...", text: $newCommentText)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-
-                            Button(action: submitComment) {
-                                Image(systemName: "paperplane.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(newCommentText.isEmpty ? .gray : .blue)
-                            }
-                            .disabled(newCommentText.isEmpty || isSubmittingComment)
-                        }
-
-                        // Comments List
-                        if commentsViewModel.isLoading && commentsViewModel.comments.isEmpty {
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .tint(.gray)
-                                Spacer()
-                            }
-                            .padding(.vertical, 20)
-                        } else if commentsViewModel.comments.isEmpty {
-                            Text("Be the first to comment!")
-                                .font(.system(size: 16))
-                                .foregroundColor(.secondary)
-                                .padding(.vertical, 20)
-                        } else {
-                            ForEach(commentsViewModel.comments.prefix(5)) { comment in
-                                RecipeCommentRow(comment: comment, onUserTap: {
-                                    selectedUserID = comment.userID
-                                    selectedUserName = comment.userName
-                                    showingUserProfile = true
-                                })
-                                .padding(.vertical, 8)
-                            }
-
-                            if commentsViewModel.comments.count > 5 {
-                                Button(action: { showingAllComments = true }) {
-                                    Text("View all \(commentsViewModel.comments.count) comments")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding()
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { showingPrintView = true }) {
-                        Image(systemName: "printer")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white)
-                    }
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+                    commentsSection
+                    
+                    Spacer(minLength: 50)
                 }
             }
+        }
+        .navigationBarHidden(true)
             .sheet(isPresented: $showingPrintView) {
                 RecipePrintView(recipe: recipe)
             }
@@ -490,13 +541,15 @@ struct RecipeDetailView: View {
             } message: {
                 Text("Are you sure you want to delete \"\(recipe.name)\"? This action cannot be undone.")
             }
+            .onAppear {
+                print("🔍 DEBUG: RecipeDetailView appeared")
+            }
             .task {
                 await loadLikeStatus()
                 await loadAuthorInfo()
                 await commentsViewModel.loadComments(for: recipe.id.uuidString)
             }
         }
-    }
 
     // MARK: - Delete Recipe
     private func deleteRecipe() {
@@ -650,19 +703,24 @@ struct RecipeDetailNutritionItem: View {
         VStack(spacing: 4) {
             Text(value)
                 .font(.system(size: 20, weight: .bold))
+                .foregroundColor(Color(hex: "#9b59b6"))
             Text(label)
                 .font(.system(size: 14))
-                .foregroundColor(.secondary)
+                .foregroundColor(.white.opacity(0.8))
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color.gray.opacity(0.1))
+        .background(Color.white.opacity(0.1))
         .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+        )
     }
 }
 
-// MARK: - Recipe Comment Row
-struct RecipeCommentRow: View {
+// MARK: - Detective Comment Row
+struct DetectiveCommentRow: View {
     let comment: CommentItem
     let onUserTap: () -> Void
 
@@ -674,7 +732,7 @@ struct RecipeCommentRow: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                colors: [Color(hex: "#9b59b6"), Color(hex: "#8e44ad")],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -683,7 +741,7 @@ struct RecipeCommentRow: View {
                         .overlay(
                             Text(comment.userName.prefix(1).uppercased())
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color(hex: "#2d1b69"))
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -693,25 +751,35 @@ struct RecipeCommentRow: View {
                         Button(action: onUserTap) {
                             Text(comment.userName)
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.primary)
+                                .foregroundColor(Color(hex: "#9b59b6"))
                         }
                         .buttonStyle(PlainButtonStyle())
 
                         Text("• \(comment.timeAgoText)")
                             .font(.system(size: 12))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.6))
 
                         Spacer()
                     }
 
                     Text(comment.content)
                         .font(.system(size: 15))
-                        .foregroundColor(.primary)
+                        .foregroundColor(.white.opacity(0.9))
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
         .padding(.horizontal, 4)
+    }
+}
+
+// MARK: - Recipe Comment Row (kept for compatibility)
+struct RecipeCommentRow: View {
+    let comment: CommentItem
+    let onUserTap: () -> Void
+
+    var body: some View {
+        DetectiveCommentRow(comment: comment, onUserTap: onUserTap)
     }
 }
 
@@ -891,6 +959,100 @@ struct RecipePrintView: View {
     }
 }
 
+// MARK: - Comments Section
+extension RecipeDetailView {
+    @ViewBuilder
+    private var commentsSection: some View {
+        DetectiveCard {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "bubble.left.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(Color(hex: "#9b59b6"))
+                    
+                    Text("Comments")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    if !commentsViewModel.comments.isEmpty {
+                        Text("\(commentsViewModel.comments.count)")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+
+                // Comment Input
+                HStack(spacing: 12) {
+                    TextField("Add a comment...", text: $newCommentText)
+                        .textFieldStyle(DetectiveTextFieldStyle())
+
+                    Button(action: submitComment) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(newCommentText.isEmpty ? .white.opacity(0.5) : Color(hex: "#9b59b6"))
+                    }
+                    .disabled(newCommentText.isEmpty || isSubmittingComment)
+                }
+
+                // Comments List
+                if commentsViewModel.isLoading && commentsViewModel.comments.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .tint(Color(hex: "#9b59b6"))
+                        Spacer()
+                    }
+                    .padding(.vertical, 20)
+                } else if commentsViewModel.comments.isEmpty {
+                    Text("Be the first to comment!")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.8))
+                        .padding(.vertical, 20)
+                } else {
+                    ForEach(commentsViewModel.comments.prefix(5)) { comment in
+                        DetectiveCommentRow(comment: comment, onUserTap: {
+                            selectedUserID = comment.userID
+                            selectedUserName = comment.userName
+                            showingUserProfile = true
+                        })
+                        .padding(.vertical, 8)
+                    }
+
+                    if commentsViewModel.comments.count > 5 {
+                        Button(action: { showingAllComments = true }) {
+                            Text("View all \(commentsViewModel.comments.count) comments")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color(hex: "#9b59b6"))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+}
+
+// MARK: - Supporting Views
+
+struct DetectiveTextFieldStyle: TextFieldStyle {
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                    )
+            )
+            .foregroundColor(.white)
+    }
+}
+
 #Preview {
     RecipeDetailView(recipe: MockDataProvider.shared.mockRecipe())
+        .environmentObject(AppState())
 }

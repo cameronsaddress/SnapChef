@@ -211,6 +211,9 @@ struct PremiumUpgradePrompt: View {
         .fullScreenCover(isPresented: $showSubscriptionView) {
             SubscriptionView()
         }
+        .onAppear {
+            print("🔍 DEBUG: PremiumUpgradePrompt appeared")
+        }
     }
 }
 

@@ -65,6 +65,7 @@ struct PhysicsLoadingOverlay: View {
                 }
             }
             .onAppear {
+                print("🔍 DEBUG: [PhysicsLoadingOverlay] appeared")
                 startAnimations(in: geometry.size)
             }
             .onReceive(Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()) { _ in

@@ -96,6 +96,8 @@ struct ProfileView: View {
         .navigationBarHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear {
+            print("🔍 DEBUG: ProfileView appeared")
+            
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
                 profileImageScale = 1
             }

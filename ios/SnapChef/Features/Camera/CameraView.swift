@@ -251,6 +251,7 @@ struct CameraView: View {
             }
         }
         .onAppear {
+            print("🔍 DEBUG: CameraView appeared")
             // Performance optimization: Progressive loading
             setupViewProgressively()
         }

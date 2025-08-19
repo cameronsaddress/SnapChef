@@ -35,6 +35,9 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.5), value: showingLaunchAnimation)
+        .onAppear {
+            print("🔍 DEBUG: ContentView appeared")
+        }
     }
 }
 

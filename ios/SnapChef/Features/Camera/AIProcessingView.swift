@@ -267,6 +267,7 @@ struct AIProcessingView: View {
             }
         }
         .onAppear {
+            print("🔍 DEBUG: [AIProcessingView] appeared")
             // Start animations
             withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
                 isAnimating = true

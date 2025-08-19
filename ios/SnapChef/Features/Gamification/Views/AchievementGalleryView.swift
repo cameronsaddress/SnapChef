@@ -94,6 +94,9 @@ struct AchievementGalleryView: View {
                 }
             }
         }
+        .onAppear {
+            print("🔍 DEBUG: AchievementGalleryView appeared")
+        }
     }
 
     // MARK: - Stats Overview

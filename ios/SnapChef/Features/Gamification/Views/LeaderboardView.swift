@@ -174,6 +174,7 @@ struct LeaderboardView: View {
             LeaderboardShareSheet(items: [generateShareText()])
         }
         .onAppear {
+            print("🔍 DEBUG: LeaderboardView appeared")
             loadLeaderboard()
             animateRankChange = true
         }

@@ -148,6 +148,8 @@ struct HomeView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .particleExplosion(trigger: $particleTrigger)
         .onAppear {
+            print("🔍 DEBUG: HomeView appeared")
+            
             // Track screen view
             Task {
                 await cloudKitDataManager.trackScreenView("Home")

@@ -15,6 +15,9 @@ struct OnboardingView: View {
                 completeOnboarding()
             }
         }
+        .onAppear {
+            print("🔍 DEBUG: [OnboardingView] appeared")
+        }
     }
     
     private func completeOnboarding() {

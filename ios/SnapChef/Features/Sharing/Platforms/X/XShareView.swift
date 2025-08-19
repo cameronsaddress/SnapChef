@@ -264,6 +264,9 @@ struct XShareView: View {
         } message: {
             Text("Your post has been copied to clipboard. Open X to paste and share!")
         }
+        .onAppear {
+            print("🔍 DEBUG: XShareView appeared")
+        }
     }
 
     private var suggestedHashtags: [String] {

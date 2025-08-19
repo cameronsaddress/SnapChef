@@ -133,6 +133,9 @@ struct AuthenticationView: View {
         } message: {
             Text(errorMessage)
         }
+        .onAppear {
+            print("🔍 DEBUG: [AuthenticationView] appeared")
+        }
         .overlay(
             isLoading ? LoadingOverlay() : nil
         )

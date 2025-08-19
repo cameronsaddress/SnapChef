@@ -235,6 +235,9 @@ struct ChallengeProofSubmissionView: View {
                 }
             }
         }
+        .onAppear {
+            print("🔍 DEBUG: ChallengeProofSubmissionView appeared")
+        }
     }
 
     private func submitProof() {

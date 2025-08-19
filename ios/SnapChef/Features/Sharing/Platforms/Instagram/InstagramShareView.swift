@@ -245,6 +245,9 @@ struct InstagramShareView: View {
                 Text(error)
             }
         }
+        .onAppear {
+            print("🔍 DEBUG: InstagramShareView appeared")
+        }
     }
 
     private var suggestedHashtags: [String] {

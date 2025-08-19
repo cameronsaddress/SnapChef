@@ -263,6 +263,7 @@ struct UsernameSetupView: View {
             Text(errorMessage)
         }
         .onAppear {
+            print("🔍 DEBUG: UsernameSetupView appeared")
             withAnimation(.easeOut(duration: 0.5)) {
                 contentVisible = true
             }

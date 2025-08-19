@@ -115,6 +115,9 @@ struct PerformanceSettingsView: View {
                     }
                 }
             }
+            .onAppear {
+                print("🔍 DEBUG: [PerformanceSettingsView] appeared")
+            }
         }
     }
     

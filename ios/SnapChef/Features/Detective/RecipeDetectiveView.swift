@@ -271,6 +271,7 @@ struct RecipeDetectiveView: View {
         }
         .navigationBarHidden(true)
         .onAppear {
+            print("🔍 DEBUG: RecipeDetectiveView appeared")
             setupAnimations()
             cameraModel.requestCameraPermission()
         }

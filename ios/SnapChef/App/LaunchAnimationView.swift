@@ -49,6 +49,7 @@ struct LaunchAnimationView: View {
             }
         }
         .onAppear {
+            print("🔍 DEBUG: [LaunchAnimationView] appeared")
             if deviceManager.shouldShowParticles {
                 startFallingEmojis()
             } else {

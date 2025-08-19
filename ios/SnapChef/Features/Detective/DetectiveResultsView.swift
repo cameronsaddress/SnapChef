@@ -422,6 +422,7 @@ struct DetectiveResultsView: View {
         }
         .navigationBarHidden(true)
         .onAppear {
+            print("🔍 DEBUG: DetectiveResultsView appeared")
             startAnimations()
         }
         .fullScreenCover(isPresented: $showingRecipeDetail) {

@@ -154,6 +154,7 @@ struct SubscriptionView: View {
                 }
             }
             .onAppear {
+                print("🔍 DEBUG: [SubscriptionView] appeared")
                 // Load products when view appears
                 Task {
                     await subscriptionManager.loadProducts()

@@ -104,6 +104,7 @@ struct EnhancedShareSheet: View {
             }
         }
         .onAppear {
+            print("🔍 DEBUG: EnhancedShareSheet appeared")
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                 contentReady = true
             }

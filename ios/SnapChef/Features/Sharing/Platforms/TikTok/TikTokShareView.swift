@@ -79,6 +79,7 @@ struct TikTokShareView: View {
             })
         }
         .onAppear {
+            print("🔍 DEBUG: TikTokShareView appeared")
             // Pre-select exactly 5 most popular hashtags
             let optimizedTags = generateSmartHashtags()
             selectedHashtags = Array(optimizedTags.prefix(5))
