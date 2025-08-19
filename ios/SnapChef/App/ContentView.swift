@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
@@ -39,7 +40,9 @@ struct ContentView: View {
 
 struct MainTabView: View {
     @State private var selectedTab = 0
+    @State private var pendingTabSelection: Int?
     @EnvironmentObject var authManager: AuthenticationManager
+    @State private var showingCameraPermissionAlert = false
 
     var body: some View {
         // Single NavigationStack at the root level
@@ -95,7 +98,7 @@ struct MainTabView: View {
                     VStack {
                         Spacer()
 
-                        MorphingTabBar(selectedTab: $selectedTab)
+                        MorphingTabBar(selectedTab: $selectedTab, onTabSelection: handleTabSelection)
                             .padding(.horizontal, 30)
                             .padding(.bottom, 30)
                             .shadow(
@@ -112,6 +115,63 @@ struct MainTabView: View {
         .sheet(isPresented: $authManager.showUsernameSetup) {
             UsernameSetupView()
                 .environmentObject(authManager)
+        }
+        .alert("Camera Access Required", isPresented: $showingCameraPermissionAlert) {
+            Button("Settings") {
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsURL)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("SnapChef needs camera access to capture photos of your ingredients. Please enable camera access in Settings.")
+        }
+    }
+    
+    // Handle tab selection with camera permission checking
+    private func handleTabSelection(_ newTab: Int) {
+        // Check if user is trying to switch to camera tab (index 1) or detective tab (index 2)
+        if newTab == 1 || newTab == 2 {
+            Task {
+                let granted = await requestCameraPermission()
+                if granted {
+                    await MainActor.run {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedTab = newTab
+                        }
+                    }
+                }
+                // If permission denied, stay on current tab
+            }
+        } else {
+            // For non-camera tabs, switch immediately
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                selectedTab = newTab
+            }
+        }
+    }
+    
+    // MARK: - Camera Permission Handling
+    @MainActor
+    private func requestCameraPermission() async -> Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        
+        switch status {
+        case .authorized:
+            return true
+            
+        case .notDetermined:
+            // Request permission
+            let granted = await AVCaptureDevice.requestAccess(for: .video)
+            return granted
+            
+        case .denied, .restricted:
+            showingCameraPermissionAlert = true
+            return false
+            
+        @unknown default:
+            showingCameraPermissionAlert = true
+            return false
         }
     }
 }

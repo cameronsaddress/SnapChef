@@ -3,6 +3,7 @@ import SwiftUI
 struct MorphingTabBar: View {
     @Binding var selectedTab: Int
     @Namespace private var animation
+    let onTabSelection: ((Int) -> Void)?
 
     let tabs = [
         ("house.fill", "Home", Color(hex: "#667eea")),
@@ -12,6 +13,11 @@ struct MorphingTabBar: View {
         ("heart.text.square.fill", "Feed", Color(hex: "#f77062")),
         ("person.fill", "Profile", Color(hex: "#43e97b"))
     ]
+    
+    init(selectedTab: Binding<Int>, onTabSelection: ((Int) -> Void)? = nil) {
+        self._selectedTab = selectedTab
+        self.onTabSelection = onTabSelection
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -23,8 +29,12 @@ struct MorphingTabBar: View {
                     isSelected: selectedTab == index,
                     namespace: animation,
                     action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            selectedTab = index
+                        if let onTabSelection = onTabSelection {
+                            onTabSelection(index)
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedTab = index
+                            }
                         }
                     }
                 )

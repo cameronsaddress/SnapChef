@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 struct DisplayChallenge {
     let emoji: String
@@ -19,6 +20,7 @@ struct HomeView: View {
     @StateObject private var fallingFoodManager = FallingFoodManager()
     @State private var buttonShake = false
     @State private var showingDetective = false
+    @State private var showingCameraPermissionAlert = false
 
     var body: some View {
         ZStack {
@@ -60,8 +62,13 @@ struct HomeView: View {
                                 title: "Snap Your Fridge",
                                 icon: "camera.fill",
                                 action: {
-                                    showingCamera = true
-                                    particleTrigger = true
+                                    Task {
+                                        let granted = await requestCameraPermission()
+                                        if granted {
+                                            showingCamera = true
+                                            particleTrigger = true
+                                        }
+                                    }
                                 }
                             )
                             .padding(.horizontal, 30)
@@ -184,6 +191,40 @@ struct HomeView: View {
         }
         .fullScreenCover(isPresented: $showingDetective) {
             DetectiveView()
+        }
+        .alert("Camera Access Required", isPresented: $showingCameraPermissionAlert) {
+            Button("Settings") {
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsURL)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("SnapChef needs camera access to capture photos of your ingredients. Please enable camera access in Settings.")
+        }
+    }
+    
+    // MARK: - Camera Permission Handling
+    @MainActor
+    private func requestCameraPermission() async -> Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        
+        switch status {
+        case .authorized:
+            return true
+            
+        case .notDetermined:
+            // Request permission
+            let granted = await AVCaptureDevice.requestAccess(for: .video)
+            return granted
+            
+        case .denied, .restricted:
+            showingCameraPermissionAlert = true
+            return false
+            
+        @unknown default:
+            showingCameraPermissionAlert = true
+            return false
         }
     }
 
@@ -1227,6 +1268,7 @@ struct DetectiveFeatureTile: View {
     @State private var isAnimating = false
     @StateObject private var userLifecycle = UserLifecycleManager.shared
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @State private var showingCameraPermissionAlert = false
     
     // Track detective uses (10 for testing, should be 3 for production)
     @AppStorage("detectiveFeatureUses") private var detectiveUses: Int = 0
@@ -1238,7 +1280,12 @@ struct DetectiveFeatureTile: View {
     
     var body: some View {
         Button(action: {
-            showingDetective = true
+            Task {
+                let granted = await requestCameraPermission()
+                if granted {
+                    showingDetective = true
+                }
+            }
         }) {
             HStack(spacing: 16) {
                 // Animated detective icon
@@ -1346,6 +1393,40 @@ struct DetectiveFeatureTile: View {
         }
         .fullScreenCover(isPresented: $showingDetective) {
             DetectiveView()
+        }
+        .alert("Camera Access Required", isPresented: $showingCameraPermissionAlert) {
+            Button("Settings") {
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsURL)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("SnapChef needs camera access to capture photos of your ingredients. Please enable camera access in Settings.")
+        }
+    }
+    
+    // MARK: - Camera Permission Handling for Detective
+    @MainActor
+    private func requestCameraPermission() async -> Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        
+        switch status {
+        case .authorized:
+            return true
+            
+        case .notDetermined:
+            // Request permission
+            let granted = await AVCaptureDevice.requestAccess(for: .video)
+            return granted
+            
+        case .denied, .restricted:
+            showingCameraPermissionAlert = true
+            return false
+            
+        @unknown default:
+            showingCameraPermissionAlert = true
+            return false
         }
     }
 }
