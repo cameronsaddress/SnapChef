@@ -463,6 +463,9 @@ struct DetectiveResultsView: View {
     }
     
     private func saveToRecipeBook() {
+        print("🔍 DEBUG: Detective recipe save started for '\(detectedRecipe.reconstructedRecipe.name)'")
+        print("🔍   - savedRecipes count before: \(appState.savedRecipes.count)")
+        
         // Add detective badge to recipe
         let recipeWithBadge = Recipe(
             id: detectedRecipe.reconstructedRecipe.id,
@@ -489,6 +492,9 @@ struct DetectiveResultsView: View {
         )
         
         appState.savedRecipes.append(recipeWithBadge)
+        
+        print("🔍   - savedRecipes count after append: \(appState.savedRecipes.count)")
+        print("🔍   - Recipe now in savedRecipes: \(appState.savedRecipes.contains(where: { $0.id == recipeWithBadge.id }))")
         
         showingSaveSuccess = true
         

@@ -10,7 +10,7 @@ import SwiftUI
 import AuthenticationServices
 
 struct SimpleProgressivePrompt: View {
-    @StateObject private var authManager = UnifiedAuthManager.shared
+    @StateObject private var authManager = CloudKitAuthManager.shared
     @Environment(\.dismiss) private var dismiss
     
     let context: PromptContext
@@ -280,7 +280,8 @@ struct SimpleProgressivePrompt: View {
             do {
                 isLoading = true
                 
-                try await authManager.signInWithTikTok()
+                // TikTok sign-in not available with CloudKitAuthManager
+                throw NSError(domain: "AuthError", code: -1, userInfo: [NSLocalizedDescriptionKey: "TikTok sign-in requires UnifiedAuthManager"])
                 
                 await MainActor.run {
                     recordSuccess()

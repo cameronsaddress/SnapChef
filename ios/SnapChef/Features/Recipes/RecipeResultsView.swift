@@ -177,9 +177,23 @@ struct RecipeResultsView: View {
     }
     
     private func saveRecipe(_ recipe: Recipe) {
+        print("🔍 DEBUG: Fridge recipe save started for '\(recipe.name)'")
+        print("🔍   - savedRecipes count before: \(appState.savedRecipes.count)")
+        
         // Save the recipe with the captured image
         appState.addRecentRecipe(recipe)
         appState.saveRecipeWithPhotos(recipe, beforePhoto: capturedImage, afterPhoto: nil)
+        
+        // CRITICAL FIX: Ensure the recipe is in savedRecipes array (same as Detective)
+        // This guarantees it appears in Recipe Book view
+        if !appState.savedRecipes.contains(where: { $0.id == recipe.id }) {
+            appState.savedRecipes.append(recipe)
+            print("🔍   - MANUALLY added recipe to savedRecipes (backup)")
+        }
+        
+        print("🔍   - savedRecipes count after saveRecipeWithPhotos: \(appState.savedRecipes.count)")
+        print("🔍   - Recipe now in savedRecipes: \(appState.savedRecipes.contains(where: { $0.id == recipe.id }))")
+        
         savedRecipeIds.insert(recipe.id)
         
         // Create activity for recipe save if user is authenticated

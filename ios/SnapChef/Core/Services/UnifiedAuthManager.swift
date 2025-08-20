@@ -40,7 +40,7 @@ final class UnifiedAuthManager: ObservableObject {
     
     private let cloudKitContainer = CKContainer(identifier: CloudKitConfig.containerIdentifier)
     private let cloudKitDatabase = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
-    private let profileManager = KeychainProfileManager.shared
+    internal let profileManager = KeychainProfileManager.shared
     private let tikTokAuthManager = TikTokAuthManager.shared
     
     // MARK: - Auth completion callback
@@ -49,8 +49,10 @@ final class UnifiedAuthManager: ObservableObject {
     // MARK: - Initialization
     
     private init() {
-        // Load anonymous profile
-        self.anonymousProfile = profileManager.getOrCreateProfile()
+        // Load anonymous profile async
+        Task { @MainActor in
+            self.anonymousProfile = await profileManager.getOrCreateProfile()
+        }
         
         // Check existing auth status
         checkAuthStatus()
@@ -241,7 +243,7 @@ final class UnifiedAuthManager: ObservableObject {
         completeAuthentication()
     }
     
-    private func checkUsernameAvailability(_ username: String) async throws -> Bool {
+    func checkUsernameAvailability(_ username: String) async throws -> Bool {
         let predicate = NSPredicate(format: "%K == %@", CKField.User.username, username.lowercased())
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         
@@ -278,8 +280,12 @@ final class UnifiedAuthManager: ObservableObject {
         profile.updateLastActive()
         
         // Save updated profile
-        if profileManager.saveProfile(profile) {
-            self.anonymousProfile = profile
+        Task {
+            if await profileManager.saveProfile(profile) {
+                await MainActor.run {
+                    self.anonymousProfile = profile
+                }
+            }
         }
         
         // Check if we should show progressive auth prompt
@@ -305,6 +311,224 @@ final class UnifiedAuthManager: ObservableObject {
         
         if shouldShow && !profile.hasRecentDismissals(within: 3) {
             self.shouldShowProgressivePrompt = true
+        }
+    }
+    
+    // MARK: - User Discovery Methods
+    
+    /// Get suggested users for discovery
+    func getSuggestedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
+        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+        
+        do {
+            let results = try await cloudKitDatabase.records(matching: query)
+            let users = results.matchResults.compactMap { result in
+                switch result.1 {
+                case .success(let record):
+                    return CloudKitUser(from: record)
+                case .failure:
+                    return nil
+                }
+            }
+            return Array(users.prefix(limit))
+        } catch {
+            throw UnifiedAuthError.networkError
+        }
+    }
+    
+    /// Get trending users based on recent activity
+    func getTrendingUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
+        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.recipesShared, ascending: false)]
+        
+        do {
+            let results = try await cloudKitDatabase.records(matching: query)
+            let users = results.matchResults.compactMap { result in
+                switch result.1 {
+                case .success(let record):
+                    return CloudKitUser(from: record)
+                case .failure:
+                    return nil
+                }
+            }
+            return Array(users.prefix(limit))
+        } catch {
+            throw UnifiedAuthError.networkError
+        }
+    }
+    
+    /// Get verified users
+    func getVerifiedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        let predicate = NSPredicate(format: "%K == %d AND %K == %d", 
+                                  CKField.User.isVerified, 1,
+                                  CKField.User.isProfilePublic, 1)
+        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+        
+        do {
+            let results = try await cloudKitDatabase.records(matching: query)
+            let users = results.matchResults.compactMap { result in
+                switch result.1 {
+                case .success(let record):
+                    return CloudKitUser(from: record)
+                case .failure:
+                    return nil
+                }
+            }
+            return Array(users.prefix(limit))
+        } catch {
+            throw UnifiedAuthError.networkError
+        }
+    }
+    
+    /// Get new users (recently joined) for discovery
+    func getNewUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
+        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.createdAt, ascending: false)]
+        
+        do {
+            let results = try await cloudKitDatabase.records(matching: query)
+            let users = results.matchResults.compactMap { result in
+                switch result.1 {
+                case .success(let record):
+                    return CloudKitUser(from: record)
+                case .failure:
+                    return nil
+                }
+            }
+            return Array(users.prefix(limit))
+        } catch {
+            throw UnifiedAuthError.networkError
+        }
+    }
+    
+    /// Search users by username or display name
+    func searchUsers(query: String) async throws -> [CloudKitUser] {
+        guard !query.isEmpty else {
+            return []
+        }
+        
+        let predicate = NSPredicate(
+            format: "(%K CONTAINS[cd] %@ OR %K CONTAINS[cd] %@) AND %K == %d",
+            CKField.User.username, query,
+            CKField.User.displayName, query,
+            CKField.User.isProfilePublic, 1
+        )
+        
+        let queryObj = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        queryObj.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+        
+        do {
+            let results = try await cloudKitDatabase.records(matching: queryObj)
+            let users = results.matchResults.compactMap { result in
+                switch result.1 {
+                case .success(let record):
+                    return CloudKitUser(from: record)
+                case .failure:
+                    return nil
+                }
+            }
+            return users
+        } catch {
+            throw UnifiedAuthError.networkError
+        }
+    }
+    
+    // MARK: - Social Features
+    
+    /// Check if the current user is following another user
+    func isFollowing(userID: String) async -> Bool {
+        guard let currentUser = currentUser,
+              let currentUserID = currentUser.recordID else {
+            return false
+        }
+        
+        let predicate = NSPredicate(
+            format: "%K == %@ AND %K == %@ AND %K == %d",
+            CKField.Follow.followerID, currentUserID,
+            CKField.Follow.followingID, userID,
+            CKField.Follow.isActive, 1
+        )
+        
+        let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
+        
+        do {
+            let results = try await cloudKitDatabase.records(matching: query)
+            return !results.matchResults.isEmpty
+        } catch {
+            print("Error checking follow status: \(error)")
+            return false
+        }
+    }
+    
+    /// Follow a user
+    func followUser(userID: String) async throws {
+        guard let currentUser = currentUser,
+              let currentUserID = currentUser.recordID else {
+            throw UnifiedAuthError.notAuthenticated
+        }
+        
+        // Check if already following
+        let isAlreadyFollowing = await isFollowing(userID: userID)
+        if isAlreadyFollowing {
+            return // Already following
+        }
+        
+        // Create follow record
+        let followRecord = CKRecord(recordType: CloudKitConfig.followRecordType)
+        followRecord[CKField.Follow.followerID] = currentUserID
+        followRecord[CKField.Follow.followingID] = userID
+        followRecord[CKField.Follow.followedAt] = Date()
+        followRecord[CKField.Follow.isActive] = Int64(1)
+        
+        _ = try await cloudKitDatabase.save(followRecord)
+        
+        print("✅ User followed: \(userID)")
+        
+        // Update local follower count
+        self.currentUser?.followingCount += 1
+    }
+    
+    /// Unfollow a user
+    func unfollowUser(userID: String) async throws {
+        guard let currentUser = currentUser,
+              let currentUserID = currentUser.recordID else {
+            throw UnifiedAuthError.notAuthenticated
+        }
+        
+        let predicate = NSPredicate(
+            format: "%K == %@ AND %K == %@ AND %K == %d",
+            CKField.Follow.followerID, currentUserID,
+            CKField.Follow.followingID, userID,
+            CKField.Follow.isActive, 1
+        )
+        
+        let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
+        
+        do {
+            let results = try await cloudKitDatabase.records(matching: query)
+            
+            for result in results.matchResults {
+                switch result.1 {
+                case .success(let record):
+                    // Soft delete by setting isActive to 0
+                    record[CKField.Follow.isActive] = Int64(0)
+                    _ = try await cloudKitDatabase.save(record)
+                case .failure(let error):
+                    print("Error processing follow record: \(error)")
+                }
+            }
+            
+            print("✅ User unfollowed: \(userID)")
+            
+            // Update local follower count
+            self.currentUser?.followingCount = max(0, (self.currentUser?.followingCount ?? 0) - 1)
+        } catch {
+            throw UnifiedAuthError.networkError
         }
     }
     
@@ -340,8 +564,10 @@ final class UnifiedAuthManager: ObservableObject {
         tikTokAuthManager.logout()
         tikTokUser = nil
         
-        // Reset anonymous profile
-        anonymousProfile = profileManager.getOrCreateProfile()
+        // Reset anonymous profile async
+        Task { @MainActor in
+            anonymousProfile = await profileManager.getOrCreateProfile()
+        }
     }
     
     // MARK: - Private Helpers
@@ -398,7 +624,9 @@ final class UnifiedAuthManager: ObservableObject {
         profile.addAuthPromptEvent(context: "migration", action: "completed")
         
         // Save updated profile (or delete if no longer needed)
-        _ = profileManager.saveProfile(profile)
+        Task {
+            _ = await profileManager.saveProfile(profile)
+        }
         
         // Note: In production, you might want to upload anonymous usage data to CloudKit here
     }

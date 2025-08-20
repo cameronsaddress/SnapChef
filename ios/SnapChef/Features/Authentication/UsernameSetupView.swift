@@ -4,6 +4,7 @@ import CloudKit
 
 struct UsernameSetupView: View {
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    // Use only CloudKitAuthManager - simplified authentication
     @Environment(\.dismiss) var dismiss
 
     @State private var username = ""
@@ -358,6 +359,7 @@ struct UsernameSetupView: View {
 
         Task {
             do {
+                // Use CloudKitAuthManager
                 try await cloudKitAuth.setUsername(tempUsername)
                 await MainActor.run {
                     cloudKitAuth.showUsernameSelection = false

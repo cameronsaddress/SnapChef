@@ -37,6 +37,7 @@ struct UserProfile: Identifiable {
 // MARK: - Discover Users View
 struct DiscoverUsersView: View {
     @StateObject private var viewModel = DiscoverUsersViewModel()
+    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @State private var searchText = ""
     @State private var selectedCategory: DiscoverCategory = .suggested
 
@@ -116,8 +117,12 @@ struct DiscoverUsersView: View {
                                     UserDiscoveryCard(
                                         user: user,
                                         onFollow: {
-                                            Task {
-                                                await viewModel.toggleFollow(user)
+                                            if cloudKitAuth.isAuthenticated {
+                                                Task {
+                                                    await viewModel.toggleFollow(user)
+                                                }
+                                            } else {
+                                                cloudKitAuth.promptAuthForFeature(.socialSharing)
                                             }
                                         },
                                         onTap: {
@@ -164,6 +169,9 @@ struct DiscoverUsersView: View {
             // User profile view not implemented - showing basic info
             Text("User Profile: \(user.displayName)")
                 .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $cloudKitAuth.showAuthSheet) {
+            CloudKitAuthView()
         }
     }
 
@@ -570,8 +578,7 @@ class DiscoverUsersViewModel: ObservableObject {
                 searchResults[index].followerCount += searchResults[index].isFollowing ? 1 : -1
             }
 
-            // Force reload the current user to update following count in FeedView
-            await cloudKitAuth.refreshCurrentUser()
+            print("✅ Toggle follow completed for user: \(user.displayName)")
         } catch {
             print("Failed to toggle follow: \(error)")
         }

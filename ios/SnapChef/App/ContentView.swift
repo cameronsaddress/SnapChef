@@ -45,6 +45,7 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var pendingTabSelection: Int?
     @EnvironmentObject var authManager: AuthenticationManager
+    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @State private var showingCameraPermissionAlert = false
 
     var body: some View {
@@ -118,6 +119,12 @@ struct MainTabView: View {
         .sheet(isPresented: $authManager.showUsernameSetup) {
             UsernameSetupView()
                 .environmentObject(authManager)
+        }
+        .sheet(isPresented: $cloudKitAuth.showAuthSheet) {
+            CloudKitAuthView()
+        }
+        .sheet(isPresented: $cloudKitAuth.showUsernameSelection) {
+            UsernameSetupView()
         }
         .alert("Camera Access Required", isPresented: $showingCameraPermissionAlert) {
             Button("Settings") {
@@ -229,6 +236,9 @@ struct SocialFeedView: View {
             // Update social counts when view appears
             await cloudKitAuth.updateSocialCounts()
         }
+        .onAppear {
+            // Authentication status is checked automatically in CloudKitAuthManager
+        }
     }
 
     private func refreshSocialData() async {
@@ -253,7 +263,7 @@ struct SocialFeedView: View {
                         )
                         .frame(width: 60, height: 60)
                         .overlay(
-                            Text((user.displayName ?? "U").prefix(1).uppercased())
+                            Text(user.displayName.prefix(1).uppercased())
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundColor(.white)
                         )

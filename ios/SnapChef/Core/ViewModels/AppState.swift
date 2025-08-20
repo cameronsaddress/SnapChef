@@ -329,6 +329,9 @@ final class RecipesViewModel: ObservableObject {
     }
     
     func saveRecipeWithPhotos(_ recipe: Recipe, beforePhoto: UIImage?, afterPhoto: UIImage?) {
+        print("🔍 DEBUG: saveRecipeWithPhotos called for '\(recipe.name)'")
+        print("🔍   - savedRecipes count before: \(savedRecipes.count)")
+        
         let savedRecipe = SavedRecipe(recipe: recipe, beforePhoto: beforePhoto, afterPhoto: afterPhoto)
         savedRecipesWithPhotos.append(savedRecipe)
         saveToDisk()
@@ -336,7 +339,12 @@ final class RecipesViewModel: ObservableObject {
         // Also update the simple lists
         if !savedRecipes.contains(where: { $0.id == recipe.id }) {
             savedRecipes.append(recipe)
+            print("🔍   - Added recipe to savedRecipes array")
+        } else {
+            print("🔍   - Recipe already in savedRecipes array")
         }
+        
+        print("🔍   - savedRecipes count after: \(savedRecipes.count)")
     }
     
     func updateAfterPhoto(for recipeId: UUID, afterPhoto: UIImage) {
@@ -769,13 +777,4 @@ enum AppError: LocalizedError {
     }
 }
 
-/// Enumeration of anonymous user actions for progressive authentication tracking
-enum AnonymousAction: String, CaseIterable, Sendable {
-    case recipeCreated = "recipe_created"
-    case recipeViewed = "recipe_viewed"
-    case videoGenerated = "video_generated"
-    case videoShared = "video_shared"
-    case appOpened = "app_opened"
-    case challengeViewed = "challenge_viewed"
-    case socialExplored = "social_explored"
-}
+// AnonymousAction enum moved to UnifiedAuthManager.swift to avoid duplication

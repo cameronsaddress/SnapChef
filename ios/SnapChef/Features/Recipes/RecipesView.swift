@@ -170,6 +170,13 @@ struct RecipesView: View {
         // Show local recipes immediately, then merge CloudKit recipes
         let localRecipes = appState.recentRecipes + appState.savedRecipes
         let cloudKitRecipes = cloudKitRecipeCache.cachedRecipes
+        
+        // DEBUG: Log recipe counts
+        print("🔍 DEBUG: RecipesView filteredRecipes called")
+        print("🔍   - recentRecipes count: \(appState.recentRecipes.count)")
+        print("🔍   - savedRecipes count: \(appState.savedRecipes.count)")
+        print("🔍   - localRecipes total: \(localRecipes.count)")
+        print("🔍   - cloudKitRecipes count: \(cloudKitRecipes.count)")
 
         // Remove duplicates - local recipes take precedence
         let localRecipeIds = Set(localRecipes.map { $0.id })

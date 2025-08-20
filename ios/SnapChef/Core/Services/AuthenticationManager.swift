@@ -157,36 +157,7 @@ enum AuthProvider: String {
     case facebook = "facebook"
 }
 
-enum AuthRequiredFeature {
-    case basicRecipes
-    case challenges
-    case leaderboard
-    case socialSharing
-    case teams
-    case streaks
-    case premiumFeatures
-
-    var title: String {
-        switch self {
-        case .basicRecipes: return "Basic Recipes"
-        case .challenges: return "Challenges"
-        case .leaderboard: return "Leaderboard"
-        case .socialSharing: return "Social Sharing"
-        case .teams: return "Teams"
-        case .streaks: return "Streaks"
-        case .premiumFeatures: return "Premium Features"
-        }
-    }
-
-    var requiresAuth: Bool {
-        switch self {
-        case .basicRecipes:
-            return false
-        case .challenges, .leaderboard, .socialSharing, .teams, .streaks, .premiumFeatures:
-            return true
-        }
-    }
-}
+// AuthRequiredFeature enum moved to UnifiedAuthManager.swift to avoid duplication
 
 enum AuthError: LocalizedError {
     case invalidCredential
