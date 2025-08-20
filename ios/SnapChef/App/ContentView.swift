@@ -263,7 +263,7 @@ struct SocialFeedView: View {
                         )
                         .frame(width: 60, height: 60)
                         .overlay(
-                            Text(user.displayName.prefix(1).uppercased())
+                            Text((user.username ?? user.displayName).prefix(1).uppercased())
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundColor(.white)
                         )

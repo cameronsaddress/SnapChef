@@ -97,7 +97,7 @@ struct UserProfileView: View {
                     )
                     .frame(width: 100, height: 100)
 
-                Text((user.displayName ?? "U").prefix(1).uppercased())
+                Text((user.username ?? user.displayName ?? "U").prefix(1).uppercased())
                     .font(.system(size: 40, weight: .bold))
                     .foregroundColor(.white)
 
@@ -122,7 +122,7 @@ struct UserProfileView: View {
 
             // User Info
             VStack(spacing: 8) {
-                Text(user.displayName ?? "Chef")
+                Text(user.username ?? user.displayName ?? "Chef")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
@@ -558,14 +558,14 @@ struct UserListRow: View {
                     )
                     .frame(width: 50, height: 50)
                     .overlay(
-                        Text((user.displayName ?? "U").prefix(1).uppercased())
+                        Text((user.username ?? user.displayName ?? "U").prefix(1).uppercased())
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(.white)
                     )
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text(user.displayName ?? "Chef")
+                        Text(user.username ?? user.displayName ?? "Chef")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
 
@@ -603,7 +603,7 @@ struct UserListRow: View {
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingProfile) {
-            UserProfileView(userID: user.recordID ?? "", userName: user.displayName ?? "Chef")
+            UserProfileView(userID: user.recordID ?? "", userName: user.username ?? user.displayName ?? "Chef")
         }
     }
 }

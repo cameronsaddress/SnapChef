@@ -2,6 +2,7 @@
 -- Version: 2.1
 -- Last Updated: August 20, 2025
 -- Changes: Added QUERYABLE markers to all fields used in NSPredicate queries
+--          Fixed isDeleted field to be QUERYABLE for comment filtering
 --
 -- DEPLOYMENT INSTRUCTIONS:
 -- 1. Open CloudKit Dashboard: https://icloud.developer.apple.com/dashboard
@@ -22,6 +23,7 @@
 -- - User.username, displayName, authProvider, totalPoints, lastActiveAt (all QUERYABLE)
 -- - UserChallenge.userID, challengeID, status, startedAt, completedAt (all QUERYABLE)
 -- - Recipe.ownerID, title, isPublic, createdAt, difficulty, cuisine (all QUERYABLE)
+-- - RecipeComment.isDeleted (QUERYABLE) - for filtering soft-deleted comments
 -- - All timestamp fields used for date range queries and sorting
 --
 -- PERMISSION MODEL:
@@ -292,6 +294,9 @@ DEFINE SCHEMA
         shareCaption      STRING,         -- Social media ready caption
         fromLLM           INT64,          -- 1 if AI generated
         -- Future: Multiple food photos after moderation
+        -- NOTE: WRITE permission limited to "_creator" causes issues with incrementing
+        --       viewCount for recipes not owned by current user. Consider implementing
+        --       a separate RecipeView record type for tracking views/analytics.
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"
     );
@@ -343,7 +348,7 @@ DEFINE SCHEMA
         content            STRING,
         createdAt          TIMESTAMP SORTABLE,
         updatedAt          TIMESTAMP,
-        isDeleted          INT64,
+        isDeleted          INT64 QUERYABLE,
         isEdited           INT64,
         likeCount          INT64,
         replyCount         INT64,

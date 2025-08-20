@@ -264,7 +264,6 @@ struct BrandedSharePopup: View {
             try await CloudKitSyncService.shared.createActivity(
                 type: activityType,
                 actorID: userID,
-                actorName: userName,
                 recipeID: metadata["recipeId"] as? String,
                 recipeName: metadata["recipeName"] as? String,
                 challengeID: metadata["challengeId"] as? String,

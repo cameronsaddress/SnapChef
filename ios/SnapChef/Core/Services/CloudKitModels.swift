@@ -35,7 +35,7 @@ struct SocialRecipeCard: Identifiable {
         self.isLiked = false // Will be updated after checking like status
         
         self.creatorID = creatorInfo.recordID ?? ""
-        self.creatorName = creatorInfo.displayName
+        self.creatorName = creatorInfo.username ?? creatorInfo.displayName
         self.creatorImageURL = creatorInfo.profileImageURL
         self.creatorIsVerified = creatorInfo.isVerified
     }

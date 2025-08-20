@@ -73,7 +73,6 @@ final class SyncModule: ObservableObject {
         try await createActivity(
             type: "recipeShared",
             actorID: userID,
-            actorName: userName,
             recipeID: recipe.id.uuidString,
             recipeName: recipe.name
         )
@@ -209,7 +208,6 @@ final class SyncModule: ObservableObject {
             try await createActivity(
                 type: "recipeLiked",
                 actorID: userID,
-                actorName: userName,
                 targetUserID: recipeOwnerID,
                 recipeID: recipeID,
                 recipeName: recipeName
@@ -313,17 +311,16 @@ final class SyncModule: ObservableObject {
     }
     
     // MARK: - Activity Feed Methods
-    func createActivity(type: String, actorID: String, actorName: String,
-                       targetUserID: String? = nil, targetUserName: String? = nil,
+    func createActivity(type: String, actorID: String,
+                       targetUserID: String? = nil,
                        recipeID: String? = nil, recipeName: String? = nil,
                        challengeID: String? = nil, challengeName: String? = nil) async throws {
         let activity = CKRecord(recordType: CloudKitConfig.activityRecordType)
         activity[CKField.Activity.id] = UUID().uuidString
         activity[CKField.Activity.type] = type
         activity[CKField.Activity.actorID] = actorID
-        activity[CKField.Activity.actorName] = actorName
         activity[CKField.Activity.targetUserID] = targetUserID
-        activity[CKField.Activity.targetUserName] = targetUserName
+        // Note: actorName and targetUserName are now fetched dynamically when displaying activities
         activity[CKField.Activity.recipeID] = recipeID
         activity[CKField.Activity.recipeName] = recipeName
         activity[CKField.Activity.challengeID] = challengeID
@@ -399,7 +396,6 @@ final class SyncModule: ObservableObject {
             try await createActivity(
                 type: "recipeComment",
                 actorID: userID,
-                actorName: userName,
                 targetUserID: recipeOwnerID,
                 recipeID: recipeID
             )

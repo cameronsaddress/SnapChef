@@ -426,11 +426,9 @@ final class CloudKitAuthManager: ObservableObject {
         _ = try await database.save(followRecord)
         
         // Create activity for the followed user
-        let userName = currentUser.displayName
         try await CloudKitSyncService.shared.createActivity(
             type: "follow",
             actorID: currentUserID,
-            actorName: userName,
             targetUserID: userID
         )
         
@@ -473,11 +471,9 @@ final class CloudKitAuthManager: ObservableObject {
             }
             
             // Create activity for the unfollowed user
-            let userName = currentUser.displayName
             try await CloudKitSyncService.shared.createActivity(
                 type: "unfollow",
                 actorID: currentUserID,
-                actorName: userName,
                 targetUserID: userID
             )
             

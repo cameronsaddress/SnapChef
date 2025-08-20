@@ -488,10 +488,12 @@ class CloudKitRecipeManager: ObservableObject {
                 let recipe = try parseRecipeFromRecord(record)
                 cachedRecipes[recipeID] = recipe
                 
-                // Increment view count for public recipes
-                Task {
-                    await incrementViewCount(for: recipeID)
-                }
+                // Note: View count increment disabled due to CloudKit permission restrictions
+                // Only recipe owner can modify recipe records (GRANT WRITE TO "_creator")
+                // TODO: Implement separate RecipeView record type for tracking views
+                // Task {
+                //     await incrementViewCount(for: recipeID)
+                // }
                 
                 print("☁️ Recipe fetched from public CloudKit: \(recipeID)")
                 return recipe
@@ -513,10 +515,12 @@ class CloudKitRecipeManager: ObservableObject {
                 let recipe = try parseRecipeFromRecord(record)
                 cachedRecipes[recipeID] = recipe
                 
-                // Increment view count for public recipes
-                Task {
-                    await incrementViewCount(for: recipeID)
-                }
+                // Note: View count increment disabled due to CloudKit permission restrictions
+                // Only recipe owner can modify recipe records (GRANT WRITE TO "_creator")
+                // TODO: Implement separate RecipeView record type for tracking views
+                // Task {
+                //     await incrementViewCount(for: recipeID)
+                // }
                 
                 print("☁️ Recipe fetched from public CloudKit after private error: \(recipeID)")
                 return recipe

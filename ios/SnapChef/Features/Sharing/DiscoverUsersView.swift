@@ -167,7 +167,7 @@ struct DiscoverUsersView: View {
         }
         .sheet(item: $viewModel.selectedUser) { user in
             // User profile view not implemented - showing basic info
-            Text("User Profile: \(user.displayName)")
+            Text("User Profile: \(user.username ?? user.displayName)")
                 .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $cloudKitAuth.showAuthSheet) {
@@ -305,7 +305,7 @@ struct UserDiscoveryCard: View {
                             )
                             .frame(width: 60, height: 60)
                             .overlay(
-                                Text(user.displayName.prefix(1).uppercased())
+                                Text((user.username ?? user.displayName).prefix(1).uppercased())
                                     .font(.system(size: 24, weight: .bold))
                                     .foregroundColor(.white)
                             )
@@ -323,7 +323,7 @@ struct UserDiscoveryCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     // Name and Username
                     HStack {
-                        Text(user.displayName)
+                        Text(user.username ?? user.displayName)
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.white)
                             .lineLimit(1)
@@ -587,7 +587,7 @@ class DiscoverUsersViewModel: ObservableObject {
                 searchResults[index].followerCount += searchResults[index].isFollowing ? 1 : -1
             }
 
-            print("✅ Toggle follow completed for user: \(user.displayName)")
+            print("✅ Toggle follow completed for user: \(user.username ?? user.displayName)")
         } catch {
             print("Failed to toggle follow: \(error)")
         }

@@ -290,8 +290,8 @@ struct EnhancedProfileHeader: View {
                     if !cloudKitAuthManager.isAuthenticated {
                         cloudKitAuthManager.showAuthSheet = true
                     } else {
-                        // Show EditProfile for photo and local customization
-                        showingEditProfile = true
+                        // For authenticated users, show UsernameEditView for CloudKit username
+                        showingUsernameEdit = true
                     }
                 }) {
                     GlassmorphicCard(content: {

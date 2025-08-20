@@ -199,13 +199,11 @@ struct RecipeResultsView: View {
         // Create activity for recipe save if user is authenticated
         Task {
             if CloudKitAuthManager.shared.isAuthenticated,
-               let userID = CloudKitAuthManager.shared.currentUser?.recordID,
-               let userName = CloudKitAuthManager.shared.currentUser?.displayName {
+               let userID = CloudKitAuthManager.shared.currentUser?.recordID {
                 do {
                     try await CloudKitSyncService.shared.createActivity(
                         type: "recipeSaved",
                         actorID: userID,
-                        actorName: userName,
                         recipeID: recipe.id.uuidString,
                         recipeName: recipe.name
                     )

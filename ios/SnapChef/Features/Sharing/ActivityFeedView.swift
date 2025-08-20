@@ -6,10 +6,10 @@ struct ActivityItem: Identifiable {
     let id: String
     let type: ActivityType
     let userID: String
-    let userName: String
+    let userName: String  // This will be populated dynamically by the ActivityFeedManager
     let userPhoto: UIImage?
     let targetUserID: String?
-    let targetUserName: String?
+    let targetUserName: String?  // This will be populated dynamically by the ActivityFeedManager
     let recipeID: String?
     let recipeName: String?
     let recipeImage: UIImage?
@@ -199,7 +199,31 @@ struct ActivityFeedView: View {
         }
         .sheet(isPresented: $showingRecipeDetail) {
             if let recipe = selectedRecipe {
-                RecipeDetailView(recipe: recipe)
+                // Ensure recipe has minimum required data before showing detail view
+                if !recipe.name.isEmpty && !recipe.ingredients.isEmpty && !recipe.instructions.isEmpty {
+                    RecipeDetailView(recipe: recipe)
+                } else {
+                    // Show error view for incomplete recipe data
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 50))
+                            .foregroundColor(.orange)
+                        
+                        Text("Recipe Unavailable")
+                            .font(.system(size: 24, weight: .bold))
+                        
+                        Text("This recipe appears to be incomplete or corrupted.")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                        
+                        Button("Close") {
+                            showingRecipeDetail = false
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding()
+                }
             }
         }
     }
@@ -261,7 +285,14 @@ struct ActivityFeedView: View {
                 }
             } catch {
                 print("❌ Failed to load recipe \(recipeID): \(error)")
-                // Could show an error alert here
+                
+                // Show error alert to user
+                await MainActor.run {
+                    // You could add @State private var showErrorAlert = false and errorMessage = ""
+                    // then set them here to show an alert, but for now just log the error
+                    // This prevents blank popups from appearing
+                    print("📱 Recipe not available - skipping detail view")
+                }
             }
         }
     }
@@ -411,6 +442,8 @@ class ActivityFeedManager: ObservableObject {
 
     private let cloudKitSync = CloudKitSyncService.shared
     private var lastFetchedRecord: CKRecord?
+    private var userCache: [String: CloudKitUser] = [:] // Cache for user details
+    private let publicDatabase = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
 
     func loadInitialActivities() async {
         isLoading = true
@@ -509,8 +542,20 @@ class ActivityFeedManager: ObservableObject {
             // Take only the most recent 50 activities to avoid duplicates
             let limitedRecords = Array(sortedRecords.prefix(50))
             
-            let newActivities = limitedRecords.compactMap { record in
-                mapCloudKitRecordToActivityItem(record)
+            let newActivities = await withTaskGroup(of: ActivityItem?.self) { group in
+                for record in limitedRecords {
+                    group.addTask {
+                        await self.mapCloudKitRecordToActivityItem(record)
+                    }
+                }
+                
+                var results: [ActivityItem] = []
+                for await result in group {
+                    if let activity = result {
+                        results.append(activity)
+                    }
+                }
+                return results
             }
 
             if loadMore {
@@ -567,12 +612,33 @@ class ActivityFeedManager: ObservableObject {
         // Return only the requested number of activities
         return Array(activities.prefix(limit))
     }
+    
+    /// Fetches user display name by userID, using cache when possible
+    private func fetchUserDisplayName(userID: String) async -> String {
+        // Check cache first
+        if let cachedUser = userCache[userID] {
+            return cachedUser.username ?? cachedUser.displayName
+        }
+        
+        // Fetch from CloudKit
+        do {
+            let userRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: userID))
+            let user = CloudKitUser(from: userRecord)
+            
+            // Cache the user for future use
+            userCache[userID] = user
+            
+            return user.username ?? user.displayName
+        } catch {
+            print("❌ Failed to fetch user details for \(userID): \(error)")
+            return "Unknown Chef"
+        }
+    }
 
-    private func mapCloudKitRecordToActivityItem(_ record: CKRecord) -> ActivityItem? {
+    private func mapCloudKitRecordToActivityItem(_ record: CKRecord) async -> ActivityItem? {
         guard let id = record[CKField.Activity.id] as? String,
               let typeString = record[CKField.Activity.type] as? String,
               let actorID = record[CKField.Activity.actorID] as? String,
-              let actorName = record[CKField.Activity.actorName] as? String,
               let timestamp = record[CKField.Activity.timestamp] as? Date else {
             print("❌ Invalid activity record structure")
             return nil
@@ -597,9 +663,12 @@ class ActivityFeedManager: ObservableObject {
             activityType = .recipeShared
         }
 
+        // Fetch actor (user) details dynamically
+        let actorName = await fetchUserDisplayName(userID: actorID)
+        
         // Extract optional fields
         let targetUserID = record[CKField.Activity.targetUserID] as? String
-        let targetUserName = record[CKField.Activity.targetUserName] as? String
+        let targetUserName = targetUserID != nil ? await fetchUserDisplayName(userID: targetUserID!) : nil
         let recipeID = record[CKField.Activity.recipeID] as? String
         let recipeName = record[CKField.Activity.recipeName] as? String
         let isReadInt = record[CKField.Activity.isRead] as? Int64 ?? 0

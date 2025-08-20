@@ -420,13 +420,11 @@ class ChallengeProgressTracker: ObservableObject {
         // Create activity for challenge completion
         Task {
             if CloudKitAuthManager.shared.isAuthenticated,
-               let userID = CloudKitAuthManager.shared.currentUser?.recordID,
-               let userName = CloudKitAuthManager.shared.currentUser?.displayName {
+               let userID = CloudKitAuthManager.shared.currentUser?.recordID {
                 do {
                     try await CloudKitSyncService.shared.createActivity(
                         type: "challengeCompleted",
                         actorID: userID,
-                        actorName: userName,
                         challengeID: challenge.id,
                         challengeName: challenge.title
                     )

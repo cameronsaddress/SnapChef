@@ -471,8 +471,7 @@ struct InstagramShareView: View {
     // MARK: - Activity Creation
     private func createInstagramShareActivity(isStory: Bool) async {
         guard CloudKitAuthManager.shared.isAuthenticated,
-              let userID = CloudKitAuthManager.shared.currentUser?.recordID,
-              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+              let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
             return
         }
         
@@ -504,7 +503,6 @@ struct InstagramShareView: View {
             try await CloudKitSyncService.shared.createActivity(
                 type: activityType,
                 actorID: userID,
-                actorName: userName,
                 recipeID: metadata["recipeId"] as? String,
                 recipeName: metadata["recipeName"] as? String,
                 challengeID: metadata["challengeId"] as? String,

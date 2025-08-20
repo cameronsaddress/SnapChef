@@ -115,7 +115,7 @@ struct FeedView: View {
                         )
                         .frame(width: 60, height: 60)
                         .overlay(
-                            Text((user.displayName ?? "U").prefix(1).uppercased())
+                            Text((user.username ?? user.displayName ?? "U").prefix(1).uppercased())
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundColor(.white)
                         )

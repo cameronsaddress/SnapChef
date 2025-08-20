@@ -453,12 +453,12 @@ extension CloudKitService {
         await syncModule.syncRecipeLikeCount(recipeID)
     }
     
-    func createActivity(type: String, actorID: String, actorName: String,
-                       targetUserID: String? = nil, targetUserName: String? = nil,
+    func createActivity(type: String, actorID: String,
+                       targetUserID: String? = nil,
                        recipeID: String? = nil, recipeName: String? = nil,
                        challengeID: String? = nil, challengeName: String? = nil) async throws {
-        try await syncModule.createActivity(type: type, actorID: actorID, actorName: actorName,
-                                          targetUserID: targetUserID, targetUserName: targetUserName,
+        try await syncModule.createActivity(type: type, actorID: actorID,
+                                          targetUserID: targetUserID,
                                           recipeID: recipeID, recipeName: recipeName,
                                           challengeID: challengeID, challengeName: challengeName)
     }

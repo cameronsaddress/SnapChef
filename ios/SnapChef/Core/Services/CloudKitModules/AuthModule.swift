@@ -411,7 +411,6 @@ final class AuthModule: ObservableObject {
             try await syncModule.createActivity(
                 type: "follow",
                 actorID: currentUserID,
-                actorName: currentUserName,
                 targetUserID: userID
             )
         }

@@ -328,8 +328,7 @@ struct MessagesShareView: View {
     // MARK: - Activity Creation
     private func createMessagesShareActivity() async {
         guard CloudKitAuthManager.shared.isAuthenticated,
-              let userID = CloudKitAuthManager.shared.currentUser?.recordID,
-              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+              let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
             return
         }
         
@@ -361,7 +360,6 @@ struct MessagesShareView: View {
             try await CloudKitSyncService.shared.createActivity(
                 type: activityType,
                 actorID: userID,
-                actorName: userName,
                 recipeID: metadata["recipeId"] as? String,
                 recipeName: metadata["recipeName"] as? String,
                 challengeID: metadata["challengeId"] as? String,
@@ -661,8 +659,7 @@ struct MessageComposerWrapper: UIViewControllerRepresentable {
     // MARK: - Activity Creation
     func createMessagesShareActivity() async {
         guard CloudKitAuthManager.shared.isAuthenticated,
-              let userID = CloudKitAuthManager.shared.currentUser?.recordID,
-              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+              let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
             return
         }
         
@@ -694,7 +691,6 @@ struct MessageComposerWrapper: UIViewControllerRepresentable {
             try await CloudKitSyncService.shared.createActivity(
                 type: activityType,
                 actorID: userID,
-                actorName: userName,
                 recipeID: metadata["recipeId"] as? String,
                 recipeName: metadata["recipeName"] as? String,
                 challengeID: metadata["challengeId"] as? String,

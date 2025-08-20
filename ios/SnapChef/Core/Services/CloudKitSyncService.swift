@@ -34,8 +34,7 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Recipe Upload Methods
 
     func uploadRecipe(_ recipe: Recipe, imageData: Data? = nil) async throws -> String {
-        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID,
-              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
             throw CloudKitAuthError.notAuthenticated
         }
 
@@ -85,7 +84,6 @@ final class CloudKitSyncService: ObservableObject {
         try await createActivity(
             type: "recipeShared",
             actorID: userID,
-            actorName: userName,
             recipeID: recipe.id.uuidString,
             recipeName: recipe.name
         )
@@ -185,8 +183,7 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Recipe Like Methods
 
     func likeRecipe(_ recipeID: String, recipeOwnerID: String) async throws {
-        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID,
-              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
             throw CloudKitAuthError.notAuthenticated
         }
 
@@ -222,7 +219,6 @@ final class CloudKitSyncService: ObservableObject {
             try await createActivity(
                 type: "recipeLiked",
                 actorID: userID,
-                actorName: userName,
                 targetUserID: recipeOwnerID,
                 recipeID: recipeID,
                 recipeName: recipeName
@@ -334,17 +330,16 @@ final class CloudKitSyncService: ObservableObject {
     
     // MARK: - Activity Feed Methods
 
-    func createActivity(type: String, actorID: String, actorName: String,
-                       targetUserID: String? = nil, targetUserName: String? = nil,
+    func createActivity(type: String, actorID: String,
+                       targetUserID: String? = nil,
                        recipeID: String? = nil, recipeName: String? = nil,
                        challengeID: String? = nil, challengeName: String? = nil) async throws {
         let activity = CKRecord(recordType: CloudKitConfig.activityRecordType)
         activity[CKField.Activity.id] = UUID().uuidString
         activity[CKField.Activity.type] = type
         activity[CKField.Activity.actorID] = actorID
-        activity[CKField.Activity.actorName] = actorName
         activity[CKField.Activity.targetUserID] = targetUserID
-        activity[CKField.Activity.targetUserName] = targetUserName
+        // Note: actorName and targetUserName are now fetched dynamically when displaying activities
         activity[CKField.Activity.recipeID] = recipeID
         activity[CKField.Activity.recipeName] = recipeName
         activity[CKField.Activity.challengeID] = challengeID
@@ -373,7 +368,7 @@ final class CloudKitSyncService: ObservableObject {
             }
         }
 
-        try await publicDatabase.add(operation)
+        publicDatabase.add(operation)
         
         // Sort by timestamp in code since it may not be sortable in CloudKit
         activities.sort { record1, record2 in
@@ -395,14 +390,13 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Comment Methods
 
     func addComment(recipeID: String, content: String, parentCommentID: String? = nil) async throws {
-        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID,
-              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
             print("❌ Cannot add comment: User not authenticated")
             throw CloudKitAuthError.notAuthenticated
         }
 
         print("📝 Creating comment for recipe: \(recipeID)")
-        print("👤 User: \(userName) (ID: \(userID))")
+        print("👤 User ID: \(userID)")
         print("💬 Content: \(content)")
 
         let commentID = UUID().uuidString
@@ -428,7 +422,7 @@ final class CloudKitSyncService: ObservableObject {
         print("   - parentCommentID: \(parentCommentID ?? "nil")")
 
         print("💾 Saving comment to CloudKit...")
-        let savedComment = try await publicDatabase.save(comment)
+        _ = try await publicDatabase.save(comment)
         print("✅ Comment saved to CloudKit with ID: \(commentID)")
 
         // Update recipe comment count
@@ -441,7 +435,6 @@ final class CloudKitSyncService: ObservableObject {
             try await createActivity(
                 type: "recipeComment",
                 actorID: userID,
-                actorName: userName,
                 targetUserID: recipeOwnerID,
                 recipeID: recipeID
             )
@@ -451,6 +444,8 @@ final class CloudKitSyncService: ObservableObject {
     func fetchComments(for recipeID: String, limit: Int = 50) async throws -> [CKRecord] {
         print("🔍 Fetching comments for recipe: \(recipeID)")
         
+        // Filter by recipeID and non-deleted comments
+        // isDeleted field is now QUERYABLE in the updated CloudKit schema
         let predicate = NSPredicate(format: "%K == %@ AND %K == %d",
                                   CKField.RecipeComment.recipeID, recipeID,
                                   CKField.RecipeComment.isDeleted, 0)
@@ -497,7 +492,7 @@ final class CloudKitSyncService: ObservableObject {
 
         // Soft delete
         record[CKField.RecipeComment.isDeleted] = Int64(1)
-        let savedRecord = try await publicDatabase.save(record)
+        _ = try await publicDatabase.save(record)
         print("✅ Comment soft deleted in CloudKit with ID: \(commentID)")
 
         // Update recipe comment count
@@ -521,7 +516,7 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Comment Like Methods
     
     func likeComment(_ commentID: String) async throws {
-        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
+        guard CloudKitAuthManager.shared.currentUser?.recordID != nil else {
             throw CloudKitAuthError.notAuthenticated
         }
 
@@ -537,7 +532,7 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     func unlikeComment(_ commentID: String) async throws {
-        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
+        guard CloudKitAuthManager.shared.currentUser?.recordID != nil else {
             throw CloudKitAuthError.notAuthenticated
         }
 
@@ -569,7 +564,7 @@ final class CloudKitSyncService: ObservableObject {
 
     // MARK: - iCloud Status
     private func checkiCloudStatus() {
-        container.accountStatus { [weak self] status, _ in
+        container.accountStatus { status, _ in
             DispatchQueue.main.async {
                 switch status {
                 case .available:
@@ -715,10 +710,10 @@ final class CloudKitSyncService: ObservableObject {
             let operation = CKQueryOperation(query: query)
             operation.resultsLimit = 100
 
-            var leaderboardEntries: [LeaderboardEntry] = []
+            let leaderboardEntries: [LeaderboardEntry] = []
 
             operation.recordMatchedBlock = { _, result in
-                if case .success(let record) = result {
+                if case .success(_) = result {
                     // Use LeaderboardEntry directly
                 }
             }
