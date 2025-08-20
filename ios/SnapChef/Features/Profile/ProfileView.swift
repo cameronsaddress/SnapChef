@@ -149,6 +149,9 @@ struct EnhancedProfileHeader: View {
 
     // Computed properties for display
     private var displayName: String {
+        // Force refresh trigger to ensure we get latest data
+        _ = refreshTrigger
+        
         // Priority: CloudKit username > CloudKit display name > Auth username > Custom name > User name > Guest
         if let cloudKitUser = cloudKitAuthManager.currentUser {
             // Prefer username if set, otherwise use display name
@@ -287,6 +290,7 @@ struct EnhancedProfileHeader: View {
                     if !cloudKitAuthManager.isAuthenticated {
                         cloudKitAuthManager.showAuthSheet = true
                     } else {
+                        // Show EditProfile for photo and local customization
                         showingEditProfile = true
                     }
                 }) {
@@ -349,12 +353,9 @@ struct EnhancedProfileHeader: View {
                     if !cloudKitAuthManager.isAuthenticated {
                         cloudKitAuthManager.showAuthSheet = true
                     } else {
-                        // For authenticated users, show username edit if they have a username, otherwise edit profile
-                        if cloudKitAuthManager.currentUser?.username != nil {
-                            showingUsernameEdit = true
-                        } else {
-                            showingEditProfile = true
-                        }
+                        // For authenticated users, always show username edit for CloudKit username
+                        // EditProfile is for local customization only
+                        showingUsernameEdit = true
                     }
                 }) {
                     HStack(spacing: 8) {
@@ -462,7 +463,12 @@ struct EnhancedProfileHeader: View {
             UsernameEditView()
                 .onDisappear {
                     // Trigger UI refresh after username edit
-                    refreshTrigger += 1
+                    Task {
+                        // Refresh CloudKit user data after username change
+                        await cloudKitAuthManager.refreshCurrentUser()
+                        // Trigger UI refresh
+                        refreshTrigger += 1
+                    }
                 }
         }
         .sheet(isPresented: $cloudKitAuthManager.showAuthSheet) {
@@ -485,11 +491,22 @@ struct EnhancedProfileHeader: View {
         }
         .onChange(of: cloudKitAuthManager.currentUser?.username) { _ in
             // Refresh when CloudKit username changes
-            refreshTrigger += 1
+            DispatchQueue.main.async {
+                refreshTrigger += 1
+            }
         }
-        .onChange(of: cloudKitAuthManager.isAuthenticated) { _ in
+        .onChange(of: cloudKitAuthManager.isAuthenticated) { isAuthenticated in
             // Refresh when authentication status changes
-            refreshTrigger += 1
+            DispatchQueue.main.async {
+                refreshTrigger += 1
+            }
+            
+            // If just authenticated, refresh user data
+            if isAuthenticated {
+                Task {
+                    await cloudKitAuthManager.refreshCurrentUser()
+                }
+            }
         }
     }
 }
@@ -920,6 +937,29 @@ struct EditProfileView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 30) {
+                    // Note explaining this is for local customization only
+                    VStack(spacing: 12) {
+                        Text("Local Profile Customization")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text("This customizes your local display name only. For your CloudKit username, use the pencil icon next to your name on the profile.")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    .padding(.vertical)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.blue.opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                    .padding(.horizontal)
+
                     // Profile Photo
                     Button(action: { showingImagePicker = true }) {
                         ZStack {
@@ -983,11 +1023,11 @@ struct EditProfileView: View {
 
                     // Name Input
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Chef Name")
+                        Text("Local Display Name (Optional)")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
 
-                        TextField("Enter your chef name", text: $tempName)
+                        TextField("Enter your local display name", text: $tempName)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.white)
                             .padding()

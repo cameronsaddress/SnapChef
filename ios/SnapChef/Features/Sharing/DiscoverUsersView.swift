@@ -10,7 +10,7 @@ struct UserProfile: Identifiable {
     let profileImage: UIImage?
     var followerCount: Int
     var followingCount: Int
-    let recipesShared: Int
+    let recipesCreated: Int
     let isVerified: Bool
     var isFollowing: Bool
     let bio: String?
@@ -320,12 +320,13 @@ struct UserDiscoveryCard: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 3) {
                     // Name and Username
                     HStack {
                         Text(user.displayName)
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.white)
+                            .lineLimit(1)
 
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
@@ -337,16 +338,21 @@ struct UserDiscoveryCard: View {
                     Text("@\(user.username)")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(1)
 
                     // Stats
-                    HStack(spacing: 16) {
+                    HStack(spacing: 12) {
                         Text(user.followerText)
                             .font(.system(size: 13))
                             .foregroundColor(.white.opacity(0.8))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                        Text("\(user.recipesShared) recipes")
+                        Text("\(user.recipesCreated) recipes")
                             .font(.system(size: 13))
                             .foregroundColor(.white.opacity(0.8))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
@@ -362,8 +368,11 @@ struct UserDiscoveryCard: View {
                     Text(isFollowing ? "Following" : "Follow")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(isFollowing ? .white : .black)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .frame(minWidth: 80)
                         .background(
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(isFollowing ? Color.white.opacity(0.2) : Color.white)
@@ -518,7 +527,7 @@ class DiscoverUsersViewModel: ObservableObject {
             profileImage: nil,
             followerCount: cloudKitUser.followerCount,
             followingCount: cloudKitUser.followingCount,
-            recipesShared: cloudKitUser.recipesShared,
+            recipesCreated: cloudKitUser.recipesShared,
             isVerified: cloudKitUser.isVerified,
             isFollowing: false, // Will be updated based on actual follow status
             bio: nil,

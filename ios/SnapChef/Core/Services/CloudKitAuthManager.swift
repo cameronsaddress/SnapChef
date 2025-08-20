@@ -215,15 +215,19 @@ final class CloudKitAuthManager: ObservableObject {
             guard baseUsername.count >= 3 else { continue }
             
             // Check if base username is available
-            if try await checkUsernameAvailability(baseUsername) {
+            let isBaseAvailable = try await checkUsernameAvailability(baseUsername)
+            if isBaseAvailable {
                 return baseUsername
             }
             
             // Try with numbers appended (1-999)
             for suffix in 1...999 {
                 let numberedUsername = baseUsername + String(suffix)
-                if numberedUsername.count <= 20 && try await checkUsernameAvailability(numberedUsername) {
-                    return numberedUsername
+                if numberedUsername.count <= 20 {
+                    let isAvailable = try await checkUsernameAvailability(numberedUsername)
+                    if isAvailable {
+                        return numberedUsername
+                    }
                 }
             }
         }

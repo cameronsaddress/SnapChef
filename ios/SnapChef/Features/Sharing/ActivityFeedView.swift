@@ -93,9 +93,11 @@ struct ActivityItem: Identifiable {
 // MARK: - Activity Feed View
 struct ActivityFeedView: View {
     @StateObject private var feedManager = ActivityFeedManager()
+    @EnvironmentObject var appState: AppState
     @State private var selectedFilter: ActivityFilter = .all
     @State private var showingRecipeDetail = false
     @State private var selectedRecipeID: String?
+    @State private var selectedRecipe: Recipe?
 
     enum ActivityFilter: String, CaseIterable {
         case all = "All"
@@ -153,18 +155,20 @@ struct ActivityFeedView: View {
                         ScrollView {
                             LazyVStack(spacing: 16) {
                                 ForEach(filteredActivities) { activity in
-                                    ActivityItemView(activity: activity)
-                                        .onTapGesture {
-                                            handleActivityTap(activity)
-                                        }
-                                        .onAppear {
-                                            // Mark activity as read when it appears on screen
-                                            if !activity.isRead {
-                                                Task {
-                                                    await feedManager.markActivityAsRead(activity.id)
-                                                }
+                                    Button(action: {
+                                        handleActivityTap(activity)
+                                    }) {
+                                        ActivityItemView(activity: activity)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .onAppear {
+                                        // Mark activity as read when it appears on screen
+                                        if !activity.isRead {
+                                            Task {
+                                                await feedManager.markActivityAsRead(activity.id)
                                             }
                                         }
+                                    }
                                 }
 
                                 if feedManager.hasMore {
@@ -193,6 +197,11 @@ struct ActivityFeedView: View {
         .task {
             await feedManager.loadInitialActivities()
         }
+        .sheet(isPresented: $showingRecipeDetail) {
+            if let recipe = selectedRecipe {
+                RecipeDetailView(recipe: recipe)
+            }
+        }
     }
 
     private var filteredActivities: [ActivityItem] {
@@ -217,7 +226,7 @@ struct ActivityFeedView: View {
         case .recipeShared, .recipeLiked, .recipeComment:
             if let recipeID = activity.recipeID {
                 selectedRecipeID = recipeID
-                showingRecipeDetail = true
+                loadRecipeAndShowDetail(recipeID: recipeID)
             }
         case .follow:
             // Navigate to user profile
@@ -229,6 +238,37 @@ struct ActivityFeedView: View {
             // Show badge detail
             break
         }
+    }
+    
+    private func loadRecipeAndShowDetail(recipeID: String) {
+        Task {
+            do {
+                // Try to load recipe from local app state first
+                if let localRecipe = findLocalRecipe(by: recipeID) {
+                    await MainActor.run {
+                        selectedRecipe = localRecipe
+                        showingRecipeDetail = true
+                    }
+                    return
+                }
+                
+                // If not found locally, try to load from CloudKit
+                let recipe = try await CloudKitRecipeManager.shared.fetchRecipe(by: recipeID)
+                
+                await MainActor.run {
+                    selectedRecipe = recipe
+                    showingRecipeDetail = true
+                }
+            } catch {
+                print("❌ Failed to load recipe \(recipeID): \(error)")
+                // Could show an error alert here
+            }
+        }
+    }
+    
+    private func findLocalRecipe(by id: String) -> Recipe? {
+        // Search through all local recipes
+        return appState.allRecipes.first { $0.id.uuidString == id }
     }
 }
 
