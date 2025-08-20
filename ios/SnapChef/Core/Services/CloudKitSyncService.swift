@@ -388,20 +388,39 @@ final class CloudKitSyncService: ObservableObject {
     func addComment(recipeID: String, content: String, parentCommentID: String? = nil) async throws {
         guard let userID = CloudKitAuthManager.shared.currentUser?.recordID,
               let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+            print("❌ Cannot add comment: User not authenticated")
             throw CloudKitAuthError.notAuthenticated
         }
 
-        let comment = CKRecord(recordType: CloudKitConfig.recipeCommentRecordType)
-        comment[CKField.RecipeComment.id] = UUID().uuidString
-        comment[CKField.RecipeComment.userID] = userID
-        comment[CKField.RecipeComment.recipeID] = recipeID
-        comment[CKField.RecipeComment.content] = content
-        comment[CKField.RecipeComment.createdAt] = Date()
-        comment[CKField.RecipeComment.isDeleted] = Int64(0)
-        comment[CKField.RecipeComment.likeCount] = Int64(0)
-        comment[CKField.RecipeComment.parentCommentID] = parentCommentID
+        print("📝 Creating comment for recipe: \(recipeID)")
+        print("👤 User: \(userName) (ID: \(userID))")
+        print("💬 Content: \(content)")
 
-        try await publicDatabase.save(comment)
+        let commentID = UUID().uuidString
+        let comment = CKRecord(recordType: CloudKitConfig.recipeCommentRecordType, recordID: CKRecord.ID(recordName: commentID))
+        
+        // Debug field assignments
+        print("🔧 Setting comment fields:")
+        comment[CKField.RecipeComment.id] = commentID
+        print("   - id: \(commentID)")
+        comment[CKField.RecipeComment.userID] = userID
+        print("   - userID: \(userID)")
+        comment[CKField.RecipeComment.recipeID] = recipeID
+        print("   - recipeID: \(recipeID)")
+        comment[CKField.RecipeComment.content] = content
+        print("   - content: \(content)")
+        comment[CKField.RecipeComment.createdAt] = Date()
+        print("   - createdAt: \(Date())")
+        comment[CKField.RecipeComment.isDeleted] = Int64(0)
+        print("   - isDeleted: 0")
+        comment[CKField.RecipeComment.likeCount] = Int64(0)
+        print("   - likeCount: 0")
+        comment[CKField.RecipeComment.parentCommentID] = parentCommentID
+        print("   - parentCommentID: \(parentCommentID ?? "nil")")
+
+        print("💾 Saving comment to CloudKit...")
+        let savedComment = try await publicDatabase.save(comment)
+        print("✅ Comment saved to CloudKit with ID: \(commentID)")
 
         // Update recipe comment count
         await updateRecipeCommentCount(recipeID, increment: true)
@@ -421,25 +440,46 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     func fetchComments(for recipeID: String, limit: Int = 50) async throws -> [CKRecord] {
+        print("🔍 Fetching comments for recipe: \(recipeID)")
+        
         let predicate = NSPredicate(format: "%K == %@ AND %K == %d",
                                   CKField.RecipeComment.recipeID, recipeID,
                                   CKField.RecipeComment.isDeleted, 0)
         let query = CKQuery(recordType: CloudKitConfig.recipeCommentRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.RecipeComment.createdAt, ascending: false)]
 
-        let operation = CKQueryOperation(query: query)
-        operation.resultsLimit = limit
+        print("📊 Query predicate: \(predicate)")
+        print("📊 Record type: \(CloudKitConfig.recipeCommentRecordType)")
 
-        var comments: [CKRecord] = []
+        return try await withCheckedThrowingContinuation { continuation in
+            let operation = CKQueryOperation(query: query)
+            operation.resultsLimit = limit
 
-        operation.recordMatchedBlock = { _, result in
-            if case .success(let record) = result {
-                comments.append(record)
+            var comments: [CKRecord] = []
+
+            operation.recordMatchedBlock = { _, result in
+                switch result {
+                case .success(let record):
+                    comments.append(record)
+                    print("✅ Found comment record: \(record.recordID.recordName)")
+                case .failure(let error):
+                    print("❌ Failed to process comment record: \(error)")
+                }
             }
-        }
 
-        try await publicDatabase.add(operation)
-        return comments
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    print("✅ Comment query completed successfully. Found \(comments.count) comments")
+                    continuation.resume(returning: comments)
+                case .failure(let error):
+                    print("❌ Comment query failed: \(error)")
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            publicDatabase.add(operation)
+        }
     }
 
     func deleteComment(_ commentID: String) async throws {
@@ -448,7 +488,8 @@ final class CloudKitSyncService: ObservableObject {
 
         // Soft delete
         record[CKField.RecipeComment.isDeleted] = Int64(1)
-        try await publicDatabase.save(record)
+        let savedRecord = try await publicDatabase.save(record)
+        print("✅ Comment soft deleted in CloudKit with ID: \(commentID)")
 
         // Update recipe comment count
         if let recipeID = record[CKField.RecipeComment.recipeID] as? String {

@@ -479,13 +479,21 @@ class RecipeCommentsViewModel: ObservableObject {
         lastFetchedRecord = nil
         hasMore = true
 
+        print("🔍 Loading comments for recipe: \(recipeID)")
+
         do {
             let ckRecords = try await cloudKitSync.fetchComments(for: recipeID, limit: 50)
+            print("✅ Fetched \(ckRecords.count) comment records from CloudKit")
+            
             let commentItems = await parseCommentsFromRecords(ckRecords)
+            print("✅ Parsed \(commentItems.count) comment items")
+            
             comments = organizeCommentsWithReplies(commentItems)
+            print("✅ Organized into \(comments.count) top-level comments")
+            
             hasMore = ckRecords.count >= 50
         } catch {
-            print("Failed to load comments: \(error)")
+            print("❌ Failed to load comments for recipe \(recipeID): \(error)")
             // Fall back to empty state on error
             comments = []
             hasMore = false
@@ -512,39 +520,74 @@ class RecipeCommentsViewModel: ObservableObject {
 
     func addComment(to recipeID: String, content: String, parentCommentID: String? = nil) async {
         guard let userID = cloudKitAuth.currentUser?.recordID,
-              let userName = cloudKitAuth.currentUser?.displayName else { return }
+              let userName = cloudKitAuth.currentUser?.displayName else { 
+            print("❌ Cannot add comment: User not authenticated")
+            return 
+        }
+
+        // Create comment for immediate UI update
+        let commentID = UUID().uuidString
+        let newComment = CommentItem(
+            id: commentID,
+            userID: userID,
+            userName: userName,
+            userPhoto: nil,
+            recipeID: recipeID,
+            content: content,
+            createdAt: Date(),
+            editedAt: nil,
+            likeCount: 0,
+            isLiked: false,
+            parentCommentID: parentCommentID,
+            replies: []
+        )
+
+        // Add to UI immediately for better UX
+        if let parentCommentID = parentCommentID,
+           let parentIndex = comments.firstIndex(where: { $0.id == parentCommentID }) {
+            // Add as reply
+            let updatedParent = comments[parentIndex]
+            var replies = updatedParent.replies
+            replies.append(newComment)
+
+            comments[parentIndex] = CommentItem(
+                id: updatedParent.id,
+                userID: updatedParent.userID,
+                userName: updatedParent.userName,
+                userPhoto: updatedParent.userPhoto,
+                recipeID: updatedParent.recipeID,
+                content: updatedParent.content,
+                createdAt: updatedParent.createdAt,
+                editedAt: updatedParent.editedAt,
+                likeCount: updatedParent.likeCount,
+                isLiked: updatedParent.isLiked,
+                parentCommentID: updatedParent.parentCommentID,
+                replies: replies
+            )
+        } else {
+            // Add as top-level comment
+            comments.insert(newComment, at: 0)
+        }
 
         do {
-            // Save to CloudKit first
+            // Save to CloudKit
             try await cloudKitSync.addComment(
                 recipeID: recipeID,
                 content: content,
                 parentCommentID: parentCommentID
             )
+            print("✅ Comment successfully saved to CloudKit")
             
-            // Create comment for immediate UI update
-            let newComment = CommentItem(
-                id: UUID().uuidString,
-                userID: userID,
-                userName: userName,
-                userPhoto: nil,
-                recipeID: recipeID,
-                content: content,
-                createdAt: Date(),
-                editedAt: nil,
-                likeCount: 0,
-                isLiked: false,
-                parentCommentID: parentCommentID,
-                replies: []
-            )
-
+        } catch {
+            print("❌ Failed to save comment to CloudKit: \(error)")
+            
+            // Remove from UI if CloudKit save failed
             if let parentCommentID = parentCommentID,
                let parentIndex = comments.firstIndex(where: { $0.id == parentCommentID }) {
-                // Add as reply
+                // Remove from replies
                 let updatedParent = comments[parentIndex]
-                var replies = updatedParent.replies
-                replies.append(newComment)
-
+                let filteredReplies = updatedParent.replies.filter { $0.id != commentID }
+                
                 comments[parentIndex] = CommentItem(
                     id: updatedParent.id,
                     userID: updatedParent.userID,
@@ -557,15 +600,14 @@ class RecipeCommentsViewModel: ObservableObject {
                     likeCount: updatedParent.likeCount,
                     isLiked: updatedParent.isLiked,
                     parentCommentID: updatedParent.parentCommentID,
-                    replies: replies
+                    replies: filteredReplies
                 )
             } else {
-                // Add as top-level comment
-                comments.insert(newComment, at: 0)
+                // Remove from top-level comments
+                comments.removeAll { $0.id == commentID }
             }
-        } catch {
-            print("Failed to save comment: \(error)")
-            // Show error to user
+            
+            // TODO: Show error toast to user
         }
     }
 
@@ -657,14 +699,24 @@ class RecipeCommentsViewModel: ObservableObject {
     }
     
     private func parseCommentFromRecord(_ record: CKRecord) async -> CommentItem? {
+        print("🔍 Parsing comment record: \(record.recordID.recordName)")
+        print("📝 Record fields: \(record.allKeys())")
+        
         guard let id = record[CKField.RecipeComment.id] as? String,
               let userID = record[CKField.RecipeComment.userID] as? String,
               let recipeID = record[CKField.RecipeComment.recipeID] as? String,
               let content = record[CKField.RecipeComment.content] as? String,
               let createdAt = record[CKField.RecipeComment.createdAt] as? Date else {
-            print("⚠️ Failed to parse comment from CloudKit record: missing required fields")
+            print("❌ Failed to parse comment from CloudKit record: missing required fields")
+            print("   - id: \(record[CKField.RecipeComment.id] as? String ?? "missing")")
+            print("   - userID: \(record[CKField.RecipeComment.userID] as? String ?? "missing")")
+            print("   - recipeID: \(record[CKField.RecipeComment.recipeID] as? String ?? "missing")")
+            print("   - content: \(record[CKField.RecipeComment.content] as? String ?? "missing")")
+            print("   - createdAt: \(record[CKField.RecipeComment.createdAt] as? Date)")
             return nil
         }
+        
+        print("✅ Successfully extracted basic comment fields")
         
         // Get user display name (this could be cached or fetched from User records)
         let userName = await getUserDisplayName(for: userID) ?? "Unknown User"
@@ -676,7 +728,7 @@ class RecipeCommentsViewModel: ObservableObject {
         // Check if current user has liked this comment (not implemented yet)
         let isLiked = false // TODO: Implement comment likes
         
-        return CommentItem(
+        let commentItem = CommentItem(
             id: id,
             userID: userID,
             userName: userName,
@@ -690,6 +742,9 @@ class RecipeCommentsViewModel: ObservableObject {
             parentCommentID: parentCommentID,
             replies: []
         )
+        
+        print("✅ Created CommentItem: \(commentItem.content)")
+        return commentItem
     }
     
     private func organizeCommentsWithReplies(_ commentItems: [CommentItem]) -> [CommentItem] {

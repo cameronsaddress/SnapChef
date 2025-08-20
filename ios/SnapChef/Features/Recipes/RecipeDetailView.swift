@@ -563,6 +563,15 @@ struct RecipeDetailView: View {
             .task {
                 await loadLikeStatus()
                 await loadAuthorInfo()
+                
+                print("🔍 RecipeDetailView: Loading comments for recipe: \(recipe.name) (ID: \(recipe.id.uuidString))")
+                print("🔍 Authentication status: \(cloudKitAuth.isAuthenticated)")
+                if let user = cloudKitAuth.currentUser {
+                    print("🔍 Current user: \(user.displayName) (ID: \(user.recordID))")
+                } else {
+                    print("🔍 No current user found")
+                }
+                
                 await commentsViewModel.loadComments(for: recipe.id.uuidString)
             }
         }
@@ -663,15 +672,26 @@ struct RecipeDetailView: View {
     }
 
     private func submitComment() {
-        guard !newCommentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let trimmedText = newCommentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else { return }
+        
+        // Check if user is authenticated
+        guard cloudKitAuth.isAuthenticated else {
+            print("❌ Cannot submit comment: User not authenticated")
+            // TODO: Show authentication prompt
+            return
+        }
 
         Task {
             isSubmittingComment = true
             defer { isSubmittingComment = false }
 
+            print("🔍 Submitting comment for recipe: \(recipe.id.uuidString)")
+            print("📝 Comment content: \(trimmedText)")
+
             await commentsViewModel.addComment(
                 to: recipe.id.uuidString,
-                content: newCommentText
+                content: trimmedText
             )
 
             await MainActor.run {
@@ -1000,16 +1020,48 @@ extension RecipeDetailView {
                 }
 
                 // Comment Input
-                HStack(spacing: 12) {
-                    TextField("Add a comment...", text: $newCommentText)
-                        .textFieldStyle(DetectiveTextFieldStyle())
+                if cloudKitAuth.isAuthenticated {
+                    HStack(spacing: 12) {
+                        TextField("Add a comment...", text: $newCommentText)
+                            .textFieldStyle(DetectiveTextFieldStyle())
 
-                    Button(action: submitComment) {
-                        Image(systemName: "paperplane.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(newCommentText.isEmpty ? .white.opacity(0.5) : Color(hex: "#9b59b6"))
+                        Button(action: submitComment) {
+                            if isSubmittingComment {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .tint(Color(hex: "#9b59b6"))
+                            } else {
+                                Image(systemName: "paperplane.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(newCommentText.isEmpty ? .white.opacity(0.5) : Color(hex: "#9b59b6"))
+                            }
+                        }
+                        .disabled(newCommentText.isEmpty || isSubmittingComment)
                     }
-                    .disabled(newCommentText.isEmpty || isSubmittingComment)
+                } else {
+                    HStack(spacing: 12) {
+                        Text("Sign in to comment")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.6))
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.white.opacity(0.1))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                        
+                        Button(action: {
+                            cloudKitAuth.showAuthSheet = true
+                        }) {
+                            Image(systemName: "person.circle")
+                                .font(.system(size: 20))
+                                .foregroundColor(Color(hex: "#9b59b6"))
+                        }
+                    }
                 }
 
                 // Comments List

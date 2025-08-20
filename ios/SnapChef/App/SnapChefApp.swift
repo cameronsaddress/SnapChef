@@ -154,15 +154,11 @@ struct SnapChefApp: App {
     private func initializeAuthentication() async {
         print("🔐 Initializing authentication systems...")
         
-        // Initialize the unified auth manager to check existing auth status
-        let unifiedAuthManager = UnifiedAuthManager.shared
-        let cloudKitAuthManager = CloudKitAuthManager.shared
+        // Check if user was previously authenticated using the existing auth manager
+        // Note: checkAuthStatus() is called automatically in AuthenticationManager's init
         
-        // Check if user was previously authenticated
-        unifiedAuthManager.checkAuthStatus()
-        
-        // This will also initialize CloudKitAuthManager's checkExistingAuth
-        // which will restore authentication state if the user was previously signed in
+        // The AuthenticationManager handles authentication flows
+        // and will restore authentication state if the user was previously signed in
         
         print("🔐 Authentication initialization completed")
     }
@@ -225,7 +221,7 @@ struct SnapChefApp: App {
         
         // Verify it was stored successfully
         if let storedKey = KeychainManager.shared.getAPIKey() {
-            print("✅ API key verification successful")
+            print("✅ API key verification successful: \(storedKey.prefix(10))...")
         } else {
             print("❌ Failed to verify API key storage")
         }

@@ -78,12 +78,6 @@
     <key>CFBundleURLTypes</key>
     <array>
         <dict>
-            <key>CFBundleURLSchemes</key>
-            <array>
-                <string>com.googleusercontent.apps.YOUR_GOOGLE_CLIENT_ID</string>
-            </array>
-        </dict>
-        <dict>
             <key>CFBundleURLName</key>
             <string>tiktok-sandbox</string>
             <key>CFBundleURLSchemes</key>
@@ -104,8 +98,6 @@
     <string>sbawj0946ft24i4wjv</string>
     <key>TikTokClientSecret</key>
     <string>$(TIKTOK_CLIENT_SECRET)</string>
-    <key>GOOGLE_CLIENT_ID</key>
-    <string>YOUR_GOOGLE_CLIENT_ID</string>
     <key>API_BASE_URL</key>
     <string>https://api-dev.snapchef.app</string>
 </dict>
