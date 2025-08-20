@@ -212,13 +212,7 @@ struct ActivityFeedView: View {
             await feedManager.loadInitialActivities()
         }
         .sheet(isPresented: $showingRecipeDetail) {
-            print("🎯 SHEET PRESENTATION TRIGGERED")
-            print("🔍 showingRecipeDetail: \(showingRecipeDetail)")
-            print("🔍 selectedRecipe: \(selectedRecipe != nil ? "NOT NIL" : "NIL")")
             if let recipe = selectedRecipe {
-                print("🔍 Sheet will show recipe: \(recipe.name)")
-                print("🔍 Recipe ingredients count: \(recipe.ingredients.count)")
-                print("🔍 Recipe instructions count: \(recipe.instructions.count)")
                 NavigationStack {
                     RecipeDetailView(recipe: recipe)
                         .environmentObject(appState)
@@ -235,8 +229,14 @@ struct ActivityFeedView: View {
                             .ignoresSafeArea()
                         )
                 }
+                .onAppear {
+                    print("🎯 SHEET PRESENTATION TRIGGERED")
+                    print("🔍 showingRecipeDetail: \(showingRecipeDetail)")
+                    print("🔍 Sheet will show recipe: \(recipe.name)")
+                    print("🔍 Recipe ingredients count: \(recipe.ingredients.count)")
+                    print("🔍 Recipe instructions count: \(recipe.instructions.count)")
+                }
             } else {
-                print("🚨 CRITICAL: Sheet triggered but selectedRecipe is NIL!")
                 // Show a fallback view or empty view
                 VStack {
                     Text("Recipe not found")
@@ -248,6 +248,9 @@ struct ActivityFeedView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black)
+                .onAppear {
+                    print("🚨 CRITICAL: Sheet triggered but selectedRecipe is NIL!")
+                }
             }
         }
     }

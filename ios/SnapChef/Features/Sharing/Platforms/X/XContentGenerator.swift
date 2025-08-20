@@ -476,10 +476,10 @@ struct XThreadCard: View {
                             .foregroundColor(.white)
 
                         HStack(spacing: 40) {
-                            NutritionItem(label: "Calories", value: "\(nutrition.calories)")
-                            NutritionItem(label: "Protein", value: "\(nutrition.protein)g")
-                            NutritionItem(label: "Carbs", value: "\(nutrition.carbs)g")
-                            NutritionItem(label: "Fat", value: "\(nutrition.fat)g")
+                            XNutritionItem(label: "Calories", value: "\(nutrition.calories)")
+                            XNutritionItem(label: "Protein", value: "\(nutrition.protein)g")
+                            XNutritionItem(label: "Carbs", value: "\(nutrition.carbs)g")
+                            XNutritionItem(label: "Fat", value: "\(nutrition.fat)g")
                         }
 
                         Text("Enjoy your meal! 🍽")
@@ -518,7 +518,7 @@ struct XStatItem: View {
     }
 }
 
-struct NutritionItem: View {
+struct XNutritionItem: View {
     let label: String
     let value: String
 
