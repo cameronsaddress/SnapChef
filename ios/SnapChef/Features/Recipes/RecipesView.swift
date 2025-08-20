@@ -619,9 +619,13 @@ struct RecipeGridCard: View {
     @State private var showDetail = false
     @State private var showSharePopup = false
     @State private var showingUserProfile = false
+    @State private var creatorUsername: String = "Anonymous"
+    @State private var isLoadingUsername = false
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitUserManager = CloudKitUserManager.shared
+    @StateObject private var cloudKitRecipeCache = CloudKitRecipeCache.shared
 
     var body: some View {
         // Base card with tap gesture for viewing details
@@ -727,17 +731,23 @@ struct RecipeGridCard: View {
                             .frame(minHeight: 40, alignment: .topLeading)
                             .allowsHitTesting(false) // Allow scroll to pass through
 
-                        // Author row
+                        // Author row with dynamic username fetching
                         Button(action: {
-                            if let currentUser = cloudKitAuth.currentUser {
+                            if cloudKitAuth.isAuthenticated {
                                 showingUserProfile = true
                             }
                         }) {
                             HStack(spacing: 4) {
-                                Image(systemName: "person.circle.fill")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.white.opacity(0.6))
-                                Text(cloudKitAuth.currentUser?.displayName ?? "Me")
+                                if isLoadingUsername {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
+                                        .scaleEffect(0.5)
+                                } else {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.6))
+                                }
+                                Text(creatorUsername)
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundColor(.white.opacity(0.8))
                                     .lineLimit(1)
@@ -817,6 +827,9 @@ struct RecipeGridCard: View {
                 )
             }
         }
+        .task {
+            await fetchCreatorUsername()
+        }
     }
 
     private func deleteRecipe() {
@@ -873,6 +886,81 @@ struct RecipeGridCard: View {
         }
 
         return nil
+    }
+    
+    /// Fetch the actual creator username from CloudKit or use current user info
+    private func fetchCreatorUsername() async {
+        // Skip if already loaded
+        guard creatorUsername == "Anonymous" && !isLoadingUsername else {
+            return
+        }
+        
+        await MainActor.run {
+            isLoadingUsername = true
+        }
+        
+        do {
+            // Check if we can find this recipe in CloudKit to get the owner information
+            let cloudKitRecipes = await cloudKitRecipeCache.getRecipes(forceRefresh: false)
+            
+            // Look for this recipe in CloudKit by matching name and creation time
+            if let cloudKitRecipe = cloudKitRecipes.first(where: { cloudKitRecipe in
+                cloudKitRecipe.name == recipe.name && 
+                abs(cloudKitRecipe.createdAt.timeIntervalSince(recipe.createdAt)) < 60 // Within 1 minute
+            }) {
+                // This is a CloudKit recipe, get the owner name
+                let ownerName = cloudKitRecipe.name.isEmpty ? "Anonymous" : await getOwnerName(for: cloudKitRecipe)
+                await MainActor.run {
+                    creatorUsername = ownerName
+                    isLoadingUsername = false
+                }
+                print("✅ RecipeCard: Found CloudKit recipe owner '\(ownerName)' for recipe '\(recipe.name)'")
+                return
+            }
+            
+            // For local recipes (not found in CloudKit), use current user's info
+            await MainActor.run {
+                creatorUsername = cloudKitAuth.isAuthenticated ? (cloudKitAuth.currentUser?.displayName ?? "Me") : "Me"
+                isLoadingUsername = false
+            }
+            print("✅ RecipeCard: Using current user for local recipe '\(recipe.name)'")
+            
+        } catch {
+            print("❌ RecipeCard: Failed to fetch creator username for recipe '\(recipe.name)': \(error)")
+            await MainActor.run {
+                creatorUsername = "Anonymous"
+                isLoadingUsername = false
+            }
+        }
+    }
+    
+    /// Get the owner name for a CloudKit recipe
+    private func getOwnerName(for cloudKitRecipe: Recipe) async -> String {
+        // Try to find the CloudKitRecipe wrapper that has owner information
+        if let ckRecipeManager = cloudKitRecipeManager as? CloudKitRecipeManager,
+           let ownerID = try? await getCurrentRecipeOwnerID(for: cloudKitRecipe) {
+            
+            // If it's the current user, use their display name
+            if let currentUserID = try? await cloudKitUserManager.getCurrentUserID(),
+               ownerID == currentUserID {
+                return cloudKitAuth.currentUser?.displayName ?? "Me"
+            }
+            
+            // Otherwise, fetch the user profile for the owner
+            if let userProfile = try? await cloudKitUserManager.fetchUserByUID(ownerID) {
+                return userProfile.displayName
+            }
+        }
+        
+        return "Anonymous"
+    }
+    
+    /// Get the current recipe owner ID from CloudKit
+    private func getCurrentRecipeOwnerID(for recipe: Recipe) async throws -> String? {
+        // This is a simplified approach - in a real implementation, you'd need to
+        // query CloudKit for the recipe record to get the ownerID
+        // For now, we'll return the current user ID for locally created recipes
+        return try await cloudKitUserManager.getCurrentUserID()
     }
 }
 

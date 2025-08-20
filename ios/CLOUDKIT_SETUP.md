@@ -20,6 +20,7 @@ The app is encountering permission errors when trying to create records in Cloud
      - `Team`
      - `Leaderboard`
      - `UserActivity`
+     - `RecipeComment` **[CRITICAL FIX NEEDED]**
    
 3. **Set Public Database Permissions**
    For the **Public Database**:
@@ -28,13 +29,21 @@ The app is encountering permission errors when trying to create records in Cloud
    - Set permissions for "World" (unauthenticated users):
      - **Read**: ✅ Allowed
      - **Write**: ❌ Not Allowed (for security)
-   - Set permissions for "Authenticated" users:
+   - Set permissions for "Authenticated" users (_icloud):
      - **Read**: ✅ Allowed
-     - **Write**: ✅ Allowed (for Challenge, Team, Leaderboard)
+     - **Write**: ✅ Allowed (for Challenge, Team, Leaderboard, **RecipeComment**)
    - Set permissions for "Creator":
      - **Read**: ✅ Allowed
      - **Write**: ✅ Allowed
      - **Delete**: ✅ Allowed
+
+   **CRITICAL: RecipeComment Record Type Permissions**
+   - The `RecipeComment` record type must have **CREATE** permission for authenticated users (_icloud)
+   - Without this permission, users cannot create comments on recipes
+   - Ensure the following permissions are set for `RecipeComment`:
+     - World (unauthenticated): Read ✅, Write ❌
+     - Authenticated (_icloud): **Create ✅**, Read ✅, Write ✅ 
+     - Creator: Read ✅, Write ✅, Delete ✅
 
 4. **Deploy Schema to Production**
    - After making changes, click "Deploy Schema Changes..."

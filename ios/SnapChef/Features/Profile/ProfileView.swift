@@ -40,6 +40,8 @@ struct ProfileView: View {
     @State private var showingPerformanceSettings = false
     @State private var contentVisible = false
     @State private var profileImageScale: CGFloat = 0
+    @State private var userStats: UserStats?
+    @State private var isLoadingStats = false
 
     var body: some View {
         ZStack {
@@ -104,6 +106,9 @@ struct ProfileView: View {
             withAnimation(.easeOut(duration: 0.5).delay(0.2)) {
                 contentVisible = true
             }
+            
+            // Load user stats if authenticated
+            loadUserStats()
         }
         .sheet(isPresented: $showingSubscriptionView) {
             SubscriptionView()
@@ -129,6 +134,39 @@ struct ProfileView: View {
             }
         }
     }
+    
+    // MARK: - Data Loading Methods
+    
+    private func loadUserStats() {
+        guard cloudKitAuthManager.isAuthenticated else {
+            return
+        }
+        
+        guard !isLoadingStats else { return }
+        isLoadingStats = true
+        
+        Task {
+            do {
+                guard let userID = try await CloudKitUserManager.shared.getCurrentUserID() else {
+                    await MainActor.run {
+                        self.isLoadingStats = false
+                    }
+                    return
+                }
+                
+                let stats = try await CloudKitUserManager.shared.getUserStats(for: userID)
+                await MainActor.run {
+                    self.userStats = stats
+                    self.isLoadingStats = false
+                }
+            } catch {
+                print("Error loading user stats: \(error)")
+                await MainActor.run {
+                    self.isLoadingStats = false
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Enhanced Profile Header
@@ -146,6 +184,8 @@ struct EnhancedProfileHeader: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var gamificationManager: GamificationManager
     @EnvironmentObject var authManager: AuthenticationManager
+    @State private var userStats: UserStats?
+    @State private var isLoadingStats = false
 
     // Computed properties for display
     private var displayName: String {
@@ -189,8 +229,10 @@ struct EnhancedProfileHeader: View {
     }
 
     private var currentStreak: Int {
-        // Use CloudKit streak if available, otherwise calculate from local data
-        if let cloudKitUser = cloudKitAuthManager.currentUser {
+        // Use UserStats streak if available, otherwise CloudKit, otherwise calculate from local data
+        if let stats = userStats {
+            return stats.currentStreak
+        } else if let cloudKitUser = cloudKitAuthManager.currentUser {
             return cloudKitUser.currentStreak
         } else {
             return calculateStreak()
@@ -386,7 +428,7 @@ struct EnhancedProfileHeader: View {
 
                 // Status pills
                 HStack(spacing: 12) {
-                    StatusPill(text: "🔥 \(calculateStreak()) day streak", color: Color(hex: "#f093fb"))
+                    StatusPill(text: "🔥 \(currentStreak) day streak", color: Color(hex: "#f093fb"))
                     StatusPill(text: calculateUserStatus(), color: Color(hex: "#4facfe"))
                 }
 
@@ -485,6 +527,7 @@ struct EnhancedProfileHeader: View {
             withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
                 rotationAngle = 360
             }
+            loadUserStats()
             withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
                 glowAnimation = true
             }
@@ -505,6 +548,39 @@ struct EnhancedProfileHeader: View {
             if isAuthenticated {
                 Task {
                     await cloudKitAuthManager.refreshCurrentUser()
+                }
+            }
+        }
+    }
+    
+    // MARK: - Data Loading Methods
+    
+    private func loadUserStats() {
+        guard cloudKitAuthManager.isAuthenticated else {
+            return
+        }
+        
+        guard !isLoadingStats else { return }
+        isLoadingStats = true
+        
+        Task {
+            do {
+                guard let userID = try await CloudKitUserManager.shared.getCurrentUserID() else {
+                    await MainActor.run {
+                        self.isLoadingStats = false
+                    }
+                    return
+                }
+                
+                let stats = try await CloudKitUserManager.shared.getUserStats(for: userID)
+                await MainActor.run {
+                    self.userStats = stats
+                    self.isLoadingStats = false
+                }
+            } catch {
+                print("Error loading user stats in EnhancedProfileHeader: \(error)")
+                await MainActor.run {
+                    self.isLoadingStats = false
                 }
             }
         }
@@ -1521,10 +1597,14 @@ struct CollectionProgressView: View {
     @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @State private var animateProgress = false
+    @State private var userStats: UserStats?
+    @State private var isLoadingStats = false
 
     var totalRecipes: Int {
-        // Use CloudKit recipe counts when available
-        if cloudKitAuthManager.isAuthenticated {
+        // Use UserStats if available, otherwise CloudKit recipe counts when available
+        if let stats = userStats {
+            return stats.recipeCount
+        } else if cloudKitAuthManager.isAuthenticated {
             return cloudKitRecipeManager.userCreatedRecipeIDs.count + cloudKitRecipeManager.userSavedRecipeIDs.count
         } else {
             return appState.allRecipes.count
@@ -1600,6 +1680,40 @@ struct CollectionProgressView: View {
         .onAppear {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.5)) {
                 animateProgress = true
+            }
+            loadUserStats()
+        }
+    }
+    
+    // MARK: - Data Loading Methods
+    
+    private func loadUserStats() {
+        guard cloudKitAuthManager.isAuthenticated else {
+            return
+        }
+        
+        guard !isLoadingStats else { return }
+        isLoadingStats = true
+        
+        Task {
+            do {
+                guard let userID = try await CloudKitUserManager.shared.getCurrentUserID() else {
+                    await MainActor.run {
+                        self.isLoadingStats = false
+                    }
+                    return
+                }
+                
+                let stats = try await CloudKitUserManager.shared.getUserStats(for: userID)
+                await MainActor.run {
+                    self.userStats = stats
+                    self.isLoadingStats = false
+                }
+            } catch {
+                print("Error loading user stats in CollectionProgressView: \(error)")
+                await MainActor.run {
+                    self.isLoadingStats = false
+                }
             }
         }
     }
@@ -1686,6 +1800,10 @@ struct ProfileAchievementGalleryView: View {
                 ProfileAchievement(id: "social_butterfly", title: "Social Butterfly", description: "Share 10 recipes", icon: "🦋", isUnlocked: false, unlockedDate: nil)
             ]
         }
+    }
+    
+    var achievementCount: Int {
+        return achievements.filter { isAchievementUnlocked($0) }.count
     }
 
     private func loadCloudKitAchievements() {

@@ -1,4 +1,5 @@
 import SwiftUI
+import CloudKit
 
 /// Compact streak indicator for displaying in HomeView and other locations
 struct StreakIndicatorView: View {
@@ -186,17 +187,28 @@ struct StreakBadge: View {
 /// Streak summary card for profile
 struct StreakSummaryCard: View {
     @StateObject private var streakManager = StreakManager.shared
+    @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
+    @State private var recipeStreak: Int = 0
+    @State private var isLoadingStreak = false
 
     private var activeStreakCount: Int {
         streakManager.currentStreaks.values.filter { $0.isActive }.count
     }
 
     private var totalStreakDays: Int {
-        streakManager.currentStreaks.values.reduce(0) { $0 + $1.currentStreak }
+        // Use recipe streak if available
+        if recipeStreak > 0 {
+            return recipeStreak
+        }
+        return streakManager.currentStreaks.values.reduce(0) { $0 + $1.currentStreak }
     }
 
     private var longestStreak: Int {
-        streakManager.currentStreaks.values.map { $0.longestStreak }.max() ?? 0
+        // Use recipe streak if available
+        if recipeStreak > 0 {
+            return recipeStreak
+        }
+        return streakManager.currentStreaks.values.map { $0.longestStreak }.max() ?? 0
     }
 
     var body: some View {
@@ -270,6 +282,42 @@ struct StreakSummaryCard: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .onAppear {
+            loadRecipeStreak()
+        }
+    }
+    
+    // MARK: - Data Loading Methods
+    
+    private func loadRecipeStreak() {
+        guard cloudKitAuthManager.isAuthenticated else {
+            return
+        }
+        
+        guard !isLoadingStreak else { return }
+        isLoadingStreak = true
+        
+        Task {
+            do {
+                guard let userID = try await CloudKitUserManager.shared.getCurrentUserID() else {
+                    await MainActor.run {
+                        self.isLoadingStreak = false
+                    }
+                    return
+                }
+                
+                let streak = try await CloudKitUserManager.shared.calculateRecipeStreak(for: userID)
+                await MainActor.run {
+                    self.recipeStreak = streak
+                    self.isLoadingStreak = false
+                }
+            } catch {
+                print("Error loading recipe streak: \(error)")
+                await MainActor.run {
+                    self.isLoadingStreak = false
+                }
+            }
+        }
     }
 }
 
