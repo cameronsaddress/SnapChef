@@ -237,19 +237,64 @@ struct ActivityFeedView: View {
                     print("🔍 Recipe instructions count: \(recipe.instructions.count)")
                 }
             } else {
-                // Show a fallback view or empty view
-                VStack {
-                    Text("Recipe not found")
-                        .foregroundColor(.white)
-                    Button("Close") {
-                        showingRecipeDetail = false
+                // Show loading view while recipe loads
+                NavigationStack {
+                    ZStack {
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#0f0625"),
+                                Color(hex: "#1a0033"),
+                                Color(hex: "#0a051a")
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .ignoresSafeArea()
+                        
+                        VStack(spacing: 20) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+                            
+                            Text("Loading recipe...")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(.white)
+                            
+                            Button("Close") {
+                                showingRecipeDetail = false
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(8)
+                        }
                     }
-                    .foregroundColor(.blue)
+                    .navigationBarHidden(true)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black)
                 .onAppear {
                     print("🚨 CRITICAL: Sheet triggered but selectedRecipe is NIL!")
+                    print("🚨 selectedRecipeID: \(selectedRecipeID ?? "nil")")
+                    
+                    // Try to reload the recipe if we have an ID
+                    if let recipeID = selectedRecipeID, selectedRecipe == nil {
+                        print("🔄 Attempting to reload recipe: \(recipeID)")
+                        Task {
+                            do {
+                                let recipe = try await CloudKitRecipeManager.shared.fetchRecipe(by: recipeID)
+                                await MainActor.run {
+                                    self.selectedRecipe = recipe
+                                    print("✅ Recipe loaded in sheet: \(recipe.name)")
+                                }
+                            } catch {
+                                print("❌ Failed to load recipe in sheet: \(error)")
+                                await MainActor.run {
+                                    self.showingRecipeDetail = false
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -333,7 +378,8 @@ struct ActivityFeedView: View {
                     
                     print("🎯 SETTING selectedRecipe on MainActor...")
                     selectedRecipe = localRecipe
-                    print("✅ Local recipe set, now triggering sheet...")
+                    selectedRecipeID = recipeID
+                    print("✅ Local recipe set: \(localRecipe.name), ID: \(recipeID)")
                     
                     // Small delay to ensure state is properly set
                     try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -363,7 +409,8 @@ struct ActivityFeedView: View {
                 
                 print("🎯 SETTING CloudKit recipe on MainActor...")
                 selectedRecipe = recipe
-                print("✅ CloudKit recipe set, now triggering sheet...")
+                selectedRecipeID = recipeID
+                print("✅ CloudKit recipe set: \(recipe.name), ID: \(recipeID)")
                 
                 // Small delay to ensure state is properly set
                 try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
