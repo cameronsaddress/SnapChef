@@ -143,7 +143,18 @@ struct ActivityFeedView: View {
                     .padding(.vertical, 16)
 
                     // Activity List
-                    if feedManager.isLoading && feedManager.activities.isEmpty {
+                    if feedManager.showingSkeletonViews {
+                        // Skeleton Loading Views
+                        ScrollView {
+                            LazyVStack(spacing: 16) {
+                                ForEach(0..<5, id: \.self) { _ in
+                                    SkeletonActivityView()
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 20)
+                        }
+                    } else if feedManager.isLoading && feedManager.activities.isEmpty {
                         Spacer()
                         ProgressView()
                             .scaleEffect(1.5)
@@ -168,18 +179,20 @@ struct ActivityFeedView: View {
                                                 await feedManager.markActivityAsRead(activity.id)
                                             }
                                         }
-                                    }
-                                }
-
-                                if feedManager.hasMore {
-                                    ProgressView()
-                                        .tint(.white)
-                                        .padding()
-                                        .onAppear {
+                                        
+                                        // Load more when approaching end
+                                        if activity.id == filteredActivities.last?.id {
                                             Task {
                                                 await feedManager.loadMore()
                                             }
                                         }
+                                    }
+                                }
+
+                                if feedManager.hasMore && feedManager.isLoading {
+                                    ProgressView()
+                                        .tint(.white)
+                                        .padding()
                                 }
                             }
                             .padding(.horizontal, 20)
@@ -446,19 +459,32 @@ class ActivityFeedManager: ObservableObject {
     @Published var activities: [ActivityItem] = []
     @Published var isLoading = false
     @Published var hasMore = true
+    @Published var showingSkeletonViews = false
 
     private let cloudKitSync = CloudKitSyncService.shared
     private var lastFetchedRecord: CKRecord?
     private var userCache: [String: CloudKitUser] = [:] // Cache for user details
     private let publicDatabase = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+    
+    // Cache configuration
+    private let cacheKey = "ActivityFeedCache"
+    private let cacheTimestampKey = "ActivityFeedCacheTimestamp"
+    private let cacheExpirationTime: TimeInterval = 300 // 5 minutes
 
     func loadInitialActivities() async {
+        showingSkeletonViews = true
         isLoading = true
         activities = []
         lastFetchedRecord = nil
 
-        await fetchActivitiesFromCloudKit()
-
+        // Try loading from cache first
+        await loadCachedActivities()
+        
+        if activities.isEmpty {
+            await fetchActivitiesFromCloudKit()
+        }
+        
+        showingSkeletonViews = false
         isLoading = false
     }
 
@@ -568,6 +594,9 @@ class ActivityFeedManager: ObservableObject {
             hasMore = newActivities.count >= 50
 
             print("✅ Loaded \(newActivities.count) activities from CloudKit (target: \(targetActivities.count), public: \(publicActivities.count))")
+            
+            // Save to cache
+            await saveCachedActivities()
         } catch {
             print("❌ CloudKit activity fetch error: \(error)")
             // Don't throw here - just fallback to existing behavior
@@ -707,6 +736,39 @@ class ActivityFeedManager: ObservableObject {
             isRead: isReadInt == 1
         )
     }
+    
+    // MARK: - Caching Methods
+    
+    private func loadCachedActivities() async {
+        guard let data = UserDefaults.standard.data(forKey: cacheKey),
+              let timestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date,
+              Date().timeIntervalSince(timestamp) < cacheExpirationTime else {
+            return
+        }
+        
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let cachedData = try decoder.decode(CachedActivityData.self, from: data)
+            activities = cachedData.activities
+            print("✅ Loaded \(activities.count) cached activities")
+        } catch {
+            print("❌ Failed to load cached activities: \(error)")
+        }
+    }
+    
+    private func saveCachedActivities() async {
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let cachedData = CachedActivityData(activities: activities)
+            let data = try encoder.encode(cachedData)
+            UserDefaults.standard.set(data, forKey: cacheKey)
+            UserDefaults.standard.set(Date(), forKey: cacheTimestampKey)
+        } catch {
+            print("❌ Failed to save cached activities: \(error)")
+        }
+    }
 
     private func generateMockActivities() -> [ActivityItem] {
         [
@@ -767,6 +829,142 @@ class ActivityFeedManager: ObservableObject {
                 isRead: true
             )
         ]
+    }
+}
+
+// MARK: - Cached Activity Data Model
+struct CachedActivityData: Codable {
+    let activities: [ActivityItem]
+    
+    init(activities: [ActivityItem]) {
+        self.activities = activities
+    }
+}
+
+// MARK: - Activity Item Codable Extension
+extension ActivityItem: Codable {
+    enum CodingKeys: String, CodingKey {
+        case id, type, userID, userName, userPhoto, targetUserID, targetUserName
+        case recipeID, recipeName, recipeImage, timestamp, isRead
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(String.self, forKey: .id)
+        userID = try container.decode(String.self, forKey: .userID)
+        userName = try container.decode(String.self, forKey: .userName)
+        userPhoto = nil // UIImage is not codable
+        targetUserID = try container.decodeIfPresent(String.self, forKey: .targetUserID)
+        targetUserName = try container.decodeIfPresent(String.self, forKey: .targetUserName)
+        recipeID = try container.decodeIfPresent(String.self, forKey: .recipeID)
+        recipeName = try container.decodeIfPresent(String.self, forKey: .recipeName)
+        recipeImage = nil // UIImage is not codable
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        isRead = try container.decode(Bool.self, forKey: .isRead)
+        
+        // Decode activity type
+        let typeString = try container.decode(String.self, forKey: .type)
+        switch typeString {
+        case "follow": type = .follow
+        case "recipeShared": type = .recipeShared
+        case "recipeLiked": type = .recipeLiked
+        case "recipeComment": type = .recipeComment
+        case "challengeCompleted": type = .challengeCompleted
+        case "badgeEarned": type = .badgeEarned
+        default: type = .recipeShared
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        
+        try container.encode(id, forKey: .id)
+        try container.encode(userID, forKey: .userID)
+        try container.encode(userName, forKey: .userName)
+        try container.encodeIfPresent(targetUserID, forKey: .targetUserID)
+        try container.encodeIfPresent(targetUserName, forKey: .targetUserName)
+        try container.encodeIfPresent(recipeID, forKey: .recipeID)
+        try container.encodeIfPresent(recipeName, forKey: .recipeName)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(isRead, forKey: .isRead)
+        
+        // Encode activity type as string
+        let typeString: String
+        switch type {
+        case .follow: typeString = "follow"
+        case .recipeShared: typeString = "recipeShared"
+        case .recipeLiked: typeString = "recipeLiked"
+        case .recipeComment: typeString = "recipeComment"
+        case .challengeCompleted: typeString = "challengeCompleted"
+        case .badgeEarned: typeString = "badgeEarned"
+        }
+        try container.encode(typeString, forKey: .type)
+    }
+}
+
+// MARK: - Skeleton Loading Views
+struct SkeletonActivityView: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // User Photo Skeleton
+            Circle()
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 50, height: 50)
+                .overlay(
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.3),
+                                    Color.white.opacity(0.1),
+                                    Color.white.opacity(0.3)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .scaleEffect(isAnimating ? 1.2 : 0.8)
+                        .opacity(isAnimating ? 0.8 : 0.4)
+                )
+            
+            VStack(alignment: .leading, spacing: 8) {
+                // Activity Text Skeleton
+                Rectangle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(height: 16)
+                    .frame(maxWidth: .infinity)
+                    .cornerRadius(8)
+                
+                Rectangle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 120, height: 14)
+                    .cornerRadius(7)
+            }
+            
+            Spacer()
+            
+            // Recipe Image Skeleton
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 60, height: 60)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                isAnimating = true
+            }
+        }
     }
 }
 

@@ -39,7 +39,18 @@ struct SocialRecipeFeedView: View {
                         .padding(.bottom, 16)
                     
                     // Recipe Grid
-                    if feedManager.isLoading && feedManager.recipes.isEmpty {
+                    if feedManager.showingSkeletonViews {
+                        // Skeleton Loading Views
+                        ScrollView {
+                            LazyVGrid(columns: columns, spacing: 16) {
+                                ForEach(0..<6, id: \.self) { _ in
+                                    SkeletonRecipeCardView()
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 20)
+                        }
+                    } else if feedManager.isLoading && feedManager.recipes.isEmpty {
                         loadingView
                     } else if feedManager.recipes.isEmpty {
                         emptyStateView
@@ -462,15 +473,27 @@ final class SocialRecipeFeedManager: ObservableObject {
     @Published var isLoading = false
     @Published var hasMore = true
     @Published var error: Error?
+    @Published var showingSkeletonViews = false
     
     private let cloudKitSync = CloudKitSyncService.shared
     private let cloudKitAuth = CloudKitAuthManager.shared
     private var lastLoadedDate: Date?
     private let pageSize = 20
     
+    // Caching
+    private let cacheKey = "social_recipe_feed_cache"
+    private let cacheTimestampKey = "social_recipe_feed_cache_timestamp"
+    private let cacheExpirationTime: TimeInterval = 10 * 60 // 10 minutes
+    
     func loadInitialRecipes() async {
         guard !isLoading else { return }
         
+        showingSkeletonViews = true
+        
+        // Load cached recipes immediately
+        await loadCachedRecipes()
+        
+        // Load fresh recipes in background
         isLoading = true
         recipes = []
         lastLoadedDate = nil
@@ -478,8 +501,10 @@ final class SocialRecipeFeedManager: ObservableObject {
         error = nil
         
         await loadRecipes()
+        await saveCachedRecipes()
         
         isLoading = false
+        showingSkeletonViews = false
     }
     
     func loadMoreRecipes() async {
@@ -583,6 +608,177 @@ final class SocialRecipeFeedManager: ObservableObject {
                 creatorIsVerified: true
             )
         ]
+    }
+    
+    // MARK: - Caching Methods
+    
+    private func loadCachedRecipes() async {
+        guard let data = UserDefaults.standard.data(forKey: cacheKey),
+              let timestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date,
+              Date().timeIntervalSince(timestamp) < cacheExpirationTime else {
+            return
+        }
+        
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let cachedRecipes = try decoder.decode([SocialRecipeCard].self, from: data)
+            recipes = cachedRecipes
+            print("✅ Loaded \(recipes.count) cached social recipes")
+        } catch {
+            print("❌ Failed to load cached social recipes: \(error)")
+        }
+    }
+    
+    private func saveCachedRecipes() async {
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(recipes)
+            UserDefaults.standard.set(data, forKey: cacheKey)
+            UserDefaults.standard.set(Date(), forKey: cacheTimestampKey)
+        } catch {
+            print("❌ Failed to save cached social recipes: \(error)")
+        }
+    }
+}
+
+// MARK: - SocialRecipeCard Codable Extension
+extension SocialRecipeCard: Codable {
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, imageURL, createdAt
+        case likeCount, commentCount, viewCount, difficulty, cookingTime, isLiked
+        case creatorID, creatorName, creatorImageURL, creatorIsVerified
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        description = try container.decode(String.self, forKey: .description)
+        imageURL = try container.decodeIfPresent(String.self, forKey: .imageURL)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        likeCount = try container.decode(Int.self, forKey: .likeCount)
+        commentCount = try container.decode(Int.self, forKey: .commentCount)
+        viewCount = try container.decode(Int.self, forKey: .viewCount)
+        difficulty = try container.decode(String.self, forKey: .difficulty)
+        cookingTime = try container.decode(Int.self, forKey: .cookingTime)
+        isLiked = try container.decode(Bool.self, forKey: .isLiked)
+        creatorID = try container.decode(String.self, forKey: .creatorID)
+        creatorName = try container.decode(String.self, forKey: .creatorName)
+        creatorImageURL = try container.decodeIfPresent(String.self, forKey: .creatorImageURL)
+        creatorIsVerified = try container.decode(Bool.self, forKey: .creatorIsVerified)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(description, forKey: .description)
+        try container.encodeIfPresent(imageURL, forKey: .imageURL)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(likeCount, forKey: .likeCount)
+        try container.encode(commentCount, forKey: .commentCount)
+        try container.encode(viewCount, forKey: .viewCount)
+        try container.encode(difficulty, forKey: .difficulty)
+        try container.encode(cookingTime, forKey: .cookingTime)
+        try container.encode(isLiked, forKey: .isLiked)
+        try container.encode(creatorID, forKey: .creatorID)
+        try container.encode(creatorName, forKey: .creatorName)
+        try container.encodeIfPresent(creatorImageURL, forKey: .creatorImageURL)
+        try container.encode(creatorIsVerified, forKey: .creatorIsVerified)
+    }
+}
+
+// MARK: - Skeleton Recipe Card View
+struct SkeletonRecipeCardView: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Recipe Image Skeleton
+            Rectangle()
+                .fill(Color.white.opacity(0.1))
+                .frame(height: 160)
+                .overlay(
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.3),
+                                    Color.white.opacity(0.1),
+                                    Color.white.opacity(0.3)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .scaleEffect(isAnimating ? 1.2 : 0.8)
+                        .opacity(isAnimating ? 0.8 : 0.4)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            
+            // Recipe Info Skeleton
+            VStack(alignment: .leading, spacing: 8) {
+                // Creator Info Skeleton
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 24, height: 24)
+                    
+                    Rectangle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 80, height: 12)
+                        .cornerRadius(6)
+                    
+                    Spacer()
+                    
+                    Rectangle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 40, height: 10)
+                        .cornerRadius(5)
+                }
+                
+                // Recipe Title Skeleton
+                Rectangle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(height: 14)
+                    .frame(maxWidth: .infinity)
+                    .cornerRadius(7)
+                
+                // Recipe Stats Skeleton
+                HStack(spacing: 12) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 30, height: 10)
+                        .cornerRadius(5)
+                    
+                    Rectangle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 35, height: 10)
+                        .cornerRadius(5)
+                    
+                    Spacer()
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                isAnimating = true
+            }
+        }
     }
 }
 

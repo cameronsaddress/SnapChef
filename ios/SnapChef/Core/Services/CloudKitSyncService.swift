@@ -381,10 +381,22 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     func markActivityAsRead(_ activityID: String) async throws {
-        let recordID = CKRecord.ID(recordName: activityID)
-        let record = try await publicDatabase.record(for: recordID)
-        record[CKField.Activity.isRead] = Int64(1)
-        try await publicDatabase.save(record)
+        do {
+            let recordID = CKRecord.ID(recordName: activityID)
+            let record = try await publicDatabase.record(for: recordID)
+            record[CKField.Activity.isRead] = Int64(1)
+            try await publicDatabase.save(record)
+            print("✅ Marked activity \(activityID) as read")
+        } catch {
+            if let ckError = error as? CKError, ckError.code == .unknownItem {
+                print("⚠️ Activity \(activityID) not found in CloudKit, skipping mark as read")
+                // Don't throw error for missing records - activity might have been deleted
+                return
+            } else {
+                print("❌ Failed to mark activity \(activityID) as read: \(error)")
+                throw error
+            }
+        }
     }
 
     // MARK: - Comment Methods

@@ -73,8 +73,11 @@ struct FeedView: View {
             print("🔍 DEBUG: FeedView appeared")
         }
         .task {
-            // Load initial data
-            await refreshUserStats()
+            // Load initial data in parallel
+            async let userStatsTask = refreshUserStats()
+            
+            // No need to pre-warm here since each tab view manages its own loading
+            await userStatsTask
         }
         .refreshable {
             // Pull to refresh
