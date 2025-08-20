@@ -234,7 +234,11 @@ struct DetectiveRecipeCard: View {
     let onSave: () -> Void
     
     var body: some View {
-        // Custom card structure to allow photo to extend to edges
+        mainCardView
+    }
+    
+    @ViewBuilder
+    private var mainCardView: some View {
         VStack(spacing: 0) {
             // Photo container at top (full width, 150px height, no padding)
             detectivePhotoContainer(recipe: recipe)
@@ -250,142 +254,29 @@ struct DetectiveRecipeCard: View {
             // Content below photo
             VStack(spacing: 20) {
                     // Confidence indicator (95% match for recipes)
-                    HStack(spacing: 12) {
-                    Text("🎯")
-                        .font(.title2)
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Confidence: 95%")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                        
-                        Text("Excellent match")
-                            .font(.caption)
-                            .foregroundColor(Color(hex: "#43e97b"))
-                    }
-                    
-                    Spacer()
-                    
-                    Text("95%")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(Color(hex: "#43e97b"))
-                }
+                    confidenceSection
                 
                 // Recipe info
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Generated Recipe")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                            
-                            Text(recipe.name)
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .lineLimit(2)
-                        }
-                        
-                        Spacer()
-                        
-                        // Difficulty badge
-                        Text(recipe.difficulty.rawValue.capitalized)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule()
-                                    .fill(Color(hex: "#9b59b6").opacity(0.3))
-                            )
-                    }
-                    
-                    Divider()
-                        .overlay(Color.white.opacity(0.3))
-                    
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Description")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                            
-                            Text(recipe.description)
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.9))
-                                .lineLimit(3)
-                        }
-                        
-                        Spacer()
-                        
-                        Button(action: onSelect) {
-                            HStack(spacing: 6) {
-                                Text("View Recipe")
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                
-                                Image(systemName: "arrow.right")
-                                    .font(.system(size: 12))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(Color(hex: "#9b59b6"))
-                            )
-                        }
-                    }
-                }
+                recipeInfoSection
                 
-                // Action buttons at bottom - EXACTLY like DetectiveView
-                HStack(spacing: 12) {
-                    Button(action: onSave) {
-                        HStack(spacing: 8) {
-                            Image(systemName: isSaved ? "heart.fill" : "heart")
-                            Text(isSaved ? "Saved" : "Save")
-                        }
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(isSaved ? Color(hex: "#4CAF50").opacity(0.3) : Color.white.opacity(0.2))
-                        .cornerRadius(12)
-                    }
-                    .disabled(isSaved)
-                    
-                    Button(action: onShare) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "square.and.arrow.up")
-                            Text("Share")
-                        }
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.white.opacity(0.2))
-                        .cornerRadius(12)
-                    }
-                }
+                // Action buttons at bottom
+                actionButtonsSection
             }
             .padding(20)
             .background(
                 UnevenRoundedRectangle(
                     topLeadingRadius: 0,
-                    topTrailingRadius: 0,
                     bottomLeadingRadius: 16,
-                    bottomTrailingRadius: 16
+                    bottomTrailingRadius: 16,
+                    topTrailingRadius: 0
                 )
                 .fill(Color.white.opacity(0.1))
                 .overlay(
                     UnevenRoundedRectangle(
                         topLeadingRadius: 0,
-                        topTrailingRadius: 0,
                         bottomLeadingRadius: 16,
-                        bottomTrailingRadius: 16
+                        bottomTrailingRadius: 16,
+                        topTrailingRadius: 0
                     )
                     .stroke(
                         LinearGradient(
@@ -402,9 +293,9 @@ struct DetectiveRecipeCard: View {
                 .background(
                     UnevenRoundedRectangle(
                         topLeadingRadius: 0,
-                        topTrailingRadius: 0,
                         bottomLeadingRadius: 16,
-                        bottomTrailingRadius: 16
+                        bottomTrailingRadius: 16,
+                        topTrailingRadius: 0
                     )
                     .fill(.ultraThinMaterial.opacity(0.2))
                 )
@@ -430,6 +321,145 @@ struct DetectiveRecipeCard: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: Color.black.opacity(0.2), radius: 10, y: 5)
+    }
+    
+    // MARK: - Sub-views
+    @ViewBuilder
+    private var confidenceSection: some View {
+        HStack(spacing: 12) {
+            Text("🎯")
+                .font(.title2)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Confidence: 95%")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                
+                Text("Excellent match")
+                    .font(.caption)
+                    .foregroundColor(Color(hex: "#43e97b"))
+            }
+            
+            Spacer()
+            
+            Text("95%")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(Color(hex: "#43e97b"))
+        }
+    }
+    
+    @ViewBuilder
+    private var recipeInfoSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            recipeHeader
+            
+            Divider()
+                .overlay(Color.white.opacity(0.3))
+            
+            recipeDescriptionSection
+        }
+    }
+    
+    @ViewBuilder
+    private var recipeHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Generated Recipe")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                
+                Text(recipe.name)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+            }
+            
+            Spacer()
+            
+            // Difficulty badge
+            Text(recipe.difficulty.rawValue.capitalized)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color(hex: "#9b59b6").opacity(0.3))
+                )
+        }
+    }
+    
+    @ViewBuilder
+    private var recipeDescriptionSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Description")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                
+                Text(recipe.description)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(3)
+            }
+            
+            Spacer()
+            
+            Button(action: onSelect) {
+                HStack(spacing: 6) {
+                    Text("View Recipe")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 12))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(Color(hex: "#9b59b6"))
+                )
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var actionButtonsSection: some View {
+        HStack(spacing: 12) {
+            Button(action: onSave) {
+                HStack(spacing: 8) {
+                    Image(systemName: isSaved ? "heart.fill" : "heart")
+                    Text(isSaved ? "Saved" : "Save")
+                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(isSaved ? Color(hex: "#4CAF50").opacity(0.3) : Color.white.opacity(0.2))
+                .cornerRadius(12)
+            }
+            .disabled(isSaved)
+            
+            Button(action: onShare) {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.and.arrow.up")
+                    Text("Share")
+                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.white.opacity(0.2))
+                .cornerRadius(12)
+            }
+        }
     }
     
     // Photo container exactly like DetectiveView
