@@ -197,12 +197,22 @@ final class SyncModule: ObservableObject {
         
         // Create activity for recipe owner
         if userID != recipeOwnerID {
+            // Get recipe name for the activity
+            var recipeName: String?
+            do {
+                let recipeRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
+                recipeName = recipeRecord[CKField.Recipe.title] as? String
+            } catch {
+                print("⚠️ Could not fetch recipe name for activity: \(error)")
+            }
+            
             try await createActivity(
                 type: "recipeLiked",
                 actorID: userID,
                 actorName: userName,
                 targetUserID: recipeOwnerID,
-                recipeID: recipeID
+                recipeID: recipeID,
+                recipeName: recipeName
             )
         }
     }
@@ -246,15 +256,60 @@ final class SyncModule: ObservableObject {
     }
     
     func getRecipeLikeCount(_ recipeID: String) async throws -> Int {
-        let predicate = NSPredicate(format: "%K == %@", CKField.RecipeLike.recipeID, recipeID)
-        let query = CKQuery(recordType: CloudKitConfig.recipeLikeRecordType, predicate: predicate)
-        
-        let results = try await publicDatabase.records(matching: query)
-        return results.matchResults.count
+        // Get like count directly from Recipe record for efficiency
+        do {
+            let recordID = CKRecord.ID(recordName: recipeID)
+            let record = try await publicDatabase.record(for: recordID)
+            return Int(record[CKField.Recipe.likeCount] as? Int64 ?? 0)
+        } catch {
+            // Fallback to counting RecipeLike records if Recipe record not found
+            let predicate = NSPredicate(format: "%K == %@", CKField.RecipeLike.recipeID, recipeID)
+            let query = CKQuery(recordType: CloudKitConfig.recipeLikeRecordType, predicate: predicate)
+            let results = try await publicDatabase.records(matching: query)
+            return results.matchResults.count
+        }
     }
     
     private func updateRecipeLikeCount(_ recipeID: String, increment: Bool) async {
-        print("Recipe \(recipeID) like count \(increment ? "incremented" : "decremented")")
+        do {
+            // Fetch the recipe record from CloudKit
+            let recordID = CKRecord.ID(recordName: recipeID)
+            let record = try await publicDatabase.record(for: recordID)
+            
+            // Update the like count
+            let currentCount = record[CKField.Recipe.likeCount] as? Int64 ?? 0
+            let newCount = increment ? currentCount + 1 : max(0, currentCount - 1)
+            record[CKField.Recipe.likeCount] = newCount
+            
+            // Save the updated record back to CloudKit
+            try await publicDatabase.save(record)
+            
+            print("✅ Recipe \(recipeID) like count \(increment ? "incremented" : "decremented") to \(newCount)")
+        } catch {
+            print("❌ Failed to update recipe like count for \(recipeID): \(error)")
+        }
+    }
+    
+    /// Syncs the like count for a recipe by counting RecipeLike records
+    /// This method can be used for data consistency and recovery
+    func syncRecipeLikeCount(_ recipeID: String) async {
+        do {
+            // Count actual RecipeLike records
+            let predicate = NSPredicate(format: "%K == %@", CKField.RecipeLike.recipeID, recipeID)
+            let query = CKQuery(recordType: CloudKitConfig.recipeLikeRecordType, predicate: predicate)
+            let results = try await publicDatabase.records(matching: query)
+            let actualLikeCount = Int64(results.matchResults.count)
+            
+            // Update Recipe record with actual count
+            let recordID = CKRecord.ID(recordName: recipeID)
+            let record = try await publicDatabase.record(for: recordID)
+            record[CKField.Recipe.likeCount] = actualLikeCount
+            try await publicDatabase.save(record)
+            
+            print("♾️ Synced recipe \(recipeID) like count to \(actualLikeCount) from RecipeLike records")
+        } catch {
+            print("❌ Failed to sync recipe like count from records for \(recipeID): \(error)")
+        }
     }
     
     // MARK: - Activity Feed Methods

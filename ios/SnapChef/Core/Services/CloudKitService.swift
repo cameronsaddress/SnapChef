@@ -447,6 +447,12 @@ extension CloudKitService {
         return try await syncModule.getRecipeLikeCount(recipeID)
     }
     
+    /// Syncs the like count for a recipe by counting RecipeLike records
+    /// This method can be used for data consistency and recovery
+    func syncRecipeLikeCount(_ recipeID: String) async {
+        await syncModule.syncRecipeLikeCount(recipeID)
+    }
+    
     func createActivity(type: String, actorID: String, actorName: String,
                        targetUserID: String? = nil, targetUserName: String? = nil,
                        recipeID: String? = nil, recipeName: String? = nil,
