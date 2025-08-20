@@ -1,8 +1,9 @@
 -- SnapChef CloudKit Schema Definition
--- Version: 2.1
+-- Version: 2.2
 -- Last Updated: August 20, 2025
 -- Changes: Added QUERYABLE markers to all fields used in NSPredicate queries
 --          Fixed isDeleted field to be QUERYABLE for comment filtering
+--          Added CREATE permission for RecipeComment to allow authenticated users to post comments
 --
 -- DEPLOYMENT INSTRUCTIONS:
 -- 1. Open CloudKit Dashboard: https://icloud.developer.apple.com/dashboard
@@ -33,6 +34,7 @@
 --
 -- This allows users to:
 -- - Create their own challenges, teams, and activities
+-- - Comment on any recipe (RecipeComment has CREATE permission for _icloud)
 -- - Read all public content
 -- - Only modify their own records
 
@@ -355,6 +357,7 @@ DEFINE SCHEMA
         parentCommentID    STRING QUERYABLE,
         mentions           LIST<STRING>,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
