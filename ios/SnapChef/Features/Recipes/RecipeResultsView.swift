@@ -281,7 +281,7 @@ struct DetectiveRecipeCard: View {
                     .stroke(
                         LinearGradient(
                             colors: [
-                                Color(hex: "#43e97b").opacity(0.4),
+                                Color(hex: "#ffd700").opacity(0.4),
                                 Color(hex: "#2d1b69").opacity(0.3)
                             ],
                             startPoint: .topLeading,
@@ -309,7 +309,7 @@ struct DetectiveRecipeCard: View {
                         .stroke(
                             LinearGradient(
                                 colors: [
-                                    Color(hex: "#43e97b").opacity(0.4),
+                                    Color(hex: "#ffd700").opacity(0.4),
                                     Color(hex: "#2d1b69").opacity(0.3)
                                 ],
                                 startPoint: .topLeading,
@@ -337,7 +337,7 @@ struct DetectiveRecipeCard: View {
                 
                 Text("Excellent match")
                     .font(.caption)
-                    .foregroundColor(Color(hex: "#43e97b"))
+                    .foregroundColor(Color(hex: "#ffd700"))
             }
             
             Spacer()
@@ -1013,7 +1013,7 @@ struct FridgeInventoryCard: View {
                     // Arrow indicator
                     Image(systemName: "chevron.right.circle.fill")
                         .font(.system(size: 30))
-                        .foregroundColor(Color(hex: "#38f9d7"))
+                        .foregroundColor(Color(hex: "#ffd700"))
                         .scaleEffect(bounceAnimation ? 1.2 : 1)
                 }
                 
