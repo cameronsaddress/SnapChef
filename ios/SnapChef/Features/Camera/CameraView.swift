@@ -572,9 +572,11 @@ struct CameraView: View {
                             print("🔍   - shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : "\"\(recipe.shareCaption)\"")")
                         }
 
-                        // Update state
+                        // Update state immediately for UI
                         self.generatedRecipes = recipes
                         self.detectedIngredients = apiResponse.data.ingredients
+                        self.capturedImage = image
+                        self.resultsPreloaded = true
 
                         // Store the fridge photo for all generated recipes
                         // IMPORTANT: Use 'image' parameter directly, not self.capturedImage which isn't set yet
@@ -584,157 +586,190 @@ struct CameraView: View {
                             for: recipes.map { $0.id }
                         )
 
-                        // Track camera session completion
-                        let processingTime = Date().timeIntervalSince(startTime)
-                        let completedSession = CameraSessionData(
-                            sessionID: sessionId,
-                            captureType: "fridge_snap",
-                            flashEnabled: cameraModel.flashMode == .on,
-                            ingredientsDetected: apiResponse.data.ingredients.map { $0.name },
-                            recipesGenerated: recipes.count,
-                            aiModel: llmProvider,
-                            processingTime: processingTime
-                        )
-                        await cloudKitDataManager.trackCameraSession(completedSession)
-
-                        // Track usage with UsageTracker for daily limits
-                        self.usageTracker.trackRecipeGenerated()
-
-                        // Track with UserLifecycleManager
-                        self.userLifecycleManager.trackRecipeCreated()
-
-                        // Track recipe generation
-                        for recipe in recipes {
-                            let generationData = RecipeGenerationData(
-                                sessionID: sessionId,
-                                recipe: recipe,
-                                ingredients: apiResponse.data.ingredients.map { $0.name },
-                                preferencesJSON: String(describing: [
-                                    "dietary": currentDietaryRestrictions,
-                                    "foodType": effectiveFoodType ?? "",
-                                    "difficulty": selectedDifficulty ?? "",
-                                    "health": selectedHealthPreference ?? "",
-                                    "mealType": selectedMealType ?? "",
-                                    "cookingTime": selectedCookingTime ?? ""
-                                ]),
-                                generationTime: processingTime / Double(recipes.count),
-                                quality: "high"
-                            )
-                            await cloudKitDataManager.trackRecipeGeneration(generationData)
-                        }
-
-                        // Track feature usage
-                        await cloudKitDataManager.trackFeatureUse("recipe_generation")
-
-                        // Check if paywall should be triggered after successful generation
-                        if let suggestedContext = self.paywallTriggerManager.getSuggestedPaywallContext() {
-                            if self.paywallTriggerManager.shouldShowPaywall(for: suggestedContext) {
-                                Task { @MainActor in
-                                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-                                    self.premiumPromptReason = .dailyLimitReached
-                                    self.showPremiumPrompt = true
-                                }
-                            }
-                        }
-
-                        // Save recipes to CloudKit with the captured fridge photo
-                        print("📸 Uploading \(recipes.count) recipes with the same fridge photo to CloudKit...")
-                        for (index, recipe) in recipes.enumerated() {
-                            do {
-                                print("📸 Uploading recipe \(index + 1)/\(recipes.count): '\(recipe.name)'")
-                                let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: image)
-                                print("✅ Recipe \(index + 1)/\(recipes.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
-
-                                // Also add to user's saved recipes list
-                                try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
-                                print("✅ Recipe added to user's saved list")
-                            } catch {
-                                print("❌ Failed to save recipe \(index + 1)/\(recipes.count) to CloudKit: \(error)")
-                            }
-                        }
-                        print("✅ All \(recipes.count) recipes have been saved with the same fridge photo")
-
-                        // Increment snaps taken counter
-                        self.appState.incrementSnapsTaken()
-
-                        // Increment daily recipe count if not premium
-                        if !self.subscriptionManager.isPremium {
-                            self.subscriptionManager.incrementDailyRecipeCount()
-                        }
-
-                        // Track challenge progress for recipe creation
-                        for recipe in recipes {
-                            // Post notification for recipe creation
-                            NotificationCenter.default.post(
-                                name: Notification.Name("RecipeCreated"),
-                                object: recipe
-                            )
-
-                            // Award coins based on recipe quality
-                            let quality = self.determineRecipeQuality(recipe)
-                            ChefCoinsManager.shared.awardRecipeCreationCoins(recipeQuality: quality)
-
-                            // Track specific challenge actions
-                            if recipe.nutrition.calories < 500 {
-                                ChallengeProgressTracker.shared.trackAction(.calorieTarget, metadata: [
-                                    "calories": recipe.nutrition.calories,
-                                    "recipeId": recipe.id
-                                ])
-                            }
-
-                            if recipe.nutrition.protein >= 20 {
-                                ChallengeProgressTracker.shared.trackAction(.proteinTarget, metadata: [
-                                    "protein": recipe.nutrition.protein,
-                                    "recipeId": recipe.id
-                                ])
-                            }
-
-                            // Track cuisine if available in tags
-                            if let cuisineTag = recipe.tags.first(where: { tag in
-                                ["italian", "mexican", "chinese", "japanese", "thai", "indian", "french", "american"].contains(tag.lowercased())
-                            }) {
-                                ChallengeProgressTracker.shared.trackAction(.cuisineExplored, metadata: [
-                                    "cuisine": cuisineTag,
-                                    "recipeId": recipe.id
-                                ])
-                            }
-
-                            // Check for speed challenges
-                            if recipe.prepTime + recipe.cookTime <= 30 {
-                                ChallengeProgressTracker.shared.trackAction(.timeCompleted, metadata: [
-                                    "totalTime": recipe.prepTime + recipe.cookTime,
-                                    "recipeId": recipe.id
-                                ])
-                            }
-
-                            // Track analytics for recipe creation
-                            ChallengeAnalyticsService.shared.trackEvent(.milestoneReached, parameters: [
-                                "milestone": "recipe_created",
-                                "quality": quality.rawValue,
-                                "calories": recipe.nutrition.calories,
-                                "protein": recipe.nutrition.protein,
-                                "totalTime": recipe.prepTime + recipe.cookTime,
-                                "difficulty": recipe.difficulty,
-                                "recipeId": recipe.id.uuidString
-                            ])
-                        }
-
-                        // Don't auto-save recipes - user will choose which ones to save
-                        // Store the captured image for later use
-                        self.capturedImage = image
-
-                        // Update UI on main thread
-                        self.generatedRecipes = recipes
-                        self.detectedIngredients = apiResponse.data.ingredients
-                        self.resultsPreloaded = true
-
                         // Dismiss processing overlay first
                         self.isProcessing = false
 
-                        // Small delay to ensure smooth transition
+                        // Navigate to results immediately - user sees recipes right away!
                         Task { @MainActor in
                             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
                             self.showingResults = true
+                        }
+
+                        // Capture values before entering detached task (these are @MainActor properties)
+                        let flashEnabled = cameraModel.flashMode == .on
+                        let dietaryRestrictions = currentDietaryRestrictions
+                        let foodType = effectiveFoodType
+                        let difficulty = selectedDifficulty
+                        let health = selectedHealthPreference
+                        let mealType = selectedMealType
+                        let cookingTime = selectedCookingTime
+
+                        // BACKGROUND SAVING: All the CloudKit saving happens after navigation
+                        Task.detached(priority: .background) {
+                            do {
+                                // Only proceed with CloudKit saving if user is authenticated
+                                guard await CloudKitAuthManager.shared.isAuthenticated else {
+                                    print("📱 Background: User not authenticated - skipping CloudKit saving")
+                                    return
+                                }
+                                
+                                // Track camera session completion
+                                let processingTime = Date().timeIntervalSince(startTime)
+                                let completedSession = CameraSessionData(
+                                    sessionID: sessionId,
+                                    captureType: "fridge_snap",
+                                    flashEnabled: flashEnabled,
+                                    ingredientsDetected: apiResponse.data.ingredients.map { $0.name },
+                                    recipesGenerated: recipes.count,
+                                    aiModel: llmProvider,
+                                    processingTime: processingTime
+                                )
+                                await cloudKitDataManager.trackCameraSession(completedSession)
+
+                                // Track usage with UsageTracker for daily limits
+                                await MainActor.run {
+                                    self.usageTracker.trackRecipeGenerated()
+                                    self.userLifecycleManager.trackRecipeCreated()
+                                }
+
+                                // Track recipe generation
+                                for recipe in recipes {
+                                    let generationData = RecipeGenerationData(
+                                        sessionID: sessionId,
+                                        recipe: recipe,
+                                        ingredients: apiResponse.data.ingredients.map { $0.name },
+                                        preferencesJSON: String(describing: [
+                                            "dietary": dietaryRestrictions,
+                                            "foodType": foodType ?? "",
+                                            "difficulty": difficulty ?? "",
+                                            "health": health ?? "",
+                                            "mealType": mealType ?? "",
+                                            "cookingTime": cookingTime ?? ""
+                                        ]),
+                                        generationTime: processingTime / Double(recipes.count),
+                                        quality: "high"
+                                    )
+                                    await cloudKitDataManager.trackRecipeGeneration(generationData)
+                                }
+
+                                // Track feature usage
+                                await cloudKitDataManager.trackFeatureUse("recipe_generation")
+
+                                // Check if paywall should be triggered after successful generation
+                                if let suggestedContext = await MainActor.run { self.paywallTriggerManager.getSuggestedPaywallContext() } {
+                                    if await MainActor.run { self.paywallTriggerManager.shouldShowPaywall(for: suggestedContext) } {
+                                        await MainActor.run {
+                                            Task { @MainActor in
+                                                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                                                self.premiumPromptReason = .dailyLimitReached
+                                                self.showPremiumPrompt = true
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Save recipes to CloudKit with the captured fridge photo
+                                print("📸 Background: Uploading \(recipes.count) recipes with the same fridge photo to CloudKit...")
+                                for (index, recipe) in recipes.enumerated() {
+                                    do {
+                                        print("📸 Background: Uploading recipe \(index + 1)/\(recipes.count): '\(recipe.name)'")
+                                        let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: image)
+                                        print("✅ Background: Recipe \(index + 1)/\(recipes.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
+
+                                        // Also add to user's saved recipes list
+                                        try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
+                                        print("✅ Background: Recipe added to user's saved list")
+                                    } catch {
+                                        print("❌ Background: Failed to save recipe \(index + 1)/\(recipes.count) to CloudKit: \(error)")
+                                    }
+                                }
+                                print("✅ Background: All \(recipes.count) recipes have been saved with the same fridge photo")
+
+                                // Increment snaps taken counter
+                                await MainActor.run {
+                                    self.appState.incrementSnapsTaken()
+                                }
+
+                                // Increment daily recipe count if not premium
+                                await MainActor.run {
+                                    if !self.subscriptionManager.isPremium {
+                                        self.subscriptionManager.incrementDailyRecipeCount()
+                                    }
+                                }
+
+                                // Track challenge progress for recipe creation
+                                for recipe in recipes {
+                                    // Post notification for recipe creation
+                                    await MainActor.run {
+                                        NotificationCenter.default.post(
+                                            name: Notification.Name("RecipeCreated"),
+                                            object: recipe
+                                        )
+                                    }
+
+                                    // Award coins based on recipe quality
+                                    let quality = await MainActor.run { self.determineRecipeQuality(recipe) }
+                                    await MainActor.run {
+                                        ChefCoinsManager.shared.awardRecipeCreationCoins(recipeQuality: quality)
+                                    }
+
+                                    // Track specific challenge actions
+                                    if recipe.nutrition.calories < 500 {
+                                        await MainActor.run {
+                                            ChallengeProgressTracker.shared.trackAction(.calorieTarget, metadata: [
+                                                "calories": recipe.nutrition.calories,
+                                                "recipeId": recipe.id
+                                            ])
+                                        }
+                                    }
+
+                                    if recipe.nutrition.protein >= 20 {
+                                        await MainActor.run {
+                                            ChallengeProgressTracker.shared.trackAction(.proteinTarget, metadata: [
+                                                "protein": recipe.nutrition.protein,
+                                                "recipeId": recipe.id
+                                            ])
+                                        }
+                                    }
+
+                                    // Track cuisine if available in tags
+                                    if let cuisineTag = recipe.tags.first(where: { tag in
+                                        ["italian", "mexican", "chinese", "japanese", "thai", "indian", "french", "american"].contains(tag.lowercased())
+                                    }) {
+                                        await MainActor.run {
+                                            ChallengeProgressTracker.shared.trackAction(.cuisineExplored, metadata: [
+                                                "cuisine": cuisineTag,
+                                                "recipeId": recipe.id
+                                            ])
+                                        }
+                                    }
+
+                                    // Check for speed challenges
+                                    if recipe.prepTime + recipe.cookTime <= 30 {
+                                        await MainActor.run {
+                                            ChallengeProgressTracker.shared.trackAction(.timeCompleted, metadata: [
+                                                "totalTime": recipe.prepTime + recipe.cookTime,
+                                                "recipeId": recipe.id
+                                            ])
+                                        }
+                                    }
+
+                                    // Track analytics for recipe creation
+                                    await MainActor.run {
+                                        ChallengeAnalyticsService.shared.trackEvent(.milestoneReached, parameters: [
+                                            "milestone": "recipe_created",
+                                            "quality": quality.rawValue,
+                                            "calories": recipe.nutrition.calories,
+                                            "protein": recipe.nutrition.protein,
+                                            "totalTime": recipe.prepTime + recipe.cookTime,
+                                            "difficulty": recipe.difficulty,
+                                            "recipeId": recipe.id.uuidString
+                                        ])
+                                    }
+                                }
+                            } catch {
+                                print("❌ Background saving failed: \(error)")
+                            }
                         }
 
                     case .failure(let error):
@@ -796,7 +831,7 @@ struct CameraView: View {
             let sessionId = UUID().uuidString
 
             // Track camera session start
-            let sessionData = CameraSessionData(
+            let _ = CameraSessionData(
                 sessionID: sessionId,
                 captureType: "fridge_and_pantry_snap",
                 flashEnabled: cameraModel.flashMode == .on,
@@ -879,9 +914,11 @@ struct CameraView: View {
                             print("🔍   - shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : "\"\(recipe.shareCaption)\"")")
                         }
 
-                        // Update state
+                        // Update state immediately for UI
                         self.generatedRecipes = recipes
                         self.detectedIngredients = apiResponse.data.ingredients
+                        self.capturedImage = fridgeImage
+                        self.resultsPreloaded = true
 
                         // Store both photos for all generated recipes
                         print("📸 CameraView: Storing fridge and pantry photos in PhotoStorageManager for \(recipes.count) recipes")
@@ -894,145 +931,177 @@ struct CameraView: View {
                             for: recipes.map { $0.id }
                         )
 
-                        // Track camera session completion
-                        let processingTime = Date().timeIntervalSince(startTime)
-                        let completedSession = CameraSessionData(
-                            sessionID: sessionId,
-                            captureType: "fridge_and_pantry_snap",
-                            flashEnabled: cameraModel.flashMode == .on,
-                            ingredientsDetected: apiResponse.data.ingredients.map { $0.name },
-                            recipesGenerated: recipes.count,
-                            aiModel: llmProvider,
-                            processingTime: processingTime
-                        )
-                        await cloudKitDataManager.trackCameraSession(completedSession)
-
-                        // Track usage with UsageTracker for dual images
-                        self.usageTracker.trackRecipeGenerated()
-
-                        // Track with UserLifecycleManager
-                        self.userLifecycleManager.trackRecipeCreated()
-
-                        // Track recipe generation
-                        for recipe in recipes {
-                            let generationData = RecipeGenerationData(
-                                sessionID: sessionId,
-                                recipe: recipe,
-                                ingredients: apiResponse.data.ingredients.map { $0.name },
-                                preferencesJSON: String(describing: [
-                                    "dietary": currentDietaryRestrictions,
-                                    "foodType": effectiveFoodType ?? "",
-                                    "difficulty": selectedDifficulty ?? "",
-                                    "health": selectedHealthPreference ?? "",
-                                    "mealType": selectedMealType ?? "",
-                                    "cookingTime": selectedCookingTime ?? ""
-                                ]),
-                                generationTime: processingTime / Double(recipes.count),
-                                quality: "high"
-                            )
-                            await cloudKitDataManager.trackRecipeGeneration(generationData)
-                        }
-
-                        // Track feature usage
-                        await cloudKitDataManager.trackFeatureUse("recipe_generation_with_pantry")
-
-                        // Save recipes to CloudKit with the captured fridge photo
-                        print("📸 Uploading \(recipes.count) recipes with fridge and pantry photos to CloudKit...")
-                        for (index, recipe) in recipes.enumerated() {
-                            do {
-                                print("📸 Uploading recipe \(index + 1)/\(recipes.count): '\(recipe.name)'")
-                                let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: fridgeImage)
-                                print("✅ Recipe \(index + 1)/\(recipes.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
-
-                                // Also add to user's saved recipes list
-                                try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
-                                print("✅ Recipe added to user's saved list")
-                            } catch {
-                                print("❌ Failed to save recipe \(index + 1)/\(recipes.count) to CloudKit: \(error)")
-                            }
-                        }
-                        print("✅ All \(recipes.count) recipes have been saved with fridge and pantry photos")
-
-                        // Increment snaps taken counter
-                        self.appState.incrementSnapsTaken()
-
-                        // Increment daily recipe count if not premium
-                        if !self.subscriptionManager.isPremium {
-                            self.subscriptionManager.incrementDailyRecipeCount()
-                        }
-
-                        // Track challenge progress for recipe creation
-                        for recipe in recipes {
-                            // Post notification for recipe creation
-                            NotificationCenter.default.post(
-                                name: Notification.Name("RecipeCreated"),
-                                object: recipe
-                            )
-
-                            // Award coins based on recipe quality
-                            let quality = self.determineRecipeQuality(recipe)
-                            ChefCoinsManager.shared.awardRecipeCreationCoins(recipeQuality: quality)
-
-                            // Track specific challenge actions
-                            if recipe.nutrition.calories < 500 {
-                                ChallengeProgressTracker.shared.trackAction(.calorieTarget, metadata: [
-                                    "calories": recipe.nutrition.calories,
-                                    "recipeId": recipe.id
-                                ])
-                            }
-
-                            if recipe.nutrition.protein >= 20 {
-                                ChallengeProgressTracker.shared.trackAction(.proteinTarget, metadata: [
-                                    "protein": recipe.nutrition.protein,
-                                    "recipeId": recipe.id
-                                ])
-                            }
-
-                            // Track cuisine if available in tags
-                            if let cuisineTag = recipe.tags.first(where: { tag in
-                                ["italian", "mexican", "chinese", "japanese", "thai", "indian", "french", "american"].contains(tag.lowercased())
-                            }) {
-                                ChallengeProgressTracker.shared.trackAction(.cuisineExplored, metadata: [
-                                    "cuisine": cuisineTag,
-                                    "recipeId": recipe.id
-                                ])
-                            }
-
-                            // Check for speed challenges
-                            if recipe.prepTime + recipe.cookTime <= 30 {
-                                ChallengeProgressTracker.shared.trackAction(.timeCompleted, metadata: [
-                                    "totalTime": recipe.prepTime + recipe.cookTime,
-                                    "recipeId": recipe.id
-                                ])
-                            }
-
-                            // Track analytics for recipe creation
-                            ChallengeAnalyticsService.shared.trackEvent(.milestoneReached, parameters: [
-                                "milestone": "recipe_created_with_pantry",
-                                "quality": quality.rawValue,
-                                "calories": recipe.nutrition.calories,
-                                "protein": recipe.nutrition.protein,
-                                "totalTime": recipe.prepTime + recipe.cookTime,
-                                "difficulty": recipe.difficulty,
-                                "recipeId": recipe.id.uuidString
-                            ])
-                        }
-
-                        // Store the captured image for later use
-                        self.capturedImage = fridgeImage
-
-                        // Update UI on main thread
-                        self.generatedRecipes = recipes
-                        self.detectedIngredients = apiResponse.data.ingredients
-                        self.resultsPreloaded = true
-
                         // Dismiss processing overlay first
                         self.isProcessing = false
 
-                        // Small delay to ensure smooth transition
+                        // Navigate to results immediately - user sees recipes right away!
                         Task { @MainActor in
                             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
                             self.showingResults = true
+                        }
+
+                        // Capture values before entering detached task (these are @MainActor properties)
+                        let flashEnabled = cameraModel.flashMode == .on
+                        let dietaryRestrictions = currentDietaryRestrictions
+                        let foodType = effectiveFoodType
+                        let difficulty = selectedDifficulty
+                        let health = selectedHealthPreference
+                        let mealType = selectedMealType
+                        let cookingTime = selectedCookingTime
+
+                        // BACKGROUND SAVING: All the CloudKit saving happens after navigation
+                        Task.detached(priority: .background) {
+                            do {
+                                // Only proceed with CloudKit saving if user is authenticated
+                                guard await CloudKitAuthManager.shared.isAuthenticated else {
+                                    print("📱 Background: User not authenticated - skipping CloudKit saving")
+                                    return
+                                }
+                                
+                                // Track camera session completion
+                                let processingTime = Date().timeIntervalSince(startTime)
+                                let completedSession = CameraSessionData(
+                                    sessionID: sessionId,
+                                    captureType: "fridge_and_pantry_snap",
+                                    flashEnabled: flashEnabled,
+                                    ingredientsDetected: apiResponse.data.ingredients.map { $0.name },
+                                    recipesGenerated: recipes.count,
+                                    aiModel: llmProvider,
+                                    processingTime: processingTime
+                                )
+                                await cloudKitDataManager.trackCameraSession(completedSession)
+
+                                // Track usage with UsageTracker for dual images
+                                await MainActor.run {
+                                    self.usageTracker.trackRecipeGenerated()
+                                    self.userLifecycleManager.trackRecipeCreated()
+                                }
+
+                                // Track recipe generation
+                                for recipe in recipes {
+                                    let generationData = RecipeGenerationData(
+                                        sessionID: sessionId,
+                                        recipe: recipe,
+                                        ingredients: apiResponse.data.ingredients.map { $0.name },
+                                        preferencesJSON: String(describing: [
+                                            "dietary": dietaryRestrictions,
+                                            "foodType": foodType ?? "",
+                                            "difficulty": difficulty ?? "",
+                                            "health": health ?? "",
+                                            "mealType": mealType ?? "",
+                                            "cookingTime": cookingTime ?? ""
+                                        ]),
+                                        generationTime: processingTime / Double(recipes.count),
+                                        quality: "high"
+                                    )
+                                    await cloudKitDataManager.trackRecipeGeneration(generationData)
+                                }
+
+                                // Track feature usage
+                                await cloudKitDataManager.trackFeatureUse("recipe_generation_with_pantry")
+
+                                // Save recipes to CloudKit with the captured fridge photo
+                                print("📸 Background: Uploading \(recipes.count) recipes with fridge and pantry photos to CloudKit...")
+                                for (index, recipe) in recipes.enumerated() {
+                                    do {
+                                        print("📸 Background: Uploading recipe \(index + 1)/\(recipes.count): '\(recipe.name)'")
+                                        let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: fridgeImage)
+                                        print("✅ Background: Recipe \(index + 1)/\(recipes.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
+
+                                        // Also add to user's saved recipes list
+                                        try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
+                                        print("✅ Background: Recipe added to user's saved list")
+                                    } catch {
+                                        print("❌ Background: Failed to save recipe \(index + 1)/\(recipes.count) to CloudKit: \(error)")
+                                    }
+                                }
+                                print("✅ Background: All \(recipes.count) recipes have been saved with fridge and pantry photos")
+
+                                // Increment snaps taken counter
+                                await MainActor.run {
+                                    self.appState.incrementSnapsTaken()
+                                }
+
+                                // Increment daily recipe count if not premium
+                                await MainActor.run {
+                                    if !self.subscriptionManager.isPremium {
+                                        self.subscriptionManager.incrementDailyRecipeCount()
+                                    }
+                                }
+
+                                // Track challenge progress for recipe creation
+                                for recipe in recipes {
+                                    // Post notification for recipe creation
+                                    await MainActor.run {
+                                        NotificationCenter.default.post(
+                                            name: Notification.Name("RecipeCreated"),
+                                            object: recipe
+                                        )
+                                    }
+
+                                    // Award coins based on recipe quality
+                                    let quality = await MainActor.run { self.determineRecipeQuality(recipe) }
+                                    await MainActor.run {
+                                        ChefCoinsManager.shared.awardRecipeCreationCoins(recipeQuality: quality)
+                                    }
+
+                                    // Track specific challenge actions
+                                    if recipe.nutrition.calories < 500 {
+                                        await MainActor.run {
+                                            ChallengeProgressTracker.shared.trackAction(.calorieTarget, metadata: [
+                                                "calories": recipe.nutrition.calories,
+                                                "recipeId": recipe.id
+                                            ])
+                                        }
+                                    }
+
+                                    if recipe.nutrition.protein >= 20 {
+                                        await MainActor.run {
+                                            ChallengeProgressTracker.shared.trackAction(.proteinTarget, metadata: [
+                                                "protein": recipe.nutrition.protein,
+                                                "recipeId": recipe.id
+                                            ])
+                                        }
+                                    }
+
+                                    // Track cuisine if available in tags
+                                    if let cuisineTag = recipe.tags.first(where: { tag in
+                                        ["italian", "mexican", "chinese", "japanese", "thai", "indian", "french", "american"].contains(tag.lowercased())
+                                    }) {
+                                        await MainActor.run {
+                                            ChallengeProgressTracker.shared.trackAction(.cuisineExplored, metadata: [
+                                                "cuisine": cuisineTag,
+                                                "recipeId": recipe.id
+                                            ])
+                                        }
+                                    }
+
+                                    // Check for speed challenges
+                                    if recipe.prepTime + recipe.cookTime <= 30 {
+                                        await MainActor.run {
+                                            ChallengeProgressTracker.shared.trackAction(.timeCompleted, metadata: [
+                                                "totalTime": recipe.prepTime + recipe.cookTime,
+                                                "recipeId": recipe.id
+                                            ])
+                                        }
+                                    }
+
+                                    // Track analytics for recipe creation
+                                    await MainActor.run {
+                                        ChallengeAnalyticsService.shared.trackEvent(.milestoneReached, parameters: [
+                                            "milestone": "recipe_created_with_pantry",
+                                            "quality": quality.rawValue,
+                                            "calories": recipe.nutrition.calories,
+                                            "protein": recipe.nutrition.protein,
+                                            "totalTime": recipe.prepTime + recipe.cookTime,
+                                            "difficulty": recipe.difficulty,
+                                            "recipeId": recipe.id.uuidString
+                                        ])
+                                    }
+                                }
+                            } catch {
+                                print("❌ Background saving failed: \(error)")
+                            }
                         }
 
                     case .failure(let error):

@@ -17,6 +17,11 @@ class CloudKitRecipeManager: ObservableObject {
     @Published var userSavedRecipeIDs: Set<String> = []
     @Published var userCreatedRecipeIDs: Set<String> = []
     @Published var userFavoritedRecipeIDs: Set<String> = []
+    
+    // OPTIMIZATION: Photo fetch caching and deduplication
+    private var photoFetchCache: [String: (before: UIImage?, after: UIImage?)] = [:]
+    private var activeFetches: Set<String> = []
+    private var fetchCompletionHandlers: [String: [(Result<(before: UIImage?, after: UIImage?), Error>) -> Void]] = [:]
 
     private init() {
         self.publicDB = container.publicCloudDatabase
@@ -1134,26 +1139,46 @@ class CloudKitRecipeManager: ObservableObject {
     // MARK: - Analytics
 
     private func incrementViewCount(for recipeID: String) async {
+        let recordID = CKRecord.ID(recordName: recipeID)
+        
+        // Only try public database for view counts (views are for public recipes)
         do {
-            let recordID = CKRecord.ID(recordName: recipeID)
             let record = try await publicDB.record(for: recordID)
             let currentCount = record["viewCount"] as? Int64 ?? 0
             record["viewCount"] = currentCount + 1
             _ = try await publicDB.save(record)
+            print("✅ View count incremented for public recipe: \(recipeID)")
         } catch {
-            print("Failed to increment view count: \(error)")
+            // This is expected for private recipes - they don't need view tracking
+            print("ℹ️ Could not increment view count for recipe \(recipeID) - likely a private recipe. This is normal.")
         }
     }
 
     private func incrementSaveCount(for recipeID: String) async {
+        let recordID = CKRecord.ID(recordName: recipeID)
+        
+        // Try private database first (user's own recipes)
         do {
-            let recordID = CKRecord.ID(recordName: recipeID)
+            let record = try await privateDB.record(for: recordID)
+            let currentCount = record["saveCount"] as? Int64 ?? 0
+            record["saveCount"] = currentCount + 1
+            _ = try await privateDB.save(record)
+            print("✅ Save count incremented in private database for recipe: \(recipeID)")
+            return
+        } catch {
+            print("⚠️ Recipe not found in private database, trying public: \(error)")
+        }
+        
+        // Try public database if not in private
+        do {
             let record = try await publicDB.record(for: recordID)
             let currentCount = record["saveCount"] as? Int64 ?? 0
             record["saveCount"] = currentCount + 1
             _ = try await publicDB.save(record)
+            print("✅ Save count incremented in public database for recipe: \(recipeID)")
         } catch {
-            print("Failed to increment save count: \(error)")
+            // This is expected for user's own recipes that are only in private database
+            print("ℹ️ Could not increment save count for recipe \(recipeID) - likely a private recipe. This is normal.")
         }
     }
 
@@ -1227,7 +1252,7 @@ class CloudKitRecipeManager: ObservableObject {
         }
     }
 
-    /// Fetch photos for a recipe
+    /// Fetch photos for a recipe with caching and deduplication
     func fetchRecipePhotos(for recipeID: String) async throws -> (before: UIImage?, after: UIImage?) {
         // Only fetch photos if authenticated
         guard CloudKitAuthManager.shared.isAuthenticated else {
@@ -1235,25 +1260,85 @@ class CloudKitRecipeManager: ObservableObject {
             return (nil, nil)
         }
         
+        // OPTIMIZATION: Return cached photos if available
+        if let cachedPhotos = photoFetchCache[recipeID] {
+            print("📸 CloudKit: Returning cached photos for recipe \(recipeID)")
+            return cachedPhotos
+        }
+        
+        // OPTIMIZATION: If already fetching, wait for completion instead of duplicating
+        if activeFetches.contains(recipeID) {
+            print("📸 CloudKit: Recipe \(recipeID) already being fetched, waiting for completion...")
+            return try await withCheckedThrowingContinuation { continuation in
+                if fetchCompletionHandlers[recipeID] == nil {
+                    fetchCompletionHandlers[recipeID] = []
+                }
+                fetchCompletionHandlers[recipeID]?.append { result in
+                    continuation.resume(with: result)
+                }
+            }
+        }
+        
+        // Mark as fetching
+        activeFetches.insert(recipeID)
+        
         let recordID = CKRecord.ID(recordName: recipeID)
-
         print("🔍 CloudKit: Fetching photos for recipe ID: \(recipeID)")
 
         do {
-            // Try private database first
-            let record = try await privateDB.record(for: recordID)
-            let recipeTitle = record["title"] as? String ?? "Unknown Recipe"
-            print("🔍 CloudKit: Found recipe '\(recipeTitle)' in Private DB, fetching photos...")
-            let photos = await fetchPhotosFromRecord(record, recipeTitle: recipeTitle, recipeID: recipeID)
+            let photos: (before: UIImage?, after: UIImage?)
+            
+            do {
+                // Try private database first
+                let record = try await privateDB.record(for: recordID)
+                let recipeTitle = record["title"] as? String ?? "Unknown Recipe"
+                print("🔍 CloudKit: Found recipe '\(recipeTitle)' in Private DB, fetching photos...")
+                photos = await fetchPhotosFromRecord(record, recipeTitle: recipeTitle, recipeID: recipeID)
+            } catch {
+                // Try public database
+                let record = try await publicDB.record(for: recordID)
+                let recipeTitle = record["title"] as? String ?? "Unknown Recipe"
+                print("🔍 CloudKit: Found recipe '\(recipeTitle)' in Public DB, fetching photos...")
+                photos = await fetchPhotosFromRecord(record, recipeTitle: recipeTitle, recipeID: recipeID)
+            }
+            
+            // Cache the result
+            photoFetchCache[recipeID] = photos
+            
+            // Complete fetch and notify waiting handlers
+            completeFetch(for: recipeID, with: .success(photos))
+            
             return photos
         } catch {
-            // Try public database
-            let record = try await publicDB.record(for: recordID)
-            let recipeTitle = record["title"] as? String ?? "Unknown Recipe"
-            print("🔍 CloudKit: Found recipe '\(recipeTitle)' in Public DB, fetching photos...")
-            let photos = await fetchPhotosFromRecord(record, recipeTitle: recipeTitle, recipeID: recipeID)
-            return photos
+            // Complete fetch with error and notify waiting handlers
+            completeFetch(for: recipeID, with: .failure(error))
+            throw error
         }
+    }
+    
+    /// Complete fetch and notify all waiting handlers
+    private func completeFetch(for recipeID: String, with result: Result<(before: UIImage?, after: UIImage?), Error>) {
+        activeFetches.remove(recipeID)
+        
+        if let handlers = fetchCompletionHandlers[recipeID] {
+            for handler in handlers {
+                handler(result)
+            }
+            fetchCompletionHandlers[recipeID] = nil
+        }
+    }
+    
+    /// Clear photo cache for a specific recipe (useful when photos are updated)
+    func clearPhotoCache(for recipeID: String) {
+        photoFetchCache.removeValue(forKey: recipeID)
+        print("📸 CloudKit: Cleared photo cache for recipe \(recipeID)")
+    }
+    
+    /// Clear all photo cache (useful for memory management)
+    func clearAllPhotoCache() {
+        let count = photoFetchCache.count
+        photoFetchCache.removeAll()
+        print("📸 CloudKit: Cleared all photo cache (\(count) entries)")
     }
 
     /// Helper to fetch photos from a CKRecord

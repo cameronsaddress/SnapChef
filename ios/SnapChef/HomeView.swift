@@ -704,7 +704,9 @@ struct EnhancedChallengeCard: View {
             updateTimeRemaining()
         }
         .onReceive(timer) { _ in
-            updateTimeRemaining()
+            Task { @MainActor in
+                updateTimeRemaining()
+            }
         }
     }
 

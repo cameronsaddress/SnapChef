@@ -80,6 +80,9 @@ struct SnapChefApp: App {
         configureTableView()
         configureWindow()
 
+        // Check CloudKit environment (determined by Xcode build configuration)
+        detectCloudKitEnvironment()
+
         // Set default LLM provider to Gemini if not already set
         if UserDefaults.standard.object(forKey: "SelectedLLMProvider") == nil {
             UserDefaults.standard.set("gemini", forKey: "SelectedLLMProvider")
@@ -203,6 +206,60 @@ struct SnapChefApp: App {
         }
 
         print("✅ CloudKit photo sync completed")
+    }
+    
+    // MARK: - CloudKit Environment Detection
+    
+    private func detectCloudKitEnvironment() {
+        // The CloudKit environment is determined by Xcode's build configuration
+        // Debug builds use Development, Release/TestFlight/App Store use Production
+        
+        let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+        
+        // Check account status to verify CloudKit is available
+        container.accountStatus { status, error in
+            var environmentString = ""
+            
+            // Determine environment based on build configuration
+            #if DEBUG
+                environmentString = "🔧 CloudKit Environment: DEVELOPMENT"
+                print("════════════════════════════════════════════════")
+                print(environmentString)
+                print("   Container: iCloud.com.snapchefapp.app")
+                print("   Build Config: Debug")
+                print("   Note: Using CloudKit Development database")
+                print("════════════════════════════════════════════════")
+            #else
+                environmentString = "🚀 CloudKit Environment: PRODUCTION"
+                print("════════════════════════════════════════════════")
+                print(environmentString)
+                print("   Container: iCloud.com.snapchefapp.app")
+                print("   Build Config: Release/Archive")
+                print("   Note: Using CloudKit Production database")
+                print("════════════════════════════════════════════════")
+            #endif
+            
+            // Also show account status
+            switch status {
+            case .available:
+                print("✅ CloudKit Account: Available")
+            case .noAccount:
+                print("⚠️ CloudKit Account: No iCloud account")
+            case .restricted:
+                print("⚠️ CloudKit Account: Restricted")
+            case .couldNotDetermine:
+                print("❌ CloudKit Account: Could not determine")
+                if let error = error {
+                    print("   Error: \(error.localizedDescription)")
+                }
+            case .temporarilyUnavailable:
+                print("⚠️ CloudKit Account: Temporarily unavailable")
+            @unknown default:
+                print("❓ CloudKit Account: Unknown status")
+            }
+            
+            print("════════════════════════════════════════════════")
+        }
     }
     
     // MARK: - API Key Configuration

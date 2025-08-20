@@ -972,26 +972,46 @@ final class RecipeModule: ObservableObject {
     // MARK: - Analytics
     
     private func incrementViewCount(for recipeID: String) async {
+        let recordID = CKRecord.ID(recordName: recipeID)
+        
+        // Only try public database for view counts (views are for public recipes)
         do {
-            let recordID = CKRecord.ID(recordName: recipeID)
             let record = try await publicDatabase.record(for: recordID)
             let currentCount = record["viewCount"] as? Int64 ?? 0
             record["viewCount"] = currentCount + 1
             _ = try await publicDatabase.save(record)
+            print("✅ View count incremented for public recipe: \(recipeID)")
         } catch {
-            print("Failed to increment view count: \(error)")
+            // This is expected for private recipes - they don't need view tracking
+            print("ℹ️ Could not increment view count for recipe \(recipeID) - likely a private recipe. This is normal.")
         }
     }
     
     private func incrementSaveCount(for recipeID: String) async {
+        let recordID = CKRecord.ID(recordName: recipeID)
+        
+        // Try private database first (user's own recipes)
         do {
-            let recordID = CKRecord.ID(recordName: recipeID)
+            let record = try await privateDatabase.record(for: recordID)
+            let currentCount = record["saveCount"] as? Int64 ?? 0
+            record["saveCount"] = currentCount + 1
+            _ = try await privateDatabase.save(record)
+            print("✅ Save count incremented in private database for recipe: \(recipeID)")
+            return
+        } catch {
+            print("⚠️ Recipe not found in private database, trying public: \(error)")
+        }
+        
+        // Try public database if not in private
+        do {
             let record = try await publicDatabase.record(for: recordID)
             let currentCount = record["saveCount"] as? Int64 ?? 0
             record["saveCount"] = currentCount + 1
             _ = try await publicDatabase.save(record)
+            print("✅ Save count incremented in public database for recipe: \(recipeID)")
         } catch {
-            print("Failed to increment save count: \(error)")
+            // This is expected for user's own recipes that are only in private database
+            print("ℹ️ Could not increment save count for recipe \(recipeID) - likely a private recipe. This is normal.")
         }
     }
     

@@ -124,12 +124,12 @@ final class AppState: ObservableObject {
         // Initialize isFirstLaunch from authViewModel after view models are initialized
         self.isFirstLaunch = authViewModel.isFirstLaunch
         
-        // DEBUG: Clear recipes for testing - remove this in production
-        #if DEBUG
-        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" {
-            clearAllRecipes()
-        }
-        #endif
+        // DEBUG: Clear recipes for testing - DISABLED to preserve saved recipes
+        // #if DEBUG
+        // if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" {
+        //     clearAllRecipes()
+        // }
+        // #endif
     }
 
     // MARK: - Delegated Methods

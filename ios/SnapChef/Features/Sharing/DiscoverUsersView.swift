@@ -165,6 +165,11 @@ struct DiscoverUsersView: View {
         .task {
             await viewModel.loadUsers(for: selectedCategory)
         }
+        .onAppear {
+            Task {
+                await viewModel.refreshFollowStatus()
+            }
+        }
         .sheet(item: $viewModel.selectedUser) { user in
             // User profile view not implemented - showing basic info
             Text("User Profile: \(user.username ?? user.displayName)")
@@ -395,6 +400,9 @@ struct UserDiscoveryCard: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .onChange(of: user.isFollowing) { newValue in
+            isFollowing = newValue
+        }
     }
 }
 
@@ -496,21 +504,34 @@ class DiscoverUsersViewModel: ObservableObject {
 
     private func loadCloudKitUsers(for category: DiscoverUsersView.DiscoverCategory) async {
         do {
+            var fetchedUsers: [CloudKitUser] = []
+            
             switch category {
             case .suggested:
-                let suggestedUsers = try await cloudKitAuth.getSuggestedUsers(limit: 20)
-                cloudKitUsers = suggestedUsers.map { convertToUserProfile($0) }
+                fetchedUsers = try await cloudKitAuth.getSuggestedUsers(limit: 20)
             case .trending:
-                let trendingUsers = try await cloudKitAuth.getTrendingUsers(limit: 20)
-                cloudKitUsers = trendingUsers.map { convertToUserProfile($0) }
+                fetchedUsers = try await cloudKitAuth.getTrendingUsers(limit: 20)
             case .newChefs:
                 // Get users who joined recently
-                let newUsers = try await cloudKitAuth.getNewUsers(limit: 20)
-                cloudKitUsers = newUsers.map { convertToUserProfile($0) }
+                fetchedUsers = try await cloudKitAuth.getNewUsers(limit: 20)
             case .verified:
-                let verifiedUsers = try await cloudKitAuth.getVerifiedUsers(limit: 20)
-                cloudKitUsers = verifiedUsers.map { convertToUserProfile($0) }
+                fetchedUsers = try await cloudKitAuth.getVerifiedUsers(limit: 20)
             }
+            
+            // Convert to UserProfile and check follow status for each user
+            var convertedUsers: [UserProfile] = []
+            for cloudKitUser in fetchedUsers {
+                var userProfile = convertToUserProfile(cloudKitUser)
+                
+                // Check actual follow status if authenticated
+                if cloudKitAuth.isAuthenticated {
+                    userProfile.isFollowing = await cloudKitAuth.isFollowing(userID: userProfile.id)
+                }
+                
+                convertedUsers.append(userProfile)
+            }
+            
+            cloudKitUsers = convertedUsers
         } catch {
             print("Failed to load CloudKit users: \(error)")
             cloudKitUsers = []
@@ -529,7 +550,7 @@ class DiscoverUsersViewModel: ObservableObject {
             followingCount: cloudKitUser.followingCount,
             recipesCreated: cloudKitUser.recipesShared,
             isVerified: cloudKitUser.isVerified,
-            isFollowing: false, // Will be updated based on actual follow status
+            isFollowing: false, // Updated after creation based on actual follow status
             bio: nil,
             joinedDate: cloudKitUser.createdAt,
             lastActive: cloudKitUser.lastLoginAt,
@@ -549,7 +570,21 @@ class DiscoverUsersViewModel: ObservableObject {
         // Search CloudKit users only
         do {
             let cloudKitResults = try await cloudKitAuth.searchUsers(query: query)
-            searchResults = cloudKitResults.map { convertToUserProfile($0) }
+            
+            // Convert to UserProfile and check follow status for each user
+            var convertedResults: [UserProfile] = []
+            for cloudKitUser in cloudKitResults {
+                var userProfile = convertToUserProfile(cloudKitUser)
+                
+                // Check actual follow status if authenticated
+                if cloudKitAuth.isAuthenticated {
+                    userProfile.isFollowing = await cloudKitAuth.isFollowing(userID: userProfile.id)
+                }
+                
+                convertedResults.append(userProfile)
+            }
+            
+            searchResults = convertedResults
         } catch {
             print("Failed to search CloudKit users: \(error)")
             searchResults = []
@@ -590,6 +625,21 @@ class DiscoverUsersViewModel: ObservableObject {
             print("✅ Toggle follow completed for user: \(user.username ?? user.displayName)")
         } catch {
             print("Failed to toggle follow: \(error)")
+        }
+    }
+    
+    /// Refresh follow status for all users when returning to the view
+    func refreshFollowStatus() async {
+        guard cloudKitAuth.isAuthenticated else { return }
+        
+        // Refresh follow status for main users list
+        for i in 0..<users.count {
+            users[i].isFollowing = await cloudKitAuth.isFollowing(userID: users[i].id)
+        }
+        
+        // Refresh follow status for search results
+        for i in 0..<searchResults.count {
+            searchResults[i].isFollowing = await cloudKitAuth.isFollowing(userID: searchResults[i].id)
         }
     }
 }

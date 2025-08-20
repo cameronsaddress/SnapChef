@@ -909,7 +909,7 @@ struct DetectiveView: View {
                                     .stroke(Color.white.opacity(0.3), lineWidth: 1)
                                     .scaleEffect(1.02)
                                     .opacity(0.5)
-                                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: UUID())
+                                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: true)
                             )
                         }
                     }

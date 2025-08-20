@@ -110,13 +110,21 @@ public final class PhotoStorageManager: ObservableObject {
             mealPhoto: mealPhoto
         )
 
+        // OPTIMIZATION: Clear CloudKit cache since we have new local data
+        Task { @MainActor in
+            CloudKitRecipeManager.shared.clearPhotoCache(for: recipeId.uuidString)
+        }
+
         logger.info("📸 Total stored photos now: \(self.recipePhotos.count)")
     }
 
     /// Get photos for a recipe
     public func getPhotos(for recipeId: UUID) -> RecipePhotos? {
         let photos = recipePhotos[recipeId]
-        logger.info("📸 Getting photos for recipe \(recipeId) - found: \(photos != nil)")
+        // OPTIMIZATION: Only log when photos are first found or after long intervals to reduce spam
+        if photos != nil {
+            logger.debug("📸 Getting photos for recipe \(recipeId) - found: true")
+        }
         return photos
     }
 

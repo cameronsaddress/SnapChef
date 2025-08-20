@@ -121,13 +121,16 @@ struct RecipesView: View {
         }
         .navigationBarHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
-        .onAppear {
+        .task {
             print("🔍 DEBUG: RecipesView appeared")
             
-            withAnimation(.easeOut(duration: 0.5)) {
-                contentVisible = true
+            // Defer UI state changes to avoid modifying state during view update
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.5)) {
+                    contentVisible = true
+                }
+                hasInitiallyLoaded = true
             }
-            hasInitiallyLoaded = true
 
             // OPTIMIZATION: Start background CloudKit sync without blocking UI
             if cloudKitAuth.isAuthenticated {
@@ -262,9 +265,12 @@ struct RecipesView: View {
         guard !isBackgroundSyncing else { return }
 
         print("📱 RecipesView: Starting background CloudKit sync...")
-        isBackgroundSyncing = true
-
+        
         Task {
+            await MainActor.run {
+                isBackgroundSyncing = true
+            }
+            
             do {
                 // Get recipes from cache (intelligent caching)
                 let recipes = await cloudKitRecipeCache.getRecipes(forceRefresh: false)
@@ -291,7 +297,10 @@ struct RecipesView: View {
     /// Perform foreground sync for pull-to-refresh
     private func performForegroundSync() async {
         print("📱 RecipesView: Performing foreground sync...")
-        isBackgroundSyncing = true
+        
+        await MainActor.run {
+            isBackgroundSyncing = true
+        }
 
         do {
             // Force refresh for pull-to-refresh
@@ -307,7 +316,9 @@ struct RecipesView: View {
             print("❌ RecipesView: Foreground sync failed: \(error)")
         }
 
-        isBackgroundSyncing = false
+        await MainActor.run {
+            isBackgroundSyncing = false
+        }
     }
 
     /// Fetch photos in background without blocking main UI thread
@@ -825,17 +836,22 @@ struct RecipeGridCard: View {
             return photo
         }
 
-        // Fallback to appState for backwards compatibility with instant migration
+        // Fallback to appState for backwards compatibility with controlled migration
         if let savedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id }),
            let photo = savedRecipe.beforePhoto {
-            // Migrate to PhotoStorageManager in background for future instant access
-            Task(priority: .background) {
-                PhotoStorageManager.shared.storePhotos(
-                    fridgePhoto: photo,
-                    mealPhoto: savedRecipe.afterPhoto,
-                    for: recipe.id
-                )
-                print("📸 RecipeCard: Migrated legacy photos to PhotoStorageManager for \(recipe.name)")
+            // Use the shared migration coordinator to prevent duplicates
+            if PhotoMigrationCoordinator.shared.startMigration(for: recipe.id) {
+                Task(priority: .background) {
+                    PhotoStorageManager.shared.storePhotos(
+                        fridgePhoto: photo,
+                        mealPhoto: savedRecipe.afterPhoto,
+                        for: recipe.id
+                    )
+                    await MainActor.run {
+                        PhotoMigrationCoordinator.shared.completeMigration(for: recipe.id)
+                        print("📸 RecipeCard: Successfully migrated legacy photos to PhotoStorageManager for \(recipe.name)")
+                    }
+                }
             }
             return photo
         }
