@@ -1,15 +1,28 @@
 -- SnapChef CloudKit Schema Definition
--- Version: 2.0
--- Last Updated: February 2, 2025
+-- Version: 2.1
+-- Last Updated: August 20, 2025
+-- Changes: Added QUERYABLE markers to all fields used in NSPredicate queries
 --
 -- DEPLOYMENT INSTRUCTIONS:
 -- 1. Open CloudKit Dashboard: https://icloud.developer.apple.com/dashboard
 -- 2. Select container: iCloud.com.snapchefapp.app
 -- 3. Go to Schema > Record Types
 -- 4. Import this schema or manually create each record type
--- 5. Deploy to Development environment first
--- 6. Test thoroughly
--- 7. Deploy to Production environment
+-- 5. CRITICAL: Ensure all QUERYABLE fields are properly marked in the CloudKit Dashboard
+-- 6. Deploy to Development environment first
+-- 7. Test queries thoroughly - especially Activity.timestamp and user discovery queries
+-- 8. Verify all NSPredicate queries work without "Field not marked queryable" errors
+-- 9. Deploy to Production environment
+--
+-- IMPORTANT QUERYABLE FIELDS (frequently used in app queries):
+-- - Activity.timestamp (QUERYABLE SORTABLE) - for activity feed sorting
+-- - Activity.targetUserID (QUERYABLE) - for user-specific activity feeds
+-- - Activity.recipeID (QUERYABLE) - for recipe-related activities
+-- - Activity.challengeID (QUERYABLE) - for challenge-related activities
+-- - User.username, displayName, authProvider, totalPoints, lastActiveAt (all QUERYABLE)
+-- - UserChallenge.userID, challengeID, status, startedAt, completedAt (all QUERYABLE)
+-- - Recipe.ownerID, title, isPublic, createdAt, difficulty, cuisine (all QUERYABLE)
+-- - All timestamp fields used for date range queries and sorting
 --
 -- PERMISSION MODEL:
 -- "_world" = Any user (authenticated or not) can read
@@ -103,8 +116,8 @@ DEFINE SCHEMA
         challengeID     REFERENCE QUERYABLE,
         status          STRING QUERYABLE,
         progress        DOUBLE,
-        startedAt       TIMESTAMP SORTABLE,
-        completedAt     TIMESTAMP SORTABLE,
+        startedAt       TIMESTAMP QUERYABLE SORTABLE,
+        completedAt     TIMESTAMP QUERYABLE SORTABLE,
         earnedPoints    INT64,
         earnedCoins     INT64,
         proofImageURL   STRING,
@@ -148,8 +161,8 @@ DEFINE SCHEMA
         senderID        STRING,
         senderName      STRING,
         message         STRING,
-        timestamp       TIMESTAMP SORTABLE,
-        type            STRING,
+        timestamp       TIMESTAMP QUERYABLE SORTABLE,
+        type            STRING QUERYABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"
     );
@@ -207,11 +220,11 @@ DEFINE SCHEMA
         "___recordID"   REFERENCE,
         userID          STRING QUERYABLE,
         amount          INT64,
-        type            STRING,
+        type            STRING QUERYABLE,
         reason          STRING,
-        timestamp       TIMESTAMP SORTABLE,
+        timestamp       TIMESTAMP QUERYABLE SORTABLE,
         balance         INT64,
-        challengeID     STRING,
+        challengeID     STRING QUERYABLE,
         itemPurchased   STRING,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
@@ -229,6 +242,7 @@ DEFINE SCHEMA
         followedAt        TIMESTAMP SORTABLE,
         isActive          INT64 QUERYABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -352,11 +366,11 @@ DEFINE SCHEMA
         actorName          STRING,
         targetUserID       STRING QUERYABLE,
         targetUserName     STRING,
-        recipeID           STRING,
+        recipeID           STRING QUERYABLE,
         recipeName         STRING,
-        challengeID        STRING,
+        challengeID        STRING QUERYABLE,
         challengeName      STRING,
-        timestamp          TIMESTAMP SORTABLE,
+        timestamp          TIMESTAMP QUERYABLE SORTABLE,
         isRead             INT64 QUERYABLE,
         GRANT WRITE TO "_creator",
         GRANT CREATE TO "_icloud",
@@ -379,7 +393,7 @@ DEFINE SCHEMA
         notificationSettings STRING,
         privacySettings    STRING,
         themePreference    STRING,
-        lastUpdated        TIMESTAMP SORTABLE,
+        lastUpdated        TIMESTAMP QUERYABLE SORTABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
     );
@@ -396,7 +410,7 @@ DEFINE SCHEMA
         eventName          STRING QUERYABLE,
         eventData          STRING,
         screenName         STRING QUERYABLE,
-        timestamp          TIMESTAMP SORTABLE,
+        timestamp          TIMESTAMP QUERYABLE SORTABLE,
         sessionID          STRING QUERYABLE,
         platform           STRING,
         appVersion         STRING,
@@ -413,9 +427,9 @@ DEFINE SCHEMA
         "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         recipeID           STRING QUERYABLE,
-        rating             INT64,
+        rating             INT64 QUERYABLE,
         feedback           STRING,
-        ratedAt            TIMESTAMP SORTABLE,
+        ratedAt            TIMESTAMP QUERYABLE SORTABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"
     );
@@ -432,7 +446,7 @@ DEFINE SCHEMA
         challengeID        STRING,
         platform           STRING QUERYABLE,
         shareURL           STRING,
-        sharedAt           TIMESTAMP SORTABLE,
+        sharedAt           TIMESTAMP QUERYABLE SORTABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
     );
@@ -452,7 +466,7 @@ DEFINE SCHEMA
         recipesGenerated   INT64,
         aiModel            STRING,
         processingTime     DOUBLE,
-        timestamp          TIMESTAMP SORTABLE,
+        timestamp          TIMESTAMP QUERYABLE SORTABLE,
         -- photoData field reserved for future use after moderation
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
@@ -471,8 +485,8 @@ DEFINE SCHEMA
         ingredients        LIST<STRING>,
         preferences        STRING,
         generationTime     DOUBLE,
-        quality            STRING,
-        timestamp          TIMESTAMP SORTABLE,
+        quality            STRING QUERYABLE,
+        timestamp          TIMESTAMP QUERYABLE SORTABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
     );
@@ -486,7 +500,7 @@ DEFINE SCHEMA
         "___recordID"      REFERENCE,
         userID             STRING QUERYABLE,
         sessionID          STRING QUERYABLE,
-        startTime          TIMESTAMP SORTABLE,
+        startTime          TIMESTAMP QUERYABLE SORTABLE,
         endTime            TIMESTAMP,
         duration           DOUBLE,
         screensViewed      LIST<STRING>,
@@ -509,7 +523,7 @@ DEFINE SCHEMA
         userID             STRING QUERYABLE,
         feature            STRING QUERYABLE,
         usageCount         INT64,
-        lastUsed           TIMESTAMP SORTABLE,
+        lastUsed           TIMESTAMP QUERYABLE SORTABLE,
         totalDuration      DOUBLE,
         successRate        DOUBLE,
         GRANT WRITE TO "_creator",
@@ -529,8 +543,8 @@ DEFINE SCHEMA
         stackTrace         STRING,
         context            STRING,
         severity           STRING QUERYABLE,
-        timestamp          TIMESTAMP SORTABLE,
-        resolved           INT64,
+        timestamp          TIMESTAMP QUERYABLE SORTABLE,
+        resolved           INT64 QUERYABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
     );
@@ -551,7 +565,7 @@ DEFINE SCHEMA
         preferredCookTime  INT64,
         kitchenTools       LIST<STRING>,
         mealPlanningGoals  STRING,
-        lastUpdated        TIMESTAMP SORTABLE,
+        lastUpdated        TIMESTAMP QUERYABLE SORTABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
     );
@@ -568,7 +582,7 @@ DEFINE SCHEMA
         searchType         STRING,
         resultsCount       INT64,
         clickedResults     LIST<STRING>,
-        timestamp          TIMESTAMP SORTABLE,
+        timestamp          TIMESTAMP QUERYABLE SORTABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
     );
@@ -607,7 +621,7 @@ DEFINE SCHEMA
         deviceType         STRING,
         osVersion          STRING,
         appVersion         STRING,
-        lastSync           TIMESTAMP SORTABLE,
+        lastSync           TIMESTAMP QUERYABLE SORTABLE,
         syncData           STRING,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
@@ -625,8 +639,8 @@ DEFINE SCHEMA
         streakType         STRING QUERYABLE,
         currentStreak      INT64 SORTABLE,
         longestStreak      INT64 SORTABLE,
-        lastActivityDate   TIMESTAMP SORTABLE,
-        streakStartDate    TIMESTAMP,
+        lastActivityDate   TIMESTAMP QUERYABLE SORTABLE,
+        streakStartDate    TIMESTAMP QUERYABLE,
         totalDaysActive    INT64,
         frozenUntil        TIMESTAMP,
         insuranceActive    INT64,
@@ -645,9 +659,9 @@ DEFINE SCHEMA
         "___recordID"      REFERENCE,
         userID             STRING QUERYABLE,
         streakType         STRING QUERYABLE,
-        streakLength       INT64 SORTABLE,
-        startDate          TIMESTAMP,
-        endDate            TIMESTAMP SORTABLE,
+        streakLength       INT64 QUERYABLE SORTABLE,
+        startDate          TIMESTAMP QUERYABLE SORTABLE,
+        endDate            TIMESTAMP QUERYABLE SORTABLE,
         breakReason        STRING,
         restored           INT64,
         GRANT WRITE TO "_creator",
@@ -663,8 +677,8 @@ DEFINE SCHEMA
         "___recordID"      REFERENCE,
         userID             STRING QUERYABLE,
         achievementType    STRING QUERYABLE,
-        unlockedAt         TIMESTAMP SORTABLE,
-        streakLength       INT64,
+        unlockedAt         TIMESTAMP QUERYABLE SORTABLE,
+        streakLength       INT64 QUERYABLE,
         rewardsClaimed     INT64,
         badgeIcon          STRING,
         milestoneTitle     STRING,
@@ -682,12 +696,12 @@ DEFINE SCHEMA
         "___modifiedBy"    REFERENCE,
         "___recordID"      REFERENCE,
         userID             STRING QUERYABLE,
-        freezeDate         TIMESTAMP SORTABLE,
-        freezeType         STRING,
-        streakType         STRING,
+        freezeDate         TIMESTAMP QUERYABLE SORTABLE,
+        freezeType         STRING QUERYABLE,
+        streakType         STRING QUERYABLE,
         remainingFreezes   INT64,
-        expiresAt          TIMESTAMP,
-        source             STRING,
+        expiresAt          TIMESTAMP QUERYABLE,
+        source             STRING QUERYABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
     );
@@ -701,10 +715,10 @@ DEFINE SCHEMA
         "___recordID"      REFERENCE,
         teamID             STRING QUERYABLE,
         streakType         STRING QUERYABLE,
-        currentStreak      INT64 SORTABLE,
+        currentStreak      INT64 QUERYABLE SORTABLE,
         memberContributions STRING,
-        lastActivityDate   TIMESTAMP,
-        gracePeriodUntil   TIMESTAMP,
+        lastActivityDate   TIMESTAMP QUERYABLE SORTABLE,
+        gracePeriodUntil   TIMESTAMP QUERYABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"
     );
@@ -718,9 +732,9 @@ DEFINE SCHEMA
         "___recordID"      REFERENCE,
         userID             STRING QUERYABLE,
         powerUpType        STRING QUERYABLE,
-        streakType         STRING,
-        activatedAt        TIMESTAMP,
-        expiresAt          TIMESTAMP,
+        streakType         STRING QUERYABLE,
+        activatedAt        TIMESTAMP QUERYABLE SORTABLE,
+        expiresAt          TIMESTAMP QUERYABLE,
         costInCoins        INT64,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_creator"
@@ -741,7 +755,7 @@ DEFINE SCHEMA
         totalStreakDays    INT64,
         globalRank         INT64,
         regionalRank       INT64,
-        lastUpdated        TIMESTAMP SORTABLE,
+        lastUpdated        TIMESTAMP QUERYABLE SORTABLE,
         GRANT WRITE TO "_creator",
         GRANT READ TO "_world"
     );
@@ -757,8 +771,8 @@ DEFINE SCHEMA
         userID             STRING QUERYABLE,
         photoType          STRING QUERYABLE,
         moderationStatus   STRING QUERYABLE,
-        moderationScore    DOUBLE,
-        approvedAt         TIMESTAMP,
+        moderationScore    DOUBLE QUERYABLE,
+        approvedAt         TIMESTAMP QUERYABLE SORTABLE,
         rejectionReason    STRING,
         photoAsset         ASSET,
         thumbnail          ASSET,

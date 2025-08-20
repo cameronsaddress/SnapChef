@@ -95,7 +95,7 @@ import CloudKit
  - senderID: String (Indexed)
  - senderName: String
  - message: String
- - timestamp: Date/Time (Indexed, Sortable)
+ - timestamp: Date/Time (Indexed, Sortable, Queryable)
  - type: String // "text", "achievement", "completion"
  
  === RECORD TYPE: Leaderboard ===
@@ -130,10 +130,29 @@ import CloudKit
  - amount: Int64
  - type: String (Indexed) // "earned", "spent", "bonus"
  - reason: String
- - timestamp: Date/Time (Indexed, Sortable)
+ - timestamp: Date/Time (Indexed, Sortable, Queryable)
  - balance: Int64
  - challengeID: String
  - itemPurchased: String
+
+ === RECORD TYPE: Activity ===
+ Fields:
+ - id: String (Indexed, Queryable)
+ - type: String (Indexed, Queryable) // "follow", "recipeShared", "recipeLiked", "recipeComment", "challengeCompleted", "badgeEarned"
+ - actorID: String (Indexed, Queryable) // User who performed the action
+ - actorName: String
+ - targetUserID: String (Indexed, Queryable) // User affected by the action (if applicable)
+ - targetUserName: String
+ - recipeID: String (Indexed, Queryable) // Recipe involved (if applicable)
+ - recipeName: String
+ - recipeImageURL: String
+ - challengeID: String (Indexed, Queryable) // Challenge involved (if applicable)
+ - challengeName: String
+ - badgeID: String // Badge earned (if applicable)
+ - badgeName: String
+ - timestamp: Date/Time (Indexed, Sortable, Queryable)
+ - isRead: Int64 // 0 or 1, for the target user
+ - metadata: String // JSON for additional data
  
  === RECORD TYPE: Follow ===
  Fields:

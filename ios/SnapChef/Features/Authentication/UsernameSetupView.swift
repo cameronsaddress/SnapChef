@@ -78,7 +78,7 @@ struct UsernameSetupView: View {
                             .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
 
-                        Text("Choose a unique username and profile photo")
+                        Text(username.isEmpty ? "Choose a unique username and profile photo" : "Confirm your username or change it below")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.white.opacity(0.9))
                             .multilineTextAlignment(.center)
@@ -265,6 +265,15 @@ struct UsernameSetupView: View {
         }
         .onAppear {
             print("🔍 DEBUG: UsernameSetupView appeared")
+            
+            // Pre-fill with generated username if available
+            if let currentUser = cloudKitAuth.currentUser,
+               let generatedUsername = currentUser.username,
+               !generatedUsername.isEmpty && username.isEmpty {
+                username = generatedUsername
+                validateUsername(generatedUsername)
+            }
+            
             withAnimation(.easeOut(duration: 0.5)) {
                 contentVisible = true
             }

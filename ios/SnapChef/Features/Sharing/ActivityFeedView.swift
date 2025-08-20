@@ -491,27 +491,41 @@ class ActivityFeedManager: ObservableObject {
     }
 
     private func fetchRecentPublicActivities(limit: Int) async throws -> [CKRecord] {
-        // Create a predicate for recent public activities (last 7 days)
-        let sevenDaysAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
-        let predicate = NSPredicate(format: "%K >= %@", CKField.Activity.timestamp, sevenDaysAgo as NSDate)
+        // Since timestamp field may not be queryable, use a simpler query and filter in code
+        // Query all activities and filter/sort client-side as a workaround
+        let predicate = NSPredicate(format: "TRUEPREDICATE") // Get all records
         
         let query = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: predicate)
-        query.sortDescriptors = [NSSortDescriptor(key: CKField.Activity.timestamp, ascending: false)]
+        // Remove sort descriptor since timestamp may not be sortable in CloudKit
+        // query.sortDescriptors = [NSSortDescriptor(key: CKField.Activity.timestamp, ascending: false)]
 
         var activities: [CKRecord] = []
 
-        // Use a direct query to fetch recent public activities
+        // Use a direct query to fetch activities
         let results = try await CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase.records(matching: query)
         
-        var count = 0
+        let sevenDaysAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+        
+        // Collect all valid records first
         for (_, result) in results.matchResults {
-            if case .success(let record) = result, count < limit {
-                activities.append(record)
-                count += 1
+            if case .success(let record) = result {
+                // Filter by timestamp in code since it may not be queryable
+                if let timestamp = record[CKField.Activity.timestamp] as? Date,
+                   timestamp >= sevenDaysAgo {
+                    activities.append(record)
+                }
             }
         }
         
-        return activities
+        // Sort by timestamp in code since it may not be sortable in CloudKit
+        activities.sort { record1, record2 in
+            let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+            let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+            return date1 > date2 // Descending order (newest first)
+        }
+        
+        // Return only the requested number of activities
+        return Array(activities.prefix(limit))
     }
 
     private func mapCloudKitRecordToActivityItem(_ record: CKRecord) -> ActivityItem? {

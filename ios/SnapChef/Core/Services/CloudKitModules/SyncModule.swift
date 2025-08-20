@@ -337,7 +337,8 @@ final class SyncModule: ObservableObject {
     func fetchActivityFeed(for userID: String, limit: Int = 20) async throws -> [CKRecord] {
         let predicate = NSPredicate(format: "%K == %@", CKField.Activity.targetUserID, userID)
         let query = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: predicate)
-        query.sortDescriptors = [NSSortDescriptor(key: CKField.Activity.timestamp, ascending: false)]
+        // Remove timestamp sort descriptor since it may not be sortable in CloudKit
+        // query.sortDescriptors = [NSSortDescriptor(key: CKField.Activity.timestamp, ascending: false)]
         
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = limit
@@ -351,6 +352,14 @@ final class SyncModule: ObservableObject {
         }
         
         try await publicDatabase.add(operation)
+        
+        // Sort by timestamp in code since it may not be sortable in CloudKit
+        activities.sort { record1, record2 in
+            let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+            let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+            return date1 > date2 // Descending order (newest first)
+        }
+        
         return activities
     }
     

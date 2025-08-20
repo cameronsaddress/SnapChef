@@ -137,8 +137,10 @@ struct EnhancedProfileHeader: View {
     @State private var glowAnimation = false
     @State private var rotationAngle: Double = 0
     @State private var showingEditProfile = false
+    @State private var showingUsernameEdit = false
     @State private var customName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
     @State private var customPhotoData: Data? = ProfilePhotoHelper.loadCustomPhotoFromFile()
+    @State private var refreshTrigger = 0
     @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @EnvironmentObject var appState: AppState
@@ -147,16 +149,18 @@ struct EnhancedProfileHeader: View {
 
     // Computed properties for display
     private var displayName: String {
-        // Priority: Auth username > CloudKit username > Custom name > User name > Guest
-        if let authUser = authManager.currentUser {
-            return authUser.username
-        } else if let cloudKitUser = cloudKitAuthManager.currentUser {
+        // Priority: CloudKit username > CloudKit display name > Auth username > Custom name > User name > Guest
+        if let cloudKitUser = cloudKitAuthManager.currentUser {
             // Prefer username if set, otherwise use display name
             if let username = cloudKitUser.username, !username.isEmpty {
                 return username
-            } else {
+            } else if !cloudKitUser.displayName.isEmpty {
                 return cloudKitUser.displayName
             }
+        }
+        
+        if let authUser = authManager.currentUser {
+            return authUser.username
         } else if !customName.isEmpty {
             return customName
         } else if let userName = user?.name {
@@ -345,18 +349,33 @@ struct EnhancedProfileHeader: View {
                     if !cloudKitAuthManager.isAuthenticated {
                         cloudKitAuthManager.showAuthSheet = true
                     } else {
-                        showingEditProfile = true
+                        // For authenticated users, show username edit if they have a username, otherwise edit profile
+                        if cloudKitAuthManager.currentUser?.username != nil {
+                            showingUsernameEdit = true
+                        } else {
+                            showingEditProfile = true
+                        }
                     }
                 }) {
-                    Text(displayName)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color.white, Color.white.opacity(0.9)],
-                                startPoint: .top,
-                                endPoint: .bottom
+                    HStack(spacing: 8) {
+                        Text(displayName)
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.white, Color.white.opacity(0.9)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
                             )
-                        )
+                            .id("displayName-\(refreshTrigger)") // Force refresh when trigger changes
+                        
+                        // Show edit icon for authenticated users
+                        if cloudKitAuthManager.isAuthenticated {
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                    }
                 }
                 .buttonStyle(PlainButtonStyle())
 
@@ -439,12 +458,20 @@ struct EnhancedProfileHeader: View {
                 customPhotoData: $customPhotoData
             )
         }
+        .sheet(isPresented: $showingUsernameEdit) {
+            UsernameEditView()
+                .onDisappear {
+                    // Trigger UI refresh after username edit
+                    refreshTrigger += 1
+                }
+        }
         .sheet(isPresented: $cloudKitAuthManager.showAuthSheet) {
             CloudKitAuthView()
                 .onDisappear {
                     // Refresh profile data after authentication
                     if cloudKitAuthManager.isAuthenticated {
-                        // The displayName will automatically update from cloudKitAuthManager.currentUser
+                        // Trigger UI refresh by updating the refresh trigger
+                        refreshTrigger += 1
                     }
                 }
         }
@@ -455,6 +482,14 @@ struct EnhancedProfileHeader: View {
             withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
                 glowAnimation = true
             }
+        }
+        .onChange(of: cloudKitAuthManager.currentUser?.username) { _ in
+            // Refresh when CloudKit username changes
+            refreshTrigger += 1
+        }
+        .onChange(of: cloudKitAuthManager.isAuthenticated) { _ in
+            // Refresh when authentication status changes
+            refreshTrigger += 1
         }
     }
 }
@@ -2186,6 +2221,273 @@ struct ProfilePhotoHelper {
         let filePath = documentsPath.appendingPathComponent("customChefPhoto.jpg")
 
         return try? Data(contentsOf: filePath)
+    }
+}
+
+// MARK: - Username Edit View
+struct UsernameEditView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var cloudKitAuthManager = CloudKitAuthManager.shared
+    
+    @State private var username: String = ""
+    @State private var isCheckingUsername = false
+    @State private var usernameStatus: UsernameStatus = .unchecked
+    @State private var isLoading = false
+    @State private var showError = false
+    @State private var errorMessage = ""
+
+    enum UsernameStatus {
+        case unchecked
+        case checking
+        case available
+        case taken
+        case invalid
+        case profanity
+        case current
+
+        var color: Color {
+            switch self {
+            case .unchecked, .checking: return .gray
+            case .available: return .green
+            case .taken, .invalid, .profanity: return .red
+            case .current: return .blue
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .unchecked: return ""
+            case .checking: return "Checking availability..."
+            case .available: return "Username available!"
+            case .taken: return "Username already taken"
+            case .invalid: return "Username must be 3-20 characters, alphanumeric only"
+            case .profanity: return "Username contains inappropriate content"
+            case .current: return "This is your current username"
+            }
+        }
+
+        var icon: String? {
+            switch self {
+            case .available: return "checkmark.circle.fill"
+            case .taken, .invalid, .profanity: return "xmark.circle.fill"
+            case .current: return "person.circle.fill"
+            default: return nil
+            }
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                MagicalBackground()
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 30) {
+                        // Header
+                        VStack(spacing: 16) {
+                            Image(systemName: "person.crop.circle.badge.checkmark")
+                                .font(.system(size: 60))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                            
+                            Text("Edit Username")
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            
+                            Text("Choose a unique username for your profile")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.top, 20)
+                        
+                        // Username Input Section
+                        VStack(spacing: 16) {
+                            // Username field
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    TextField("Enter username", text: $username)
+                                        .textFieldStyle(PlainTextFieldStyle())
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundColor(.white)
+                                        .autocapitalization(.none)
+                                        .disableAutocorrection(true)
+                                        .onChange(of: username) { newValue in
+                                            validateUsername(newValue)
+                                        }
+
+                                    if isCheckingUsername {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .scaleEffect(0.8)
+                                    } else if let icon = usernameStatus.icon {
+                                        Image(systemName: icon)
+                                            .foregroundColor(usernameStatus.color)
+                                            .font(.system(size: 20))
+                                    }
+                                }
+                                .padding()
+                                .background(Color.white.opacity(0.2))
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(usernameStatus.color.opacity(0.5), lineWidth: 2)
+                                )
+
+                                // Status message
+                                if !usernameStatus.message.isEmpty {
+                                    HStack {
+                                        Text(usernameStatus.message)
+                                            .font(.system(size: 14))
+                                            .foregroundColor(usernameStatus.color)
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, 4)
+                                }
+                            }
+
+                            // Username requirements
+                            VStack(alignment: .leading, spacing: 4) {
+                                Label("3-20 characters", systemImage: "textformat.123")
+                                Label("Letters, numbers, underscore only", systemImage: "textformat.abc")
+                                Label("Must be unique", systemImage: "person.badge.shield.checkmark")
+                            }
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.8))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .navigationTitle("Edit Username")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        saveUsername()
+                    }
+                    .disabled(!canSave || isLoading)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(canSave ? Color(hex: "#43e97b") : .white.opacity(0.5))
+                }
+            }
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK") { }
+        } message: {
+            Text(errorMessage)
+        }
+        .onAppear {
+            // Pre-fill with current username
+            if let currentUsername = cloudKitAuthManager.currentUser?.username {
+                username = currentUsername
+                usernameStatus = .current
+            }
+        }
+    }
+    
+    private var canSave: Bool {
+        return (usernameStatus == .available || usernameStatus == .current) && !username.isEmpty
+    }
+    
+    private func validateUsername(_ username: String) {
+        // Reset if empty
+        guard !username.isEmpty else {
+            usernameStatus = .unchecked
+            return
+        }
+        
+        // Check if it's the current username
+        if username == cloudKitAuthManager.currentUser?.username {
+            usernameStatus = .current
+            return
+        }
+
+        // Check format
+        let usernameRegex = "^[a-zA-Z0-9_]{3,20}$"
+        let usernamePredicate = NSPredicate(format: "SELF MATCHES %@", usernameRegex)
+
+        guard usernamePredicate.evaluate(with: username) else {
+            usernameStatus = .invalid
+            return
+        }
+
+        // Check for profanity
+        if ProfanityFilter.shared.containsProfanity(username) {
+            usernameStatus = .profanity
+            return
+        }
+
+        // Check availability in CloudKit
+        checkUsernameAvailability(username)
+    }
+    
+    private func checkUsernameAvailability(_ username: String) {
+        isCheckingUsername = true
+        usernameStatus = .checking
+
+        Task {
+            do {
+                let isAvailable = try await cloudKitAuthManager.checkUsernameAvailability(username)
+
+                await MainActor.run {
+                    isCheckingUsername = false
+                    usernameStatus = isAvailable ? .available : .taken
+                }
+            } catch {
+                await MainActor.run {
+                    isCheckingUsername = false
+                    usernameStatus = .unchecked
+                    errorMessage = "Failed to check username availability"
+                    showError = true
+                }
+            }
+        }
+    }
+    
+    private func saveUsername() {
+        guard canSave else { return }
+
+        // If it's the current username, no need to save
+        if usernameStatus == .current {
+            dismiss()
+            return
+        }
+
+        isLoading = true
+
+        Task {
+            do {
+                try await cloudKitAuthManager.setUsername(username)
+                
+                await MainActor.run {
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    errorMessage = "Failed to update username. Please try again."
+                    showError = true
+                }
+            }
+        }
     }
 }
 

@@ -104,6 +104,11 @@ final class CloudKitAuthManager: ObservableObject {
             existingRecord[CKField.User.lastLoginAt] = Date()
             _ = try await database.save(existingRecord)
             
+            // Check if user needs username setup
+            if self.currentUser?.username == nil || self.currentUser?.username?.isEmpty == true {
+                showUsernameSelection = true
+            }
+            
             print("✅ Existing CloudKit user loaded: \(cloudKitUserID)")
         } catch {
             // Create new user profile if it doesn't exist
@@ -121,12 +126,26 @@ final class CloudKitAuthManager: ObservableObject {
         let newRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: CKRecord.ID(recordName: cloudKitUserID))
         
         // Extract user info from Apple ID authorization if available
+        var displayName = "Anonymous Chef"
+        var generatedUsername: String? = nil
+        
         if let appleAuth = authorization as? ASAuthorization,
            let appleIDCredential = appleAuth.credential as? ASAuthorizationAppleIDCredential {
             newRecord[CKField.User.email] = appleIDCredential.email ?? ""
-            newRecord[CKField.User.displayName] = appleIDCredential.fullName?.formatted() ?? "Anonymous Chef"
-        } else {
-            newRecord[CKField.User.displayName] = "Anonymous Chef"
+            
+            // Use the formatted name from Apple ID
+            if let fullName = appleIDCredential.fullName {
+                displayName = fullName.formatted()
+                // Generate username from the full name
+                generatedUsername = try await generateUsernameFromName(fullName)
+            }
+        }
+        
+        newRecord[CKField.User.displayName] = displayName
+        
+        // Set the generated username if we have one
+        if let username = generatedUsername {
+            newRecord[CKField.User.username] = username
         }
         
         // Set initial values
@@ -150,7 +169,67 @@ final class CloudKitAuthManager: ObservableObject {
         try await database.save(newRecord)
         self.currentUser = CloudKitUser(from: newRecord)
         
+        // Show username selection if we couldn't generate one automatically
+        if generatedUsername == nil {
+            showUsernameSelection = true
+        }
+        
         print("✅ New CloudKit user profile created: \(cloudKitUserID)")
+        if let username = generatedUsername {
+            print("✅ Generated username: \(username)")
+        } else {
+            print("⚠️ No username generated, will show username selection")
+        }
+    }
+    
+    /// Generate a unique username from Apple ID name
+    private func generateUsernameFromName(_ personNameComponents: PersonNameComponents) async throws -> String? {
+        // Create a base username from the name
+        let firstName = personNameComponents.givenName?.lowercased() ?? ""
+        let lastName = personNameComponents.familyName?.lowercased() ?? ""
+        
+        // Remove special characters and spaces
+        let cleanFirstName = firstName.replacingOccurrences(of: "[^a-z0-9]", with: "", options: .regularExpression)
+        let cleanLastName = lastName.replacingOccurrences(of: "[^a-z0-9]", with: "", options: .regularExpression)
+        
+        // Create potential usernames in order of preference
+        var potentialUsernames: [String] = []
+        
+        if !cleanFirstName.isEmpty && !cleanLastName.isEmpty {
+            potentialUsernames.append(cleanFirstName + cleanLastName)
+            potentialUsernames.append(cleanFirstName + "." + cleanLastName)
+            potentialUsernames.append(cleanFirstName + "_" + cleanLastName)
+        }
+        
+        if !cleanFirstName.isEmpty {
+            potentialUsernames.append(cleanFirstName)
+        }
+        
+        if !cleanLastName.isEmpty {
+            potentialUsernames.append(cleanLastName)
+        }
+        
+        // Try each potential username
+        for baseUsername in potentialUsernames {
+            // Make sure it meets minimum length requirement
+            guard baseUsername.count >= 3 else { continue }
+            
+            // Check if base username is available
+            if try await checkUsernameAvailability(baseUsername) {
+                return baseUsername
+            }
+            
+            // Try with numbers appended (1-999)
+            for suffix in 1...999 {
+                let numberedUsername = baseUsername + String(suffix)
+                if numberedUsername.count <= 20 && try await checkUsernameAvailability(numberedUsername) {
+                    return numberedUsername
+                }
+            }
+        }
+        
+        // If we still can't find one, return nil to show manual selection
+        return nil
     }
     
     /// Check if a username is available
@@ -413,9 +492,10 @@ final class CloudKitAuthManager: ObservableObject {
     
     /// Get suggested users for discovery
     func getSuggestedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
-        let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
+        // Use only queryable fields - totalPoints is queryable, isProfilePublic is not
+        let predicate = NSPredicate(format: "%K >= %d", CKField.User.totalPoints, 0)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
-        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.totalPoints, ascending: false)]
         
         do {
             let results = try await database.records(matching: query)
@@ -423,21 +503,31 @@ final class CloudKitAuthManager: ObservableObject {
                 switch result.1 {
                 case .success(let record):
                     return CloudKitUser(from: record)
-                case .failure:
+                case .failure(let error):
+                    print("❌ Failed to process user record: \(error)")
                     return nil
                 }
             }
-            return Array(users.prefix(limit))
+            let limitedUsers = Array(users.prefix(limit))
+            print("✅ Found \(limitedUsers.count) suggested users")
+            return limitedUsers
         } catch {
+            print("❌ Failed to fetch suggested users: \(error)")
+            if let ckError = error as? CKError {
+                print("   CloudKit error code: \(ckError.code)")
+                print("   CloudKit error description: \(ckError.localizedDescription)")
+            }
             throw CloudKitAuthError.networkError
         }
     }
     
     /// Get trending users based on recent activity
     func getTrendingUsers(limit: Int = 20) async throws -> [CloudKitUser] {
-        let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
+        // Use lastActiveAt which is queryable to get recently active users
+        let weekAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+        let predicate = NSPredicate(format: "%K >= %@", CKField.User.lastActiveAt, weekAgo as NSDate)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
-        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.recipesShared, ascending: false)]
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.lastActiveAt, ascending: false)]
         
         do {
             let results = try await database.records(matching: query)
@@ -445,23 +535,31 @@ final class CloudKitAuthManager: ObservableObject {
                 switch result.1 {
                 case .success(let record):
                     return CloudKitUser(from: record)
-                case .failure:
+                case .failure(let error):
+                    print("❌ Failed to process user record: \(error)")
                     return nil
                 }
             }
-            return Array(users.prefix(limit))
+            let limitedUsers = Array(users.prefix(limit))
+            print("✅ Found \(limitedUsers.count) suggested users")
+            return limitedUsers
         } catch {
+            print("❌ Failed to fetch suggested users: \(error)")
+            if let ckError = error as? CKError {
+                print("   CloudKit error code: \(ckError.code)")
+                print("   CloudKit error description: \(ckError.localizedDescription)")
+            }
             throw CloudKitAuthError.networkError
         }
     }
     
     /// Get verified users
     func getVerifiedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
-        let predicate = NSPredicate(format: "%K == %d AND %K == %d", 
-                                  CKField.User.isVerified, 1,
-                                  CKField.User.isProfilePublic, 1)
+        // Since isVerified is not queryable, we'll get users with high totalPoints as a proxy for verified status
+        // This is a workaround until the CloudKit schema is updated to make isVerified queryable
+        let predicate = NSPredicate(format: "%K >= %d", CKField.User.totalPoints, 1000)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
-        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.totalPoints, ascending: false)]
         
         do {
             let results = try await database.records(matching: query)
@@ -469,19 +567,29 @@ final class CloudKitAuthManager: ObservableObject {
                 switch result.1 {
                 case .success(let record):
                     return CloudKitUser(from: record)
-                case .failure:
+                case .failure(let error):
+                    print("❌ Failed to process user record: \(error)")
                     return nil
                 }
             }
-            return Array(users.prefix(limit))
+            let limitedUsers = Array(users.prefix(limit))
+            print("✅ Found \(limitedUsers.count) suggested users")
+            return limitedUsers
         } catch {
+            print("❌ Failed to fetch suggested users: \(error)")
+            if let ckError = error as? CKError {
+                print("   CloudKit error code: \(ckError.code)")
+                print("   CloudKit error description: \(ckError.localizedDescription)")
+            }
             throw CloudKitAuthError.networkError
         }
     }
     
     /// Get new users (recently joined) for discovery
     func getNewUsers(limit: Int = 20) async throws -> [CloudKitUser] {
-        let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
+        // Use createdAt which is queryable to get recently joined users
+        let monthAgo = Date().addingTimeInterval(-30 * 24 * 60 * 60)
+        let predicate = NSPredicate(format: "%K >= %@", CKField.User.createdAt, monthAgo as NSDate)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.createdAt, ascending: false)]
         
@@ -491,12 +599,20 @@ final class CloudKitAuthManager: ObservableObject {
                 switch result.1 {
                 case .success(let record):
                     return CloudKitUser(from: record)
-                case .failure:
+                case .failure(let error):
+                    print("❌ Failed to process user record: \(error)")
                     return nil
                 }
             }
-            return Array(users.prefix(limit))
+            let limitedUsers = Array(users.prefix(limit))
+            print("✅ Found \(limitedUsers.count) suggested users")
+            return limitedUsers
         } catch {
+            print("❌ Failed to fetch suggested users: \(error)")
+            if let ckError = error as? CKError {
+                print("   CloudKit error code: \(ckError.code)")
+                print("   CloudKit error description: \(ckError.localizedDescription)")
+            }
             throw CloudKitAuthError.networkError
         }
     }
@@ -507,15 +623,15 @@ final class CloudKitAuthManager: ObservableObject {
             return []
         }
         
+        // Use BEGINSWITH instead of CONTAINS for better performance with queryable fields
         let predicate = NSPredicate(
-            format: "(%K CONTAINS[cd] %@ OR %K CONTAINS[cd] %@) AND %K == %d",
-            CKField.User.username, query,
-            CKField.User.displayName, query,
-            CKField.User.isProfilePublic, 1
+            format: "%K BEGINSWITH[cd] %@ OR %K BEGINSWITH[cd] %@",
+            CKField.User.username, query.lowercased(),
+            CKField.User.displayName, query
         )
         
         let queryObj = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
-        queryObj.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+        queryObj.sortDescriptors = [NSSortDescriptor(key: CKField.User.totalPoints, ascending: false)]
         
         do {
             let results = try await database.records(matching: queryObj)
@@ -605,28 +721,28 @@ struct CloudKitUser: Identifiable {
     
     init(from record: CKRecord) {
         self.recordID = record.recordID.recordName
-        self.username = record["username"] as? String
-        self.displayName = record["displayName"] as? String ?? "Anonymous Chef"
+        self.username = record[CKField.User.username] as? String
+        self.displayName = record[CKField.User.displayName] as? String ?? "Anonymous Chef"
         self.profilePictureData = record["profilePictureData"] as? Data
         self.totalLikes = record["totalLikes"] as? Int ?? 0
         self.totalShares = record["totalShares"] as? Int ?? 0
-        self.streakCount = record["streakCount"] as? Int ?? 0
-        self.joinDate = record["joinDate"] as? Date ?? Date()
-        self.lastActiveDate = record["lastActiveDate"] as? Date ?? Date()
-        self.isVerified = record["isVerified"] as? Bool ?? false
+        self.streakCount = Int(record[CKField.User.currentStreak] as? Int64 ?? 0)
+        self.joinDate = record[CKField.User.createdAt] as? Date ?? Date()
+        self.lastActiveDate = record[CKField.User.lastActiveAt] as? Date ?? Date()
+        self.isVerified = (record[CKField.User.isVerified] as? Int64 ?? 0) == 1
         self.bio = record["bio"] as? String
         self.favoriteRecipes = record["favoriteRecipes"] as? [String] ?? []
-        self.challengesCompleted = record["challengesCompleted"] as? Int ?? 0
+        self.challengesCompleted = Int(record[CKField.User.challengesCompleted] as? Int64 ?? 0)
         self.level = record["level"] as? Int ?? 1
         self.experiencePoints = record["experiencePoints"] as? Int ?? 0
-        self.recipesShared = record["recipesShared"] as? Int ?? 0
-        self.followerCount = record["followerCount"] as? Int ?? 0
-        self.followingCount = record["followingCount"] as? Int ?? 0
-        self.profileImageURL = record["profileImageURL"] as? String
-        self.createdAt = record["createdAt"] as? Date ?? Date()
-        self.lastLoginAt = record["lastLoginAt"] as? Date ?? Date()
-        self.totalPoints = record["totalPoints"] as? Int ?? 0
-        self.currentStreak = record["currentStreak"] as? Int ?? 0
+        self.recipesShared = Int(record[CKField.User.recipesShared] as? Int64 ?? 0)
+        self.followerCount = Int(record[CKField.User.followerCount] as? Int64 ?? 0)
+        self.followingCount = Int(record[CKField.User.followingCount] as? Int64 ?? 0)
+        self.profileImageURL = record[CKField.User.profileImageURL] as? String
+        self.createdAt = record[CKField.User.createdAt] as? Date ?? Date()
+        self.lastLoginAt = record[CKField.User.lastLoginAt] as? Date ?? Date()
+        self.totalPoints = Int(record[CKField.User.totalPoints] as? Int64 ?? 0)
+        self.currentStreak = Int(record[CKField.User.currentStreak] as? Int64 ?? 0)
     }
 }
 
