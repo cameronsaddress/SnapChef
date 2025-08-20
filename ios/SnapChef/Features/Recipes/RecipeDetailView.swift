@@ -37,32 +37,94 @@ struct RecipeDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 // Recipe title with like and share buttons
                 HStack(alignment: .top, spacing: 12) {
-                    Text(recipe.name)
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(recipe.name)
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .fixedSize(horizontal: false, vertical: true)
+                        
+                        // Detective badge if applicable
+                        if recipe.isFromDetective {
+                            HStack(spacing: 6) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(Color(hex: "#2d1b69"))
+                                
+                                Text("DETECTIVE")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(Color(hex: "#2d1b69"))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(Color(hex: "#ffd700"))
+                            )
+                        }
+                    }
                     
                     Spacer()
                     
-                    shareButton
-                    likeButton
+                    VStack(spacing: 8) {
+                        shareButton
+                        likeButton
+                    }
                 }
                 
                 authorInfo
                 
-                Text(recipe.description)
-                    .font(.system(size: 18))
-                    .foregroundColor(.white.opacity(0.9))
-                
-                HStack(spacing: 20) {
-                    Label("\(recipe.prepTime + recipe.cookTime)m", systemImage: "clock")
-                        .foregroundColor(Color(hex: "#9b59b6"))
-                    Label("\(recipe.servings) servings", systemImage: "person.2")
-                        .foregroundColor(Color(hex: "#9b59b6"))
-                    Label(recipe.difficulty.rawValue, systemImage: "star.fill")
-                        .foregroundColor(Color(hex: "#9b59b6"))
+                if !recipe.description.isEmpty {
+                    Text(recipe.description)
+                        .font(.system(size: 18))
+                        .foregroundColor(.white.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .font(.system(size: 16, weight: .medium))
+                
+                // Recipe stats in a more prominent layout
+                VStack(spacing: 12) {
+                    HStack(spacing: 20) {
+                        RecipeStatItem(
+                            icon: "clock.fill",
+                            value: "\(recipe.prepTime + recipe.cookTime)m",
+                            label: "Total Time"
+                        )
+                        
+                        RecipeStatItem(
+                            icon: "person.2.fill",
+                            value: "\(recipe.servings)",
+                            label: "Servings"
+                        )
+                        
+                        RecipeStatItem(
+                            icon: "star.fill",
+                            value: recipe.difficulty.rawValue,
+                            label: "Difficulty",
+                            color: recipe.difficulty.swiftUIColor
+                        )
+                    }
+                    
+                    // Dietary info badges
+                    if recipe.dietaryInfo.isVegetarian || recipe.dietaryInfo.isVegan || 
+                       recipe.dietaryInfo.isGlutenFree || recipe.dietaryInfo.isDairyFree {
+                        HStack(spacing: 8) {
+                            if recipe.dietaryInfo.isVegan {
+                                DietaryBadge(text: "Vegan", color: Color(hex: "#43e97b"))
+                            } else if recipe.dietaryInfo.isVegetarian {
+                                DietaryBadge(text: "Vegetarian", color: Color(hex: "#66bb6a"))
+                            }
+                            
+                            if recipe.dietaryInfo.isGlutenFree {
+                                DietaryBadge(text: "Gluten Free", color: Color(hex: "#ffb74d"))
+                            }
+                            
+                            if recipe.dietaryInfo.isDairyFree {
+                                DietaryBadge(text: "Dairy Free", color: Color(hex: "#64b5f6"))
+                            }
+                            
+                            Spacer()
+                        }
+                    }
+                }
             }
         }
         .padding(.horizontal, 20)
@@ -147,32 +209,84 @@ struct RecipeDetailView: View {
                 HStack {
                     Image(systemName: "list.bullet.circle.fill")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#9b59b6"))
+                        .foregroundColor(Color(hex: "#ffd700"))
                     
                     Text("Ingredients")
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
                     
                     Spacer()
+                    
+                    // Ingredient count
+                    Text("\(recipe.ingredients.count)")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(Color(hex: "#ffd700"))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color(hex: "#ffd700").opacity(0.2))
+                        )
                 }
                 
                 if recipe.ingredients.isEmpty {
-                    Text("No ingredients listed")
-                        .font(.system(size: 16))
-                        .foregroundColor(.white.opacity(0.6))
-                        .italic()
-                        .padding(.vertical, 8)
+                    VStack(spacing: 12) {
+                        Image(systemName: "questionmark.circle")
+                            .font(.system(size: 32))
+                            .foregroundColor(.white.opacity(0.4))
+                        
+                        Text("No ingredients listed")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.6))
+                            .italic()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
                 } else {
-                    ForEach(recipe.ingredients) { ingredient in
-                        HStack {
-                            Image(systemName: ingredient.isAvailable ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(ingredient.isAvailable ? Color(hex: "#9b59b6") : .white.opacity(0.5))
-                            Text("\(ingredient.quantity) \(ingredient.unit ?? "") \(ingredient.name)")
-                                .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.9))
-                            Spacer()
+                    LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
+                        ForEach(Array(recipe.ingredients.enumerated()), id: \.element.id) { index, ingredient in
+                            HStack(spacing: 12) {
+                                // Number badge
+                                Text("\(index + 1)")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(Color(hex: "#2d1b69"))
+                                    .frame(width: 24, height: 24)
+                                    .background(
+                                        Circle()
+                                            .fill(Color(hex: "#ffd700"))
+                                    )
+                                
+                                // Ingredient text
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(ingredient.name)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    
+                                    if !ingredient.quantity.isEmpty {
+                                        Text("\(ingredient.quantity) \(ingredient.unit ?? "")")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                // Availability indicator
+                                Image(systemName: ingredient.isAvailable ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(ingredient.isAvailable ? Color(hex: "#43e97b") : .white.opacity(0.5))
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.white.opacity(0.05))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(hex: "#ffd700").opacity(0.2), lineWidth: 1)
+                                    )
+                            )
                         }
-                        .padding(.vertical, 4)
                     }
                 }
             }
@@ -187,34 +301,73 @@ struct RecipeDetailView: View {
                 HStack {
                     Image(systemName: "doc.text.fill")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#9b59b6"))
+                        .foregroundColor(Color(hex: "#ffd700"))
                     
                     Text("Instructions")
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
                     
                     Spacer()
+                    
+                    // Step count
+                    Text("\(recipe.instructions.count) steps")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(Color(hex: "#ffd700"))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color(hex: "#ffd700").opacity(0.2))
+                        )
                 }
                 
                 if recipe.instructions.isEmpty {
-                    Text("No instructions provided")
-                        .font(.system(size: 16))
-                        .foregroundColor(.white.opacity(0.6))
-                        .italic()
-                        .padding(.vertical, 8)
+                    VStack(spacing: 12) {
+                        Image(systemName: "questionmark.circle")
+                            .font(.system(size: 32))
+                            .foregroundColor(.white.opacity(0.4))
+                        
+                        Text("No instructions provided")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.6))
+                            .italic()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
                 } else {
-                    ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
-                        HStack(alignment: .top) {
-                            Text("\(index + 1).")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(Color(hex: "#9b59b6"))
-                                .frame(width: 30)
-                            Text(instruction)
-                                .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.9))
-                            Spacer()
+                    VStack(spacing: 12) {
+                        ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
+                            HStack(alignment: .top, spacing: 16) {
+                                // Step number badge
+                                Text("\(index + 1)")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(Color(hex: "#2d1b69"))
+                                    .frame(width: 36, height: 36)
+                                    .background(
+                                        Circle()
+                                            .fill(Color(hex: "#ffd700"))
+                                    )
+                                
+                                // Instruction text
+                                Text(instruction)
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.white.opacity(0.05))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(hex: "#ffd700").opacity(0.2), lineWidth: 1)
+                                    )
+                            )
                         }
-                        .padding(.vertical, 8)
                     }
                 }
             }
@@ -414,20 +567,71 @@ struct RecipeDetailView: View {
                 HStack {
                     Image(systemName: "chart.bar.fill")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#9b59b6"))
+                        .foregroundColor(Color(hex: "#ffd700"))
                     
                     Text("Nutrition Facts")
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
                     
                     Spacer()
+                    
+                    Text("Per serving")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
                 }
                 
-                HStack(spacing: 16) {
-                    RecipeDetailNutritionItem(label: "Calories", value: "\(recipe.nutrition.calories)")
-                    RecipeDetailNutritionItem(label: "Protein", value: "\(recipe.nutrition.protein)g")
-                    RecipeDetailNutritionItem(label: "Carbs", value: "\(recipe.nutrition.carbs)g")
-                    RecipeDetailNutritionItem(label: "Fat", value: "\(recipe.nutrition.fat)g")
+                // Main nutrition grid
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible()),
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 12) {
+                    NutritionItem(
+                        label: "Calories", 
+                        value: "\(recipe.nutrition.calories)", 
+                        unit: "",
+                        color: Color(hex: "#ff6b6b")
+                    )
+                    NutritionItem(
+                        label: "Protein", 
+                        value: "\(recipe.nutrition.protein)", 
+                        unit: "g",
+                        color: Color(hex: "#4ecdc4")
+                    )
+                    NutritionItem(
+                        label: "Carbs", 
+                        value: "\(recipe.nutrition.carbs)", 
+                        unit: "g",
+                        color: Color(hex: "#ffe66d")
+                    )
+                    NutritionItem(
+                        label: "Fat", 
+                        value: "\(recipe.nutrition.fat)", 
+                        unit: "g",
+                        color: Color(hex: "#a8e6cf")
+                    )
+                }
+                
+                // Additional nutrition info if available
+                if let fiber = recipe.nutrition.fiber,
+                   let sugar = recipe.nutrition.sugar,
+                   let sodium = recipe.nutrition.sodium {
+                    
+                    Divider()
+                        .background(Color.white.opacity(0.3))
+                    
+                    VStack(spacing: 8) {
+                        Text("Additional Info")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.8))
+                        
+                        HStack(spacing: 16) {
+                            AdditionalNutritionItem(label: "Fiber", value: "\(fiber)g")
+                            AdditionalNutritionItem(label: "Sugar", value: "\(sugar)g")
+                            AdditionalNutritionItem(label: "Sodium", value: "\(sodium)mg")
+                        }
+                    }
                 }
             }
         }
@@ -558,8 +762,30 @@ struct RecipeDetailView: View {
                 Text("Are you sure you want to delete \"\(recipe.name)\"? This action cannot be undone.")
             }
             .onAppear {
+                print("🎯 RECIPEDETAILVIEW ONAPPEAR TRIGGERED")
                 print("🔍 DEBUG: RecipeDetailView appeared for recipe: \(recipe.name)")
-                print("🔍 RECIPE ENHANCED FIELDS IN UI:")
+                print("🔍 RECIPE MEMORY ADDRESS: \(Unmanaged.passUnretained(recipe as AnyObject).toOpaque())")
+                print("🔍 RECIPE BASIC FIELDS:")
+                print("🔍   - name: \"\(recipe.name)\" (isEmpty: \(recipe.name.isEmpty))")
+                print("🔍   - description: \"\(recipe.description)\" (isEmpty: \(recipe.description.isEmpty))")
+                print("🔍   - ingredients count: \(recipe.ingredients.count)")
+                if recipe.ingredients.isEmpty {
+                    print("🔍   - ⚠️ INGREDIENTS ARRAY IS EMPTY!")
+                } else {
+                    print("🔍   - First 3 ingredients: \(recipe.ingredients.prefix(3).map { $0.name })")
+                }
+                print("🔍   - instructions count: \(recipe.instructions.count)")
+                if recipe.instructions.isEmpty {
+                    print("🔍   - ⚠️ INSTRUCTIONS ARRAY IS EMPTY!")
+                } else {
+                    print("🔍   - First instruction: \(recipe.instructions.first ?? "nil")")
+                }
+                print("🔍   - prepTime: \(recipe.prepTime), cookTime: \(recipe.cookTime)")
+                print("🔍   - servings: \(recipe.servings)")
+                print("🔍   - difficulty: \(recipe.difficulty.rawValue)")
+                print("🔍   - nutrition calories: \(recipe.nutrition.calories)")
+                
+                print("🔍 RECIPE ENHANCED FIELDS:")
                 print("🔍   - cookingTechniques: \(recipe.cookingTechniques.isEmpty ? "EMPTY" : "\(recipe.cookingTechniques)")")
                 print("🔍   - flavorProfile: \(recipe.flavorProfile != nil ? "PRESENT" : "NIL")")
                 if let fp = recipe.flavorProfile {
@@ -570,11 +796,31 @@ struct RecipeDetailView: View {
                 print("🔍   - visualClues: \(recipe.visualClues.isEmpty ? "EMPTY" : "\(recipe.visualClues)")")
                 print("🔍   - shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : "\"\(recipe.shareCaption)\"")")
                 print("🔍   - isDetectiveRecipe: \(recipe.isDetectiveRecipe)")
+                
+                print("🔍 DIETARY INFO:")
+                print("🔍   - isVegetarian: \(recipe.dietaryInfo.isVegetarian)")
+                print("🔍   - isVegan: \(recipe.dietaryInfo.isVegan)")
+                print("🔍   - isGlutenFree: \(recipe.dietaryInfo.isGlutenFree)")
+                print("🔍   - isDairyFree: \(recipe.dietaryInfo.isDairyFree)")
+                
                 print("🔍 UI SECTIONS VISIBILITY:")
+                print("🔍   - headerSection will show: Recipe name and basic info")
+                print("🔍   - ingredientsSection will show: \(recipe.ingredients.count) ingredients")
+                print("🔍   - instructionsSection will show: \(recipe.instructions.count) steps")
                 print("🔍   - cookingTechniquesSection will show: \(!recipe.cookingTechniques.isEmpty)")
                 print("🔍   - secretIngredientsSection will show: \(!recipe.secretIngredients.isEmpty)")
                 print("🔍   - proTipsSection will show: \(!recipe.proTips.isEmpty)")
                 print("🔍   - visualCluesSection will show: \(!recipe.visualClues.isEmpty)")
+                print("🔍   - nutritionSection will show: Always (calories: \(recipe.nutrition.calories))")
+                
+                print("🔍 VALIDATION CHECK:")
+                print("🔍   - Recipe should display properly: \(!recipe.name.isEmpty && (!recipe.ingredients.isEmpty || !recipe.instructions.isEmpty))")
+                if recipe.name.isEmpty {
+                    print("🚨 CRITICAL: Recipe name is empty - this will cause UI issues!")
+                }
+                if recipe.ingredients.isEmpty && recipe.instructions.isEmpty {
+                    print("🚨 CRITICAL: Both ingredients and instructions are empty - recipe will appear blank!")
+                }
             }
             .task {
                 await loadLikeStatus()
@@ -1133,6 +1379,128 @@ struct DetectiveTextFieldStyle: TextFieldStyle {
                     )
             )
             .foregroundColor(.white)
+    }
+}
+
+// MARK: - Recipe Stat Item
+
+struct RecipeStatItem: View {
+    let icon: String
+    let value: String
+    let label: String
+    let color: Color
+    
+    init(icon: String, value: String, label: String, color: Color = Color(hex: "#9b59b6")) {
+        self.icon = icon
+        self.value = value
+        self.label = label
+        self.color = color
+    }
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(color)
+                
+                Text(value)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(color.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+}
+
+// MARK: - Dietary Badge
+
+struct DietaryBadge: View {
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(color)
+            )
+    }
+}
+
+// MARK: - Enhanced Nutrition Components
+
+struct NutritionItem: View {
+    let label: String
+    let value: String
+    let unit: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.2))
+                    .frame(width: 50, height: 50)
+                
+                VStack(spacing: 2) {
+                    Text(value)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(color)
+                    
+                    if !unit.isEmpty {
+                        Text(unit)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(color.opacity(0.8))
+                    }
+                }
+            }
+            
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.8))
+                .lineLimit(1)
+        }
+    }
+}
+
+struct AdditionalNutritionItem: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.white)
+            
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.white.opacity(0.1))
+        )
     }
 }
 

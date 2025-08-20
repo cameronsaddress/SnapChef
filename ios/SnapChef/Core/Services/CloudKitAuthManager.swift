@@ -490,16 +490,24 @@ final class CloudKitAuthManager: ObservableObject {
     
     // MARK: - User Discovery Methods
     
-    /// Get suggested users for discovery
+    /// Get suggested users for discovery - smart recommendations based on activity and engagement
     func getSuggestedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
-        // Use only queryable fields - totalPoints is queryable, isProfilePublic is not
-        let predicate = NSPredicate(format: "%K >= %d", CKField.User.totalPoints, 0)
+        // Smart recommendations: Users who are active and have created recipes or have moderate engagement
+        // Filter for users who have at least 1 recipe created or some activity
+        let predicate = NSPredicate(format: "%K >= %d OR %K >= %d", 
+                                   CKField.User.recipesCreated, 1,
+                                   CKField.User.totalPoints, 100)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
-        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.totalPoints, ascending: false)]
+        
+        // Sort by a combination of engagement factors: total points (activity) and recipe creation
+        query.sortDescriptors = [
+            NSSortDescriptor(key: CKField.User.totalPoints, ascending: false),
+            NSSortDescriptor(key: CKField.User.recipesCreated, ascending: false)
+        ]
         
         do {
             let results = try await database.records(matching: query)
-            let users = results.matchResults.compactMap { result in
+            var users = results.matchResults.compactMap { result in
                 switch result.1 {
                 case .success(let record):
                     return CloudKitUser(from: record)
@@ -508,8 +516,22 @@ final class CloudKitAuthManager: ObservableObject {
                     return nil
                 }
             }
+            
+            // If current user is authenticated, filter out users they already follow
+            if let currentUserID = currentUser?.recordID {
+                // Get list of users the current user already follows
+                let followingUsers = await getUsersFollowedBy(userID: currentUserID)
+                let followingIDs = Set(followingUsers.compactMap { $0.recordID })
+                
+                // Filter out already followed users and the current user
+                users = users.filter { user in
+                    guard let userID = user.recordID else { return false }
+                    return userID != currentUserID && !followingIDs.contains(userID)
+                }
+            }
+            
             let limitedUsers = Array(users.prefix(limit))
-            print("✅ Found \(limitedUsers.count) suggested users")
+            print("✅ Found \(limitedUsers.count) suggested chefs (active users with recipes)")
             return limitedUsers
         } catch {
             print("❌ Failed to fetch suggested users: \(error)")
@@ -521,13 +543,56 @@ final class CloudKitAuthManager: ObservableObject {
         }
     }
     
-    /// Get trending users based on recent activity
+    /// Get users that the current user is following - helper method for suggestions
+    private func getUsersFollowedBy(userID: String) async -> [CloudKitUser] {
+        let predicate = NSPredicate(
+            format: "%K == %@ AND %K == %d",
+            CKField.Follow.followerID, userID,
+            CKField.Follow.isActive, 1
+        )
+        let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
+        
+        do {
+            let results = try await database.records(matching: query)
+            var followedUserIDs: [String] = []
+            
+            for result in results.matchResults {
+                switch result.1 {
+                case .success(let record):
+                    if let followingID = record[CKField.Follow.followingID] as? String {
+                        followedUserIDs.append(followingID)
+                    }
+                case .failure:
+                    continue
+                }
+            }
+            
+            // Fetch the actual user records
+            var followedUsers: [CloudKitUser] = []
+            for userID in followedUserIDs {
+                do {
+                    let userRecord = try await database.record(for: CKRecord.ID(recordName: userID))
+                    followedUsers.append(CloudKitUser(from: userRecord))
+                } catch {
+                    print("Failed to fetch followed user: \(userID)")
+                }
+            }
+            
+            return followedUsers
+        } catch {
+            print("Failed to fetch following list: \(error)")
+            return []
+        }
+    }
+    
+    /// Get trending users based on follower count - top 20 users with at least 5 followers
     func getTrendingUsers(limit: Int = 20) async throws -> [CloudKitUser] {
-        // Use lastActiveAt which is queryable to get recently active users
-        let weekAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
-        let predicate = NSPredicate(format: "%K >= %@", CKField.User.lastActiveAt, weekAgo as NSDate)
+        // Filter for users with at least 5 followers and sort by follower count
+        let predicate = NSPredicate(format: "%K >= %d", CKField.User.followerCount, 5)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
-        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.lastActiveAt, ascending: false)]
+        
+        // Sort by follower count descending to get most popular users first
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
         
         do {
             let results = try await database.records(matching: query)
@@ -541,10 +606,10 @@ final class CloudKitAuthManager: ObservableObject {
                 }
             }
             let limitedUsers = Array(users.prefix(limit))
-            print("✅ Found \(limitedUsers.count) suggested users")
+            print("✅ Found \(limitedUsers.count) trending chefs (minimum 5 followers)")
             return limitedUsers
         } catch {
-            print("❌ Failed to fetch suggested users: \(error)")
+            print("❌ Failed to fetch trending users: \(error)")
             if let ckError = error as? CKError {
                 print("   CloudKit error code: \(ckError.code)")
                 print("   CloudKit error description: \(ckError.localizedDescription)")
@@ -585,13 +650,18 @@ final class CloudKitAuthManager: ObservableObject {
         }
     }
     
-    /// Get new users (recently joined) for discovery
-    func getNewUsers(limit: Int = 20) async throws -> [CloudKitUser] {
-        // Use createdAt which is queryable to get recently joined users
-        let monthAgo = Date().addingTimeInterval(-30 * 24 * 60 * 60)
-        let predicate = NSPredicate(format: "%K >= %@", CKField.User.createdAt, monthAgo as NSDate)
+    /// Get new users (recently joined) for discovery - latest 100 users based on lastLoginAt or createdAt
+    func getNewUsers(limit: Int = 100) async throws -> [CloudKitUser] {
+        // Get the newest 100 users based on most recent activity (lastLoginAt) or creation date
+        // Use lastLoginAt as primary sort since it shows recent activity, fallback to createdAt
+        let predicate = NSPredicate(format: "%K >= %d", CKField.User.totalPoints, 0) // Get all users with valid profiles
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
-        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.createdAt, ascending: false)]
+        
+        // Sort by lastLoginAt (most recent activity first), then by createdAt as secondary sort
+        query.sortDescriptors = [
+            NSSortDescriptor(key: CKField.User.lastLoginAt, ascending: false),
+            NSSortDescriptor(key: CKField.User.createdAt, ascending: false)
+        ]
         
         do {
             let results = try await database.records(matching: query)
@@ -605,10 +675,10 @@ final class CloudKitAuthManager: ObservableObject {
                 }
             }
             let limitedUsers = Array(users.prefix(limit))
-            print("✅ Found \(limitedUsers.count) suggested users")
+            print("✅ Found \(limitedUsers.count) new chefs (sorted by recent activity)")
             return limitedUsers
         } catch {
-            print("❌ Failed to fetch suggested users: \(error)")
+            print("❌ Failed to fetch new users: \(error)")
             if let ckError = error as? CKError {
                 print("   CloudKit error code: \(ckError.code)")
                 print("   CloudKit error description: \(ckError.localizedDescription)")

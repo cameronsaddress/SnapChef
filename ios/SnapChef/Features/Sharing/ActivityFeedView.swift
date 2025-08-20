@@ -98,6 +98,7 @@ struct ActivityFeedView: View {
     @State private var showingRecipeDetail = false
     @State private var selectedRecipeID: String?
     @State private var selectedRecipe: Recipe?
+    @State private var isLoadingRecipe = false
 
     enum ActivityFilter: String, CaseIterable {
         case all = "All"
@@ -211,7 +212,13 @@ struct ActivityFeedView: View {
             await feedManager.loadInitialActivities()
         }
         .sheet(isPresented: $showingRecipeDetail) {
+            print("🎯 SHEET PRESENTATION TRIGGERED")
+            print("🔍 showingRecipeDetail: \(showingRecipeDetail)")
+            print("🔍 selectedRecipe: \(selectedRecipe != nil ? "NOT NIL" : "NIL")")
             if let recipe = selectedRecipe {
+                print("🔍 Sheet will show recipe: \(recipe.name)")
+                print("🔍 Recipe ingredients count: \(recipe.ingredients.count)")
+                print("🔍 Recipe instructions count: \(recipe.instructions.count)")
                 NavigationStack {
                     RecipeDetailView(recipe: recipe)
                         .environmentObject(appState)
@@ -228,6 +235,19 @@ struct ActivityFeedView: View {
                             .ignoresSafeArea()
                         )
                 }
+            } else {
+                print("🚨 CRITICAL: Sheet triggered but selectedRecipe is NIL!")
+                // Show a fallback view or empty view
+                VStack {
+                    Text("Recipe not found")
+                        .foregroundColor(.white)
+                    Button("Close") {
+                        showingRecipeDetail = false
+                    }
+                    .foregroundColor(.blue)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black)
             }
         }
     }
@@ -250,13 +270,24 @@ struct ActivityFeedView: View {
     }
 
     private func handleActivityTap(_ activity: ActivityItem) {
+        print("🎯 ACTIVITY TAPPED: \(activity.type)")
+        print("🔍 Activity details:")
+        print("   - ID: \(activity.id)")
+        print("   - Type: \(activity.type)")
+        print("   - Recipe ID: \(activity.recipeID ?? "nil")")
+        print("   - Recipe Name: \(activity.recipeName ?? "nil")")
+        print("   - User Name: \(activity.userName)")
+        
         switch activity.type {
         case .recipeShared, .recipeLiked, .recipeComment:
             if let recipeID = activity.recipeID {
+                print("🎯 RECIPE ACTIVITY TAPPED - Recipe ID: \(recipeID)")
                 selectedRecipeID = recipeID
                 loadRecipeAndShowDetail(recipeID: recipeID)
             } else {
                 print("⚠️ Activity tapped but no recipe ID available")
+                print("⚠️ Activity type: \(activity.type)")
+                print("⚠️ Activity: \(activity)")
             }
         case .follow:
             // Navigate to user profile
@@ -274,33 +305,81 @@ struct ActivityFeedView: View {
     }
     
     private func loadRecipeAndShowDetail(recipeID: String) {
-        Task {
+        print("🚀 STARTING loadRecipeAndShowDetail for ID: \(recipeID)")
+        
+        // Prevent multiple concurrent loads
+        guard !isLoadingRecipe else {
+            print("⚠️ Already loading a recipe, ignoring duplicate request")
+            return
+        }
+        
+        Task { @MainActor in
+            isLoadingRecipe = true
+            defer { isLoadingRecipe = false }
+            
             do {
                 // Try to load recipe from local app state first
+                print("🔍 STEP 1: Checking local app state for recipe: \(recipeID)")
                 if let localRecipe = findLocalRecipe(by: recipeID) {
-                    await MainActor.run {
-                        selectedRecipe = localRecipe
-                        showingRecipeDetail = true
-                    }
+                    print("✅ FOUND LOCAL RECIPE: \(localRecipe.name)")
+                    print("🔍 Local recipe data check:")
+                    print("   - Ingredients: \(localRecipe.ingredients.count)")
+                    print("   - Instructions: \(localRecipe.instructions.count)")
+                    print("   - Name: '\(localRecipe.name)'")
+                    print("   - Description: '\(localRecipe.description)'")
+                    
+                    print("🎯 SETTING selectedRecipe on MainActor...")
+                    selectedRecipe = localRecipe
+                    print("✅ Local recipe set, now triggering sheet...")
+                    
+                    // Small delay to ensure state is properly set
+                    try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                    showingRecipeDetail = true
+                    print("✅ UI STATE UPDATED: showingRecipeDetail = true")
                     return
                 }
                 
                 // If not found locally, try to load from CloudKit
-                print("🔍 Attempting to load recipe from CloudKit: \(recipeID)")
-                let recipe = try await CloudKitRecipeManager.shared.fetchRecipe(by: recipeID)
+                print("🔍 STEP 2: No local recipe found, attempting CloudKit fetch for ID: \(recipeID)")
+                print("⚡ CloudKit fetch starting...")
                 
-                await MainActor.run {
-                    selectedRecipe = recipe
-                    showingRecipeDetail = true
-                }
+                // Fetch from CloudKit (this call is already async)
+                let recipe = try await CloudKitRecipeManager.shared.fetchRecipe(by: recipeID)
+                print("✅ CLOUDKIT FETCH SUCCESS: \(recipe.name)")
+                
+                print("🔍 CloudKit recipe data verification:")
+                print("   - Recipe ID: \(recipe.id)")
+                print("   - Name: '\(recipe.name)' (length: \(recipe.name.count))")
+                print("   - Description: '\(recipe.description)' (length: \(recipe.description.count))")
+                print("   - Ingredients count: \(recipe.ingredients.count)")
+                print("   - Instructions count: \(recipe.instructions.count)")
+                print("   - Prep time: \(recipe.prepTime), Cook time: \(recipe.cookTime)")
+                print("   - Servings: \(recipe.servings)")
+                print("   - Difficulty: \(recipe.difficulty.rawValue)")
+                print("   - Nutrition calories: \(recipe.nutrition.calories)")
+                
+                print("🎯 SETTING CloudKit recipe on MainActor...")
+                selectedRecipe = recipe
+                print("✅ CloudKit recipe set, now triggering sheet...")
+                
+                // Small delay to ensure state is properly set
+                try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                showingRecipeDetail = true
+                print("✅ UI STATE UPDATED with CloudKit recipe: showingRecipeDetail = true")
                 print("✅ Successfully loaded recipe: \(recipe.name)")
                 print("🔍 Recipe details - Ingredients: \(recipe.ingredients.count), Instructions: \(recipe.instructions.count)")
             } catch {
-                print("❌ Failed to load recipe \(recipeID): \(error)")
+                print("❌ RECIPE LOAD FAILED for ID: \(recipeID)")
+                print("❌ Error details: \(error)")
+                print("❌ Error type: \(type(of: error))")
                 
                 // Check if it's a specific "not found" error
-                if let ckError = error as? CKError, ckError.code == .unknownItem {
-                    print("📄 Recipe \(recipeID) does not exist in CloudKit")
+                if let ckError = error as? CKError {
+                    print("❌ CloudKit Error Code: \(ckError.code)")
+                    print("❌ CloudKit Error Description: \(ckError.localizedDescription)")
+                    if ckError.code == .unknownItem {
+                        print("📄 Recipe \(recipeID) does not exist in CloudKit")
+                    }
                 } else {
                     print("⚠️ Other error loading recipe: \(error.localizedDescription)")
                 }

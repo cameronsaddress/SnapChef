@@ -512,8 +512,8 @@ class DiscoverUsersViewModel: ObservableObject {
             case .trending:
                 fetchedUsers = try await cloudKitAuth.getTrendingUsers(limit: 20)
             case .newChefs:
-                // Get users who joined recently
-                fetchedUsers = try await cloudKitAuth.getNewUsers(limit: 20)
+                // Get the newest 100 users based on recent activity
+                fetchedUsers = try await cloudKitAuth.getNewUsers(limit: 100)
             case .verified:
                 fetchedUsers = try await cloudKitAuth.getVerifiedUsers(limit: 20)
             }
