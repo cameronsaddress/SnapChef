@@ -205,6 +205,7 @@ struct MessagesShareView: View {
             MessageComposerWrapper(
                 messageText: messageText,
                 image: generatedCard,
+                content: content,
                 onDismiss: {
                     showingMessageComposer = false
                 }
@@ -321,6 +322,53 @@ struct MessagesShareView: View {
 
         @unknown default:
             errorMessage = "Unable to access photo library."
+        }
+    }
+    
+    // MARK: - Activity Creation
+    private func createMessagesShareActivity() async {
+        guard CloudKitAuthManager.shared.isAuthenticated,
+              let userID = CloudKitAuthManager.shared.currentUser?.recordID,
+              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+            return
+        }
+        
+        var activityType = "messagesCardShared"
+        var metadata: [String: Any] = ["platform": "messages", "cardStyle": selectedCardStyle.rawValue]
+        
+        // Add content-specific metadata
+        switch content.type {
+        case .recipe(let recipe):
+            activityType = "recipeMessagesCardShared"
+            metadata["recipeId"] = recipe.id.uuidString
+            metadata["recipeName"] = recipe.name
+        case .achievement(let achievementName):
+            activityType = "achievementMessagesCardShared"
+            metadata["achievementName"] = achievementName
+        case .challenge(let challenge):
+            activityType = "challengeMessagesCardShared"
+            metadata["challengeId"] = challenge.id
+            metadata["challengeName"] = challenge.title
+        case .profile:
+            activityType = "profileMessagesCardShared"
+        case .teamInvite(let teamName, let joinCode):
+            activityType = "teamInviteMessagesCardShared"
+            metadata["teamName"] = teamName
+            metadata["joinCode"] = joinCode
+        }
+        
+        do {
+            try await CloudKitSyncService.shared.createActivity(
+                type: activityType,
+                actorID: userID,
+                actorName: userName,
+                recipeID: metadata["recipeId"] as? String,
+                recipeName: metadata["recipeName"] as? String,
+                challengeID: metadata["challengeId"] as? String,
+                challengeName: metadata["challengeName"] as? String
+            )
+        } catch {
+            print("Failed to create Messages share activity: \(error)")
         }
     }
 }
@@ -565,6 +613,7 @@ struct MessageFeatureRow: View {
 struct MessageComposerWrapper: UIViewControllerRepresentable {
     let messageText: String
     let image: UIImage?
+    let content: ShareContent
     let onDismiss: () -> Void
 
     func makeUIViewController(context: Context) -> MFMessageComposeViewController {
@@ -594,9 +643,65 @@ struct MessageComposerWrapper: UIViewControllerRepresentable {
         }
 
         func messageComposeViewController(_ controller: MFMessageComposeViewController, didFinishWith result: MessageComposeResult) {
-            DispatchQueue.main.async { [parent] in
-                parent.onDismiss()
+            let parentView = parent
+            
+            // Create activity for successful message sends
+            if result == .sent {
+                Task { @MainActor in
+                    await parentView.createMessagesShareActivity()
+                }
             }
+            
+            DispatchQueue.main.async {
+                parentView.onDismiss()
+            }
+        }
+    }
+    
+    // MARK: - Activity Creation
+    func createMessagesShareActivity() async {
+        guard CloudKitAuthManager.shared.isAuthenticated,
+              let userID = CloudKitAuthManager.shared.currentUser?.recordID,
+              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+            return
+        }
+        
+        var activityType = "messagesCardShared"
+        var metadata: [String: Any] = ["platform": "messages"]
+        
+        // Add content-specific metadata
+        switch content.type {
+        case .recipe(let recipe):
+            activityType = "recipeMessagesCardShared"
+            metadata["recipeId"] = recipe.id.uuidString
+            metadata["recipeName"] = recipe.name
+        case .achievement(let achievementName):
+            activityType = "achievementMessagesCardShared"
+            metadata["achievementName"] = achievementName
+        case .challenge(let challenge):
+            activityType = "challengeMessagesCardShared"
+            metadata["challengeId"] = challenge.id
+            metadata["challengeName"] = challenge.title
+        case .profile:
+            activityType = "profileMessagesCardShared"
+        case .teamInvite(let teamName, let joinCode):
+            activityType = "teamInviteMessagesCardShared"
+            metadata["teamName"] = teamName
+            metadata["joinCode"] = joinCode
+        }
+        
+        do {
+            try await CloudKitSyncService.shared.createActivity(
+                type: activityType,
+                actorID: userID,
+                actorName: userName,
+                recipeID: metadata["recipeId"] as? String,
+                recipeName: metadata["recipeName"] as? String,
+                challengeID: metadata["challengeId"] as? String,
+                challengeName: metadata["challengeName"] as? String
+            )
+        } catch {
+            print("Failed to create Messages share activity: \(error)")
         }
     }
 }

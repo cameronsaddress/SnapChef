@@ -477,11 +477,19 @@ class RecipeCommentsViewModel: ObservableObject {
         isLoading = true
         comments = []
         lastFetchedRecord = nil
+        hasMore = true
 
-        // For now, load mock data
-        // CloudKit comments integration not implemented - using mock data for demo
-        comments = generateMockComments()
-        hasMore = false
+        do {
+            let ckRecords = try await cloudKitSync.fetchComments(for: recipeID, limit: 50)
+            let commentItems = await parseCommentsFromRecords(ckRecords)
+            comments = organizeCommentsWithReplies(commentItems)
+            hasMore = ckRecords.count >= 50
+        } catch {
+            print("Failed to load comments: \(error)")
+            // Fall back to empty state on error
+            comments = []
+            hasMore = false
+        }
 
         isLoading = false
     }
@@ -491,7 +499,9 @@ class RecipeCommentsViewModel: ObservableObject {
 
         isLoading = true
 
-        // CloudKit pagination not implemented - using mock data for demo
+        // For now, we'll load all comments at once
+        // Future enhancement: implement proper pagination with cursor
+        hasMore = false
 
         isLoading = false
     }
@@ -504,64 +514,204 @@ class RecipeCommentsViewModel: ObservableObject {
         guard let userID = cloudKitAuth.currentUser?.recordID,
               let userName = cloudKitAuth.currentUser?.displayName else { return }
 
-        // Create temporary comment for immediate UI update
-        let newComment = CommentItem(
-            id: UUID().uuidString,
-            userID: userID,
-            userName: userName,
-            userPhoto: nil,
-            recipeID: recipeID,
-            content: content,
-            createdAt: Date(),
-            editedAt: nil,
-            likeCount: 0,
-            isLiked: false,
-            parentCommentID: parentCommentID,
-            replies: []
-        )
-
-        if let parentCommentID = parentCommentID,
-           let parentIndex = comments.firstIndex(where: { $0.id == parentCommentID }) {
-            // Add as reply
-            var updatedParent = comments[parentIndex]
-            var replies = updatedParent.replies
-            replies.append(newComment)
-
-            comments[parentIndex] = CommentItem(
-                id: updatedParent.id,
-                userID: updatedParent.userID,
-                userName: updatedParent.userName,
-                userPhoto: updatedParent.userPhoto,
-                recipeID: updatedParent.recipeID,
-                content: updatedParent.content,
-                createdAt: updatedParent.createdAt,
-                editedAt: updatedParent.editedAt,
-                likeCount: updatedParent.likeCount,
-                isLiked: updatedParent.isLiked,
-                parentCommentID: updatedParent.parentCommentID,
-                replies: replies
-            )
-        } else {
-            // Add as top-level comment
-            comments.insert(newComment, at: 0)
-        }
-
-        // CloudKit comment saving not implemented - storing locally
         do {
+            // Save to CloudKit first
             try await cloudKitSync.addComment(
                 recipeID: recipeID,
                 content: content,
                 parentCommentID: parentCommentID
             )
+            
+            // Create comment for immediate UI update
+            let newComment = CommentItem(
+                id: UUID().uuidString,
+                userID: userID,
+                userName: userName,
+                userPhoto: nil,
+                recipeID: recipeID,
+                content: content,
+                createdAt: Date(),
+                editedAt: nil,
+                likeCount: 0,
+                isLiked: false,
+                parentCommentID: parentCommentID,
+                replies: []
+            )
+
+            if let parentCommentID = parentCommentID,
+               let parentIndex = comments.firstIndex(where: { $0.id == parentCommentID }) {
+                // Add as reply
+                let updatedParent = comments[parentIndex]
+                var replies = updatedParent.replies
+                replies.append(newComment)
+
+                comments[parentIndex] = CommentItem(
+                    id: updatedParent.id,
+                    userID: updatedParent.userID,
+                    userName: updatedParent.userName,
+                    userPhoto: updatedParent.userPhoto,
+                    recipeID: updatedParent.recipeID,
+                    content: updatedParent.content,
+                    createdAt: updatedParent.createdAt,
+                    editedAt: updatedParent.editedAt,
+                    likeCount: updatedParent.likeCount,
+                    isLiked: updatedParent.isLiked,
+                    parentCommentID: updatedParent.parentCommentID,
+                    replies: replies
+                )
+            } else {
+                // Add as top-level comment
+                comments.insert(newComment, at: 0)
+            }
         } catch {
             print("Failed to save comment: \(error)")
+            // Show error to user
         }
     }
 
     func toggleLike(_ comment: CommentItem) async {
-        // Update local state immediately
-        if let index = comments.firstIndex(where: { $0.id == comment.id }) {
-            let updatedComment = CommentItem(
+        // Update local state immediately for better UX
+        updateCommentInList(comment) { current in
+            CommentItem(
+                id: current.id,
+                userID: current.userID,
+                userName: current.userName,
+                userPhoto: current.userPhoto,
+                recipeID: current.recipeID,
+                content: current.content,
+                createdAt: current.createdAt,
+                editedAt: current.editedAt,
+                likeCount: current.isLiked ? current.likeCount - 1 : current.likeCount + 1,
+                isLiked: !current.isLiked,
+                parentCommentID: current.parentCommentID,
+                replies: current.replies
+            )
+        }
+
+        do {
+            if comment.isLiked {
+                try await cloudKitSync.unlikeComment(comment.id)
+            } else {
+                try await cloudKitSync.likeComment(comment.id)
+            }
+        } catch {
+            // Revert local state on error
+            updateCommentInList(comment) { current in
+                CommentItem(
+                    id: current.id,
+                    userID: current.userID,
+                    userName: current.userName,
+                    userPhoto: current.userPhoto,
+                    recipeID: current.recipeID,
+                    content: current.content,
+                    createdAt: current.createdAt,
+                    editedAt: current.editedAt,
+                    likeCount: comment.likeCount, // Revert to original
+                    isLiked: comment.isLiked, // Revert to original
+                    parentCommentID: current.parentCommentID,
+                    replies: current.replies
+                )
+            }
+            print("Failed to toggle comment like: \(error)")
+        }
+    }
+
+    func reportComment(_ comment: CommentItem, reason: String) async {
+        // CloudKit reporting system not implemented yet
+        // In a production app, this would:
+        // 1. Create a CommentReport record in CloudKit
+        // 2. Flag the comment for moderation
+        // 3. Potentially hide the comment for the reporting user
+        print("Reported comment \(comment.id) for: \(reason)")
+    }
+    
+    func deleteComment(_ comment: CommentItem) async {
+        do {
+            try await cloudKitSync.deleteComment(comment.id)
+            
+            // Remove from local state
+            if comment.parentCommentID != nil {
+                // Remove reply
+                updateCommentInList(comment) { _ in nil }
+            } else {
+                // Remove top-level comment
+                comments.removeAll { $0.id == comment.id }
+            }
+        } catch {
+            print("Failed to delete comment: \(error)")
+        }
+    }
+
+    // MARK: - CloudKit Integration Helper Methods
+    
+    private func parseCommentsFromRecords(_ records: [CKRecord]) async -> [CommentItem] {
+        var commentItems: [CommentItem] = []
+        
+        for record in records {
+            if let commentItem = await parseCommentFromRecord(record) {
+                commentItems.append(commentItem)
+            }
+        }
+        
+        return commentItems
+    }
+    
+    private func parseCommentFromRecord(_ record: CKRecord) async -> CommentItem? {
+        guard let id = record[CKField.RecipeComment.id] as? String,
+              let userID = record[CKField.RecipeComment.userID] as? String,
+              let recipeID = record[CKField.RecipeComment.recipeID] as? String,
+              let content = record[CKField.RecipeComment.content] as? String,
+              let createdAt = record[CKField.RecipeComment.createdAt] as? Date else {
+            print("⚠️ Failed to parse comment from CloudKit record: missing required fields")
+            return nil
+        }
+        
+        // Get user display name (this could be cached or fetched from User records)
+        let userName = await getUserDisplayName(for: userID) ?? "Unknown User"
+        
+        let editedAt = record[CKField.RecipeComment.editedAt] as? Date
+        let likeCount = Int(record[CKField.RecipeComment.likeCount] as? Int64 ?? 0)
+        let parentCommentID = record[CKField.RecipeComment.parentCommentID] as? String
+        
+        // Check if current user has liked this comment (not implemented yet)
+        let isLiked = false // TODO: Implement comment likes
+        
+        return CommentItem(
+            id: id,
+            userID: userID,
+            userName: userName,
+            userPhoto: nil, // TODO: Load user photos
+            recipeID: recipeID,
+            content: content,
+            createdAt: createdAt,
+            editedAt: editedAt,
+            likeCount: likeCount,
+            isLiked: isLiked,
+            parentCommentID: parentCommentID,
+            replies: []
+        )
+    }
+    
+    private func organizeCommentsWithReplies(_ commentItems: [CommentItem]) -> [CommentItem] {
+        var topLevelComments: [CommentItem] = []
+        var repliesMap: [String: [CommentItem]] = [:]
+        
+        // Separate top-level comments and replies
+        for comment in commentItems {
+            if comment.parentCommentID == nil {
+                topLevelComments.append(comment)
+            } else if let parentID = comment.parentCommentID {
+                if repliesMap[parentID] == nil {
+                    repliesMap[parentID] = []
+                }
+                repliesMap[parentID]?.append(comment)
+            }
+        }
+        
+        // Attach replies to their parent comments
+        return topLevelComments.map { comment in
+            let replies = repliesMap[comment.id] ?? []
+            return CommentItem(
                 id: comment.id,
                 userID: comment.userID,
                 userName: comment.userName,
@@ -570,82 +720,70 @@ class RecipeCommentsViewModel: ObservableObject {
                 content: comment.content,
                 createdAt: comment.createdAt,
                 editedAt: comment.editedAt,
-                likeCount: comment.isLiked ? comment.likeCount - 1 : comment.likeCount + 1,
-                isLiked: !comment.isLiked,
+                likeCount: comment.likeCount,
+                isLiked: comment.isLiked,
                 parentCommentID: comment.parentCommentID,
-                replies: comment.replies
+                replies: replies.sorted { $0.createdAt < $1.createdAt }
             )
-            comments[index] = updatedComment
+        }.sorted { $0.createdAt > $1.createdAt } // Most recent first
+    }
+    
+    private func getUserDisplayName(for userID: String) async -> String? {
+        // If it's the current user, use their display name
+        if let currentUser = cloudKitAuth.currentUser,
+           currentUser.recordID == userID {
+            return currentUser.displayName
         }
-
-        // CloudKit comment updates not implemented
+        
+        // TODO: Implement user name caching/fetching from CloudKit User records
+        // This should maintain a cache of user names to avoid repeated fetches
+        // For now, return a generic placeholder
+        return "SnapChef User"
     }
-
-    func reportComment(_ comment: CommentItem, reason: String) async {
-        // CloudKit reporting not implemented - logging locally
-        print("Reported comment \(comment.id) for: \(reason)")
-    }
-
-    private func generateMockComments() -> [CommentItem] {
-        [
-            CommentItem(
-                id: UUID().uuidString,
-                userID: "user1",
-                userName: "Julia Child",
-                userPhoto: nil,
-                recipeID: recipeID,
-                content: "This looks absolutely delicious! I love how you've presented it. The colors are so vibrant!",
-                createdAt: Date().addingTimeInterval(-3_600),
-                editedAt: nil,
-                likeCount: 15,
-                isLiked: false,
-                parentCommentID: nil,
-                replies: [
-                    CommentItem(
-                        id: UUID().uuidString,
-                        userID: "user2",
-                        userName: "Gordon Ramsay",
-                        userPhoto: nil,
-                        recipeID: recipeID,
-                        content: "Couldn't agree more! The plating is spot on.",
-                        createdAt: Date().addingTimeInterval(-1_800),
-                        editedAt: nil,
-                        likeCount: 5,
-                        isLiked: true,
-                        parentCommentID: "parent1",
-                        replies: []
+    
+    private func updateCommentInList(_ targetComment: CommentItem, transform: (CommentItem) -> CommentItem?) {
+        for i in 0..<comments.count {
+            let comment = comments[i]
+            
+            // Check if this is the target comment
+            if comment.id == targetComment.id {
+                if let updated = transform(comment) {
+                    comments[i] = updated
+                } else {
+                    comments.remove(at: i)
+                }
+                return
+            }
+            
+            // Check replies
+            for j in 0..<comment.replies.count {
+                let reply = comment.replies[j]
+                if reply.id == targetComment.id {
+                    var updatedReplies = comment.replies
+                    if let updated = transform(reply) {
+                        updatedReplies[j] = updated
+                    } else {
+                        updatedReplies.remove(at: j)
+                    }
+                    
+                    comments[i] = CommentItem(
+                        id: comment.id,
+                        userID: comment.userID,
+                        userName: comment.userName,
+                        userPhoto: comment.userPhoto,
+                        recipeID: comment.recipeID,
+                        content: comment.content,
+                        createdAt: comment.createdAt,
+                        editedAt: comment.editedAt,
+                        likeCount: comment.likeCount,
+                        isLiked: comment.isLiked,
+                        parentCommentID: comment.parentCommentID,
+                        replies: updatedReplies
                     )
-                ]
-            ),
-            CommentItem(
-                id: UUID().uuidString,
-                userID: "user3",
-                userName: "Home Cook",
-                userPhoto: nil,
-                recipeID: recipeID,
-                content: "Made this last night and my family loved it! Thanks for sharing 🙏",
-                createdAt: Date().addingTimeInterval(-7_200),
-                editedAt: nil,
-                likeCount: 8,
-                isLiked: false,
-                parentCommentID: nil,
-                replies: []
-            ),
-            CommentItem(
-                id: UUID().uuidString,
-                userID: "user4",
-                userName: "FoodieFan",
-                userPhoto: nil,
-                recipeID: recipeID,
-                content: "What temperature did you cook this at? Looks perfect!",
-                createdAt: Date().addingTimeInterval(-10_800),
-                editedAt: Date().addingTimeInterval(-9_000),
-                likeCount: 2,
-                isLiked: false,
-                parentCommentID: nil,
-                replies: []
-            )
-        ]
+                    return
+                }
+            }
+        }
     }
 }
 

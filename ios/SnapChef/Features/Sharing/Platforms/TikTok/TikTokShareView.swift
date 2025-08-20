@@ -308,6 +308,53 @@ struct TikTokShareView: View {
         )
     }
 
+    // MARK: - Activity Creation
+    private func createTikTokShareActivity() async {
+        guard CloudKitAuthManager.shared.isAuthenticated,
+              let userID = CloudKitAuthManager.shared.currentUser?.recordID,
+              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+            return
+        }
+        
+        var activityType = "tiktokVideoShared"
+        var metadata: [String: Any] = ["platform": "tiktok", "hashtags": selectedHashtags]
+        
+        // Add content-specific metadata
+        switch content.type {
+        case .recipe(let recipe):
+            activityType = "recipeTikTokVideoShared"
+            metadata["recipeId"] = recipe.id.uuidString
+            metadata["recipeName"] = recipe.name
+        case .achievement(let achievementName):
+            activityType = "achievementTikTokVideoShared"
+            metadata["achievementName"] = achievementName
+        case .challenge(let challenge):
+            activityType = "challengeTikTokVideoShared"
+            metadata["challengeId"] = challenge.id
+            metadata["challengeName"] = challenge.title
+        case .profile:
+            activityType = "profileTikTokVideoShared"
+        case .teamInvite(let teamName, let joinCode):
+            activityType = "teamInviteTikTokVideoShared"
+            metadata["teamName"] = teamName
+            metadata["joinCode"] = joinCode
+        }
+        
+        do {
+            try await CloudKitSyncService.shared.createActivity(
+                type: activityType,
+                actorID: userID,
+                actorName: userName,
+                recipeID: metadata["recipeId"] as? String,
+                recipeName: metadata["recipeName"] as? String,
+                challengeID: metadata["challengeId"] as? String,
+                challengeName: metadata["challengeName"] as? String
+            )
+        } catch {
+            print("Failed to create TikTok share activity: \(error)")
+        }
+    }
+    
     /// Generate smart hashtag selection based on recipe and current trends
     private func generateSmartHashtags() -> [String] {
         guard case .recipe(let recipe) = content.type else {
@@ -724,6 +771,11 @@ struct TikTokShareView: View {
             case .success:
                 // Success - TikTok app should now be open
                 self.isGenerating = false
+                
+                // Create activity for successful TikTok share
+                Task {
+                    await createTikTokShareActivity()
+                }
 
                 // Auto-dismiss both TikTokShareView and parent share view
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

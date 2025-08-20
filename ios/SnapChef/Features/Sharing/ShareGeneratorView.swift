@@ -154,16 +154,15 @@ struct ShareGeneratorView: View {
                         }
 
                         // Auto-navigate to share sheet after generation
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        Task { @MainActor in
+                            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                             shareSheet = true
 
                             // Award coins for sharing
                             ChefCoinsManager.shared.awardSocialCoins(action: .share)
 
                             // Track social share streak
-                            Task {
-                                await StreakManager.shared.recordActivity(for: .socialShare)
-                            }
+                            await StreakManager.shared.recordActivity(for: .socialShare)
 
                             // Post notification for recipe sharing
                             NotificationCenter.default.post(
@@ -172,6 +171,22 @@ struct ShareGeneratorView: View {
                                 userInfo: ["recipeId": recipe.id]
                             )
 
+                            // Create activity for recipe sharing
+                            if let userID = CloudKitAuthManager.shared.currentUser?.recordID,
+                               let userName = CloudKitAuthManager.shared.currentUser?.displayName {
+                                do {
+                                    try await CloudKitSyncService.shared.createActivity(
+                                        type: "recipeShared",
+                                        actorID: userID,
+                                        actorName: userName,
+                                        recipeID: recipe.id.uuidString,
+                                        recipeName: recipe.name
+                                    )
+                                } catch {
+                                    print("Failed to create recipe share activity: \(error)")
+                                }
+                            }
+                            
                             // Track social challenge progress
                             ChallengeProgressTracker.shared.trackAction(.recipeShared, metadata: [
                                 "recipeId": recipe.id,

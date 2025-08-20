@@ -468,6 +468,55 @@ final class CloudKitSyncService: ObservableObject {
         }
     }
 
+    // MARK: - Comment Like Methods
+    
+    func likeComment(_ commentID: String) async throws {
+        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
+            throw CloudKitAuthError.notAuthenticated
+        }
+
+        // Check if already liked
+        let isLiked = try await isCommentLiked(commentID)
+        if isLiked {
+            return // Already liked
+        }
+
+        // Create like record (using a CommentLike record type - would need to be added to schema)
+        // For now, just update the comment's like count directly
+        await updateCommentLikeCount(commentID, increment: true)
+    }
+
+    func unlikeComment(_ commentID: String) async throws {
+        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
+            throw CloudKitAuthError.notAuthenticated
+        }
+
+        // Remove like and update count
+        await updateCommentLikeCount(commentID, increment: false)
+    }
+
+    func isCommentLiked(_ commentID: String) async throws -> Bool {
+        // TODO: Implement comment like tracking
+        // This would require a CommentLike record type similar to RecipeLike
+        return false
+    }
+
+    private func updateCommentLikeCount(_ commentID: String, increment: Bool) async {
+        do {
+            let recordID = CKRecord.ID(recordName: commentID)
+            let record = try await publicDatabase.record(for: recordID)
+            
+            let currentCount = record[CKField.RecipeComment.likeCount] as? Int64 ?? 0
+            let newCount = increment ? currentCount + 1 : max(0, currentCount - 1)
+            record[CKField.RecipeComment.likeCount] = newCount
+            
+            try await publicDatabase.save(record)
+            print("✅ Comment \(commentID) like count \(increment ? "incremented" : "decremented") to \(newCount)")
+        } catch {
+            print("❌ Failed to update comment like count for \(commentID): \(error)")
+        }
+    }
+
     // MARK: - iCloud Status
     private func checkiCloudStatus() {
         container.accountStatus { [weak self] status, _ in
@@ -779,6 +828,179 @@ final class CloudKitSyncService: ObservableObject {
         }
 
         print("✅ Updated leaderboard entry")
+    }
+    
+    // MARK: - Social Recipe Feed Methods
+    
+    func fetchSocialRecipeFeed(lastDate: Date? = nil, limit: Int = 20) async throws -> [SocialRecipeCard] {
+        guard let currentUser = CloudKitAuthManager.shared.currentUser,
+              let currentUserID = currentUser.recordID else {
+            throw CloudKitAuthError.notAuthenticated
+        }
+        
+        // Step 1: Get list of users that the current user follows
+        let followingUserIDs = try await getFollowingUserIDs(for: currentUserID)
+        
+        if followingUserIDs.isEmpty {
+            print("ℹ️ User is not following anyone, returning empty feed")
+            return []
+        }
+        
+        // Step 2: Fetch recipes from those users
+        var predicate: NSPredicate
+        
+        if followingUserIDs.count == 1 {
+            // Single user predicate
+            predicate = NSPredicate(format: "%K == %@ AND %K == %d",
+                                  CKField.Recipe.ownerID, followingUserIDs[0],
+                                  CKField.Recipe.isPublic, 1)
+        } else {
+            // Multiple users predicate  
+            predicate = NSPredicate(format: "%K IN %@ AND %K == %d",
+                                  CKField.Recipe.ownerID, followingUserIDs,
+                                  CKField.Recipe.isPublic, 1)
+        }
+        
+        // Add date filter for pagination
+        if let lastDate = lastDate {
+            let datePredicate = NSPredicate(format: "%K < %@", CKField.Recipe.createdAt, lastDate as NSDate)
+            predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [predicate, datePredicate])
+        }
+        
+        let query = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.Recipe.createdAt, ascending: false)]
+        
+        let operation = CKQueryOperation(query: query)
+        operation.resultsLimit = limit
+        
+        var recipeRecords: [CKRecord] = []
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            operation.recordMatchedBlock = { _, result in
+                if case .success(let record) = result {
+                    recipeRecords.append(record)
+                }
+            }
+            
+            operation.queryResultBlock = { result in
+                Task {
+                    switch result {
+                    case .success:
+                        // Step 3: Get user details for each recipe's owner
+                        let socialRecipes = await self.mapRecordsToSocialRecipeCards(recipeRecords)
+                        continuation.resume(returning: socialRecipes)
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+            
+            publicDatabase.add(operation)
+        }
+    }
+    
+    private func getFollowingUserIDs(for userID: String) async throws -> [String] {
+        let predicate = NSPredicate(format: "%K == %@ AND %K == %d",
+                                  CKField.Follow.followerID, userID,
+                                  CKField.Follow.isActive, 1)
+        
+        let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
+        
+        let results = try await publicDatabase.records(matching: query)
+        
+        var followingIDs: [String] = []
+        for (_, result) in results.matchResults {
+            if case .success(let record) = result {
+                if let followingID = record[CKField.Follow.followingID] as? String {
+                    followingIDs.append(followingID)
+                }
+            }
+        }
+        
+        print("✅ Found \(followingIDs.count) users that current user follows")
+        return followingIDs
+    }
+    
+    private func mapRecordsToSocialRecipeCards(_ records: [CKRecord]) async -> [SocialRecipeCard] {
+        var socialRecipes: [SocialRecipeCard] = []
+        
+        // Cache for user details to avoid duplicate queries
+        var userCache: [String: CloudKitUser] = [:]
+        
+        for record in records {
+            guard let ownerID = record[CKField.Recipe.ownerID] as? String else {
+                continue
+            }
+            
+            // Get user details (use cache if available)
+            var creatorInfo: CloudKitUser
+            if let cachedUser = userCache[ownerID] {
+                creatorInfo = cachedUser
+            } else {
+                do {
+                    let userRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: ownerID))
+                    creatorInfo = CloudKitUser(from: userRecord)
+                    userCache[ownerID] = creatorInfo
+                } catch {
+                    print("❌ Failed to fetch user details for \(ownerID): \(error)")
+                    // Create a minimal CloudKit record and parse it
+                    let minimalRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: CKRecord.ID(recordName: ownerID))
+                    minimalRecord[CKField.User.displayName] = "Unknown Chef"
+                    minimalRecord[CKField.User.email] = ""
+                    minimalRecord[CKField.User.authProvider] = "unknown"
+                    minimalRecord[CKField.User.totalPoints] = Int64(0)
+                    minimalRecord[CKField.User.currentStreak] = Int64(0)
+                    minimalRecord[CKField.User.longestStreak] = Int64(0)
+                    minimalRecord[CKField.User.challengesCompleted] = Int64(0)
+                    minimalRecord[CKField.User.recipesShared] = Int64(0)
+                    minimalRecord[CKField.User.recipesCreated] = Int64(0)
+                    minimalRecord[CKField.User.coinBalance] = Int64(0)
+                    minimalRecord[CKField.User.followerCount] = Int64(0)
+                    minimalRecord[CKField.User.followingCount] = Int64(0)
+                    minimalRecord[CKField.User.isVerified] = Int64(0)
+                    minimalRecord[CKField.User.isProfilePublic] = Int64(1)
+                    minimalRecord[CKField.User.showOnLeaderboard] = Int64(0)
+                    minimalRecord[CKField.User.subscriptionTier] = "free"
+                    minimalRecord[CKField.User.createdAt] = Date()
+                    minimalRecord[CKField.User.lastLoginAt] = Date()
+                    minimalRecord[CKField.User.lastActiveAt] = Date()
+                    
+                    creatorInfo = CloudKitUser(from: minimalRecord)
+                }
+            }
+            
+            // Create SocialRecipeCard
+            var socialRecipe = SocialRecipeCard(from: record, creatorInfo: creatorInfo)
+            
+            // Check if current user liked this recipe
+            do {
+                let isLiked = try await isRecipeLiked(socialRecipe.id)
+                socialRecipe = SocialRecipeCard(
+                    id: socialRecipe.id,
+                    title: socialRecipe.title,
+                    description: socialRecipe.description,
+                    imageURL: socialRecipe.imageURL,
+                    createdAt: socialRecipe.createdAt,
+                    likeCount: socialRecipe.likeCount,
+                    commentCount: socialRecipe.commentCount,
+                    viewCount: socialRecipe.viewCount,
+                    difficulty: socialRecipe.difficulty,
+                    cookingTime: socialRecipe.cookingTime,
+                    isLiked: isLiked,
+                    creatorID: socialRecipe.creatorID,
+                    creatorName: socialRecipe.creatorName,
+                    creatorImageURL: socialRecipe.creatorImageURL,
+                    creatorIsVerified: socialRecipe.creatorIsVerified
+                )
+            } catch {
+                print("❌ Failed to check like status for recipe \(socialRecipe.id): \(error)")
+            }
+            
+            socialRecipes.append(socialRecipe)
+        }
+        
+        print("✅ Mapped \(socialRecipes.count) records to SocialRecipeCard objects")
+        return socialRecipes
     }
 }
 

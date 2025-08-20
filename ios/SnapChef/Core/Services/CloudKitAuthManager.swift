@@ -228,6 +228,15 @@ final class CloudKitAuthManager: ObservableObject {
         
         _ = try await database.save(followRecord)
         
+        // Create activity for the followed user
+        let userName = currentUser.displayName
+        try await CloudKitSyncService.shared.createActivity(
+            type: "follow",
+            actorID: currentUserID,
+            actorName: userName,
+            targetUserID: userID
+        )
+        
         // Update local follower count
         await MainActor.run {
             var updatedUser = currentUser
@@ -265,6 +274,15 @@ final class CloudKitAuthManager: ObservableObject {
                     print("Error processing follow record: \(error)")
                 }
             }
+            
+            // Create activity for the unfollowed user
+            let userName = currentUser.displayName
+            try await CloudKitSyncService.shared.createActivity(
+                type: "unfollow",
+                actorID: currentUserID,
+                actorName: userName,
+                targetUserID: userID
+            )
             
             // Update local follower count
             await MainActor.run {
@@ -330,6 +348,28 @@ final class CloudKitAuthManager: ObservableObject {
                                   CKField.User.isProfilePublic, 1)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+        
+        do {
+            let results = try await database.records(matching: query)
+            let users = results.matchResults.compactMap { result in
+                switch result.1 {
+                case .success(let record):
+                    return CloudKitUser(from: record)
+                case .failure:
+                    return nil
+                }
+            }
+            return Array(users.prefix(limit))
+        } catch {
+            throw CloudKitAuthError.networkError
+        }
+    }
+    
+    /// Get new users (recently joined) for discovery
+    func getNewUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
+        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.User.createdAt, ascending: false)]
         
         do {
             let results = try await database.records(matching: query)

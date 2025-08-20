@@ -157,6 +157,14 @@ struct ActivityFeedView: View {
                                         .onTapGesture {
                                             handleActivityTap(activity)
                                         }
+                                        .onAppear {
+                                            // Mark activity as read when it appears on screen
+                                            if !activity.isRead {
+                                                Task {
+                                                    await feedManager.markActivityAsRead(activity.id)
+                                                }
+                                            }
+                                        }
                                 }
 
                                 if feedManager.hasMore {
@@ -369,10 +377,14 @@ class ActivityFeedManager: ObservableObject {
         activities = []
         lastFetchedRecord = nil
 
-        // For now, load mock data
-        // CloudKit activity data integration not implemented - using mock data
-        activities = generateMockActivities()
-        hasMore = false
+        do {
+            await fetchActivitiesFromCloudKit()
+        } catch {
+            print("❌ Failed to fetch activities from CloudKit: \(error)")
+            // Fallback to mock data on error
+            activities = generateMockActivities()
+            hasMore = false
+        }
 
         isLoading = false
     }
@@ -382,13 +394,176 @@ class ActivityFeedManager: ObservableObject {
 
         isLoading = true
 
-        // CloudKit pagination not implemented - using mock data for demo
+        do {
+            await fetchActivitiesFromCloudKit(loadMore: true)
+        } catch {
+            print("❌ Failed to load more activities: \(error)")
+            hasMore = false
+        }
 
         isLoading = false
     }
 
     func refresh() async {
         await loadInitialActivities()
+    }
+
+    func markActivityAsRead(_ activityID: String) async {
+        // Mark activity as read in CloudKit
+        do {
+            try await cloudKitSync.markActivityAsRead(activityID)
+            
+            // Update local activity state
+            if let index = activities.firstIndex(where: { $0.id == activityID }) {
+                let updatedActivity = activities[index]
+                // Create a new ActivityItem with isRead = true
+                let readActivity = ActivityItem(
+                    id: updatedActivity.id,
+                    type: updatedActivity.type,
+                    userID: updatedActivity.userID,
+                    userName: updatedActivity.userName,
+                    userPhoto: updatedActivity.userPhoto,
+                    targetUserID: updatedActivity.targetUserID,
+                    targetUserName: updatedActivity.targetUserName,
+                    recipeID: updatedActivity.recipeID,
+                    recipeName: updatedActivity.recipeName,
+                    recipeImage: updatedActivity.recipeImage,
+                    timestamp: updatedActivity.timestamp,
+                    isRead: true
+                )
+                activities[index] = readActivity
+            }
+        } catch {
+            print("❌ Failed to mark activity as read: \(error)")
+        }
+    }
+
+    private func fetchActivitiesFromCloudKit(loadMore: Bool = false) async {
+        guard let currentUser = CloudKitAuthManager.shared.currentUser,
+              let userID = currentUser.recordID else {
+            print("❌ No authenticated user for activity feed")
+            activities = generateMockActivities()
+            hasMore = false
+            return
+        }
+
+        do {
+            // Fetch activities where current user is the target (activities for them)
+            let targetActivities = try await cloudKitSync.fetchActivityFeed(for: userID, limit: 25)
+            
+            // Fetch activities from users they follow
+            // Note: This is a simplified implementation. In a real app, you'd:
+            // 1. First query Follow records to get followingIDs for current user
+            // 2. Then query Activity records where actorID is in followingIDs
+            // For now, we'll fetch recent public activities as a demonstration
+            let publicActivities = try await fetchRecentPublicActivities(limit: 25)
+            
+            // Combine and sort activities by timestamp
+            let allActivityRecords = targetActivities + publicActivities
+            let sortedRecords = allActivityRecords.sorted { record1, record2 in
+                let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+                let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+                return date1 > date2
+            }
+            
+            // Take only the most recent 50 activities to avoid duplicates
+            let limitedRecords = Array(sortedRecords.prefix(50))
+            
+            let newActivities = limitedRecords.compactMap { record in
+                mapCloudKitRecordToActivityItem(record)
+            }
+
+            if loadMore {
+                activities.append(contentsOf: newActivities)
+            } else {
+                activities = newActivities
+            }
+
+            // Check if there are more activities to load
+            hasMore = newActivities.count >= 50
+
+            print("✅ Loaded \(newActivities.count) activities from CloudKit (target: \(targetActivities.count), public: \(publicActivities.count))")
+        } catch {
+            print("❌ CloudKit activity fetch error: \(error)")
+            // Don't throw here - just fallback to existing behavior
+            hasMore = false
+        }
+    }
+
+    private func fetchRecentPublicActivities(limit: Int) async throws -> [CKRecord] {
+        // Create a predicate for recent public activities (last 7 days)
+        let sevenDaysAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+        let predicate = NSPredicate(format: "%K >= %@", CKField.Activity.timestamp, sevenDaysAgo as NSDate)
+        
+        let query = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.Activity.timestamp, ascending: false)]
+
+        var activities: [CKRecord] = []
+
+        // Use a direct query to fetch recent public activities
+        let results = try await CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase.records(matching: query)
+        
+        var count = 0
+        for (_, result) in results.matchResults {
+            if case .success(let record) = result, count < limit {
+                activities.append(record)
+                count += 1
+            }
+        }
+        
+        return activities
+    }
+
+    private func mapCloudKitRecordToActivityItem(_ record: CKRecord) -> ActivityItem? {
+        guard let id = record[CKField.Activity.id] as? String,
+              let typeString = record[CKField.Activity.type] as? String,
+              let actorID = record[CKField.Activity.actorID] as? String,
+              let actorName = record[CKField.Activity.actorName] as? String,
+              let timestamp = record[CKField.Activity.timestamp] as? Date else {
+            print("❌ Invalid activity record structure")
+            return nil
+        }
+
+        // Map activity type string to enum
+        let activityType: ActivityItem.ActivityType
+        switch typeString.lowercased() {
+        case "follow":
+            activityType = .follow
+        case "recipeshared":
+            activityType = .recipeShared
+        case "recipeliked":
+            activityType = .recipeLiked
+        case "recipecomment":
+            activityType = .recipeComment
+        case "challengecompleted":
+            activityType = .challengeCompleted
+        case "badgeearned":
+            activityType = .badgeEarned
+        default:
+            activityType = .recipeShared
+        }
+
+        // Extract optional fields
+        let targetUserID = record[CKField.Activity.targetUserID] as? String
+        let targetUserName = record[CKField.Activity.targetUserName] as? String
+        let recipeID = record[CKField.Activity.recipeID] as? String
+        let recipeName = record[CKField.Activity.recipeName] as? String
+        let isReadInt = record[CKField.Activity.isRead] as? Int64 ?? 0
+
+        return ActivityItem(
+            id: id,
+            type: activityType,
+            userID: actorID,
+            userName: actorName,
+            userPhoto: nil, // TODO: Implement user photo loading
+            targetUserID: targetUserID,
+            targetUserName: targetUserName,
+            recipeID: recipeID,
+            recipeName: recipeName,
+            recipeImage: nil, // TODO: Implement recipe image loading
+            timestamp: timestamp,
+            isRead: isReadInt == 1
+        )
     }
 
     private func generateMockActivities() -> [ActivityItem] {

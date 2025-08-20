@@ -170,6 +170,10 @@ struct BrandedSharePopup: View {
                 // Direct copy to clipboard
                 Task {
                     await shareService.share(to: platform)
+                    
+                    // Create activity for content sharing via copy
+                    await createShareActivity(platform: platform)
+                    
                     dismiss()
                 }
 
@@ -177,6 +181,9 @@ struct BrandedSharePopup: View {
                 // Show system share sheet
                 Task {
                     await shareService.share(to: platform)
+                    
+                    // Create activity for content sharing
+                    await createShareActivity(platform: platform)
                 }
             }
         } else {
@@ -218,6 +225,53 @@ struct BrandedSharePopup: View {
             MessagesShareView(content: content)
         default:
             EmptyView()
+        }
+    }
+    
+    // MARK: - Activity Creation
+    private func createShareActivity(platform: SharePlatformType) async {
+        guard CloudKitAuthManager.shared.isAuthenticated,
+              let userID = CloudKitAuthManager.shared.currentUser?.recordID,
+              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+            return
+        }
+        
+        var activityType = "contentShared"
+        var metadata: [String: Any] = ["platform": platform.rawValue]
+        
+        // Determine content type and add specific metadata
+        switch content.type {
+        case .recipe(let recipe):
+            activityType = "recipeShared"
+            metadata["recipeId"] = recipe.id.uuidString
+            metadata["recipeName"] = recipe.name
+        case .achievement(let achievementName):
+            activityType = "achievementShared"
+            metadata["achievementName"] = achievementName
+        case .challenge(let challenge):
+            activityType = "challengeShared"
+            metadata["challengeId"] = challenge.id
+            metadata["challengeName"] = challenge.title
+        case .profile:
+            activityType = "profileShared"
+        case .teamInvite(let teamName, let joinCode):
+            activityType = "teamInviteShared"
+            metadata["teamName"] = teamName
+            metadata["joinCode"] = joinCode
+        }
+        
+        do {
+            try await CloudKitSyncService.shared.createActivity(
+                type: activityType,
+                actorID: userID,
+                actorName: userName,
+                recipeID: metadata["recipeId"] as? String,
+                recipeName: metadata["recipeName"] as? String,
+                challengeID: metadata["challengeId"] as? String,
+                challengeName: metadata["challengeName"] as? String
+            )
+        } catch {
+            print("Failed to create share activity: \(error)")
         }
     }
 }

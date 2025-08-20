@@ -121,7 +121,7 @@ class ChallengeProgressTracker: ObservableObject {
             "protein": recipe.nutrition.protein,
             "cuisine": recipe.tags.first ?? "",
             "ingredientCount": recipe.ingredients.count,
-            "prepTime": recipe.prepTime ?? 0
+            "prepTime": recipe.prepTime
         ])
 
         // Update recipe count for relevant challenges
@@ -417,8 +417,25 @@ class ChallengeProgressTracker: ObservableObject {
         // Complete the challenge
         gamificationManager.completeChallengeWithPersistence(challenge, score: score)
 
-        // Track challenge completion streak
+        // Create activity for challenge completion
         Task {
+            if CloudKitAuthManager.shared.isAuthenticated,
+               let userID = CloudKitAuthManager.shared.currentUser?.recordID,
+               let userName = CloudKitAuthManager.shared.currentUser?.displayName {
+                do {
+                    try await CloudKitSyncService.shared.createActivity(
+                        type: "challengeCompleted",
+                        actorID: userID,
+                        actorName: userName,
+                        challengeID: challenge.id,
+                        challengeName: challenge.title
+                    )
+                } catch {
+                    print("Failed to create challenge completion activity: \(error)")
+                }
+            }
+            
+            // Track challenge completion streak
             await StreakManager.shared.recordActivity(for: .challengeCompletion)
         }
 

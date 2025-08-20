@@ -1,22 +1,23 @@
 import SwiftUI
+import CloudKit
 
 struct FeedView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
     @State private var showingDiscoverUsers = false
-    @State private var selectedFilter: ActivityFilter = .all
+    @State private var selectedTab: FeedTab = .activity
     @State private var isRefreshing = false
 
-    enum ActivityFilter: String, CaseIterable {
-        case all = "All"
+    enum FeedTab: String, CaseIterable {
+        case activity = "Activity"
         case following = "Following"
-        case mentions = "Mentions"
+        case discover = "Discover"
 
         var icon: String {
             switch self {
-            case .all: return "square.grid.2x2"
+            case .activity: return "bell"
             case .following: return "person.2"
-            case .mentions: return "at"
+            case .discover: return "sparkles"
             }
         }
     }
@@ -28,20 +29,21 @@ struct FeedView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Social Stats Header
-                    socialStatsHeader
+                    // Social Stats Header (only show for Activity tab)
+                    if selectedTab == .activity {
+                        socialStatsHeader
+                            .padding(.horizontal, 20)
+                            .padding(.top, 10)
+                            .padding(.bottom, 16)
+                    }
+
+                    // Tab Selector
+                    tabSelector
                         .padding(.horizontal, 20)
-                        .padding(.top, 10)
                         .padding(.bottom, 16)
 
-                    // Filter Pills
-                    filterPills
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 16)
-
-                    // Activity Feed Content
-                    ActivityFeedView()
-                        .environmentObject(appState)
+                    // Tab Content
+                    tabContent
                 }
             }
             .navigationTitle("Feed")
@@ -196,35 +198,51 @@ struct FeedView: View {
         }
     }
 
-    private var filterPills: some View {
+    private var tabSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach(ActivityFilter.allCases, id: \.self) { filter in
-                    filterPill(filter)
+                ForEach(FeedTab.allCases, id: \.self) { tab in
+                    tabPill(tab)
                 }
             }
+            .padding(.horizontal, 20)
         }
     }
 
-    private func filterPill(_ filter: ActivityFilter) -> some View {
+    private func tabPill(_ tab: FeedTab) -> some View {
         Button(action: {
             withAnimation(.spring(response: 0.3)) {
-                selectedFilter = filter
+                selectedTab = tab
             }
         }) {
             HStack(spacing: 6) {
-                Image(systemName: filter.icon)
+                Image(systemName: tab.icon)
                     .font(.system(size: 14, weight: .semibold))
-                Text(filter.rawValue)
+                Text(tab.rawValue)
                     .font(.system(size: 14, weight: .semibold))
             }
-            .foregroundColor(selectedFilter == filter ? .white : .white.opacity(0.7))
+            .foregroundColor(selectedTab == tab ? .white : .white.opacity(0.7))
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(selectedFilter == filter ? Color(hex: "#667eea") : Color.white.opacity(0.1))
+                    .fill(selectedTab == tab ? Color(hex: "#667eea") : Color.white.opacity(0.1))
             )
+        }
+    }
+    
+    @ViewBuilder
+    private var tabContent: some View {
+        switch selectedTab {
+        case .activity:
+            ActivityFeedView()
+                .environmentObject(appState)
+        case .following:
+            SocialRecipeFeedView()
+                .environmentObject(appState)
+        case .discover:
+            DiscoverUsersView()
+                .environmentObject(appState)
         }
     }
 }

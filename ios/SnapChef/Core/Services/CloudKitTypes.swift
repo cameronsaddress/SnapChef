@@ -33,15 +33,15 @@ struct CloudKitUser {
         self.email = record[CKField.User.email] as? String ?? ""
         self.profileImageURL = record[CKField.User.profileImageURL] as? String
         self.authProvider = record[CKField.User.authProvider] as? String ?? "unknown"
-        self.totalPoints = record[CKField.User.totalPoints] as? Int ?? 0
-        self.currentStreak = record[CKField.User.currentStreak] as? Int ?? 0
-        self.longestStreak = record[CKField.User.longestStreak] as? Int ?? 0
-        self.challengesCompleted = record[CKField.User.challengesCompleted] as? Int ?? 0
-        self.recipesShared = record[CKField.User.recipesShared] as? Int ?? 0
-        self.recipesCreated = record[CKField.User.recipesCreated] as? Int ?? 0
-        self.coinBalance = record[CKField.User.coinBalance] as? Int ?? 0
-        self.followerCount = record[CKField.User.followerCount] as? Int ?? 0
-        self.followingCount = record[CKField.User.followingCount] as? Int ?? 0
+        self.totalPoints = Int(record[CKField.User.totalPoints] as? Int64 ?? 0)
+        self.currentStreak = Int(record[CKField.User.currentStreak] as? Int64 ?? 0)
+        self.longestStreak = Int(record[CKField.User.longestStreak] as? Int64 ?? 0)
+        self.challengesCompleted = Int(record[CKField.User.challengesCompleted] as? Int64 ?? 0)
+        self.recipesShared = Int(record[CKField.User.recipesShared] as? Int64 ?? 0)
+        self.recipesCreated = Int(record[CKField.User.recipesCreated] as? Int64 ?? 0)
+        self.coinBalance = Int(record[CKField.User.coinBalance] as? Int64 ?? 0)
+        self.followerCount = Int(record[CKField.User.followerCount] as? Int64 ?? 0)
+        self.followingCount = Int(record[CKField.User.followingCount] as? Int64 ?? 0)
         self.isVerified = (record[CKField.User.isVerified] as? Int64 ?? 0) == 1
         self.isProfilePublic = (record[CKField.User.isProfilePublic] as? Int64 ?? 1) == 1
         self.showOnLeaderboard = (record[CKField.User.showOnLeaderboard] as? Int64 ?? 1) == 1

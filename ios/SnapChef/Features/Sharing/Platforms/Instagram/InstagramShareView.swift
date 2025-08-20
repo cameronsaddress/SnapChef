@@ -430,6 +430,16 @@ struct InstagramShareView: View {
                         }
                     }
                 }
+                // Create activity for successful Instagram share
+                Task {
+                    await createInstagramShareActivity(isStory: true)
+                }
+                
+                // Create activity for successful Instagram share
+                Task {
+                    await createInstagramShareActivity(isStory: false)
+                }
+                
                 self.dismiss()
             } else {
                 self.errorMessage = error ?? "Failed to save image"
@@ -456,6 +466,53 @@ struct InstagramShareView: View {
         }
 
         return normalizedImage
+    }
+    
+    // MARK: - Activity Creation
+    private func createInstagramShareActivity(isStory: Bool) async {
+        guard CloudKitAuthManager.shared.isAuthenticated,
+              let userID = CloudKitAuthManager.shared.currentUser?.recordID,
+              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+            return
+        }
+        
+        var activityType = isStory ? "instagramStoryShared" : "instagramFeedShared"
+        var metadata: [String: Any] = ["platform": "instagram", "isStory": isStory]
+        
+        // Add content-specific metadata
+        switch content.type {
+        case .recipe(let recipe):
+            activityType = isStory ? "recipeInstagramStoryShared" : "recipeInstagramFeedShared"
+            metadata["recipeId"] = recipe.id.uuidString
+            metadata["recipeName"] = recipe.name
+        case .achievement(let achievementName):
+            activityType = isStory ? "achievementInstagramStoryShared" : "achievementInstagramFeedShared"
+            metadata["achievementName"] = achievementName
+        case .challenge(let challenge):
+            activityType = isStory ? "challengeInstagramStoryShared" : "challengeInstagramFeedShared"
+            metadata["challengeId"] = challenge.id
+            metadata["challengeName"] = challenge.title
+        case .profile:
+            activityType = isStory ? "profileInstagramStoryShared" : "profileInstagramFeedShared"
+        case .teamInvite(let teamName, let joinCode):
+            activityType = isStory ? "teamInviteInstagramStoryShared" : "teamInviteInstagramFeedShared"
+            metadata["teamName"] = teamName
+            metadata["joinCode"] = joinCode
+        }
+        
+        do {
+            try await CloudKitSyncService.shared.createActivity(
+                type: activityType,
+                actorID: userID,
+                actorName: userName,
+                recipeID: metadata["recipeId"] as? String,
+                recipeName: metadata["recipeName"] as? String,
+                challengeID: metadata["challengeId"] as? String,
+                challengeName: metadata["challengeName"] as? String
+            )
+        } catch {
+            print("Failed to create Instagram share activity: \(error)")
+        }
     }
 }
 

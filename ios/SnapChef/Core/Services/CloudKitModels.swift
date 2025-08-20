@@ -1,6 +1,69 @@
 import Foundation
 import CloudKit
 
+// MARK: - Social Recipe Card Data Model
+struct SocialRecipeCard: Identifiable {
+    let id: String
+    let title: String
+    let description: String
+    let imageURL: String?
+    let createdAt: Date
+    let likeCount: Int
+    let commentCount: Int
+    let viewCount: Int
+    let difficulty: String
+    let cookingTime: Int
+    let isLiked: Bool
+    
+    // Creator info
+    let creatorID: String
+    let creatorName: String
+    let creatorImageURL: String?
+    let creatorIsVerified: Bool
+    
+    init(from record: CKRecord, creatorInfo: CloudKitUser) {
+        self.id = record.recordID.recordName
+        self.title = record[CKField.Recipe.title] as? String ?? "Untitled Recipe"
+        self.description = record[CKField.Recipe.description] as? String ?? ""
+        self.imageURL = record[CKField.Recipe.imageURL] as? String
+        self.createdAt = record[CKField.Recipe.createdAt] as? Date ?? Date()
+        self.likeCount = Int(record[CKField.Recipe.likeCount] as? Int64 ?? 0)
+        self.commentCount = Int(record[CKField.Recipe.commentCount] as? Int64 ?? 0)
+        self.viewCount = Int(record[CKField.Recipe.viewCount] as? Int64 ?? 0)
+        self.difficulty = record[CKField.Recipe.difficulty] as? String ?? "medium"
+        self.cookingTime = Int(record[CKField.Recipe.cookingTime] as? Int64 ?? 30)
+        self.isLiked = false // Will be updated after checking like status
+        
+        self.creatorID = creatorInfo.recordID ?? ""
+        self.creatorName = creatorInfo.displayName
+        self.creatorImageURL = creatorInfo.profileImageURL
+        self.creatorIsVerified = creatorInfo.isVerified
+    }
+    
+    // Additional initializer for updating like status
+    init(id: String, title: String, description: String, imageURL: String?, 
+         createdAt: Date, likeCount: Int, commentCount: Int, viewCount: Int,
+         difficulty: String, cookingTime: Int, isLiked: Bool,
+         creatorID: String, creatorName: String, creatorImageURL: String?,
+         creatorIsVerified: Bool) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.imageURL = imageURL
+        self.createdAt = createdAt
+        self.likeCount = likeCount
+        self.commentCount = commentCount
+        self.viewCount = viewCount
+        self.difficulty = difficulty
+        self.cookingTime = cookingTime
+        self.isLiked = isLiked
+        self.creatorID = creatorID
+        self.creatorName = creatorName
+        self.creatorImageURL = creatorImageURL
+        self.creatorIsVerified = creatorIsVerified
+    }
+}
+
 // MARK: - Social Models
 struct FollowRelation {
     let followerID: String

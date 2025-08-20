@@ -182,8 +182,25 @@ struct RecipeResultsView: View {
         appState.saveRecipeWithPhotos(recipe, beforePhoto: capturedImage, afterPhoto: nil)
         savedRecipeIds.insert(recipe.id)
         
-        // Track streak activities
+        // Create activity for recipe save if user is authenticated
         Task {
+            if CloudKitAuthManager.shared.isAuthenticated,
+               let userID = CloudKitAuthManager.shared.currentUser?.recordID,
+               let userName = CloudKitAuthManager.shared.currentUser?.displayName {
+                do {
+                    try await CloudKitSyncService.shared.createActivity(
+                        type: "recipeSaved",
+                        actorID: userID,
+                        actorName: userName,
+                        recipeID: recipe.id.uuidString,
+                        recipeName: recipe.name
+                    )
+                } catch {
+                    print("Failed to create recipe save activity: \(error)")
+                }
+            }
+            
+            // Track streak activities
             await StreakManager.shared.recordActivity(for: .recipeCreation)
             
             // Check if recipe is healthy (under 500 calories)

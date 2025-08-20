@@ -388,6 +388,11 @@ struct XShareView: View {
                         UIApplication.shared.open(webUrl)
                     }
                 }
+                
+                // Create activity for X share (regardless of success since user intent is there)
+                Task {
+                    await createXShareActivity()
+                }
             }
         }
     }
@@ -426,6 +431,53 @@ struct XShareView: View {
 
         @unknown default:
             print("Unknown photo library authorization status")
+        }
+    }
+    
+    // MARK: - Activity Creation
+    private func createXShareActivity() async {
+        guard CloudKitAuthManager.shared.isAuthenticated,
+              let userID = CloudKitAuthManager.shared.currentUser?.recordID,
+              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+            return
+        }
+        
+        var activityType = "xPostShared"
+        var metadata: [String: Any] = ["platform": "x", "includedHashtags": Array(selectedHashtags)]
+        
+        // Add content-specific metadata
+        switch content.type {
+        case .recipe(let recipe):
+            activityType = "recipeXPostShared"
+            metadata["recipeId"] = recipe.id.uuidString
+            metadata["recipeName"] = recipe.name
+        case .achievement(let achievementName):
+            activityType = "achievementXPostShared"
+            metadata["achievementName"] = achievementName
+        case .challenge(let challenge):
+            activityType = "challengeXPostShared"
+            metadata["challengeId"] = challenge.id
+            metadata["challengeName"] = challenge.title
+        case .profile:
+            activityType = "profileXPostShared"
+        case .teamInvite(let teamName, let joinCode):
+            activityType = "teamInviteXPostShared"
+            metadata["teamName"] = teamName
+            metadata["joinCode"] = joinCode
+        }
+        
+        do {
+            try await CloudKitSyncService.shared.createActivity(
+                type: activityType,
+                actorID: userID,
+                actorName: userName,
+                recipeID: metadata["recipeId"] as? String,
+                recipeName: metadata["recipeName"] as? String,
+                challengeID: metadata["challengeId"] as? String,
+                challengeName: metadata["challengeName"] as? String
+            )
+        } catch {
+            print("Failed to create X share activity: \(error)")
         }
     }
 }

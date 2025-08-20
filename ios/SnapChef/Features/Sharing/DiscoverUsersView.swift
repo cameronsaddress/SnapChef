@@ -16,7 +16,6 @@ struct UserProfile: Identifiable {
     let bio: String?
 
     // Additional properties for enhanced profiles
-    var isLocal: Bool = false  // Indicates if this is a local fake user
     var joinedDate: Date?
     var lastActive: Date?
     var cuisineSpecialty: String?
@@ -109,7 +108,7 @@ struct DiscoverUsersView: View {
                             .tint(.white)
                         Spacer()
                     } else if viewModel.users.isEmpty {
-                        EmptyDiscoverView()
+                        EmptyDiscoverView(category: selectedCategory)
                     } else {
                         ScrollView {
                             LazyVStack(spacing: 16) {
@@ -384,19 +383,21 @@ struct UserDiscoveryCard: View {
 
 // MARK: - Empty Discover View
 struct EmptyDiscoverView: View {
+    let category: DiscoverUsersView.DiscoverCategory
+    
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
 
-            Image(systemName: "person.crop.circle.badge.questionmark")
+            Image(systemName: categoryIcon)
                 .font(.system(size: 60))
                 .foregroundColor(.white.opacity(0.3))
 
-            Text("No chefs found")
+            Text(categoryTitle)
                 .font(.system(size: 24, weight: .bold))
                 .foregroundColor(.white)
 
-            Text("Try adjusting your search or\ncheck back later for new chefs")
+            Text(categoryMessage)
                 .font(.system(size: 16))
                 .foregroundColor(.white.opacity(0.6))
                 .multilineTextAlignment(.center)
@@ -404,6 +405,45 @@ struct EmptyDiscoverView: View {
             Spacer()
         }
         .padding()
+    }
+    
+    private var categoryIcon: String {
+        switch category {
+        case .suggested:
+            return "sparkles"
+        case .trending:
+            return "flame"
+        case .newChefs:
+            return "person.badge.plus"
+        case .verified:
+            return "checkmark.seal.fill"
+        }
+    }
+    
+    private var categoryTitle: String {
+        switch category {
+        case .suggested:
+            return "No suggested chefs"
+        case .trending:
+            return "No trending chefs"
+        case .newChefs:
+            return "No new chefs"
+        case .verified:
+            return "No verified chefs"
+        }
+    }
+    
+    private var categoryMessage: String {
+        switch category {
+        case .suggested:
+            return "We're still building our chef\ncommunity. Check back soon!"
+        case .trending:
+            return "No trending activity yet.\nBe the first to create and share!"
+        case .newChefs:
+            return "No new chefs have joined recently.\nInvite your friends to join SnapChef!"
+        case .verified:
+            return "No verified chefs available.\nStay tuned for chef partnerships!"
+        }
     }
 }
 
@@ -420,32 +460,18 @@ class DiscoverUsersViewModel: ObservableObject {
     private let cloudKitAuth = CloudKitAuthManager.shared
     private let cloudKitSync = CloudKitSyncService.shared
     private var lastFetchedRecord: CKRecord?
-    private var fakeUsers: [UserProfile] = []
     private var cloudKitUsers: [UserProfile] = []
-
-    init() {
-        // Load fake users on initialization
-        loadFakeUsers()
-    }
-
-    private func loadFakeUsers() {
-        // Removed fake user generation - now only uses real CloudKit users
-        fakeUsers = []
-    }
 
     func loadUsers(for category: DiscoverUsersView.DiscoverCategory) async {
         isLoading = true
         users = []
         lastFetchedRecord = nil
 
-        // Load CloudKit users
+        // Load CloudKit users only
         await loadCloudKitUsers(for: category)
 
-        // Combine with fake users based on category
-        let filteredFakeUsers = filterFakeUsers(for: category)
-
-        // Merge CloudKit and fake users
-        users = mergeUsers(cloudKit: cloudKitUsers, fake: filteredFakeUsers)
+        // Use only CloudKit users
+        users = cloudKitUsers
 
         hasMore = false
         isLoading = false
@@ -462,8 +488,8 @@ class DiscoverUsersViewModel: ObservableObject {
                 cloudKitUsers = trendingUsers.map { convertToUserProfile($0) }
             case .newChefs:
                 // Get users who joined recently
-                let newUsers = try await cloudKitAuth.searchUsers(query: "")
-                cloudKitUsers = newUsers.prefix(20).map { convertToUserProfile($0) }
+                let newUsers = try await cloudKitAuth.getNewUsers(limit: 20)
+                cloudKitUsers = newUsers.map { convertToUserProfile($0) }
             case .verified:
                 let verifiedUsers = try await cloudKitAuth.getVerifiedUsers(limit: 20)
                 cloudKitUsers = verifiedUsers.map { convertToUserProfile($0) }
@@ -474,38 +500,6 @@ class DiscoverUsersViewModel: ObservableObject {
         }
     }
 
-    private func filterFakeUsers(for category: DiscoverUsersView.DiscoverCategory) -> [UserProfile] {
-        switch category {
-        case .suggested:
-            // Return top 30 fake users by follower count
-            return Array(fakeUsers.prefix(30))
-        case .trending:
-            // Return users with recent activity
-            return fakeUsers.filter { user in
-                if let lastActive = user.lastActive {
-                    return Date().timeIntervalSince(lastActive) < 86_400 // Active in last 24 hours
-                }
-                return false
-            }.prefix(20).map { $0 }
-        case .newChefs:
-            // Return users who joined recently
-            return fakeUsers.filter { user in
-                if let joinedDate = user.joinedDate {
-                    return Date().timeIntervalSince(joinedDate) < 604_800 // Joined in last week
-                }
-                return false
-            }.prefix(20).map { $0 }
-        case .verified:
-            // Return only verified fake users
-            return fakeUsers.filter { $0.isVerified }.prefix(20).map { $0 }
-        }
-    }
-
-    private func mergeUsers(cloudKit: [UserProfile], fake: [UserProfile]) -> [UserProfile] {
-        // Combine and sort by follower count
-        let combined = cloudKit + fake
-        return combined.sorted { $0.followerCount > $1.followerCount }
-    }
 
     private func convertToUserProfile(_ cloudKitUser: CloudKitUser) -> UserProfile {
         UserProfile(
@@ -520,7 +514,6 @@ class DiscoverUsersViewModel: ObservableObject {
             isVerified: cloudKitUser.isVerified,
             isFollowing: false, // Will be updated based on actual follow status
             bio: nil,
-            isLocal: false,
             joinedDate: cloudKitUser.createdAt,
             lastActive: cloudKitUser.lastLoginAt,
             cuisineSpecialty: nil,
@@ -536,25 +529,15 @@ class DiscoverUsersViewModel: ObservableObject {
 
         isSearching = true
 
-        // Search fake users locally
-        let matchingFakeUsers = fakeUsers.filter {
-            $0.username.localizedCaseInsensitiveContains(query) ||
-            $0.displayName.localizedCaseInsensitiveContains(query) ||
-            ($0.bio?.localizedCaseInsensitiveContains(query) ?? false) ||
-            ($0.cuisineSpecialty?.localizedCaseInsensitiveContains(query) ?? false)
-        }
-
-        // Search CloudKit users
-        var matchingCloudKitUsers: [UserProfile] = []
+        // Search CloudKit users only
         do {
             let cloudKitResults = try await cloudKitAuth.searchUsers(query: query)
-            matchingCloudKitUsers = cloudKitResults.map { convertToUserProfile($0) }
+            searchResults = cloudKitResults.map { convertToUserProfile($0) }
         } catch {
             print("Failed to search CloudKit users: \(error)")
+            searchResults = []
         }
 
-        // Combine and sort results
-        searchResults = mergeUsers(cloudKit: matchingCloudKitUsers, fake: matchingFakeUsers)
         isSearching = false
     }
 
@@ -569,9 +552,15 @@ class DiscoverUsersViewModel: ObservableObject {
     }
 
     func toggleFollow(_ user: UserProfile) async {
-        // Only allow following for CloudKit users, not local fake users
-        if user.isLocal {
-            // For local users, just update the UI state
+        // Perform follow/unfollow for CloudKit users
+        do {
+            if user.isFollowing {
+                try await cloudKitAuth.unfollowUser(userID: user.id)
+            } else {
+                try await cloudKitAuth.followUser(userID: user.id)
+            }
+
+            // Update local state
             if let index = users.firstIndex(where: { $0.id == user.id }) {
                 users[index].isFollowing.toggle()
                 users[index].followerCount += users[index].isFollowing ? 1 : -1
@@ -580,30 +569,11 @@ class DiscoverUsersViewModel: ObservableObject {
                 searchResults[index].isFollowing.toggle()
                 searchResults[index].followerCount += searchResults[index].isFollowing ? 1 : -1
             }
-        } else {
-            // For CloudKit users, actually perform the follow/unfollow
-            do {
-                if user.isFollowing {
-                    try await cloudKitAuth.unfollowUser(userID: user.id)
-                } else {
-                    try await cloudKitAuth.followUser(userID: user.id)
-                }
 
-                // Update local state
-                if let index = users.firstIndex(where: { $0.id == user.id }) {
-                    users[index].isFollowing.toggle()
-                    users[index].followerCount += users[index].isFollowing ? 1 : -1
-                }
-                if let index = searchResults.firstIndex(where: { $0.id == user.id }) {
-                    searchResults[index].isFollowing.toggle()
-                    searchResults[index].followerCount += searchResults[index].isFollowing ? 1 : -1
-                }
-
-                // Force reload the current user to update following count in FeedView
-                await cloudKitAuth.refreshCurrentUser()
-            } catch {
-                print("Failed to toggle follow: \(error)")
-            }
+            // Force reload the current user to update following count in FeedView
+            await cloudKitAuth.refreshCurrentUser()
+        } catch {
+            print("Failed to toggle follow: \(error)")
         }
     }
 }
