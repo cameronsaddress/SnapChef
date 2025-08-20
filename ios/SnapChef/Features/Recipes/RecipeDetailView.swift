@@ -156,16 +156,24 @@ struct RecipeDetailView: View {
                     Spacer()
                 }
                 
-                ForEach(recipe.ingredients) { ingredient in
-                    HStack {
-                        Image(systemName: ingredient.isAvailable ? "checkmark.circle.fill" : "circle")
-                            .foregroundColor(ingredient.isAvailable ? Color(hex: "#9b59b6") : .white.opacity(0.5))
-                        Text("\(ingredient.quantity) \(ingredient.unit ?? "") \(ingredient.name)")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.9))
-                        Spacer()
+                if recipe.ingredients.isEmpty {
+                    Text("No ingredients listed")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.6))
+                        .italic()
+                        .padding(.vertical, 8)
+                } else {
+                    ForEach(recipe.ingredients) { ingredient in
+                        HStack {
+                            Image(systemName: ingredient.isAvailable ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(ingredient.isAvailable ? Color(hex: "#9b59b6") : .white.opacity(0.5))
+                            Text("\(ingredient.quantity) \(ingredient.unit ?? "") \(ingredient.name)")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white.opacity(0.9))
+                            Spacer()
+                        }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
                 }
             }
         }
@@ -188,18 +196,26 @@ struct RecipeDetailView: View {
                     Spacer()
                 }
                 
-                ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
-                    HStack(alignment: .top) {
-                        Text("\(index + 1).")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(Color(hex: "#9b59b6"))
-                            .frame(width: 30)
-                        Text(instruction)
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.9))
-                        Spacer()
+                if recipe.instructions.isEmpty {
+                    Text("No instructions provided")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.6))
+                        .italic()
+                        .padding(.vertical, 8)
+                } else {
+                    ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
+                        HStack(alignment: .top) {
+                            Text("\(index + 1).")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(Color(hex: "#9b59b6"))
+                                .frame(width: 30)
+                            Text(instruction)
+                                .font(.system(size: 16))
+                                .foregroundColor(.white.opacity(0.9))
+                            Spacer()
+                        }
+                        .padding(.vertical, 8)
                     }
-                    .padding(.vertical, 8)
                 }
             }
         }

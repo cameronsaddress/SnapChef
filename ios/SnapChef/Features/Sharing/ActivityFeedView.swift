@@ -199,30 +199,21 @@ struct ActivityFeedView: View {
         }
         .sheet(isPresented: $showingRecipeDetail) {
             if let recipe = selectedRecipe {
-                // Ensure recipe has minimum required data before showing detail view
-                if !recipe.name.isEmpty && !recipe.ingredients.isEmpty && !recipe.instructions.isEmpty {
+                NavigationStack {
                     RecipeDetailView(recipe: recipe)
-                } else {
-                    // Show error view for incomplete recipe data
-                    VStack(spacing: 20) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 50))
-                            .foregroundColor(.orange)
-                        
-                        Text("Recipe Unavailable")
-                            .font(.system(size: 24, weight: .bold))
-                        
-                        Text("This recipe appears to be incomplete or corrupted.")
-                            .font(.system(size: 16))
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                        
-                        Button("Close") {
-                            showingRecipeDetail = false
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .padding()
+                        .environmentObject(appState)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#0f0625"),
+                                    Color(hex: "#1a0033"),
+                                    Color(hex: "#0a051a")
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            .ignoresSafeArea()
+                        )
                 }
             }
         }
@@ -251,15 +242,20 @@ struct ActivityFeedView: View {
             if let recipeID = activity.recipeID {
                 selectedRecipeID = recipeID
                 loadRecipeAndShowDetail(recipeID: recipeID)
+            } else {
+                print("⚠️ Activity tapped but no recipe ID available")
             }
         case .follow:
             // Navigate to user profile
+            print("👥 Follow activity tapped - user profile navigation not implemented")
             break
         case .challengeCompleted:
             // Navigate to challenge detail
+            print("🏆 Challenge activity tapped - challenge detail navigation not implemented")
             break
         case .badgeEarned:
             // Show badge detail
+            print("🏅 Badge activity tapped - badge detail view not implemented")
             break
         }
     }
@@ -277,29 +273,40 @@ struct ActivityFeedView: View {
                 }
                 
                 // If not found locally, try to load from CloudKit
+                print("🔍 Attempting to load recipe from CloudKit: \(recipeID)")
                 let recipe = try await CloudKitRecipeManager.shared.fetchRecipe(by: recipeID)
                 
                 await MainActor.run {
                     selectedRecipe = recipe
                     showingRecipeDetail = true
                 }
+                print("✅ Successfully loaded recipe: \(recipe.name)")
+                print("🔍 Recipe details - Ingredients: \(recipe.ingredients.count), Instructions: \(recipe.instructions.count)")
             } catch {
                 print("❌ Failed to load recipe \(recipeID): \(error)")
                 
-                // Show error alert to user
-                await MainActor.run {
-                    // You could add @State private var showErrorAlert = false and errorMessage = ""
-                    // then set them here to show an alert, but for now just log the error
-                    // This prevents blank popups from appearing
-                    print("📱 Recipe not available - skipping detail view")
+                // Check if it's a specific "not found" error
+                if let ckError = error as? CKError, ckError.code == .unknownItem {
+                    print("📄 Recipe \(recipeID) does not exist in CloudKit")
+                } else {
+                    print("⚠️ Other error loading recipe: \(error.localizedDescription)")
                 }
+                
+                // Don't show detail view for non-existent recipes
+                // Just log and continue - user won't see a broken view
             }
         }
     }
     
     private func findLocalRecipe(by id: String) -> Recipe? {
         // Search through all local recipes
-        return appState.allRecipes.first { $0.id.uuidString == id }
+        let foundRecipe = appState.allRecipes.first { $0.id.uuidString == id }
+        if foundRecipe != nil {
+            print("✅ Found local recipe: \(foundRecipe!.name)")
+        } else {
+            print("🔍 Recipe \(id) not found locally, will try CloudKit")
+        }
+        return foundRecipe
     }
 }
 
@@ -450,14 +457,7 @@ class ActivityFeedManager: ObservableObject {
         activities = []
         lastFetchedRecord = nil
 
-        do {
-            await fetchActivitiesFromCloudKit()
-        } catch {
-            print("❌ Failed to fetch activities from CloudKit: \(error)")
-            // Fallback to mock data on error
-            activities = generateMockActivities()
-            hasMore = false
-        }
+        await fetchActivitiesFromCloudKit()
 
         isLoading = false
     }
@@ -467,12 +467,7 @@ class ActivityFeedManager: ObservableObject {
 
         isLoading = true
 
-        do {
-            await fetchActivitiesFromCloudKit(loadMore: true)
-        } catch {
-            print("❌ Failed to load more activities: \(error)")
-            hasMore = false
-        }
+        await fetchActivitiesFromCloudKit(loadMore: true)
 
         isLoading = false
     }
@@ -505,9 +500,14 @@ class ActivityFeedManager: ObservableObject {
                     isRead: true
                 )
                 activities[index] = readActivity
+                print("✅ Local activity state updated to read: \(activityID)")
+            } else {
+                print("⚠️ Activity not found in local state: \(activityID)")
             }
         } catch {
             print("❌ Failed to mark activity as read: \(error)")
+            // Don't crash the app, just log the error
+            // The activity will remain unread in the UI
         }
     }
 
@@ -671,7 +671,26 @@ class ActivityFeedManager: ObservableObject {
         let targetUserName = targetUserID != nil ? await fetchUserDisplayName(userID: targetUserID!) : nil
         let recipeID = record[CKField.Activity.recipeID] as? String
         let recipeName = record[CKField.Activity.recipeName] as? String
+        let challengeName = record[CKField.Activity.challengeName] as? String
         let isReadInt = record[CKField.Activity.isRead] as? Int64 ?? 0
+
+        // For recipe-related activities, validate that the recipe exists
+        // Skip activities that reference non-existent recipes to avoid errors
+        if let recipeID = recipeID, [.recipeShared, .recipeLiked, .recipeComment].contains(activityType) {
+            do {
+                // Quick check if recipe exists in CloudKit
+                let _ = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
+                print("✅ Validated recipe exists for activity: \(id)")
+            } catch {
+                if let ckError = error as? CKError, ckError.code == .unknownItem {
+                    print("⚠️ Skipping activity \(id) - recipe \(recipeID) not found")
+                    return nil // Skip this activity
+                } else {
+                    print("⚠️ Error validating recipe \(recipeID) for activity \(id): \(error)")
+                    // Continue with the activity even if validation failed due to network issues
+                }
+            }
+        }
 
         return ActivityItem(
             id: id,
@@ -682,7 +701,7 @@ class ActivityFeedManager: ObservableObject {
             targetUserID: targetUserID,
             targetUserName: targetUserName,
             recipeID: recipeID,
-            recipeName: recipeName,
+            recipeName: activityType == .challengeCompleted ? challengeName : recipeName,
             recipeImage: nil, // TODO: Implement recipe image loading
             timestamp: timestamp,
             isRead: isReadInt == 1
