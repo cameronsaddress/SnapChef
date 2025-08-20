@@ -23,8 +23,51 @@ final class CloudKitAuthManager: ObservableObject {
     private var database: CKDatabase { container.publicCloudDatabase }
     
     init() {
-        // Simplified initialization for compilation fix
         print("CloudKitAuthManager initialized")
+        // Check for existing authentication on initialization
+        checkExistingAuth()
+    }
+    
+    /// Check if user is already authenticated with CloudKit
+    private func checkExistingAuth() {
+        Task {
+            do {
+                let accountStatus = try await container.accountStatus()
+                guard accountStatus == .available else {
+                    print("⚠️ CloudKit account not available: \(accountStatus)")
+                    return
+                }
+                
+                // Check if we have a stored user ID
+                if let storedUserID = UserDefaults.standard.string(forKey: "currentUserRecordID") {
+                    print("🔍 Checking existing CloudKit user: \(storedUserID)")
+                    
+                    // Try to fetch the user record
+                    let record = try await database.record(for: CKRecord.ID(recordName: storedUserID))
+                    
+                    await MainActor.run {
+                        self.currentUser = CloudKitUser(from: record)
+                        self.isAuthenticated = true
+                        print("✅ CloudKit user restored from storage: \(storedUserID)")
+                    }
+                    
+                    // Update last active
+                    record[CKField.User.lastActiveAt] = Date()
+                    _ = try await database.save(record)
+                } else {
+                    print("ℹ️ No stored CloudKit user ID found")
+                }
+            } catch {
+                print("❌ Failed to restore CloudKit auth: \(error)")
+                // Clear invalid stored data
+                UserDefaults.standard.removeObject(forKey: "currentUserRecordID")
+                UserDefaults.standard.removeObject(forKey: "currentUserID")
+                await MainActor.run {
+                    self.isAuthenticated = false
+                    self.currentUser = nil
+                }
+            }
+        }
     }
     
     /// Calculate exponential backoff delay for auth operations
@@ -34,9 +77,80 @@ final class CloudKitAuthManager: ObservableObject {
     
     /// Sign in with Apple ID for CloudKit authentication
     func signInWithApple(authorization: Any) async throws {
-        // Simplified implementation for compilation fix
-        print("Sign in with Apple called - simplified implementation")
+        print("🔑 Starting CloudKit Sign in with Apple...")
+        
+        // First check CloudKit account status
+        let accountStatus = try await container.accountStatus()
+        guard accountStatus == .available else {
+            throw CloudKitAuthError.notAuthenticated
+        }
+        
+        // Get the CloudKit user record ID
+        let userRecord = try await container.userRecordID()
+        let cloudKitUserID = userRecord.recordName
+        
+        print("✅ CloudKit userRecordID: \(cloudKitUserID)")
+        
+        // Store the CloudKit user ID (this is the persistent ID we need)
+        UserDefaults.standard.set(cloudKitUserID, forKey: "currentUserRecordID")
+        UserDefaults.standard.set(cloudKitUserID, forKey: "currentUserID") // For compatibility
+        
+        // Try to fetch existing user profile
+        do {
+            let existingRecord = try await database.record(for: CKRecord.ID(recordName: cloudKitUserID))
+            self.currentUser = CloudKitUser(from: existingRecord)
+            
+            // Update last login
+            existingRecord[CKField.User.lastLoginAt] = Date()
+            _ = try await database.save(existingRecord)
+            
+            print("✅ Existing CloudKit user loaded: \(cloudKitUserID)")
+        } catch {
+            // Create new user profile if it doesn't exist
+            print("📝 Creating new CloudKit user profile for: \(cloudKitUserID)")
+            try await createNewUserProfile(cloudKitUserID: cloudKitUserID, authorization: authorization)
+        }
+        
+        // Set authenticated status
         isAuthenticated = true
+        print("🎉 CloudKit authentication completed successfully")
+    }
+    
+    /// Create a new user profile in CloudKit
+    private func createNewUserProfile(cloudKitUserID: String, authorization: Any) async throws {
+        let newRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: CKRecord.ID(recordName: cloudKitUserID))
+        
+        // Extract user info from Apple ID authorization if available
+        if let appleAuth = authorization as? ASAuthorization,
+           let appleIDCredential = appleAuth.credential as? ASAuthorizationAppleIDCredential {
+            newRecord[CKField.User.email] = appleIDCredential.email ?? ""
+            newRecord[CKField.User.displayName] = appleIDCredential.fullName?.formatted() ?? "Anonymous Chef"
+        } else {
+            newRecord[CKField.User.displayName] = "Anonymous Chef"
+        }
+        
+        // Set initial values
+        newRecord[CKField.User.authProvider] = "apple"
+        newRecord[CKField.User.createdAt] = Date()
+        newRecord[CKField.User.lastLoginAt] = Date()
+        newRecord[CKField.User.totalPoints] = Int64(0)
+        newRecord[CKField.User.currentStreak] = Int64(0)
+        newRecord[CKField.User.longestStreak] = Int64(0)
+        newRecord[CKField.User.challengesCompleted] = Int64(0)
+        newRecord[CKField.User.recipesShared] = Int64(0)
+        newRecord[CKField.User.recipesCreated] = Int64(0)
+        newRecord[CKField.User.coinBalance] = Int64(100) // Starting bonus
+        newRecord[CKField.User.followerCount] = Int64(0)
+        newRecord[CKField.User.followingCount] = Int64(0)
+        newRecord[CKField.User.isProfilePublic] = Int64(1)
+        newRecord[CKField.User.showOnLeaderboard] = Int64(1)
+        newRecord[CKField.User.isVerified] = Int64(0)
+        newRecord[CKField.User.subscriptionTier] = "free"
+        
+        try await database.save(newRecord)
+        self.currentUser = CloudKitUser(from: newRecord)
+        
+        print("✅ New CloudKit user profile created: \(cloudKitUserID)")
     }
     
     /// Check if a username is available

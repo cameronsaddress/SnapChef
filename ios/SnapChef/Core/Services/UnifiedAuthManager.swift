@@ -61,9 +61,17 @@ final class UnifiedAuthManager: ObservableObject {
     func checkAuthStatus() {
         // Check CloudKit auth
         if let storedUserID = UserDefaults.standard.string(forKey: "currentUserRecordID") {
+            print("🔍 Found stored CloudKit userRecordID: \(storedUserID)")
             Task {
                 await loadCloudKitUser(recordID: storedUserID)
             }
+        } else if let legacyUserID = UserDefaults.standard.string(forKey: "currentUserID") {
+            print("🔍 Found legacy currentUserID: \(legacyUserID)")
+            Task {
+                await loadCloudKitUser(recordID: legacyUserID)
+            }
+        } else {
+            print("ℹ️ No stored CloudKit user ID found")
         }
         
         // Check TikTok auth
@@ -88,11 +96,25 @@ final class UnifiedAuthManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        let userID = appleIDCredential.user
+        print("🔑 Starting unified CloudKit Sign in with Apple...")
+        
+        // CRITICAL FIX: Get the actual CloudKit userRecordID, not the Apple ID credential user ID
+        let accountStatus = try await cloudKitContainer.accountStatus()
+        guard accountStatus == .available else {
+            print("⚠️ CloudKit account not available: \(accountStatus)")
+            throw UnifiedAuthError.cloudKitNotAvailable
+        }
+        
+        // Get the CloudKit user record ID (this is the stable ID we need)
+        let userRecord = try await cloudKitContainer.userRecordID()
+        let cloudKitUserID = userRecord.recordName
+        
+        print("✅ CloudKit userRecordID: \(cloudKitUserID)")
+        
         let email = appleIDCredential.email
         let fullName = appleIDCredential.fullName
         
-        let recordID = CKRecord.ID(recordName: userID)
+        let recordID = CKRecord.ID(recordName: cloudKitUserID)
         
         do {
             // Try to fetch existing user
@@ -106,11 +128,14 @@ final class UnifiedAuthManager: ObservableObject {
             self.currentUser = CloudKitUser(from: existingRecord)
             self.isAuthenticated = true
             
-            // Store user ID
-            UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
+            // Store the CloudKit user ID (this is the persistent ID we need)
+            UserDefaults.standard.set(cloudKitUserID, forKey: "currentUserRecordID")
+            UserDefaults.standard.set(cloudKitUserID, forKey: "currentUserID") // For compatibility
             
             // Migrate anonymous data if available
             await migrateAnonymousData()
+            
+            print("✅ Existing CloudKit user loaded: \(cloudKitUserID)")
             
             // Check username requirement
             if self.currentUser?.username == nil || self.currentUser?.username?.isEmpty == true {
@@ -155,15 +180,20 @@ final class UnifiedAuthManager: ObservableObject {
             self.currentUser = CloudKitUser(from: newRecord)
             self.isAuthenticated = true
             
-            // Store user ID
-            UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
+            // Store the CloudKit user ID (this is the persistent ID we need)
+            UserDefaults.standard.set(cloudKitUserID, forKey: "currentUserRecordID")
+            UserDefaults.standard.set(cloudKitUserID, forKey: "currentUserID") // For compatibility
             
             // Migrate anonymous data
             await migrateAnonymousData()
             
+            print("✅ New CloudKit user profile created: \(cloudKitUserID)")
+            
             // Show username setup for new users
             self.showUsernameSetup = true
         }
+        
+        print("🎉 Unified CloudKit authentication completed successfully")
     }
     
     // MARK: - TikTok Authentication
@@ -318,17 +348,45 @@ final class UnifiedAuthManager: ObservableObject {
     
     private func loadCloudKitUser(recordID: String) async {
         do {
-            let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: recordID))
-            self.currentUser = CloudKitUser(from: record)
-            self.isAuthenticated = true
+            // First verify CloudKit account is still available
+            let accountStatus = try await cloudKitContainer.accountStatus()
+            guard accountStatus == .available else {
+                print("⚠️ CloudKit account not available, status: \(accountStatus)")
+                await clearStoredAuth()
+                return
+            }
             
-            // Update last active
-            record[CKField.User.lastActiveAt] = Date()
-            try await cloudKitDatabase.save(record)
+            // Try to load the user record
+            let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: recordID))
+            await MainActor.run {
+                self.currentUser = CloudKitUser(from: record)
+                self.isAuthenticated = true
+            }
+            
+            print("✅ CloudKit user loaded successfully: \(recordID)")
+            
+            // Update last active in background
+            Task {
+                do {
+                    record[CKField.User.lastActiveAt] = Date()
+                    _ = try await cloudKitDatabase.save(record)
+                } catch {
+                    print("⚠️ Failed to update last active time: \(error)")
+                }
+            }
         } catch {
-            // User not found or error
+            print("❌ Failed to load CloudKit user \(recordID): \(error)")
+            await clearStoredAuth()
+        }
+    }
+    
+    private func clearStoredAuth() async {
+        await MainActor.run {
+            // Clear stored user IDs
             UserDefaults.standard.removeObject(forKey: "currentUserRecordID")
+            UserDefaults.standard.removeObject(forKey: "currentUserID")
             self.isAuthenticated = false
+            self.currentUser = nil
         }
     }
     
@@ -372,6 +430,7 @@ enum UnifiedAuthError: LocalizedError {
     case usernameUnavailable
     case tikTokAuthFailed(String)
     case networkError
+    case cloudKitNotAvailable
     case unknown
     
     var errorDescription: String? {
@@ -379,13 +438,15 @@ enum UnifiedAuthError: LocalizedError {
         case .invalidCredential:
             return "Invalid authentication credentials"
         case .notAuthenticated:
-            return "You must be signed in to perform this action"
+            return "Please sign in to iCloud to sync your data"
         case .usernameUnavailable:
             return "This username is already taken"
         case .tikTokAuthFailed(let details):
             return "TikTok sign in failed: \(details)"
         case .networkError:
             return "Network error. Please try again."
+        case .cloudKitNotAvailable:
+            return "Please sign in to iCloud in Settings to use this feature"
         case .unknown:
             return "An unknown error occurred"
         }

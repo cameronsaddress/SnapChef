@@ -107,6 +107,9 @@ struct SnapChefApp: App {
             try? await cloudKitDataManager.registerDevice()
             // Removed automatic sync on app launch - only sync when user visits recipe views
             cloudKitDataManager.trackScreenView("AppLaunch")
+            
+            // Initialize CloudKit authentication managers
+            await initializeAuthentication()
 
             // Sync CloudKit photos to PhotoStorageManager
             await syncCloudKitPhotosToStorage()
@@ -147,6 +150,23 @@ struct SnapChefApp: App {
         }
     }
 
+    /// Initialize authentication systems
+    private func initializeAuthentication() async {
+        print("🔐 Initializing authentication systems...")
+        
+        // Initialize the unified auth manager to check existing auth status
+        let unifiedAuthManager = UnifiedAuthManager.shared
+        let cloudKitAuthManager = CloudKitAuthManager.shared
+        
+        // Check if user was previously authenticated
+        unifiedAuthManager.checkAuthStatus()
+        
+        // This will also initialize CloudKitAuthManager's checkExistingAuth
+        // which will restore authentication state if the user was previously signed in
+        
+        print("🔐 Authentication initialization completed")
+    }
+    
     @MainActor
     private func syncCloudKitPhotosToStorage() async {
         print("📸 Starting CloudKit photo sync to PhotoStorageManager...")

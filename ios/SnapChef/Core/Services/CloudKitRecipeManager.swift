@@ -991,15 +991,23 @@ class CloudKitRecipeManager: ObservableObject {
     private func getCurrentUserID() -> String? {
         // Only return user ID if authenticated
         guard CloudKitAuthManager.shared.isAuthenticated else {
+            print("⚠️ CloudKitRecipeManager: User not authenticated")
             return nil
         }
         
-        // Try both keys for compatibility
-        if let userID = UserDefaults.standard.string(forKey: "currentUserID") {
+        // Try both keys for compatibility - prefer the CloudKit recordID
+        if let userID = UserDefaults.standard.string(forKey: "currentUserRecordID") {
+            print("📱 CloudKitRecipeManager: Using currentUserRecordID: \(userID)")
             return userID
         }
-        // Also check the key used by CloudKitAuthManager
-        return UserDefaults.standard.string(forKey: "currentUserRecordID")
+        
+        if let userID = UserDefaults.standard.string(forKey: "currentUserID") {
+            print("📱 CloudKitRecipeManager: Using legacy currentUserID: \(userID)")
+            return userID
+        }
+        
+        print("❌ CloudKitRecipeManager: No user ID found despite being authenticated")
+        return nil
     }
 
     private func checkRecipeExists(_ name: String, _ description: String) async -> String? {
