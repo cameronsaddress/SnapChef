@@ -45,13 +45,10 @@ struct RecipePhotoView: View {
     }
     
     // MARK: - Safe cache refresh methods
-    private func refreshCacheIfNeeded() {
+    private func refreshCacheIfNeeded() async {
         let now = Date()
         if cachedStoredPhotos == nil || now.timeIntervalSince(lastCacheUpdate) > 5.0 {
-            // Schedule state update for next run loop to avoid modifying state during view update
-            Task { @MainActor in
-                await refreshCache()
-            }
+            await refreshCache()
         }
     }
     
@@ -66,9 +63,6 @@ struct RecipePhotoView: View {
     }
 
     private var displayBeforePhoto: UIImage? {
-        // Refresh cache if needed (non-blocking)
-        refreshCacheIfNeeded()
-        
         // OPTIMIZATION: Use PhotoStorageManager as primary source for instant display
         if let storedPhoto = storedPhotos?.fridgePhoto {
             return storedPhoto
@@ -150,7 +144,8 @@ struct RecipePhotoView: View {
         .task {
             // OPTIMIZATION: Prevent multiple onAppear calls and coordinate fetch requests
             guard !hasAppeared else { 
-                // View reappeared - just refresh loading state
+                // View reappeared - refresh cache and update loading state
+                await refreshCacheIfNeeded()
                 isLoadingPhotos = displayBeforePhoto == nil || displayAfterPhoto == nil
                 return 
             }
@@ -221,7 +216,7 @@ struct RecipePhotoView: View {
     private var beforePhotoPlaceholder: some View {
         VStack {
             Image(systemName: "refrigerator")
-                .font(.system(size: height * 0.25))
+                .font(.system(size: max(height * 0.25, 20)))  // Ensure minimum size
                 .foregroundColor(.white.opacity(0.5))
             if showLabels {
                 Text("Fridge")
@@ -248,7 +243,7 @@ struct RecipePhotoView: View {
     private var afterPhotoPlaceholder: some View {
         VStack(spacing: 4) {
             Image(systemName: "camera.fill")
-                .font(.system(size: height * 0.2))
+                .font(.system(size: max(height * 0.2, 16)))  // Ensure minimum size
                 .foregroundColor(.white.opacity(0.7))
             if showLabels {
                 Text("Take Photo")

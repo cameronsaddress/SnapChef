@@ -111,8 +111,10 @@ class SubscriptionManager: ObservableObject {
     // MARK: - Restore Purchases
     func restorePurchases() async {
         do {
-            // Sync with App Store
-            try await AppStore.sync()
+            // Sync with App Store on background queue to avoid blocking main thread
+            await Task.detached(priority: .userInitiated) {
+                try await AppStore.sync()
+            }.value
 
             // Update subscription status
             await updateSubscriptionStatus()

@@ -134,6 +134,7 @@ public final class MemoryOptimizer: @unchecked Sendable {
 
     /// Force memory cleanup when needed with emergency protocols
     public func forceMemoryCleanup() {
+        // Synchronous version for immediate cleanup
         autoreleasepool {
             let beforeMemory = getCurrentMemoryUsage()
             
@@ -152,29 +153,57 @@ public final class MemoryOptimizer: @unchecked Sendable {
                 cancelAllActiveTasks(reason: "Critical memory pressure")
             }
 
-            // ENHANCED: Multiple garbage collection cycles for better cleanup
-            for _ in 0..<3 {
-                CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0, false)
-                usleep(5_000) // 5ms between cycles
+            // ENHANCED: Non-blocking garbage collection cycles
+            Task.detached(priority: .utility) {
+                for _ in 0..<3 {
+                    CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0, false)
+                    try? await Task.sleep(nanoseconds: 5_000_000) // 5ms between cycles - non-blocking
+                }
             }
             
             // Additional cleanup for iOS
             if #available(iOS 13.0, *) {
                 URLCache.shared.removeAllCachedResponses()
             }
-            
-            // CRITICAL FIX: Clear any remaining autorelease pools
-            DispatchQueue.main.async {
-                autoreleasepool {
-                    // Trigger UI cleanup on main thread
-                }
-            }
-            
-            let afterMemory = getCurrentMemoryUsage()
-            let memoryFreed = beforeMemory > afterMemory ? beforeMemory - afterMemory : 0
-
-            logger.info("Forced memory cleanup completed - cleared \(poolCount) pools, freed \(memoryFreed / (1024*1024))MB, memory: \(afterMemory / (1024*1024))MB")
         }
+    }
+    
+    /// Async version of force memory cleanup for use in background tasks
+    public func forceMemoryCleanupAsync() async {
+        autoreleasepool {
+            let beforeMemory = getCurrentMemoryUsage()
+            
+            // Clear pixel buffer pools with thread-safe lock
+            poolsLock.lock()
+            let poolCount = pixelBufferPools.count
+            pixelBufferPools.removeAll()
+            poolsLock.unlock()
+            
+            // CRITICAL FIX: Clear CI context cache more aggressively
+            clearCIContextCache()
+            
+            // Cancel active tasks if memory is critical
+            let currentMemory = getCurrentMemoryUsage()
+            if currentMemory > criticalMemoryThreshold {
+                cancelAllActiveTasks(reason: "Critical memory pressure")
+            }
+
+            // Additional cleanup for iOS
+            if #available(iOS 13.0, *) {
+                URLCache.shared.removeAllCachedResponses()
+            }
+        }
+        
+        // ENHANCED: Async garbage collection cycles for better cleanup
+        for _ in 0..<3 {
+            CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0, false)
+            try? await Task.sleep(nanoseconds: 5_000_000) // 5ms between cycles - non-blocking
+        }
+        
+        let afterMemory = getCurrentMemoryUsage()
+        let memoryFreed = beforeMemory > afterMemory ? beforeMemory - afterMemory : 0
+
+        logger.info("Async memory cleanup completed - freed \(memoryFreed / (1024*1024))MB, memory: \(afterMemory / (1024*1024))MB")
     }
     
     /// Emergency memory cleanup with aggressive resource clearing
@@ -196,7 +225,7 @@ public final class MemoryOptimizer: @unchecked Sendable {
             // Multiple garbage collection cycles
             for _ in 0..<3 {
                 CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0, false)
-                usleep(10_000) // 10ms between cycles
+                try? await Task.sleep(nanoseconds: 10_000_000) // 10ms between cycles - non-blocking
             }
             
             logger.info("Emergency memory cleanup completed")
@@ -651,7 +680,7 @@ public final class MemoryOptimizer: @unchecked Sendable {
                 _ = autoreleasepool {
                     CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0, false)
                 }
-                usleep(10_000) // 10ms between cycles
+                try? await Task.sleep(nanoseconds: 10_000_000) // 10ms between cycles - non-blocking
             }
 
             logger.info("All resources cleaned up")
@@ -687,7 +716,9 @@ public final class MemoryOptimizer: @unchecked Sendable {
                 
                 // Auto-cleanup if we're approaching limits
                 if endMemory > warningMemoryThreshold {
-                    forceMemoryCleanup()
+                    Task.detached(priority: .utility) {
+                        await self.forceMemoryCleanupAsync()
+                    }
                 }
             }
         }
@@ -725,7 +756,9 @@ public final class MemoryOptimizer: @unchecked Sendable {
                     
                     // Auto-cleanup if we're approaching limits
                     if endMemory > warningMemoryThreshold {
-                        forceMemoryCleanup()
+                        Task.detached(priority: .utility) {
+                            await self.forceMemoryCleanupAsync()
+                        }
                     }
                 }
             }

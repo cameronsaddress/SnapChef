@@ -246,7 +246,6 @@ final class GamificationManager: ObservableObject {
 
             // Also sync user's challenge progress
             if let userID = UserDefaults.standard.string(forKey: "currentUserID") {
-                // Fetch user's active challenges from CloudKit
                 let predicate = NSPredicate(format: "userID == %@ AND status != %@", userID, "completed")
                 let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
                 let privateDB = container.privateCloudDatabase
@@ -254,6 +253,7 @@ final class GamificationManager: ObservableObject {
                 let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
                 let (results, _) = try await privateDB.records(matching: query)
 
+                var userChallengeCount = 0
                 for (_, result) in results {
                     if let record = try? result.get() {
                         // Update local challenge progress
@@ -261,11 +261,12 @@ final class GamificationManager: ObservableObject {
                            let progress = record["progress"] as? Double {
                             let challengeID = challengeIDRef.recordID.recordName
                             updateChallengeProgress(challengeID, progress: progress)
+                            userChallengeCount += 1
                         }
                     }
                 }
 
-                print("✅ Synced \(results.count) active challenges from CloudKit")
+                print("✅ Synced \(userChallengeCount) active challenges from CloudKit")
             }
         } catch {
             print("❌ Failed to sync challenges from CloudKit: \(error)")
@@ -506,11 +507,15 @@ final class GamificationManager: ObservableObject {
         if let index = activeChallenges.firstIndex(where: { $0.id == challengeID }) {
             activeChallenges[index].currentProgress = progress
 
+            // Only mark as completed when progress reaches 1.0 AND proof has been submitted
+            // The actual completion happens in submitChallengeProof method
             if progress >= 1.0 {
                 activeChallenges[index].isCompleted = true
                 // Move to completed
                 let challenge = activeChallenges.remove(at: index)
                 completedChallenges.append(challenge)
+                
+                print("✅ Challenge marked as completed after proof submission: \(challenge.title)")
             }
         }
     }
@@ -608,9 +613,13 @@ final class GamificationManager: ObservableObject {
     }
 
     func completeChallenge(challengeId: String) {
+        // This method should not be used for completing challenges
+        // Challenge completion should only happen via submitChallengeProof
+        print("⚠️ WARNING: completeChallenge called directly. Challenges should only be completed via proof submission.")
         // Find challenge by title (used as ID in some cases)
         if let challenge = activeChallenges.first(where: { $0.title == challengeId }) {
-            completeChallenge(challenge)
+            print("⚠️ Challenge '\(challenge.title)' cannot be completed without proof submission")
+            // Do not complete the challenge - require proof submission
         }
     }
 

@@ -9,6 +9,17 @@
 import Foundation
 import SwiftUI
 
+/// Simple struct to hold recipe owner information for caching
+struct RecipeOwnerInfo: Codable {
+    let ownerID: String
+    let ownerName: String
+    
+    init(ownerID: String, ownerName: String) {
+        self.ownerID = ownerID
+        self.ownerName = ownerName
+    }
+}
+
 /// Manages local caching of CloudKit recipes to prevent redundant downloads
 @MainActor
 class CloudKitRecipeCache: ObservableObject {
@@ -18,6 +29,9 @@ class CloudKitRecipeCache: ObservableObject {
     @Published var cachedRecipes: [Recipe] = []
     @Published var lastFetchDate: Date?
     @Published var isLoading = false
+    
+    // Owner information cache - maps recipe ID to creator info
+    private var recipeOwnerCache: [String: RecipeOwnerInfo] = [:]
 
     // User defaults keys
     private let lastFetchKey = "CloudKitRecipesLastFetch"
@@ -89,21 +103,29 @@ class CloudKitRecipeCache: ObservableObject {
     func clearCache() {
         cachedRecipes.removeAll()
         localRecipeIDs.removeAll()
+        recipeOwnerCache.removeAll()
         lastFetchDate = nil
 
         UserDefaults.standard.removeObject(forKey: cachedRecipesKey)
         UserDefaults.standard.removeObject(forKey: lastFetchKey)
+        UserDefaults.standard.removeObject(forKey: "CloudKitRecipeOwnerCache")
 
         print("🗑️ CloudKitCache: Cache cleared")
     }
 
     /// Add a single recipe to the cache
-    func addRecipeToCache(_ recipe: Recipe) {
+    func addRecipeToCache(_ recipe: Recipe, ownerID: String = "", ownerName: String = "") {
         if !localRecipeIDs.contains(recipe.id) {
             cachedRecipes.append(recipe)
             localRecipeIDs.insert(recipe.id)
+            
+            // Store owner information if provided
+            if !ownerID.isEmpty {
+                recipeOwnerCache[recipe.id.uuidString] = RecipeOwnerInfo(ownerID: ownerID, ownerName: ownerName)
+            }
+            
             saveToCache()
-            print("➕ CloudKitCache: Added recipe to cache: \(recipe.name)")
+            print("➕ CloudKitCache: Added recipe to cache: \(recipe.name) by \(ownerName.isEmpty ? "Unknown" : ownerName)")
         }
     }
 
@@ -111,6 +133,7 @@ class CloudKitRecipeCache: ObservableObject {
     func removeRecipeFromCache(_ recipeID: UUID) {
         cachedRecipes.removeAll { $0.id == recipeID }
         localRecipeIDs.remove(recipeID)
+        recipeOwnerCache.removeValue(forKey: recipeID.uuidString)
         saveToCache()
         print("➖ CloudKitCache: Removed recipe from cache")
     }
@@ -173,8 +196,14 @@ class CloudKitRecipeCache: ObservableObject {
         // Save recipes to UserDefaults (or could use Core Data for larger datasets)
         if let encoded = try? JSONEncoder().encode(cachedRecipes) {
             UserDefaults.standard.set(encoded, forKey: cachedRecipesKey)
-            print("💾 CloudKitCache: Saved \(cachedRecipes.count) recipes to local cache")
         }
+        
+        // Save owner information cache
+        if let ownerData = try? JSONEncoder().encode(recipeOwnerCache) {
+            UserDefaults.standard.set(ownerData, forKey: "CloudKitRecipeOwnerCache")
+        }
+        
+        print("💾 CloudKitCache: Saved \(cachedRecipes.count) recipes to local cache")
     }
 
     private func loadCachedData() {
@@ -188,11 +217,39 @@ class CloudKitRecipeCache: ObservableObject {
             localRecipeIDs = Set(decoded.map { $0.id })
             print("📱 CloudKitCache: Loaded \(cachedRecipes.count) recipes from local cache")
         }
+        
+        // Load owner information cache
+        if let ownerData = UserDefaults.standard.data(forKey: "CloudKitRecipeOwnerCache"),
+           let decoded = try? JSONDecoder().decode([String: RecipeOwnerInfo].self, from: ownerData) {
+            recipeOwnerCache = decoded
+            print("📱 CloudKitCache: Loaded owner info for \(recipeOwnerCache.count) recipes")
+        }
 
         if let lastFetch = lastFetchDate {
             let timeSince = Date().timeIntervalSince(lastFetch)
             print("📱 CloudKitCache: Last fetch was \(Int(timeSince))s ago")
         }
+    }
+    
+    // MARK: - Owner Information Methods
+    
+    /// Get owner information for a recipe
+    func getRecipeOwner(recipeID: String) -> RecipeOwnerInfo? {
+        return recipeOwnerCache[recipeID]
+    }
+    
+    /// Get owner name for a recipe by Recipe object
+    func getRecipeOwnerName(for recipe: Recipe) -> String {
+        if let ownerInfo = recipeOwnerCache[recipe.id.uuidString] {
+            return ownerInfo.ownerName.isEmpty ? "Anonymous Chef" : ownerInfo.ownerName
+        }
+        
+        // If no owner info cached, check if it's current user's recipe
+        if let currentUser = CloudKitAuthManager.shared.currentUser {
+            return currentUser.username ?? currentUser.displayName
+        }
+        
+        return "Me"
     }
 }
 

@@ -492,29 +492,69 @@ final class CloudKitAuthManager: ObservableObject {
     
     /// Get suggested users for discovery - smart recommendations based on activity and engagement
     func getSuggestedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
-        // Smart recommendations: Users who are active and have created recipes or have moderate engagement
-        // Filter for users who have at least 1 recipe created or some activity
-        let predicate = NSPredicate(format: "%K >= %d OR %K >= %d", 
-                                   CKField.User.recipesCreated, 1,
-                                   CKField.User.totalPoints, 100)
-        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        // CloudKit doesn't support OR predicates, so we need to make two separate queries
+        // and merge the results, removing duplicates
         
-        // Sort by a combination of engagement factors: total points (activity) and recipe creation
-        query.sortDescriptors = [
+        // Query 1: Users who have created recipes
+        let recipeCreatorsPredicate = NSPredicate(format: "%K >= %d", CKField.User.recipesCreated, 1)
+        let recipeCreatorsQuery = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: recipeCreatorsPredicate)
+        recipeCreatorsQuery.sortDescriptors = [
+            NSSortDescriptor(key: CKField.User.totalPoints, ascending: false),
+            NSSortDescriptor(key: CKField.User.recipesCreated, ascending: false)
+        ]
+        
+        // Query 2: Users who have moderate engagement (points)
+        let activeUsersPredicate = NSPredicate(format: "%K >= %d", CKField.User.totalPoints, 100)
+        let activeUsersQuery = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: activeUsersPredicate)
+        activeUsersQuery.sortDescriptors = [
             NSSortDescriptor(key: CKField.User.totalPoints, ascending: false),
             NSSortDescriptor(key: CKField.User.recipesCreated, ascending: false)
         ]
         
         do {
-            let results = try await database.records(matching: query)
-            var users = results.matchResults.compactMap { result in
+            // Execute both queries concurrently
+            async let recipeCreatorsResults = database.records(matching: recipeCreatorsQuery)
+            async let activeUsersResults = database.records(matching: activeUsersQuery)
+            
+            let (recipeCreatorsResponse, activeUsersResponse) = try await (recipeCreatorsResults, activeUsersResults)
+            
+            // Process results from both queries and merge
+            var userMap: [String: CloudKitUser] = [:] // Use map to automatically handle duplicates
+            
+            // Process recipe creators
+            for result in recipeCreatorsResponse.matchResults {
                 switch result.1 {
                 case .success(let record):
-                    return CloudKitUser(from: record)
+                    let user = CloudKitUser(from: record)
+                    if let recordID = user.recordID {
+                        userMap[recordID] = user
+                    }
                 case .failure(let error):
-                    print("❌ Failed to process user record: \(error)")
-                    return nil
+                    print("❌ Failed to process recipe creator record: \(error)")
                 }
+            }
+            
+            // Process active users
+            for result in activeUsersResponse.matchResults {
+                switch result.1 {
+                case .success(let record):
+                    let user = CloudKitUser(from: record)
+                    if let recordID = user.recordID {
+                        userMap[recordID] = user // Duplicates will be overwritten automatically
+                    }
+                case .failure(let error):
+                    print("❌ Failed to process active user record: \(error)")
+                }
+            }
+            
+            // Convert map to array and sort by total points (highest activity first)
+            var users = Array(userMap.values).sorted { user1, user2 in
+                let points1 = user1.totalPoints ?? 0
+                let points2 = user2.totalPoints ?? 0
+                if points1 == points2 {
+                    return (user1.recipesCreated ?? 0) > (user2.recipesCreated ?? 0)
+                }
+                return points1 > points2
             }
             
             // If current user is authenticated, filter out users they already follow

@@ -65,8 +65,10 @@ final class DataModule: ObservableObject {
         
         do {
             let (matchResults, _) = try await privateDatabase.records(matching: query)
-            guard let recordResult = matchResults.first?.1,
-                  let record = try? recordResult.get() else { return nil }
+            
+            // Get the first (most recent) match
+            guard let firstResult = matchResults.first,
+                  let record = try? firstResult.1.get() else { return nil }
             
             let preferences = FoodPreferences(
                 dietaryRestrictions: record["dietaryRestrictions"] as? [String] ?? [],

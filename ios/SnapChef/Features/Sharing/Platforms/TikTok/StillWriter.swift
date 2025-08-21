@@ -195,7 +195,7 @@ public final class StillWriter: Sendable {
             var waitCount = 0
             while !input.isReadyForMoreMediaData {
                 try cancellationToken?.throwIfCancelled()
-                usleep(1_000) // 1ms
+                try await Task.sleep(nanoseconds: 1_000_000) // 1ms - non-blocking
                 waitCount += 1
                 if waitCount > 5_000 { // 5 second timeout
                     throw StillWriterError.cannotStartWriting("Input not ready for media data after 5 seconds")
@@ -634,7 +634,7 @@ public final class StillWriter: Sendable {
             
             while !input.isReadyForMoreMediaData {
                 try cancellationToken?.throwIfCancelled()
-                usleep(1_000)
+                try await Task.sleep(nanoseconds: 1_000_000) // 1ms - non-blocking
             }
 
             var pixelBuffer: CVPixelBuffer?

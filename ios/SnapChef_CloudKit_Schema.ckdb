@@ -1,9 +1,11 @@
 -- SnapChef CloudKit Schema Definition
--- Version: 2.2
--- Last Updated: August 20, 2025
--- Changes: Added QUERYABLE markers to all fields used in NSPredicate queries
---          Fixed isDeleted field to be QUERYABLE for comment filtering
---          Added CREATE permission for RecipeComment to allow authenticated users to post comments
+-- Version: 2.4
+-- Last Updated: August 21, 2025
+-- Changes: Fixed "Field 'createdBy' is not marked queryable" errors
+--          Made ___createdBy system field QUERYABLE for all record types with "_creator" permissions
+--          Made ___recordID QUERYABLE for all record types to support ID-based queries
+--          This fixes Achievement, UserChallenge, and other private record type queries
+--          Previous changes preserved from v2.3
 --
 -- DEPLOYMENT INSTRUCTIONS:
 -- 1. Open CloudKit Dashboard: https://icloud.developer.apple.com/dashboard
@@ -50,6 +52,7 @@ DEFINE SCHEMA
         "___modTime"    TIMESTAMP,
         "___modifiedBy" REFERENCE,
         "___recordID"   REFERENCE QUERYABLE,
+        userID          STRING QUERYABLE,
         username        STRING QUERYABLE SORTABLE,
         displayName     STRING QUERYABLE SEARCHABLE,
         email           STRING,
@@ -72,6 +75,32 @@ DEFINE SCHEMA
         followingCount  INT64,
         isVerified      INT64,
         bio             STRING,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE UserProfile (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
+        userID          STRING QUERYABLE,
+        username        STRING QUERYABLE SORTABLE,
+        displayName     STRING QUERYABLE SEARCHABLE,
+        email           STRING,
+        profileImageAsset ASSET,
+        bio             STRING,
+        createdAt       TIMESTAMP SORTABLE,
+        updatedAt       TIMESTAMP SORTABLE,
+        isVerified      INT64,
+        isPremium       INT64,
+        totalPoints     INT64 QUERYABLE SORTABLE,
+        recipesShared   INT64,
+        followersCount  INT64,
+        followingCount  INT64,
         GRANT WRITE TO "_creator",
         GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
@@ -111,11 +140,11 @@ DEFINE SCHEMA
 
     RECORD TYPE UserChallenge (
         "___createTime" TIMESTAMP,
-        "___createdBy"  REFERENCE,
+        "___createdBy"  REFERENCE QUERYABLE,
         "___etag"       STRING,
         "___modTime"    TIMESTAMP,
         "___modifiedBy" REFERENCE,
-        "___recordID"   REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
         userID          STRING QUERYABLE,
         challengeID     REFERENCE QUERYABLE,
         status          STRING QUERYABLE,
@@ -196,11 +225,11 @@ DEFINE SCHEMA
 
     RECORD TYPE Achievement (
         "___createTime" TIMESTAMP,
-        "___createdBy"  REFERENCE,
+        "___createdBy"  REFERENCE QUERYABLE,
         "___etag"       STRING,
         "___modTime"    TIMESTAMP,
         "___modifiedBy" REFERENCE,
-        "___recordID"   REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
         id              STRING QUERYABLE,
         userID          STRING QUERYABLE,
         type            STRING QUERYABLE,
@@ -217,11 +246,11 @@ DEFINE SCHEMA
 
     RECORD TYPE CoinTransaction (
         "___createTime" TIMESTAMP,
-        "___createdBy"  REFERENCE,
+        "___createdBy"  REFERENCE QUERYABLE,
         "___etag"       STRING,
         "___modTime"    TIMESTAMP,
         "___modifiedBy" REFERENCE,
-        "___recordID"   REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
         userID          STRING QUERYABLE,
         amount          INT64,
         type            STRING QUERYABLE,
@@ -387,7 +416,7 @@ DEFINE SCHEMA
 
     RECORD TYPE UserPreferences (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
@@ -408,11 +437,11 @@ DEFINE SCHEMA
 
     RECORD TYPE AnalyticsEvent (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         eventType          STRING QUERYABLE,
         eventName          STRING QUERYABLE,
@@ -444,11 +473,11 @@ DEFINE SCHEMA
 
     RECORD TYPE SocialShare (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         recipeID           STRING,
         challengeID        STRING,
@@ -461,11 +490,11 @@ DEFINE SCHEMA
 
     RECORD TYPE CameraSession (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         sessionID          STRING QUERYABLE,
         captureType        STRING,
@@ -482,11 +511,11 @@ DEFINE SCHEMA
 
     RECORD TYPE RecipeGeneration (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         sessionID          STRING QUERYABLE,
         recipeData         STRING,
@@ -501,11 +530,11 @@ DEFINE SCHEMA
 
     RECORD TYPE AppSession (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         sessionID          STRING QUERYABLE,
         startTime          TIMESTAMP QUERYABLE SORTABLE,
@@ -523,11 +552,11 @@ DEFINE SCHEMA
 
     RECORD TYPE FeatureUsage (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         feature            STRING QUERYABLE,
         usageCount         INT64,
@@ -540,11 +569,11 @@ DEFINE SCHEMA
 
     RECORD TYPE ErrorLog (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         errorType          STRING QUERYABLE,
         errorMessage       STRING,
@@ -559,7 +588,7 @@ DEFINE SCHEMA
 
     RECORD TYPE FoodPreference (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
@@ -580,11 +609,11 @@ DEFINE SCHEMA
 
     RECORD TYPE SearchHistory (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         searchQuery        STRING QUERYABLE,
         searchType         STRING,
@@ -597,7 +626,7 @@ DEFINE SCHEMA
 
     RECORD TYPE NotificationPreference (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
@@ -618,11 +647,11 @@ DEFINE SCHEMA
 
     RECORD TYPE DeviceSync (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         deviceID           STRING QUERYABLE,
         deviceName         STRING,
@@ -638,11 +667,11 @@ DEFINE SCHEMA
     -- Streak System Records
     RECORD TYPE UserStreak (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         streakType         STRING QUERYABLE,
         currentStreak      INT64 SORTABLE,
@@ -660,11 +689,11 @@ DEFINE SCHEMA
 
     RECORD TYPE StreakHistory (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         streakType         STRING QUERYABLE,
         streakLength       INT64 QUERYABLE SORTABLE,
@@ -678,11 +707,11 @@ DEFINE SCHEMA
 
     RECORD TYPE StreakAchievement (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         achievementType    STRING QUERYABLE,
         unlockedAt         TIMESTAMP QUERYABLE SORTABLE,
@@ -698,11 +727,11 @@ DEFINE SCHEMA
 
     RECORD TYPE StreakFreeze (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         freezeDate         TIMESTAMP QUERYABLE SORTABLE,
         freezeType         STRING QUERYABLE,
@@ -716,11 +745,11 @@ DEFINE SCHEMA
 
     RECORD TYPE TeamStreak (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         teamID             STRING QUERYABLE,
         streakType         STRING QUERYABLE,
         currentStreak      INT64 QUERYABLE SORTABLE,
@@ -733,11 +762,11 @@ DEFINE SCHEMA
 
     RECORD TYPE StreakPowerUp (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         powerUpType        STRING QUERYABLE,
         streakType         STRING QUERYABLE,
@@ -750,11 +779,11 @@ DEFINE SCHEMA
 
     RECORD TYPE StreakLeaderboard (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         userName           STRING,
         streakType         STRING QUERYABLE,
@@ -771,11 +800,11 @@ DEFINE SCHEMA
     -- Future Photo Storage (after moderation implementation)
     RECORD TYPE PhotoModeration (
         "___createTime"    TIMESTAMP,
-        "___createdBy"     REFERENCE,
+        "___createdBy"     REFERENCE QUERYABLE,
         "___etag"          STRING,
         "___modTime"       TIMESTAMP,
         "___modifiedBy"    REFERENCE,
-        "___recordID"      REFERENCE,
+        "___recordID"      REFERENCE QUERYABLE,
         userID             STRING QUERYABLE,
         photoType          STRING QUERYABLE,
         moderationStatus   STRING QUERYABLE,

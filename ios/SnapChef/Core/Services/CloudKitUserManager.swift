@@ -301,7 +301,7 @@ class CloudKitUserManager: ObservableObject {
     
     /// Get user achievements (badges earned)
     func getUserAchievements(for userID: String) async throws -> [CloudKitAchievement] {
-        let predicate = NSPredicate(format: "\(CKField.Achievement.userID) == %@", userID)
+        let predicate = NSPredicate(format: "%K == %@", CKField.Achievement.userID, userID)
         let query = CKQuery(recordType: CloudKitConfig.achievementRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.Achievement.earnedAt, ascending: false)]
         

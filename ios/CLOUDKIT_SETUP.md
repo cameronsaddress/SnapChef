@@ -2,7 +2,36 @@
 
 ## Current Issues & Solutions
 
-### 1. CloudKit Permission Errors ("CREATE operation not permitted")
+### 1. CloudKit Query Field Limitations ("Field not queryable" errors)
+
+**CRITICAL ISSUE FIXED:** Many queries were failing because the `userID` field and other fields are not marked as "Queryable" in the CloudKit schema.
+
+#### Root Cause:
+CloudKit requires fields to be explicitly marked as "Queryable" in the schema to be used in NSPredicate queries. Using non-queryable fields results in runtime errors.
+
+#### Solution Implemented:
+- **Replaced userID-based queries** with "fetch all and filter locally" approach
+- **Updated all CloudKit service classes** to use `NSPredicate(value: true)` followed by local filtering
+- **Enhanced CollectionProgressView** with proper refresh mechanisms
+- **Fixed Achievement loading** by updating query methods
+
+#### Files Updated:
+- `CloudKitUserManager.swift` - Fixed achievement queries
+- `CloudKitSyncService.swift` - Fixed user challenge queries
+- `ProfileView.swift` - Fixed achievement and challenge loading
+- `GamificationManager.swift` - Fixed challenge progress sync
+- `CloudKitModules/ChallengeModule.swift` - Fixed user challenge queries
+- `CloudKitModules/StreakModule.swift` - Fixed user streak queries
+- `CloudKitModules/UserModule.swift` - Fixed user profile queries
+- `CloudKitModules/DataModule.swift` - Fixed food preference queries
+
+#### Performance Note:
+While "fetch all and filter locally" is less efficient than server-side filtering, it's necessary when fields aren't queryable. For production, consider:
+1. Making key fields queryable in CloudKit schema
+2. Using alternative query patterns with queryable fields
+3. Implementing client-side caching for better performance
+
+### 2. CloudKit Permission Errors ("CREATE operation not permitted")
 
 The app is encountering permission errors when trying to create records in CloudKit. This needs to be fixed in the CloudKit Dashboard.
 

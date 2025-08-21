@@ -121,10 +121,7 @@ public final class PhotoStorageManager: ObservableObject {
     /// Get photos for a recipe
     public func getPhotos(for recipeId: UUID) -> RecipePhotos? {
         let photos = recipePhotos[recipeId]
-        // OPTIMIZATION: Only log when photos are first found or after long intervals to reduce spam
-        if photos != nil {
-            logger.debug("📸 Getting photos for recipe \(recipeId) - found: true")
-        }
+        // Removed excessive logging to reduce console spam
         return photos
     }
 

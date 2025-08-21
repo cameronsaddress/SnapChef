@@ -80,13 +80,14 @@ struct ProfileView: View {
                     )
                     .staggeredFade(index: 4, isShowing: contentVisible)
 
+
                     // Sign Out Button (only if authenticated)
                     if cloudKitAuthManager.isAuthenticated {
                         EnhancedSignOutButton(action: {
                             cloudKitAuthManager.signOut()
                         })
-                        .staggeredFade(index: 5, isShowing: contentVisible)
-                        .padding(.top, 20)
+                        .staggeredFade(index: 6, isShowing: contentVisible)
+                        .padding(.top, 10)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -218,7 +219,7 @@ struct EnhancedProfileHeader: View {
     }
 
     private var emailDisplay: String {
-        if let cloudKitUser = cloudKitAuthManager.currentUser {
+        if cloudKitAuthManager.currentUser != nil {
             // TODO: Fix CloudKitUser type compatibility
             return "Start your culinary journey" // cloudKitUser.email ?? "Start your culinary journey"
         } else if let userEmail = user?.email {
@@ -1599,6 +1600,7 @@ struct CollectionProgressView: View {
     @State private var animateProgress = false
     @State private var userStats: UserStats?
     @State private var isLoadingStats = false
+    @State private var refreshID = UUID() // Force view refresh
 
     var totalRecipes: Int {
         // Use UserStats if available, otherwise CloudKit recipe counts when available
@@ -1678,11 +1680,24 @@ struct CollectionProgressView: View {
             )
         }
         .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.5)) {
-                animateProgress = true
+            DispatchQueue.main.async {
+                withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.5)) {
+                    animateProgress = true
+                }
             }
             loadUserStats()
         }
+        .onChange(of: cloudKitAuthManager.isAuthenticated) { _ in
+            // Refresh data when authentication changes
+            loadUserStats()
+            refreshID = UUID()
+        }
+        .onChange(of: cloudKitRecipeManager.userCreatedRecipeIDs.count) { _ in
+            // Refresh when recipe count changes
+            loadUserStats()
+            refreshID = UUID()
+        }
+        .id(refreshID)
     }
     
     // MARK: - Data Loading Methods
@@ -1811,27 +1826,18 @@ struct ProfileAchievementGalleryView: View {
             do {
                 guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { return }
 
-                let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-                let privateDB = container.privateCloudDatabase
-
-                let predicate = NSPredicate(format: "userID == %@", userID)
-                let query = CKQuery(recordType: "Achievement", predicate: predicate)
-
-                let (results, _) = try await privateDB.records(matching: query)
-
-                var loadedAchievements: [ProfileAchievement] = []
-                for (_, result) in results {
-                    if let record = try? result.get() {
-                        let achievement = ProfileAchievement(
-                            id: record["id"] as? String ?? UUID().uuidString,
-                            title: record["name"] as? String ?? "Unknown",
-                            description: record["description"] as? String ?? "",
-                            icon: record["iconName"] as? String ?? "🏆",
-                            isUnlocked: true,
-                            unlockedDate: record["earnedAt"] as? Date
-                        )
-                        loadedAchievements.append(achievement)
-                    }
+                // Use CloudKitUserManager which handles proper achievement queries
+                let achievements = try await CloudKitUserManager.shared.getUserAchievements(for: userID)
+                
+                let loadedAchievements: [ProfileAchievement] = achievements.map { achievement in
+                    ProfileAchievement(
+                        id: achievement.id,
+                        title: achievement.name,
+                        description: achievement.description,
+                        icon: achievement.iconName,
+                        isUnlocked: true,
+                        unlockedDate: achievement.earnedAt
+                    )
                 }
 
                 await MainActor.run {
@@ -2098,7 +2104,6 @@ struct ActiveChallengesSection: View {
                 let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
                 let privateDB = container.privateCloudDatabase
 
-                // Fetch user's active challenges
                 let predicate = NSPredicate(format: "userID == %@ AND status == %@", userID, "active")
                 let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
 

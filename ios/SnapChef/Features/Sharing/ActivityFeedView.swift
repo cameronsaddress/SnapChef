@@ -1,6 +1,15 @@
 import SwiftUI
 import CloudKit
 
+// MARK: - Array Extension for Batch Processing
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
+        }
+    }
+}
+
 // MARK: - Identifiable Wrappers for Sheet Presentation
 struct IdentifiableRecipe: Identifiable {
     let id: String
@@ -744,6 +753,9 @@ class ActivityFeedManager: ObservableObject {
             // Take only the most recent 50 activities to avoid duplicates
             let limitedRecords = Array(sortedRecords.prefix(50))
             
+            // Batch fetch all unique user IDs to avoid redundant fetches
+            await batchFetchUsers(from: limitedRecords)
+            
             let newActivities = await withTaskGroup(of: ActivityItem?.self) { group in
                 for record in limitedRecords {
                     group.addTask {
@@ -818,21 +830,97 @@ class ActivityFeedManager: ObservableObject {
         return Array(activities.prefix(limit))
     }
     
-    /// Fetches user display name by userID, using cache when possible
+    /// Batch fetch users to populate cache and avoid redundant individual fetches
+    private func batchFetchUsers(from records: [CKRecord]) async {
+        // Extract all unique user IDs from activity records
+        var userIDsToFetch = Set<String>()
+        
+        for record in records {
+            if let actorID = record[CKField.Activity.actorID] as? String {
+                if userCache[actorID] == nil {
+                    userIDsToFetch.insert(actorID)
+                }
+            }
+            if let targetUserID = record[CKField.Activity.targetUserID] as? String {
+                if userCache[targetUserID] == nil {
+                    userIDsToFetch.insert(targetUserID)
+                }
+            }
+        }
+        
+        guard !userIDsToFetch.isEmpty else {
+            print("✅ All users already cached, skipping batch fetch")
+            return
+        }
+        
+        print("📥 Batch fetching \(userIDsToFetch.count) users")
+        
+        // Fetch users in batches to avoid overwhelming CloudKit
+        let batchSize = 20
+        let userIDBatches = Array(userIDsToFetch).chunked(into: batchSize)
+        
+        await withTaskGroup(of: Void.self) { group in
+            for batch in userIDBatches {
+                group.addTask {
+                    await self.fetchUserBatch(userIDs: batch)
+                }
+            }
+        }
+    }
+    
+    /// Fetch a batch of users by their IDs
+    private func fetchUserBatch(userIDs: [String]) async {
+        let recordIDs = userIDs.map { CKRecord.ID(recordName: $0) }
+        
+        do {
+            let fetchOperation = CKFetchRecordsOperation(recordIDs: recordIDs)
+            fetchOperation.database = publicDatabase
+            
+            let (records, _) = try await publicDatabase.records(for: recordIDs)
+            
+            for (recordID, result) in records {
+                switch result {
+                case .success(let record):
+                    let user = CloudKitUser(from: record)
+                    userCache[recordID.recordName] = user
+                case .failure(let error):
+                    print("❌ Failed to fetch user \(recordID.recordName): \(error)")
+                    // Create placeholder user to avoid repeated failed fetches
+                    userCache[recordID.recordName] = CloudKitUser(
+                        recordID: recordID.recordName,
+                        username: "Unknown Chef",
+                        displayName: "Unknown Chef",
+                        email: nil,
+                        profilePicture: nil,
+                        totalPoints: 0,
+                        recipesCreated: 0,
+                        isVerified: false
+                    )
+                }
+            }
+            
+            print("✅ Batch fetched \(userIDs.count) users")
+        } catch {
+            print("❌ Failed to batch fetch users: \(error)")
+        }
+    }
+
+    /// Fetches user display name by userID, using cache when available
     private func fetchUserDisplayName(userID: String) async -> String {
-        // Check cache first
+        // Check cache first to avoid redundant fetches
         if let cachedUser = userCache[userID] {
             return cachedUser.username ?? cachedUser.displayName
         }
         
-        // Fetch from CloudKit
+        // This should rarely happen now with batch fetching, but fallback just in case
         do {
             let userRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: userID))
             let user = CloudKitUser(from: userRecord)
             
-            // Cache the user for future use
+            // Update cache with fresh data
             userCache[userID] = user
             
+            print("⚠️ Individual fetch for \(userID): \(user.username ?? user.displayName)")
             return user.username ?? user.displayName
         } catch {
             print("❌ Failed to fetch user details for \(userID): \(error)")
@@ -894,6 +982,48 @@ class ActivityFeedManager: ObservableObject {
                     print("⚠️ Error validating recipe \(recipeID) for activity \(id): \(error)")
                     // Continue with the activity even if validation failed due to network issues
                 }
+            }
+        }
+        
+        // For challenge completion activities, validate that proof was actually submitted
+        if activityType == .challengeCompleted {
+            let challengeID = record["challengeID"] as? String ?? recipeID
+            if let challengeID = challengeID {
+                // Check if there's a UserChallenge record with proof submission
+                do {
+                    // Create a CKRecord.Reference for the challenge ID
+                    let challengeReference = CKRecord.Reference(recordID: CKRecord.ID(recordName: challengeID), action: .none)
+                    let predicate = NSPredicate(format: "%K == %@ AND challengeID == %@ AND %K == %@",
+                                              CKField.UserChallenge.userID, actorID,
+                                              challengeReference,
+                                              CKField.UserChallenge.status, "completed")
+                    let query = CKQuery(recordType: CloudKitConfig.userChallengeRecordType, predicate: predicate)
+                    
+                    let results = try await publicDatabase.records(matching: query)
+                    
+                    // Only show challenge completion if there's a completed UserChallenge record with proof
+                    if results.matchResults.isEmpty {
+                        print("⚠️ Skipping challenge completion activity \(id) - no proof submission found")
+                        return nil
+                    }
+                    
+                    // Verify proof image exists in the UserChallenge record
+                    if let (_, result) = results.matchResults.first,
+                       case .success(let userChallengeRecord) = result {
+                        let hasProofImage = userChallengeRecord["proofImage"] != nil
+                        if !hasProofImage {
+                            print("⚠️ Skipping challenge completion activity \(id) - no proof image found")
+                            return nil
+                        }
+                        print("✅ Validated challenge completion with proof for activity: \(id)")
+                    }
+                } catch {
+                    print("⚠️ Error validating challenge completion for activity \(id): \(error)")
+                    return nil // Skip questionable challenge completion activities
+                }
+            } else {
+                print("⚠️ Skipping challenge completion activity \(id) - no challenge ID found")
+                return nil
             }
         }
 
@@ -996,22 +1126,8 @@ class ActivityFeedManager: ObservableObject {
                 challengeID: nil,
                 timestamp: Date().addingTimeInterval(-10_800),
                 isRead: true
-            ),
-            ActivityItem(
-                id: UUID().uuidString,
-                type: .challengeCompleted,
-                userID: "user4",
-                userName: "Bobby Flay",
-                userPhoto: nil,
-                targetUserID: nil,
-                targetUserName: nil,
-                recipeID: nil,
-                recipeName: "30-Minute Meals",
-                recipeImage: nil,
-                challengeID: "challenge_30min",  // Add a mock challenge ID
-                timestamp: Date().addingTimeInterval(-14_400),
-                isRead: true
             )
+            // Removed mock challenge completion activity - only show real completions with proof
         ]
     }
 }

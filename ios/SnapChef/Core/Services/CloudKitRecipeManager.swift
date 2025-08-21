@@ -454,6 +454,12 @@ class CloudKitRecipeManager: ObservableObject {
             let record = try await privateDB.record(for: recordID)
             let recipe = try parseRecipeFromRecord(record)
             cachedRecipes[recipeID] = recipe
+            
+            // Store owner information in cache
+            let ownerID = record["ownerID"] as? String ?? ""
+            let ownerName = record["ownerName"] as? String ?? ""
+            CloudKitRecipeCache.shared.addRecipeToCache(recipe, ownerID: ownerID, ownerName: ownerName)
+            
             print("☁️ Recipe fetched from private CloudKit: \(recipeID)")
             return recipe
         } catch {
@@ -461,6 +467,12 @@ class CloudKitRecipeManager: ObservableObject {
             let record = try await publicDB.record(for: recordID)
             let recipe = try parseRecipeFromRecord(record)
             cachedRecipes[recipeID] = recipe
+            
+            // Store owner information in cache
+            let ownerID = record["ownerID"] as? String ?? ""
+            let ownerName = record["ownerName"] as? String ?? ""
+            CloudKitRecipeCache.shared.addRecipeToCache(recipe, ownerID: ownerID, ownerName: ownerName)
+            
             print("☁️ Recipe fetched from public CloudKit: \(recipeID)")
             return recipe
         }
@@ -484,6 +496,12 @@ class CloudKitRecipeManager: ObservableObject {
             let record = try await fetchRecordWithRetry(recordID: recordID, database: privateDB, maxRetries: 2)
             let recipe = try parseRecipeFromRecord(record)
             cachedRecipes[recipeID] = recipe
+            
+            // Store owner information in cache
+            let ownerID = record["ownerID"] as? String ?? ""
+            let ownerName = record["ownerName"] as? String ?? ""
+            CloudKitRecipeCache.shared.addRecipeToCache(recipe, ownerID: ownerID, ownerName: ownerName)
+            
             print("☁️ Recipe fetched from private CloudKit: \(recipeID)")
             return recipe
         } catch _ as CKError {
@@ -492,6 +510,11 @@ class CloudKitRecipeManager: ObservableObject {
                 let record = try await fetchRecordWithRetry(recordID: recordID, database: publicDB, maxRetries: 2)
                 let recipe = try parseRecipeFromRecord(record)
                 cachedRecipes[recipeID] = recipe
+                
+                // Store owner information in cache
+                let ownerID = record["ownerID"] as? String ?? ""
+                let ownerName = record["ownerName"] as? String ?? ""
+                CloudKitRecipeCache.shared.addRecipeToCache(recipe, ownerID: ownerID, ownerName: ownerName)
                 
                 // Note: View count increment disabled due to CloudKit permission restrictions
                 // Only recipe owner can modify recipe records (GRANT WRITE TO "_creator")
@@ -519,6 +542,11 @@ class CloudKitRecipeManager: ObservableObject {
                 let record = try await fetchRecordWithRetry(recordID: recordID, database: publicDB, maxRetries: 2)
                 let recipe = try parseRecipeFromRecord(record)
                 cachedRecipes[recipeID] = recipe
+                
+                // Store owner information in cache
+                let ownerID = record["ownerID"] as? String ?? ""
+                let ownerName = record["ownerName"] as? String ?? ""
+                CloudKitRecipeCache.shared.addRecipeToCache(recipe, ownerID: ownerID, ownerName: ownerName)
                 
                 // Note: View count increment disabled due to CloudKit permission restrictions
                 // Only recipe owner can modify recipe records (GRANT WRITE TO "_creator")
@@ -897,6 +925,11 @@ class CloudKitRecipeManager: ObservableObject {
                     recipes.append(recipe)
                     // Cache the recipe
                     cachedRecipes[recipe.id.uuidString] = recipe
+                    
+                    // Store owner information in cache
+                    let ownerID = record["ownerID"] as? String ?? ""
+                    let ownerName = record["ownerName"] as? String ?? ""
+                    CloudKitRecipeCache.shared.addRecipeToCache(recipe, ownerID: ownerID, ownerName: ownerName)
                 }
             }
         }

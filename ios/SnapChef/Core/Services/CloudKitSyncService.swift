@@ -688,8 +688,8 @@ final class CloudKitSyncService: ObservableObject {
         guard let userID = AuthenticationManager().currentUser?.id else { return }
 
         do {
-            // Query user's challenge progress
-            let predicate = NSPredicate(format: "%K == %@", CKField.UserChallenge.userID, userID)
+            // Fetch all UserChallenge records and filter locally
+            let predicate = NSPredicate(value: true) // Fetch all records
             let query = CKQuery(recordType: CloudKitConfig.userChallengeRecordType, predicate: predicate)
 
             let results = try await privateDatabase.records(matching: query)
@@ -697,7 +697,11 @@ final class CloudKitSyncService: ObservableObject {
             var userChallenges: [UserChallenge] = []
             for (_, result) in results.matchResults {
                 if case .success(let record) = result {
-                    userChallenges.append(UserChallenge(from: record))
+                    // Filter for this user's challenges locally
+                    if let recordUserID = record[CKField.UserChallenge.userID] as? String,
+                       recordUserID == userID {
+                        userChallenges.append(UserChallenge(from: record))
+                    }
                 }
             }
 
@@ -762,16 +766,27 @@ final class CloudKitSyncService: ObservableObject {
         }
 
         // Find or create UserChallenge record
-        let predicate = NSPredicate(format: "%K == %@ AND %K == %@",
-                                  CKField.UserChallenge.userID, userID,
-                                  "challengeID", challengeID)
+        // Fetch all and filter locally since userID may not be queryable
+        let predicate = NSPredicate(value: true)
         let query = CKQuery(recordType: CloudKitConfig.userChallengeRecordType, predicate: predicate)
 
         let results = try await publicDatabase.records(matching: query)
+        
+        // Filter for this user's challenge locally
+        let filteredResults = results.matchResults.filter { _, result in
+            if case .success(let record) = result,
+               let recordUserID = record[CKField.UserChallenge.userID] as? String,
+               recordUserID == userID,
+               let challengeRef = record["challengeID"] as? CKRecord.Reference,
+               challengeRef.recordID.recordName == challengeID {
+                return true
+            }
+            return false
+        }
 
         var userChallengeRecord: CKRecord
 
-        if let (_, result) = results.matchResults.first,
+        if let (_, result) = filteredResults.first,
            case .success(let record) = result {
             userChallengeRecord = record
         } else {
@@ -813,6 +828,9 @@ final class CloudKitSyncService: ObservableObject {
         if let challenge = GamificationManager.shared.getChallenge(by: challengeID) {
             await awardChallengeRewards(challenge: challenge, userID: userID)
         }
+
+        // Create activity feed entry for challenge completion only after proof submission
+        await createChallengeCompletionActivity(challengeID: challengeID, userID: userID)
 
         print("✅ Challenge proof submitted successfully")
     }
@@ -859,6 +877,31 @@ final class CloudKitSyncService: ObservableObject {
             } catch {
                 print("Failed to award challenge rewards: \(error)")
             }
+        }
+    }
+
+    /// Creates an activity feed entry for challenge completion - only called after proof submission
+    private func createChallengeCompletionActivity(challengeID: String, userID: String) async {
+        do {
+            let activityRecord = CKRecord(recordType: CloudKitConfig.activityRecordType)
+            activityRecord[CKField.Activity.id] = UUID().uuidString
+            activityRecord[CKField.Activity.type] = "challengecompleted"
+            activityRecord[CKField.Activity.actorID] = userID
+            activityRecord[CKField.Activity.targetUserID] = userID // User completes their own challenge
+            activityRecord["challengeID"] = challengeID
+            activityRecord[CKField.Activity.timestamp] = Date()
+            activityRecord[CKField.Activity.isRead] = 0
+            
+            // Get challenge name for activity description
+            if let challenge = GamificationManager.shared.getChallenge(by: challengeID) {
+                activityRecord[CKField.Activity.challengeName] = challenge.title
+            }
+            
+            _ = try await publicDatabase.save(activityRecord)
+            print("✅ Created challenge completion activity for challengeID: \(challengeID)")
+        } catch {
+            print("⚠️ Failed to create challenge completion activity: \(error)")
+            // Don't throw - this is not critical to proof submission
         }
     }
 

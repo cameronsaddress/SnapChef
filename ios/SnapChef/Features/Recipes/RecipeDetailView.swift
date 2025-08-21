@@ -143,13 +143,7 @@ struct RecipeDetailView: View {
             VStack(spacing: 4) {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(size: 24, weight: .medium))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color(hex: "#9b59b6"), Color(hex: "#8e44ad")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .foregroundColor(.white.opacity(0.8))
             }
         }
     }
@@ -209,7 +203,7 @@ struct RecipeDetailView: View {
                 HStack {
                     Image(systemName: "list.bullet.circle.fill")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#ffd700"))
+                        .foregroundColor(Color(hex: "#9b59b6"))
                     
                     Text("Ingredients")
                         .font(.system(size: 24, weight: .bold))
@@ -220,12 +214,12 @@ struct RecipeDetailView: View {
                     // Ingredient count
                     Text("\(recipe.ingredients.count)")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(Color(hex: "#ffd700"))
+                        .foregroundColor(.white.opacity(0.8))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(
                             Capsule()
-                                .fill(Color(hex: "#ffd700").opacity(0.2))
+                                .fill(Color.white.opacity(0.2))
                         )
                 }
                 
@@ -246,15 +240,11 @@ struct RecipeDetailView: View {
                     LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
                         ForEach(Array(recipe.ingredients.enumerated()), id: \.element.id) { index, ingredient in
                             HStack(spacing: 12) {
-                                // Number badge
-                                Text("\(index + 1)")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(Color(hex: "#2d1b69"))
+                                // Purple bullet point
+                                Text("•")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(Color(hex: "#9b59b6"))
                                     .frame(width: 24, height: 24)
-                                    .background(
-                                        Circle()
-                                            .fill(Color(hex: "#ffd700"))
-                                    )
                                 
                                 // Ingredient text
                                 VStack(alignment: .leading, spacing: 2) {
@@ -283,7 +273,7 @@ struct RecipeDetailView: View {
                                     .fill(Color.white.opacity(0.05))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color(hex: "#ffd700").opacity(0.2), lineWidth: 1)
+                                            .stroke(Color(hex: "#9b59b6").opacity(0.2), lineWidth: 1)
                                     )
                             )
                         }
@@ -301,7 +291,7 @@ struct RecipeDetailView: View {
                 HStack {
                     Image(systemName: "doc.text.fill")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#ffd700"))
+                        .foregroundColor(Color(hex: "#9b59b6"))
                     
                     Text("Instructions")
                         .font(.system(size: 24, weight: .bold))
@@ -312,12 +302,12 @@ struct RecipeDetailView: View {
                     // Step count
                     Text("\(recipe.instructions.count) steps")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(Color(hex: "#ffd700"))
+                        .foregroundColor(.white.opacity(0.8))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(
                             Capsule()
-                                .fill(Color(hex: "#ffd700").opacity(0.2))
+                                .fill(Color.white.opacity(0.2))
                         )
                 }
                 
@@ -341,11 +331,11 @@ struct RecipeDetailView: View {
                                 // Step number badge
                                 Text("\(index + 1)")
                                     .font(.system(size: 18, weight: .bold))
-                                    .foregroundColor(Color(hex: "#2d1b69"))
+                                    .foregroundColor(.white)
                                     .frame(width: 36, height: 36)
                                     .background(
                                         Circle()
-                                            .fill(Color(hex: "#ffd700"))
+                                            .fill(Color(hex: "#9b59b6"))
                                     )
                                 
                                 // Instruction text
@@ -364,7 +354,7 @@ struct RecipeDetailView: View {
                                     .fill(Color.white.opacity(0.05))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color(hex: "#ffd700").opacity(0.2), lineWidth: 1)
+                                            .stroke(Color(hex: "#9b59b6").opacity(0.2), lineWidth: 1)
                                     )
                             )
                         }
@@ -394,7 +384,7 @@ struct RecipeDetailView: View {
                     HStack {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(Color(hex: "#9b59b6"))
+                            .foregroundColor(Color(hex: "#ff9500"))
                         
                         Text("Cooking Techniques")
                             .font(.system(size: 24, weight: .bold))
@@ -407,7 +397,7 @@ struct RecipeDetailView: View {
                         HStack {
                             Image(systemName: "arrow.right.circle.fill")
                                 .font(.system(size: 14))
-                                .foregroundColor(Color(hex: "#9b59b6"))
+                                .foregroundColor(Color(hex: "#ff9500"))
                             Text(technique)
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(.white.opacity(0.9))
@@ -429,9 +419,9 @@ struct RecipeDetailView: View {
             DetectiveCard {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
-                        Image(systemName: "sparkles")
+                        Image(systemName: "chart.bar.fill")
                             .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(Color(hex: "#9b59b6"))
+                            .foregroundColor(Color(hex: "#4facfe"))
                         
                         Text("Flavor Profile")
                             .font(.system(size: 24, weight: .bold))
@@ -496,7 +486,7 @@ struct RecipeDetailView: View {
                     HStack {
                         Image(systemName: "lightbulb.fill")
                             .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(Color(hex: "#9b59b6"))
+                            .foregroundColor(Color(hex: "#ffd700"))
                         
                         Text("Pro Tips")
                             .font(.system(size: 24, weight: .bold))
@@ -507,9 +497,9 @@ struct RecipeDetailView: View {
                     
                     ForEach(Array(recipe.proTips.enumerated()), id: \.offset) { index, tip in
                         HStack(alignment: .top) {
-                            Text("\(index + 1).")
+                            Text("•")
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(Color(hex: "#9b59b6"))
+                                .foregroundColor(Color(hex: "#ffd700"))
                                 .frame(width: 25)
                             Text(tip)
                                 .font(.system(size: 16, weight: .medium))
@@ -533,7 +523,7 @@ struct RecipeDetailView: View {
                     HStack {
                         Image(systemName: "eye.fill")
                             .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(Color(hex: "#9b59b6"))
+                            .foregroundColor(Color(hex: "#43e97b"))
                         
                         Text("Visual Clues")
                             .font(.system(size: 24, weight: .bold))
@@ -567,7 +557,7 @@ struct RecipeDetailView: View {
                 HStack {
                     Image(systemName: "chart.bar.fill")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#ffd700"))
+                        .foregroundColor(.white.opacity(0.8))
                     
                     Text("Nutrition Facts")
                         .font(.system(size: 24, weight: .bold))
@@ -659,13 +649,7 @@ struct RecipeDetailView: View {
                         Button(action: { showingPrintView = true }) {
                             Image(systemName: "printer")
                                 .font(.system(size: 28))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [Color(hex: "#9b59b6"), Color(hex: "#8e44ad")],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
+                                .foregroundColor(.white.opacity(0.8))
                         }
                         
                         Spacer()
@@ -1266,7 +1250,7 @@ extension RecipeDetailView {
                 HStack {
                     Image(systemName: "bubble.left.fill")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(Color(hex: "#9b59b6"))
+                        .foregroundColor(.white.opacity(0.8))
                     
                     Text("Comments")
                         .font(.system(size: 24, weight: .bold))

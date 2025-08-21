@@ -1227,7 +1227,7 @@ struct CustomRecipePhotoView: View {
     private var beforePhotoPlaceholder: some View {
         VStack {
             Image(systemName: "refrigerator")
-                .font(.system(size: height * 0.25))
+                .font(.system(size: max(height * 0.25, 20)))  // Ensure minimum size
                 .foregroundColor(.white.opacity(0.5))
             if showLabels {
                 Text("Fridge")
@@ -1251,7 +1251,7 @@ struct CustomRecipePhotoView: View {
     private var afterPhotoPlaceholder: some View {
         VStack(spacing: 4) {
             Image(systemName: "camera.fill")
-                .font(.system(size: height * 0.2))
+                .font(.system(size: max(height * 0.2, 16)))  // Ensure minimum size
                 .foregroundColor(.white.opacity(0.7))
             if showLabels {
                 Text("After")

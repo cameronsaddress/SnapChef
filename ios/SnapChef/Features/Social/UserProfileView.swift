@@ -71,6 +71,7 @@ struct UserProfileView: View {
         }
         .task {
             await viewModel.loadUserProfile(userID: userID)
+            await viewModel.loadUserStats(userID: userID)
         }
         .sheet(isPresented: $showingFollowers) {
             FollowListView(userID: userID, mode: .followers)

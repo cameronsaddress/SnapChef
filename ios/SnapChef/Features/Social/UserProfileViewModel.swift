@@ -7,13 +7,16 @@ class UserProfileViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isFollowing = false
     @Published var isLoadingFollow = false
+    @Published var isLoadingStats = false
     @Published var userRecipes: [RecipeData] = []
     @Published var achievements: [UserAchievement] = []
     @Published var totalLikes = 0
     @Published var totalCookingTime = 0
+    @Published var dynamicStats: UserStats?
 
     private let cloudKitAuth = CloudKitAuthManager.shared
     private let cloudKitSync = CloudKitSyncService.shared
+    private let cloudKitUserManager = CloudKitUserManager.shared
     private let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
 
     func loadUserProfile(userID: String) async {
@@ -108,6 +111,85 @@ class UserProfileViewModel: ObservableObject {
 
         // Calculate total cooking time (mock data for now)
         totalCookingTime = userRecipes.count * 45 // Average 45 mins per recipe
+    }
+    
+    /// Load comprehensive user stats from CloudKit
+    func loadUserStats(userID: String) async {
+        isLoadingStats = true
+        
+        do {
+            let stats = try await cloudKitUserManager.getUserStats(for: userID)
+            self.dynamicStats = stats
+            
+            // Update the user profile with dynamic stats if we have it
+            if var profile = self.userProfile {
+                profile.followerCount = stats.followerCount
+                profile.followingCount = stats.followingCount
+                profile.recipesShared = stats.recipeCount
+                profile.currentStreak = stats.currentStreak
+                self.userProfile = profile
+                print("✅ UserProfileViewModel: Updated profile with dynamic stats - followers: \(stats.followerCount), following: \(stats.followingCount), recipes: \(stats.recipeCount)")
+            }
+        } catch {
+            print("❌ UserProfileViewModel: Failed to load user stats: \(error)")
+        }
+        
+        isLoadingStats = false
+    }
+    
+    /// Check if current user is following the target user
+    private func checkIfFollowing(userID: String) async -> Bool {
+        guard let currentUserID = try? await cloudKitUserManager.getCurrentUserID(),
+              currentUserID != userID else {
+            return false
+        }
+        
+        let predicate = NSPredicate(format: "%K == %@ AND %K == %@ AND %K == %d",
+                                  CKField.Follow.followerID, currentUserID,
+                                  CKField.Follow.followingID, userID,
+                                  CKField.Follow.isActive, 1)
+        let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
+        
+        do {
+            let results = try await database.records(matching: query)
+            return !results.matchResults.isEmpty
+        } catch {
+            print("❌ Error checking follow status: \(error)")
+            return false
+        }
+    }
+    
+    /// Convert UserProfile record to CloudKitUser format
+    private func convertUserProfileToCloudKitUser(_ record: CKRecord) -> CloudKitUser {
+        // Create a new record with User record type fields mapped from UserProfile
+        let userRecord = CKRecord(recordType: "User", recordID: record.recordID)
+        
+        // Map UserProfile fields to User fields
+        userRecord[CKField.User.username] = record["username"] as? String
+        userRecord[CKField.User.displayName] = record["displayName"] as? String ?? record["username"] as? String ?? "Anonymous Chef"
+        userRecord[CKField.User.email] = "" // Not stored in UserProfile
+        userRecord[CKField.User.profileImageURL] = (record["profileImageAsset"] as? CKAsset)?.fileURL?.absoluteString
+        userRecord[CKField.User.totalPoints] = Int64(record["totalPoints"] as? Int ?? 0)
+        userRecord[CKField.User.recipesShared] = Int64(record["recipesShared"] as? Int ?? 0)
+        userRecord[CKField.User.followerCount] = Int64(record["followersCount"] as? Int ?? 0)
+        userRecord[CKField.User.followingCount] = Int64(record["followingCount"] as? Int ?? 0)
+        userRecord[CKField.User.isVerified] = Int64((record["isVerified"] as? Bool ?? false) ? 1 : 0)
+        userRecord[CKField.User.createdAt] = record["createdAt"] as? Date ?? Date()
+        userRecord[CKField.User.lastLoginAt] = record["updatedAt"] as? Date ?? Date()
+        userRecord[CKField.User.lastActiveAt] = record["updatedAt"] as? Date ?? Date()
+        
+        // Set default values for other fields
+        userRecord[CKField.User.authProvider] = "cloudkit"
+        userRecord[CKField.User.currentStreak] = Int64(0)
+        userRecord[CKField.User.longestStreak] = Int64(0)
+        userRecord[CKField.User.challengesCompleted] = Int64(0)
+        userRecord[CKField.User.recipesCreated] = Int64(record["recipesShared"] as? Int ?? 0)
+        userRecord[CKField.User.coinBalance] = Int64(0)
+        userRecord[CKField.User.isProfilePublic] = Int64(1)
+        userRecord[CKField.User.showOnLeaderboard] = Int64(1)
+        userRecord[CKField.User.subscriptionTier] = "free"
+        
+        return CloudKitUser(from: userRecord)
     }
 
     func calculateLevel(points: Int) -> Int {
