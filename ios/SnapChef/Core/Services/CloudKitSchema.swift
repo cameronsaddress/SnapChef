@@ -238,6 +238,7 @@ struct CloudKitConfig {
 
     // Record Types
     static let userRecordType = "User"
+    static let userProfileRecordType = "UserProfile"
     static let challengeRecordType = "Challenge"
     static let userChallengeRecordType = "UserChallenge"
     static let teamRecordType = "Team"

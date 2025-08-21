@@ -25,6 +25,7 @@ struct CloudKitUser {
     var createdAt: Date
     var lastLoginAt: Date
     var lastActiveAt: Date
+    var bio: String
     
     init(from record: CKRecord) {
         self.recordID = record.recordID.recordName
@@ -49,6 +50,56 @@ struct CloudKitUser {
         self.createdAt = record[CKField.User.createdAt] as? Date ?? Date()
         self.lastLoginAt = record[CKField.User.lastLoginAt] as? Date ?? Date()
         self.lastActiveAt = record[CKField.User.lastActiveAt] as? Date ?? Date()
+        self.bio = record["bio"] as? String ?? ""
+    }
+    
+    init(recordID: String?,
+         userID: String,
+         username: String?,
+         displayName: String,
+         email: String,
+         profileImageURL: String?,
+         authProvider: String,
+         totalPoints: Int,
+         currentStreak: Int,
+         longestStreak: Int,
+         challengesCompleted: Int,
+         recipesShared: Int,
+         recipesCreated: Int,
+         coinBalance: Int,
+         isProfilePublic: Bool,
+         showOnLeaderboard: Bool,
+         subscriptionTier: String,
+         createdAt: Date,
+         lastLoginAt: Date,
+         lastActiveAt: Date,
+         followerCount: Int,
+         followingCount: Int,
+         isVerified: Bool,
+         bio: String) {
+        self.recordID = recordID
+        self.username = username
+        self.displayName = displayName
+        self.email = email
+        self.profileImageURL = profileImageURL
+        self.authProvider = authProvider
+        self.totalPoints = totalPoints
+        self.currentStreak = currentStreak
+        self.longestStreak = longestStreak
+        self.challengesCompleted = challengesCompleted
+        self.recipesShared = recipesShared
+        self.recipesCreated = recipesCreated
+        self.coinBalance = coinBalance
+        self.followerCount = followerCount
+        self.followingCount = followingCount
+        self.isVerified = isVerified
+        self.isProfilePublic = isProfilePublic
+        self.showOnLeaderboard = showOnLeaderboard
+        self.subscriptionTier = subscriptionTier
+        self.createdAt = createdAt
+        self.lastLoginAt = lastLoginAt
+        self.lastActiveAt = lastActiveAt
+        self.bio = bio
     }
 }
 
@@ -106,6 +157,7 @@ enum CloudKitAuthError: LocalizedError {
     case invalidCredential
     case usernameUnavailable
     case networkError
+    case invalidRecordType
     
     var errorDescription: String? {
         switch self {
@@ -117,6 +169,8 @@ enum CloudKitAuthError: LocalizedError {
             return "Username is already taken"
         case .networkError:
             return "Network connection error"
+        case .invalidRecordType:
+            return "User record has incorrect format. Please sign in again."
         }
     }
 }

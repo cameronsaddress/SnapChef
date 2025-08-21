@@ -157,7 +157,7 @@ DEFINE SCHEMA
         notes           STRING,
         teamID          STRING QUERYABLE,
         GRANT WRITE TO "_creator",
-        GRANT READ TO "_creator"
+        GRANT READ TO "_world"
     );
 
     RECORD TYPE Team (
@@ -241,7 +241,7 @@ DEFINE SCHEMA
         points          INT64,
         associatedChallengeID STRING,
         GRANT WRITE TO "_creator",
-        GRANT READ TO "_creator"
+        GRANT READ TO "_world"
     );
 
     RECORD TYPE CoinTransaction (

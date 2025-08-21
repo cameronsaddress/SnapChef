@@ -43,7 +43,7 @@ extension UnifiedAuthManager {
         
         // Save consolidated profile
         Task {
-            _ = await profileManager.saveProfile(profile)
+            _ = profileManager.saveProfile(profile)
             await MainActor.run {
                 self.anonymousProfile = profile
             }

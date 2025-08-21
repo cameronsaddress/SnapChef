@@ -604,12 +604,32 @@ struct CameraView: View {
                         let mealType = selectedMealType
                         let cookingTime = selectedCookingTime
 
-                        // BACKGROUND SAVING: All the CloudKit saving happens after navigation
+                        // BACKGROUND SAVING: Queue CloudKit upload for background processing
                         Task.detached(priority: .background) {
                             do {
+                                // Check if recipes already exist in CloudKit before uploading
+                                print("📱 Background: Checking for duplicate recipes before CloudKit upload...")
+                                var recipesToUpload: [Recipe] = []
+                                
                                 // Only proceed with CloudKit saving if user is authenticated
                                 guard await CloudKitAuthManager.shared.isAuthenticated else {
                                     print("📱 Background: User not authenticated - skipping CloudKit saving")
+                                    return
+                                }
+                                
+                                // Check for duplicates before uploading
+                                for recipe in recipes {
+                                    let existingID = await cloudKitRecipeManager.checkRecipeExists(recipe.name, recipe.description)
+                                    if existingID == nil {
+                                        recipesToUpload.append(recipe)
+                                        print("📱 Background: Recipe '\(recipe.name)' will be uploaded")
+                                    } else {
+                                        print("📱 Background: Recipe '\(recipe.name)' already exists in CloudKit, skipping upload")
+                                    }
+                                }
+                                
+                                if recipesToUpload.isEmpty {
+                                    print("📱 Background: All recipes already exist in CloudKit, skipping upload")
                                     return
                                 }
                                 
@@ -668,22 +688,22 @@ struct CameraView: View {
                                     }
                                 }
 
-                                // Save recipes to CloudKit with the captured fridge photo
-                                print("📸 Background: Uploading \(recipes.count) recipes with the same fridge photo to CloudKit...")
-                                for (index, recipe) in recipes.enumerated() {
+                                // Save only new recipes to CloudKit with the captured fridge photo
+                                print("📸 Background: Uploading \(recipesToUpload.count) new recipes to CloudKit...")
+                                for (index, recipe) in recipesToUpload.enumerated() {
                                     do {
-                                        print("📸 Background: Uploading recipe \(index + 1)/\(recipes.count): '\(recipe.name)'")
+                                        print("📸 Background: Uploading recipe \(index + 1)/\(recipesToUpload.count): '\(recipe.name)'")
                                         let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: image)
-                                        print("✅ Background: Recipe \(index + 1)/\(recipes.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
+                                        print("✅ Background: Recipe \(index + 1)/\(recipesToUpload.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
 
                                         // Also add to user's saved recipes list
                                         try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
                                         print("✅ Background: Recipe added to user's saved list")
                                     } catch {
-                                        print("❌ Background: Failed to save recipe \(index + 1)/\(recipes.count) to CloudKit: \(error)")
+                                        print("❌ Background: Failed to save recipe \(index + 1)/\(recipesToUpload.count) to CloudKit: \(error)")
                                     }
                                 }
-                                print("✅ Background: All \(recipes.count) recipes have been saved with the same fridge photo")
+                                print("✅ Background: All \(recipesToUpload.count) new recipes have been saved with the fridge photo")
 
                                 // Increment snaps taken counter
                                 await MainActor.run {
@@ -949,12 +969,32 @@ struct CameraView: View {
                         let mealType = selectedMealType
                         let cookingTime = selectedCookingTime
 
-                        // BACKGROUND SAVING: All the CloudKit saving happens after navigation
+                        // BACKGROUND SAVING: Queue CloudKit upload for background processing
                         Task.detached(priority: .background) {
                             do {
+                                // Check if recipes already exist in CloudKit before uploading
+                                print("📱 Background: Checking for duplicate recipes before CloudKit upload...")
+                                var recipesToUpload: [Recipe] = []
+                                
                                 // Only proceed with CloudKit saving if user is authenticated
                                 guard await CloudKitAuthManager.shared.isAuthenticated else {
                                     print("📱 Background: User not authenticated - skipping CloudKit saving")
+                                    return
+                                }
+                                
+                                // Check for duplicates before uploading
+                                for recipe in recipes {
+                                    let existingID = await cloudKitRecipeManager.checkRecipeExists(recipe.name, recipe.description)
+                                    if existingID == nil {
+                                        recipesToUpload.append(recipe)
+                                        print("📱 Background: Recipe '\(recipe.name)' will be uploaded")
+                                    } else {
+                                        print("📱 Background: Recipe '\(recipe.name)' already exists in CloudKit, skipping upload")
+                                    }
+                                }
+                                
+                                if recipesToUpload.isEmpty {
+                                    print("📱 Background: All recipes already exist in CloudKit, skipping upload")
                                     return
                                 }
                                 
@@ -1000,22 +1040,22 @@ struct CameraView: View {
                                 // Track feature usage
                                 await cloudKitDataManager.trackFeatureUse("recipe_generation_with_pantry")
 
-                                // Save recipes to CloudKit with the captured fridge photo
-                                print("📸 Background: Uploading \(recipes.count) recipes with fridge and pantry photos to CloudKit...")
-                                for (index, recipe) in recipes.enumerated() {
+                                // Save only new recipes to CloudKit with the captured fridge photo
+                                print("📸 Background: Uploading \(recipesToUpload.count) new recipes to CloudKit...")
+                                for (index, recipe) in recipesToUpload.enumerated() {
                                     do {
-                                        print("📸 Background: Uploading recipe \(index + 1)/\(recipes.count): '\(recipe.name)'")
+                                        print("📸 Background: Uploading recipe \(index + 1)/\(recipesToUpload.count): '\(recipe.name)'")
                                         let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: fridgeImage)
-                                        print("✅ Background: Recipe \(index + 1)/\(recipes.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
+                                        print("✅ Background: Recipe \(index + 1)/\(recipesToUpload.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
 
                                         // Also add to user's saved recipes list
                                         try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
                                         print("✅ Background: Recipe added to user's saved list")
                                     } catch {
-                                        print("❌ Background: Failed to save recipe \(index + 1)/\(recipes.count) to CloudKit: \(error)")
+                                        print("❌ Background: Failed to save recipe \(index + 1)/\(recipesToUpload.count) to CloudKit: \(error)")
                                     }
                                 }
-                                print("✅ Background: All \(recipes.count) recipes have been saved with fridge and pantry photos")
+                                print("✅ Background: All \(recipesToUpload.count) new recipes have been saved with fridge and pantry photos")
 
                                 // Increment snaps taken counter
                                 await MainActor.run {

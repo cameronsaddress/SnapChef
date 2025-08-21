@@ -42,18 +42,35 @@ final class CloudKitAuthManager: ObservableObject {
                 if let storedUserID = UserDefaults.standard.string(forKey: "currentUserRecordID") {
                     print("🔍 Checking existing CloudKit user: \(storedUserID)")
                     
-                    // Try to fetch the user record
-                    let record = try await database.record(for: CKRecord.ID(recordName: storedUserID))
-                    
-                    await MainActor.run {
-                        self.currentUser = CloudKitUser(from: record)
-                        self.isAuthenticated = true
-                        print("✅ CloudKit user restored from storage: \(storedUserID)")
+                    do {
+                        // Try to fetch the user record
+                        let record = try await database.record(for: CKRecord.ID(recordName: storedUserID))
+                        
+                        // Check if record has correct type
+                        if record.recordType == CloudKitConfig.userRecordType {
+                            await MainActor.run {
+                                self.currentUser = CloudKitUser(from: record)
+                                self.isAuthenticated = true
+                                print("✅ CloudKit user restored from storage: \(storedUserID)")
+                            }
+                            
+                            // Update last active - only if record type is correct
+                            record[CKField.User.lastActiveAt] = Date()
+                            _ = try await database.save(record)
+                        } else {
+                            print("⚠️ User record has incorrect type '\(record.recordType)', expected '\(CloudKitConfig.userRecordType)'. Clearing stored data.")
+                            // Clear invalid stored data and let user sign in again
+                            UserDefaults.standard.removeObject(forKey: "currentUserRecordID")
+                            UserDefaults.standard.removeObject(forKey: "currentUserID")
+                            throw CloudKitAuthError.invalidRecordType
+                        }
+                    } catch {
+                        print("❌ Failed to fetch or update user record: \(error)")
+                        // Clear stored data if record fetch fails
+                        UserDefaults.standard.removeObject(forKey: "currentUserRecordID")
+                        UserDefaults.standard.removeObject(forKey: "currentUserID")
+                        throw error
                     }
-                    
-                    // Update last active
-                    record[CKField.User.lastActiveAt] = Date()
-                    _ = try await database.save(record)
                 } else {
                     print("ℹ️ No stored CloudKit user ID found")
                 }
@@ -98,18 +115,28 @@ final class CloudKitAuthManager: ObservableObject {
         // Try to fetch existing user profile
         do {
             let existingRecord = try await database.record(for: CKRecord.ID(recordName: cloudKitUserID))
-            self.currentUser = CloudKitUser(from: existingRecord)
             
-            // Update last login
-            existingRecord[CKField.User.lastLoginAt] = Date()
-            _ = try await database.save(existingRecord)
-            
-            // Check if user needs username setup
-            if self.currentUser?.username == nil || self.currentUser?.username?.isEmpty == true {
-                showUsernameSelection = true
+            // Check if record has correct type
+            if existingRecord.recordType == CloudKitConfig.userRecordType {
+                self.currentUser = CloudKitUser(from: existingRecord)
+                
+                // Update last login - only if record type is correct
+                existingRecord[CKField.User.lastLoginAt] = Date()
+                _ = try await database.save(existingRecord)
+                
+                // Check if user needs username setup
+                if self.currentUser?.username == nil || self.currentUser?.username?.isEmpty == true {
+                    showUsernameSelection = true
+                }
+                
+                print("✅ Existing CloudKit user loaded: \(cloudKitUserID)")
+            } else {
+                print("⚠️ User record has incorrect type '\(existingRecord.recordType)', expected '\(CloudKitConfig.userRecordType)'. Creating new record.")
+                // Delete the old record with wrong type and create a new one
+                _ = try await database.deleteRecord(withID: existingRecord.recordID)
+                print("📝 Creating new CloudKit user profile for: \(cloudKitUserID)")
+                try await createNewUserProfile(cloudKitUserID: cloudKitUserID, authorization: authorization)
             }
-            
-            print("✅ Existing CloudKit user loaded: \(cloudKitUserID)")
         } catch {
             // Create new user profile if it doesn't exist
             print("📝 Creating new CloudKit user profile for: \(cloudKitUserID)")
@@ -872,6 +899,7 @@ enum CloudKitAuthError: LocalizedError {
     case notAuthenticated
     case networkError
     case usernameUnavailable
+    case invalidRecordType
     case unknown
     
     var errorDescription: String? {
@@ -882,6 +910,8 @@ enum CloudKitAuthError: LocalizedError {
             return "Network connection error. Please try again."
         case .usernameUnavailable:
             return "This username is already taken"
+        case .invalidRecordType:
+            return "Invalid user record type. Please sign in again."
         case .unknown:
             return "An unknown error occurred"
         }

@@ -122,13 +122,21 @@ final class UnifiedAuthManager: ObservableObject {
             // Try to fetch existing user
             let existingRecord = try await cloudKitDatabase.record(for: recordID)
             
-            // Update last login
-            existingRecord[CKField.User.lastLoginAt] = Date()
-            try await cloudKitDatabase.save(existingRecord)
-            
-            // Update state
-            self.currentUser = CloudKitUser(from: existingRecord)
-            self.isAuthenticated = true
+            // Check if record has correct type
+            if existingRecord.recordType == CloudKitConfig.userRecordType {
+                // Update last login - only if record type is correct
+                existingRecord[CKField.User.lastLoginAt] = Date()
+                try await cloudKitDatabase.save(existingRecord)
+                
+                // Update state
+                self.currentUser = CloudKitUser(from: existingRecord)
+                self.isAuthenticated = true
+            } else {
+                print("⚠️ User record has incorrect type '\(existingRecord.recordType)', expected '\(CloudKitConfig.userRecordType)'. Creating new record.")
+                // Delete the old record with wrong type and create a new one
+                _ = try await cloudKitDatabase.deleteRecord(withID: existingRecord.recordID)
+                throw CloudKitAuthError.invalidRecordType // Will trigger creation of new record
+            }
             
             // Store the CloudKit user ID (this is the persistent ID we need)
             UserDefaults.standard.set(cloudKitUserID, forKey: "currentUserRecordID")
@@ -281,7 +289,7 @@ final class UnifiedAuthManager: ObservableObject {
         
         // Save updated profile
         Task {
-            if await profileManager.saveProfile(profile) {
+            if profileManager.saveProfile(profile) {
                 await MainActor.run {
                     self.anonymousProfile = profile
                 }
@@ -625,7 +633,7 @@ final class UnifiedAuthManager: ObservableObject {
         
         // Save updated profile (or delete if no longer needed)
         Task {
-            _ = await profileManager.saveProfile(profile)
+            _ = profileManager.saveProfile(profile)
         }
         
         // Note: In production, you might want to upload anonymous usage data to CloudKit here

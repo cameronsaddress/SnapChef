@@ -382,6 +382,7 @@
 		F43329C15A8E8386F4370D4E /* SnapChefApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SnapChefApp.swift; path = SnapChef/App/SnapChefApp.swift; sourceTree = "<group>"; };
 		F5193AC22E4D437C00922841 /* Mixdown.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = Mixdown.mp3; sourceTree = "<group>"; };
 		F56F890A2E3C509A00AF95B7 /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/UserNotifications.framework; sourceTree = DEVELOPER_DIR; };
+		F5FACC612E579B0B00527E47 /* SnapChef-Debug.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; name = "SnapChef-Debug.entitlements"; path = "SnapChef/SnapChef-Debug.entitlements"; sourceTree = "<group>"; };
 		F704D9176B948F55CD9DC566 /* ShareSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShareSheet.swift; path = SnapChef/Features/Sharing/ShareSheet.swift; sourceTree = "<group>"; };
 		F927FA724DAF0F3B30276BA3 /* CameraView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CameraView.swift; path = SnapChef/Features/Camera/CameraView.swift; sourceTree = "<group>"; };
 		FBA1C719280079FC83D76F2E /* SDKInitializer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SDKInitializer.swift; path = SnapChef/Features/Sharing/Core/SDKInitializer.swift; sourceTree = "<group>"; };
@@ -431,7 +432,7 @@
 				027AD74E091AC56960637058 /* Products */,
 				C5652B40604108248A1E9076 /* Frameworks */,
 				F4737935B5BA6D0B9ABCEB27 /* SnapChef */,
-				FAE14391640BA3821562690E /*  */,
+				FAE14391640BA3821562690E,
 				F56F891D2E3D282000AF95B7 /* Recovered References */,
 				358FFFFCEF94607D3AEF5F6C /* Features */,
 				DE1AE878754E3F7811D721D6 /* Core */,
@@ -1065,6 +1066,7 @@
 				33732196C1E7BBD9AED65598 /* Resources */,
 				9DB7DB598F4184818C8C7B9C /* Preview Content */,
 				C3EE797F94908AFA8D7BA233 /* SnapChef.entitlements */,
+				F5FACC612E579B0B00527E47 /* SnapChef-Debug.entitlements */,
 				1BDD38BBCC57D0F28B462A0D /* Info.plist */,
 				8EDABA7C44187D783EF06710 /* Components */,
 			);
@@ -1081,7 +1083,7 @@
 			name = "Recovered References";
 			sourceTree = "<group>";
 		};
-		FAE14391640BA3821562690E /*  */ = {
+		FAE14391640BA3821562690E = {
 			isa = PBXGroup;
 			children = (
 				6AC0B6CEF8F1C858C2CB572F /* Users */,
@@ -1530,7 +1532,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_ENTITLEMENTS = SnapChef/SnapChef.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "SnapChef/SnapChef-Debug.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;

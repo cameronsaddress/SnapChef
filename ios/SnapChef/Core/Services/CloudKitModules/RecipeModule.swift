@@ -907,10 +907,10 @@ final class RecipeModule: ObservableObject {
             return try await privateDatabase.record(for: recordID)
         } catch {
             // Create new profile
-            let record = CKRecord(recordType: "UserProfile", recordID: recordID)
+            let record = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: recordID)
             record["userID"] = userID
             record["createdAt"] = Date()
-            record["lastUpdated"] = Date()
+            record["lastActiveAt"] = Date()
             
             return try await privateDatabase.save(record)
         }

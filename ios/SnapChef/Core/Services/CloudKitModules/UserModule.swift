@@ -24,7 +24,7 @@ final class UserModule: ObservableObject {
     // MARK: - Username Availability
     func isUsernameAvailable(_ username: String) async throws -> Bool {
         let predicate = NSPredicate(format: "username == %@", username.lowercased())
-        let query = CKQuery(recordType: "UserProfile", predicate: predicate)
+        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         
         do {
             let results = try await publicDatabase.records(matching: query)
@@ -44,7 +44,7 @@ final class UserModule: ObservableObject {
         // Check if profile already exists
         let existingProfile = try? await fetchUserProfile(userID: userID)
         
-        let record = existingProfile ?? CKRecord(recordType: "UserProfile")
+        let record = existingProfile ?? CKRecord(recordType: CloudKitConfig.userRecordType)
         
         // Set fields
         record["username"] = username.lowercased()
@@ -81,7 +81,7 @@ final class UserModule: ObservableObject {
     // MARK: - Fetch User Profile
     func fetchUserProfile(userID: String) async throws -> CKRecord? {
         let predicate = NSPredicate(format: "userID == %@", userID)
-        let query = CKQuery(recordType: "UserProfile", predicate: predicate)
+        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         
         do {
             let results = try await publicDatabase.records(matching: query)
@@ -102,7 +102,7 @@ final class UserModule: ObservableObject {
     
     func fetchUserProfile(username: String) async throws -> CKRecord? {
         let predicate = NSPredicate(format: "username == %@", username.lowercased())
-        let query = CKQuery(recordType: "UserProfile", predicate: predicate)
+        let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         
         do {
             let results = try await publicDatabase.records(matching: query)
@@ -196,7 +196,7 @@ final class UserModule: ObservableObject {
     // MARK: - Search Users
     func searchUsers(query: String) async throws -> [CloudKitUserProfile] {
         let predicate = NSPredicate(format: "username CONTAINS[cd] %@ OR displayName CONTAINS[cd] %@", query, query)
-        let ckQuery = CKQuery(recordType: "UserProfile", predicate: predicate)
+        let ckQuery = CKQuery(recordType: CloudKitConfig.userProfileRecordType, predicate: predicate)
         ckQuery.sortDescriptors = [NSSortDescriptor(key: "totalPoints", ascending: false)]
         
         do {

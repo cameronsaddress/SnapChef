@@ -61,15 +61,23 @@ final class AuthModule: ObservableObject {
             // Try to fetch existing user
             let existingRecord = try await publicDatabase.record(for: recordID)
             
-            // Update last login
-            existingRecord[CKField.User.lastLoginAt] = Date()
-            try await publicDatabase.save(existingRecord)
-            
-            // Convert to user object
-            self.currentUser = CloudKitUser(from: existingRecord)
-            self.isAuthenticated = true
-            parent?.isAuthenticated = true
-            parent?.currentUser = self.currentUser
+            // Check if record has correct type
+            if existingRecord.recordType == CloudKitConfig.userRecordType {
+                // Update last login - only if record type is correct
+                existingRecord[CKField.User.lastLoginAt] = Date()
+                try await publicDatabase.save(existingRecord)
+                
+                // Convert to user object
+                self.currentUser = CloudKitUser(from: existingRecord)
+                self.isAuthenticated = true
+                parent?.isAuthenticated = true
+                parent?.currentUser = self.currentUser
+            } else {
+                print("⚠️ User record has incorrect type '\(existingRecord.recordType)', expected '\(CloudKitConfig.userRecordType)'. Creating new record.")
+                // Delete the old record with wrong type and create a new one
+                _ = try await publicDatabase.deleteRecord(withID: existingRecord.recordID)
+                throw CloudKitAuthError.invalidRecordType // Will trigger creation of new record
+            }
             
             // Store user ID
             UserDefaults.standard.set(userID, forKey: "currentUserRecordID")
@@ -154,16 +162,24 @@ final class AuthModule: ObservableObject {
             // Try to fetch existing user
             let existingRecord = try await publicDatabase.record(for: recordID)
             
-            // Update last login
-            existingRecord[CKField.User.lastLoginAt] = Date()
-            if let profileImageURL = profileImageURL {
-                existingRecord[CKField.User.profileImageURL] = profileImageURL
+            // Check if record has correct type
+            if existingRecord.recordType == CloudKitConfig.userRecordType {
+                // Update last login - only if record type is correct
+                existingRecord[CKField.User.lastLoginAt] = Date()
+                if let profileImageURL = profileImageURL {
+                    existingRecord[CKField.User.profileImageURL] = profileImageURL
+                }
+                try await publicDatabase.save(existingRecord)
+                
+                // Convert to user object
+                self.currentUser = CloudKitUser(from: existingRecord)
+                self.isAuthenticated = true
+            } else {
+                print("⚠️ User record has incorrect type '\(existingRecord.recordType)', expected '\(CloudKitConfig.userRecordType)'. Creating new record.")
+                // Delete the old record with wrong type and create a new one
+                _ = try await publicDatabase.deleteRecord(withID: existingRecord.recordID)
+                throw CloudKitAuthError.invalidRecordType // Will trigger creation of new record
             }
-            try await publicDatabase.save(existingRecord)
-            
-            // Convert to user object
-            self.currentUser = CloudKitUser(from: existingRecord)
-            self.isAuthenticated = true
             parent?.isAuthenticated = true
             parent?.currentUser = self.currentUser
             

@@ -271,6 +271,72 @@ Update: [Brief description of what was updated]
 ## Project Overview
 SnapChef is an iOS app that transforms fridge/pantry photos into personalized recipes using AI (Grok Vision API & Gemini), featuring dual authentication systems (Traditional + CloudKit), progressive premium tiers, intelligent photo storage, TikTok video generation, and comprehensive gamification with challenges and rewards.
 
+## 🏗️ LOCAL-FIRST ARCHITECTURE RULES (CRITICAL)
+
+### Core Principles (MUST FOLLOW)
+1. **Local Storage First**: ALL data must be saved locally before any CloudKit operations
+2. **Background Sync**: CloudKit uploads happen in background, never blocking UI
+3. **Offline Support**: App must work fully offline with local data
+4. **No Duplicates**: Check for existing records before CloudKit uploads
+5. **Proper Database Usage**: 
+   - Recipe records → PUBLIC database (for social features)
+   - UserProfile records → PRIVATE database (for privacy)
+
+### Recipe Generation Flow (MANDATORY)
+```
+Photo Capture → API Generation → Local Save (instant) → Queue for CloudKit → Background Upload
+```
+
+### Implementation Requirements
+1. **Recipe Storage**:
+   - Save to AppState (in-memory) immediately
+   - Store photos in PhotoStorageManager instantly
+   - Queue CloudKit upload for background processing
+   - Never block UI during CloudKit operations
+
+2. **Unique ID Management**:
+   - Each recipe gets ONE UUID at creation
+   - Same ID used locally and in CloudKit
+   - Check `checkRecipeExists()` before uploading
+   - Never create duplicate records in CloudKit
+
+3. **Sync Strategy**:
+   - Local data is source of truth
+   - CloudKit provides backup and social features
+   - Query local first, then CloudKit if needed
+   - Batch CloudKit operations when possible
+
+4. **Database Rules**:
+   - Recipes: PUBLIC database (GRANT READ TO "_world")
+   - User profiles: PRIVATE database (user-specific data)
+   - Activities/Social: PUBLIC database (social features)
+   - Challenges: PUBLIC database (after permissions fix)
+
+### Anti-Patterns to AVOID
+❌ Uploading to CloudKit before local save
+❌ Blocking UI during CloudKit operations
+❌ Creating duplicate recipes in CloudKit
+❌ Using privateDB for Recipe records
+❌ Requiring network for basic app functions
+
+### Example: Correct Recipe Save Pattern
+```swift
+// CORRECT - Local first, CloudKit later
+func saveRecipe(_ recipe: Recipe) {
+    // 1. Save locally (instant)
+    appState.savedRecipes.append(recipe)
+    PhotoStorageManager.shared.storePhotos(for: recipe.id)
+    
+    // 2. Queue for background sync (non-blocking)
+    Task.detached(priority: .background) {
+        // Check if exists before uploading
+        if !(await cloudKitRecipeManager.checkRecipeExists(recipe.id)) {
+            await cloudKitRecipeManager.uploadRecipe(recipe)
+        }
+    }
+}
+```
+
 ## 🏗️ CURRENT APP ARCHITECTURE - AGENTS MUST UNDERSTAND
 
 ### Authentication System (DUAL APPROACH)
