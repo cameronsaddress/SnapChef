@@ -332,21 +332,57 @@ final class UnifiedAuthManager: ObservableObject {
         // Only show if not already authenticated and user hasn't opted out
         guard !isAuthenticated && profile.authenticationState == .anonymous else { return }
         
+        // Progressive thresholds based on engagement
+        let daysSinceFirstUse = Calendar.current.dateComponents([.day], from: profile.firstLaunchDate, to: Date()).day ?? 0
+        
         let shouldShow = switch action {
         case .recipeCreated:
-            profile.recipesCreatedCount == 1 // First recipe success
+            // Show after 3 recipes or after 7 days with 1 recipe
+            profile.recipesCreatedCount >= 3 || (daysSinceFirstUse >= 7 && profile.recipesCreatedCount >= 1)
         case .videoGenerated:
-            profile.videosGeneratedCount >= 1 && profile.socialFeaturesExplored >= 1 // Viral content
+            // Show after 2 videos (viral potential)
+            profile.videosGeneratedCount >= 2
+        case .videoShared:
+            // Show immediately on share (high intent)
+            profile.videosSharedCount >= 1
         case .socialExplored:
-            profile.socialFeaturesExplored >= 2 // Social interest
+            // Show after exploring social features twice
+            profile.socialFeaturesExplored >= 2
         case .challengeViewed:
-            profile.challengesViewed >= 3 // Challenge interest
-        default:
+            // Show after viewing 2 challenges
+            profile.challengesViewed >= 2
+        case .appOpened:
+            // Show after 5 app opens over 3+ days
+            profile.appOpenCount >= 5 && daysSinceFirstUse >= 3
+        case .recipeViewed:
+            // Don't prompt for just viewing
             false
         }
         
-        if shouldShow && !profile.hasRecentDismissals(within: 3) {
+        // Check dismissal cooldown (don't annoy users)
+        if shouldShow && !profile.hasRecentDismissals(within: daysSinceFirstUse < 7 ? 7 : 3) {
+            // Set context-aware prompt message
+            setupProgressivePromptMessage(for: action, profile: profile)
             self.shouldShowProgressivePrompt = true
+        }
+    }
+    
+    private func setupProgressivePromptMessage(for action: AnonymousAction, profile: AnonymousUserProfile) {
+        switch action {
+        case .recipeCreated:
+            errorMessage = "🎉 You've created \(profile.recipesCreatedCount) recipes! Sign in to save them forever and unlock challenges."
+        case .videoShared:
+            errorMessage = "🚀 Your recipe is going viral! Sign in to track views and get credit."
+        case .socialExplored:
+            errorMessage = "👥 Join the SnapChef community! Sign in to follow chefs and share recipes."
+        case .challengeViewed:
+            errorMessage = "🏆 Ready for a challenge? Sign in to compete and win rewards!"
+        case .videoGenerated:
+            errorMessage = "🎬 You're creating amazing content! Sign in to build your following."
+        case .appOpened:
+            errorMessage = "👋 Welcome back! Sign in to sync your \(profile.recipesCreatedCount) recipes across devices."
+        default:
+            errorMessage = "✨ Unlock all SnapChef features! Sign in to save recipes and join challenges."
         }
     }
     
@@ -662,12 +698,57 @@ final class UnifiedAuthManager: ObservableObject {
         profile.authenticationState = .authenticated
         profile.addAuthPromptEvent(context: "migration", action: "completed")
         
-        // Save updated profile (or delete if no longer needed)
+        // Save updated profile
         Task {
             _ = profileManager.saveProfile(profile)
         }
         
-        // Note: In production, you might want to upload anonymous usage data to CloudKit here
+        // Migrate anonymous recipes to authenticated user
+        guard let userID = currentUser?.recordID else { return }
+        
+        print("🔄 Starting migration of anonymous recipes to user: \(userID)")
+        
+        // Get all anonymous recipes from LocalRecipeStore
+        let anonymousRecipes = LocalRecipeStore.shared.getAnonymousRecipes()
+        
+        if !anonymousRecipes.isEmpty {
+            print("📦 Found \(anonymousRecipes.count) anonymous recipes to migrate")
+            
+            // Update ownership of all anonymous recipes
+            LocalRecipeStore.shared.migrateRecipesToUser(ownerID: userID)
+            
+            // Trigger sync to upload migrated recipes to CloudKit
+            Task {
+                await SyncQueueManager.shared.startSync()
+                print("✅ Migration complete: \(anonymousRecipes.count) recipes now owned by \(userID)")
+            }
+            
+            // Update user stats in CloudKit
+            if let currentUser = currentUser {
+                let updates = UserStatUpdates(
+                    recipesCreated: anonymousRecipes.count
+                )
+                
+                // Update stats in background
+                Task {
+                    do {
+                        try await CloudKitAuthManager.shared.updateUserStats(updates)
+                        print("📊 Updated user stats with \(anonymousRecipes.count) migrated recipes")
+                    } catch {
+                        print("⚠️ Failed to update user stats: \(error)")
+                    }
+                }
+            }
+        } else {
+            print("ℹ️ No anonymous recipes to migrate")
+        }
+        
+        // Migrate photos if any
+        let photoCount = PhotoStorageManager.shared.getAnonymousPhotoCount()
+        if photoCount > 0 {
+            print("📸 Migrating \(photoCount) photos to user: \(userID)")
+            PhotoStorageManager.shared.migratePhotosToUser(userID: userID)
+        }
     }
     
     private func linkTikTokAccount() async {

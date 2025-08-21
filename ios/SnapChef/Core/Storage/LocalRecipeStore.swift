@@ -6,7 +6,8 @@
 //
 
 import Foundation
-import CoreData
+import SwiftUI
+import CloudKit
 
 // MARK: - Sync Status
 enum SyncStatus: String {
@@ -310,13 +311,14 @@ final class SyncQueueManager: ObservableObject {
             guard !Task.isCancelled else { break }
             
             do {
-                // This would call CloudKit sync service
-                // For now, just simulate the sync
-                try await Task.sleep(nanoseconds: 100_000_000) // 0.1 second delay
+                // Use the existing CloudKitSyncService to upload recipe
+                let cloudKitRecordID = try await CloudKitSyncService.shared.uploadRecipe(
+                    localRecipe.recipe,
+                    imageData: nil // Photos are handled separately by PhotoStorageManager
+                )
                 
-                // Mark as synced with a fake CloudKit ID
-                let fakeCloudKitID = "ck_\(localRecipe.id.uuidString)"
-                localStore.markRecipeSynced(id: localRecipe.id, cloudKitRecordID: fakeCloudKitID)
+                // Mark as synced with the real CloudKit ID
+                localStore.markRecipeSynced(id: localRecipe.id, cloudKitRecordID: cloudKitRecordID)
                 
             } catch {
                 syncErrors.append(SyncError(
@@ -325,12 +327,60 @@ final class SyncQueueManager: ObservableObject {
                     timestamp: Date()
                 ))
                 
-                // Mark as conflict if sync fails
-                localStore.markRecipeConflict(id: localRecipe.id)
+                // Check if it's a conflict or just a network error
+                if let ckError = error as? CKError, ckError.code == .serverRecordChanged {
+                    // Mark as conflict for resolution
+                    localStore.markRecipeConflict(id: localRecipe.id)
+                    
+                    // Attempt conflict resolution
+                    await resolveConflict(localRecipe: localRecipe, error: ckError)
+                } else {
+                    // Keep as pending for retry
+                    print("⚠️ Sync failed for recipe \(localRecipe.recipe.name), will retry: \(error)")
+                }
             }
         }
         
         localStore.updateLastSyncDate()
+    }
+    
+    // MARK: - Conflict Resolution
+    
+    private func resolveConflict(localRecipe: LocalRecipe, error: CKError) async {
+        guard let serverRecord = error.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord else {
+            return
+        }
+        
+        // Strategy: Last-write-wins based on modification date
+        let serverModified = serverRecord.modificationDate ?? Date.distantPast
+        let localModified = localRecipe.modifiedAt
+        
+        if localModified > serverModified {
+            // Local version is newer - try to force update
+            do {
+                // Update the server record with local data
+                serverRecord[CKField.Recipe.title] = localRecipe.recipe.name
+                serverRecord[CKField.Recipe.description] = localRecipe.recipe.description
+                // ... update other fields
+                
+                let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
+                let savedRecord = try await container.publicCloudDatabase.save(serverRecord)
+                localStore.markRecipeSynced(id: localRecipe.id, cloudKitRecordID: savedRecord.recordID.recordName)
+                print("✅ Conflict resolved: Local version won for \(localRecipe.recipe.name)")
+            } catch {
+                print("❌ Failed to resolve conflict: \(error)")
+            }
+        } else {
+            // Server version is newer - update local with server data
+            do {
+                let (serverRecipe, _) = try await CloudKitSyncService.shared.fetchRecipe(by: serverRecord.recordID.recordName)
+                localStore.updateRecipe(serverRecipe)
+                localStore.markRecipeSynced(id: serverRecipe.id, cloudKitRecordID: serverRecord.recordID.recordName)
+                print("✅ Conflict resolved: Server version won for \(serverRecipe.name)")
+            } catch {
+                print("❌ Failed to fetch server version: \(error)")
+            }
+        }
     }
 }
 

@@ -5,9 +5,11 @@ import CloudKit
 struct SocialRecipeFeedView: View {
     @StateObject private var feedManager = SocialRecipeFeedManager()
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var authManager: UnifiedAuthManager
     @State private var selectedRecipe: SocialRecipeCard?
     @State private var showingRecipeDetail = false
     @State private var searchText = ""
+    @State private var showingAuthPrompt = false
     
     let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -31,42 +33,87 @@ struct SocialRecipeFeedView: View {
                 MagicalBackground()
                     .ignoresSafeArea()
                 
-                VStack(spacing: 0) {
-                    // Search Bar
-                    searchBar
-                        .padding(.horizontal, 20)
-                        .padding(.top, 10)
-                        .padding(.bottom, 16)
-                    
-                    // Recipe Grid
-                    if feedManager.showingSkeletonViews {
-                        // Skeleton Loading Views
-                        ScrollView {
-                            LazyVGrid(columns: columns, spacing: 16) {
-                                ForEach(0..<6, id: \.self) { _ in
-                                    SkeletonRecipeCardView()
-                                }
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 20)
+                if !authManager.isAuthenticated {
+                    // Authentication required view
+                    VStack(spacing: 24) {
+                        Spacer()
+                        
+                        Image(systemName: "person.2.circle.fill")
+                            .font(.system(size: 80))
+                            .foregroundColor(.white.opacity(0.8))
+                        
+                        VStack(spacing: 12) {
+                            Text("Join the Community")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                            
+                            Text("Sign in to follow chefs, discover recipes,\nand share your culinary creations")
+                                .multilineTextAlignment(.center)
+                                .font(.body)
+                                .foregroundColor(.white.opacity(0.8))
                         }
-                    } else if feedManager.isLoading && feedManager.recipes.isEmpty {
-                        loadingView
-                    } else if feedManager.recipes.isEmpty {
-                        emptyStateView
-                    } else {
-                        recipeGridView
+                        
+                        Button(action: {
+                            showingAuthPrompt = true
+                        }) {
+                            HStack {
+                                Image(systemName: "apple.logo")
+                                Text("Sign in with Apple")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.black)
+                            .frame(maxWidth: 280)
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(12)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding()
+                } else {
+                    VStack(spacing: 0) {
+                        // Search Bar
+                        searchBar
+                            .padding(.horizontal, 20)
+                            .padding(.top, 10)
+                            .padding(.bottom, 16)
+                        
+                        // Recipe Grid
+                        if feedManager.showingSkeletonViews {
+                            // Skeleton Loading Views
+                            ScrollView {
+                                LazyVGrid(columns: columns, spacing: 16) {
+                                    ForEach(0..<6, id: \.self) { _ in
+                                        SkeletonRecipeCardView()
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 20)
+                            }
+                        } else if feedManager.isLoading && feedManager.recipes.isEmpty {
+                            loadingView
+                        } else if feedManager.recipes.isEmpty {
+                            emptyStateView
+                        } else {
+                            recipeGridView
+                        }
                     }
                 }
             }
             .navigationTitle("Following")
             .navigationBarTitleDisplayMode(.large)
             .refreshable {
-                await feedManager.refresh()
+                if authManager.isAuthenticated {
+                    await feedManager.refresh()
+                }
             }
         }
         .task {
-            await feedManager.loadInitialRecipes()
+            if authManager.isAuthenticated {
+                await feedManager.loadInitialRecipes()
+            }
         }
         .sheet(item: $selectedRecipe) { recipe in
             if let recipe = createRecipeFromCard(recipe) {
@@ -76,6 +123,10 @@ struct SocialRecipeFeedView: View {
                 Text("Failed to load recipe")
                     .foregroundColor(.white)
             }
+        }
+        .sheet(isPresented: $showingAuthPrompt) {
+            AuthenticationView()
+                .environmentObject(authManager)
         }
     }
     

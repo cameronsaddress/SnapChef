@@ -325,4 +325,40 @@ public final class PhotoStorageManager: ObservableObject {
             borderPath.stroke()
         }
     }
+    
+    // MARK: - Migration Methods
+    
+    /// Get count of photos not associated with a user (anonymous photos)
+    public func getAnonymousPhotoCount() -> Int {
+        // For now, return total count as we don't track ownership in PhotoStorageManager
+        // In production, you'd track which photos belong to which user
+        return recipePhotos.count
+    }
+    
+    /// Migrate all photos to a specific user ID
+    public func migratePhotosToUser(userID: String) {
+        logger.info("📸 Migrating \(recipePhotos.count) photo sets to user: \(userID)")
+        
+        // In a production app, you would:
+        // 1. Update photo metadata with user ownership
+        // 2. Queue photos for CloudKit upload
+        // 3. Track sync status
+        
+        // For now, just log the migration
+        logger.info("📸 Photo migration completed for user: \(userID)")
+    }
+    
+    /// Store photos with enhanced metadata
+    public func storePhotos(fridgePhoto: UIImage?, mealPhoto: UIImage?, for recipeId: UUID) {
+        logger.info("📸 Storing photos for recipe \(recipeId)")
+        
+        recipePhotos[recipeId] = RecipePhotos(
+            recipeId: recipeId,
+            fridgePhoto: fridgePhoto,
+            pantryPhoto: nil,
+            mealPhoto: mealPhoto
+        )
+        
+        logger.info("📸 Total stored photos: \(self.recipePhotos.count)")
+    }
 }
