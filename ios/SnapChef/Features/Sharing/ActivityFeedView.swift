@@ -1,6 +1,17 @@
 import SwiftUI
 import CloudKit
 
+// MARK: - Identifiable Wrappers for Sheet Presentation
+struct IdentifiableRecipe: Identifiable {
+    let id: String
+    let recipe: Recipe
+}
+
+struct IdentifiableChallenge: Identifiable {
+    let id: String
+    let challenge: Challenge
+}
+
 // MARK: - Activity Item Model
 struct ActivityItem: Identifiable {
     let id: String
@@ -13,6 +24,7 @@ struct ActivityItem: Identifiable {
     let recipeID: String?
     let recipeName: String?
     let recipeImage: UIImage?
+    let challengeID: String?  // For challenge-related activities
     let timestamp: Date
     let isRead: Bool
 
@@ -99,6 +111,13 @@ struct ActivityFeedView: View {
     @State private var selectedRecipeID: String?
     @State private var selectedRecipe: Recipe?
     @State private var isLoadingRecipe = false
+    @State private var showingChallengeDetail = false
+    @State private var selectedChallengeID: String?
+    @State private var selectedChallenge: Challenge?
+    
+    // Use identifiable wrappers for sheet presentation
+    @State private var sheetRecipe: IdentifiableRecipe?
+    @State private var sheetChallenge: IdentifiableChallenge?
 
     enum ActivityFilter: String, CaseIterable {
         case all = "All"
@@ -211,35 +230,11 @@ struct ActivityFeedView: View {
         .task {
             await feedManager.loadInitialActivities()
         }
-        .sheet(isPresented: $showingRecipeDetail) {
-            if let recipe = selectedRecipe {
-                NavigationStack {
-                    RecipeDetailView(recipe: recipe)
-                        .environmentObject(appState)
-                        .background(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "#0f0625"),
-                                    Color(hex: "#1a0033"),
-                                    Color(hex: "#0a051a")
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            .ignoresSafeArea()
-                        )
-                }
-                .onAppear {
-                    print("🎯 SHEET PRESENTATION TRIGGERED")
-                    print("🔍 showingRecipeDetail: \(showingRecipeDetail)")
-                    print("🔍 Sheet will show recipe: \(recipe.name)")
-                    print("🔍 Recipe ingredients count: \(recipe.ingredients.count)")
-                    print("🔍 Recipe instructions count: \(recipe.instructions.count)")
-                }
-            } else {
-                // Show loading view while recipe loads
-                NavigationStack {
-                    ZStack {
+        .sheet(item: $sheetRecipe) { identifiableRecipe in
+            NavigationStack {
+                RecipeDetailView(recipe: identifiableRecipe.recipe)
+                    .environmentObject(appState)
+                    .background(
                         LinearGradient(
                             colors: [
                                 Color(hex: "#0f0625"),
@@ -250,53 +245,25 @@ struct ActivityFeedView: View {
                             endPoint: .bottomTrailing
                         )
                         .ignoresSafeArea()
-                        
-                        VStack(spacing: 20) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.5)
-                            
-                            Text("Loading recipe...")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.white)
-                            
-                            Button("Close") {
-                                showingRecipeDetail = false
-                            }
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(Color.white.opacity(0.2))
-                            .cornerRadius(8)
-                        }
-                    }
-                    .navigationBarHidden(true)
-                }
-                .onAppear {
-                    print("🚨 CRITICAL: Sheet triggered but selectedRecipe is NIL!")
-                    print("🚨 selectedRecipeID: \(selectedRecipeID ?? "nil")")
-                    
-                    // Try to reload the recipe if we have an ID
-                    if let recipeID = selectedRecipeID, selectedRecipe == nil {
-                        print("🔄 Attempting to reload recipe: \(recipeID)")
-                        Task {
-                            do {
-                                let recipe = try await CloudKitRecipeManager.shared.fetchRecipe(by: recipeID)
-                                await MainActor.run {
-                                    self.selectedRecipe = recipe
-                                    print("✅ Recipe loaded in sheet: \(recipe.name)")
-                                }
-                            } catch {
-                                print("❌ Failed to load recipe in sheet: \(error)")
-                                await MainActor.run {
-                                    self.showingRecipeDetail = false
-                                }
-                            }
-                        }
-                    }
-                }
+                    )
             }
+            .onAppear {
+                print("🎯 RECIPE SHEET APPEARED")
+                print("   - Recipe: \(identifiableRecipe.recipe.name)")
+                print("   - ID: \(identifiableRecipe.recipe.id)")
+                print("   - Ingredients: \(identifiableRecipe.recipe.ingredients.count)")
+                print("   - Instructions: \(identifiableRecipe.recipe.instructions.count)")
+            }
+        }
+        .sheet(item: $sheetChallenge) { identifiableChallenge in
+            ChallengeDetailView(challenge: identifiableChallenge.challenge)
+                .environmentObject(appState)
+                .onAppear {
+                    print("🎯 CHALLENGE SHEET APPEARED")
+                    print("   - Challenge: \(identifiableChallenge.challenge.title)")
+                    print("   - ID: \(identifiableChallenge.challenge.id)")
+                    print("   - Type: \(identifiableChallenge.challenge.type)")
+                }
         }
     }
 
@@ -342,8 +309,24 @@ struct ActivityFeedView: View {
             print("👥 Follow activity tapped - user profile navigation not implemented")
             break
         case .challengeCompleted:
-            // Navigate to challenge detail
-            print("🏆 Challenge activity tapped - challenge detail navigation not implemented")
+            // Show challenge detail popup
+            print("🏆 Challenge activity tapped - showing challenge detail")
+            if let challengeID = activity.challengeID ?? activity.recipeID {
+                // Some activities might store challenge ID in recipeID field
+                print("🎯 CHALLENGE ACTIVITY - Challenge ID: \(challengeID)")
+                selectedChallengeID = challengeID
+                loadChallengeAndShowDetail(challengeID: challengeID)
+            } else if let challengeName = activity.recipeName {
+                // Try to find challenge by name if no ID
+                print("🔍 Looking for challenge by name: \(challengeName)")
+                if let challenge = findChallengeByName(challengeName) {
+                    selectedChallenge = challenge
+                    selectedChallengeID = challenge.id
+                    // Show the sheet using the item binding
+                    sheetChallenge = IdentifiableChallenge(id: challenge.id, challenge: challenge)
+                    print("🎯 sheetChallenge set from name search: \(challenge.title)")
+                }
+            }
             break
         case .badgeEarned:
             // Show badge detail
@@ -361,37 +344,37 @@ struct ActivityFeedView: View {
             return
         }
         
+        // Try to load recipe from local app state first
+        print("🔍 STEP 1: Checking local app state for recipe: \(recipeID)")
+        if let localRecipe = findLocalRecipe(by: recipeID) {
+            print("✅ FOUND LOCAL RECIPE: \(localRecipe.name)")
+            print("🔍 Local recipe data check:")
+            print("   - Ingredients: \(localRecipe.ingredients.count)")
+            print("   - Instructions: \(localRecipe.instructions.count)")
+            print("   - Name: '\(localRecipe.name)'")
+            print("   - Description: '\(localRecipe.description)'")
+            
+            // Set the recipe using the identifiable wrapper
+            selectedRecipe = localRecipe
+            selectedRecipeID = recipeID
+            print("✅ Local recipe set: \(selectedRecipe?.name ?? "nil"), ID: \(recipeID)")
+            
+            // Show the sheet using the item binding
+            sheetRecipe = IdentifiableRecipe(id: recipeID, recipe: localRecipe)
+            print("✅ UI STATE UPDATED: sheetRecipe set")
+            print("✅ Recipe check before sheet: \(localRecipe.name)")
+            return
+        }
+        
+        // If not found locally, try to load from CloudKit asynchronously
+        print("🔍 STEP 2: No local recipe found, attempting CloudKit fetch for ID: \(recipeID)")
+        print("⚡ CloudKit fetch starting...")
+        
         Task { @MainActor in
             isLoadingRecipe = true
             defer { isLoadingRecipe = false }
             
             do {
-                // Try to load recipe from local app state first
-                print("🔍 STEP 1: Checking local app state for recipe: \(recipeID)")
-                if let localRecipe = findLocalRecipe(by: recipeID) {
-                    print("✅ FOUND LOCAL RECIPE: \(localRecipe.name)")
-                    print("🔍 Local recipe data check:")
-                    print("   - Ingredients: \(localRecipe.ingredients.count)")
-                    print("   - Instructions: \(localRecipe.instructions.count)")
-                    print("   - Name: '\(localRecipe.name)'")
-                    print("   - Description: '\(localRecipe.description)'")
-                    
-                    print("🎯 SETTING selectedRecipe on MainActor...")
-                    selectedRecipe = localRecipe
-                    selectedRecipeID = recipeID
-                    print("✅ Local recipe set: \(localRecipe.name), ID: \(recipeID)")
-                    
-                    // Small delay to ensure state is properly set
-                    try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-                    showingRecipeDetail = true
-                    print("✅ UI STATE UPDATED: showingRecipeDetail = true")
-                    return
-                }
-                
-                // If not found locally, try to load from CloudKit
-                print("🔍 STEP 2: No local recipe found, attempting CloudKit fetch for ID: \(recipeID)")
-                print("⚡ CloudKit fetch starting...")
-                
                 // Fetch from CloudKit (this call is already async)
                 let recipe = try await CloudKitRecipeManager.shared.fetchRecipe(by: recipeID)
                 print("✅ CLOUDKIT FETCH SUCCESS: \(recipe.name)")
@@ -407,15 +390,14 @@ struct ActivityFeedView: View {
                 print("   - Difficulty: \(recipe.difficulty.rawValue)")
                 print("   - Nutrition calories: \(recipe.nutrition.calories)")
                 
-                print("🎯 SETTING CloudKit recipe on MainActor...")
+                print("🎯 SETTING CloudKit recipe...")
                 selectedRecipe = recipe
                 selectedRecipeID = recipeID
                 print("✅ CloudKit recipe set: \(recipe.name), ID: \(recipeID)")
                 
-                // Small delay to ensure state is properly set
-                try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-                showingRecipeDetail = true
-                print("✅ UI STATE UPDATED with CloudKit recipe: showingRecipeDetail = true")
+                // Show the sheet using the item binding
+                sheetRecipe = IdentifiableRecipe(id: recipeID, recipe: recipe)
+                print("✅ UI STATE UPDATED with CloudKit recipe: sheetRecipe set")
                 print("✅ Successfully loaded recipe: \(recipe.name)")
                 print("🔍 Recipe details - Ingredients: \(recipe.ingredients.count), Instructions: \(recipe.instructions.count)")
             } catch {
@@ -449,6 +431,70 @@ struct ActivityFeedView: View {
             print("🔍 Recipe \(id) not found locally, will try CloudKit")
         }
         return foundRecipe
+    }
+    
+    private func loadChallengeAndShowDetail(challengeID: String) {
+        print("🚀 Loading challenge with ID: \(challengeID)")
+        
+        // Try to find challenge in GamificationManager
+        let gamificationManager = GamificationManager.shared
+        
+        // Check active challenges
+        if let challenge = gamificationManager.activeChallenges.first(where: { $0.id == challengeID }) {
+            print("✅ Found active challenge: \(challenge.title)")
+            print("   - ID: \(challenge.id)")
+            print("   - Type: \(challenge.type)")
+            print("   - Description: \(challenge.description)")
+            
+            // Set the challenge using the identifiable wrapper
+            selectedChallenge = challenge
+            selectedChallengeID = challengeID
+            print("📋 selectedChallenge set to: \(selectedChallenge?.title ?? "nil")")
+            
+            // Show the sheet using the item binding
+            sheetChallenge = IdentifiableChallenge(id: challengeID, challenge: challenge)
+            print("🎯 sheetChallenge set")
+            print("📋 Final check - challenge: \(challenge.title)")
+            return
+        }
+        
+        // If not found in active challenges, create a placeholder
+        // This might happen if the challenge has ended but is still in activity feed
+        print("⚠️ Challenge not found in active challenges, creating placeholder")
+        print("   Available challenges: \(gamificationManager.activeChallenges.map { $0.id })")
+        
+        // Create a basic challenge object from the ID
+        // In a real app, this would fetch from CloudKit or cache
+        let placeholderChallenge = Challenge(
+            id: challengeID,
+            title: "Completed Challenge",
+            description: "This challenge has ended",
+            type: .special,
+            endDate: Date().addingTimeInterval(86400)
+        )
+        
+        // Set the challenge using the identifiable wrapper
+        selectedChallenge = placeholderChallenge
+        selectedChallengeID = challengeID
+        print("📋 selectedChallenge set to placeholder: \(selectedChallenge?.title ?? "nil")")
+        
+        // Show the sheet using the item binding
+        sheetChallenge = IdentifiableChallenge(id: challengeID, challenge: placeholderChallenge)
+        print("🎯 sheetChallenge set")
+        print("📋 Final check - challenge: \(placeholderChallenge.title)")
+    }
+    
+    private func findChallengeByName(_ name: String) -> Challenge? {
+        let gamificationManager = GamificationManager.shared
+        
+        // Check active challenges
+        if let challenge = gamificationManager.activeChallenges.first(where: { $0.title == name }) {
+            return challenge
+        }
+        
+        // If not found, return nil
+        // In a real app, we could search CloudKit or cache here
+        return nil
     }
 }
 
@@ -651,6 +697,7 @@ class ActivityFeedManager: ObservableObject {
                     recipeID: updatedActivity.recipeID,
                     recipeName: updatedActivity.recipeName,
                     recipeImage: updatedActivity.recipeImage,
+                    challengeID: updatedActivity.challengeID,
                     timestamp: updatedActivity.timestamp,
                     isRead: true
                 )
@@ -850,6 +897,9 @@ class ActivityFeedManager: ObservableObject {
             }
         }
 
+        // Extract challenge ID if this is a challenge-related activity
+        let challengeID = record["challengeID"] as? String
+        
         return ActivityItem(
             id: id,
             type: activityType,
@@ -861,6 +911,7 @@ class ActivityFeedManager: ObservableObject {
             recipeID: recipeID,
             recipeName: activityType == .challengeCompleted ? challengeName : recipeName,
             recipeImage: nil, // TODO: Implement recipe image loading
+            challengeID: challengeID,
             timestamp: timestamp,
             isRead: isReadInt == 1
         )
@@ -912,6 +963,7 @@ class ActivityFeedManager: ObservableObject {
                 recipeID: nil,
                 recipeName: nil,
                 recipeImage: nil,
+                challengeID: nil,
                 timestamp: Date().addingTimeInterval(-3_600),
                 isRead: false
             ),
@@ -926,6 +978,7 @@ class ActivityFeedManager: ObservableObject {
                 recipeID: "recipe1",
                 recipeName: "Perfect Pancakes",
                 recipeImage: nil,
+                challengeID: nil,
                 timestamp: Date().addingTimeInterval(-7_200),
                 isRead: true
             ),
@@ -940,6 +993,7 @@ class ActivityFeedManager: ObservableObject {
                 recipeID: "recipe2",
                 recipeName: "Spicy Tacos",
                 recipeImage: nil,
+                challengeID: nil,
                 timestamp: Date().addingTimeInterval(-10_800),
                 isRead: true
             ),
@@ -954,6 +1008,7 @@ class ActivityFeedManager: ObservableObject {
                 recipeID: nil,
                 recipeName: "30-Minute Meals",
                 recipeImage: nil,
+                challengeID: "challenge_30min",  // Add a mock challenge ID
                 timestamp: Date().addingTimeInterval(-14_400),
                 isRead: true
             )
@@ -974,7 +1029,7 @@ struct CachedActivityData: Codable {
 extension ActivityItem: Codable {
     enum CodingKeys: String, CodingKey {
         case id, type, userID, userName, userPhoto, targetUserID, targetUserName
-        case recipeID, recipeName, recipeImage, timestamp, isRead
+        case recipeID, recipeName, recipeImage, challengeID, timestamp, isRead
     }
     
     init(from decoder: Decoder) throws {
@@ -989,6 +1044,7 @@ extension ActivityItem: Codable {
         recipeID = try container.decodeIfPresent(String.self, forKey: .recipeID)
         recipeName = try container.decodeIfPresent(String.self, forKey: .recipeName)
         recipeImage = nil // UIImage is not codable
+        challengeID = try container.decodeIfPresent(String.self, forKey: .challengeID)
         timestamp = try container.decode(Date.self, forKey: .timestamp)
         isRead = try container.decode(Bool.self, forKey: .isRead)
         
@@ -1015,6 +1071,7 @@ extension ActivityItem: Codable {
         try container.encodeIfPresent(targetUserName, forKey: .targetUserName)
         try container.encodeIfPresent(recipeID, forKey: .recipeID)
         try container.encodeIfPresent(recipeName, forKey: .recipeName)
+        try container.encodeIfPresent(challengeID, forKey: .challengeID)
         try container.encode(timestamp, forKey: .timestamp)
         try container.encode(isRead, forKey: .isRead)
         
