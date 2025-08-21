@@ -37,6 +37,19 @@ class CloudKitRecipeCache: ObservableObject {
     private let lastFetchKey = "CloudKitRecipesLastFetch"
     private let cachedRecipesKey = "CloudKitCachedRecipes"
     private let recipeFetchInterval: TimeInterval = 300 // 5 minutes
+    
+    // Enhanced caching
+    private let cacheVersion = "v2" // Increment when cache structure changes
+    private let maxCacheSize = 500 // Maximum recipes to cache
+    private let maxCacheAge: TimeInterval = 86400 // 24 hours
+    
+    // Memory cache for faster access
+    private var memoryCache: NSCache<NSString, NSData> = {
+        let cache = NSCache<NSString, NSData>()
+        cache.countLimit = 100 // Keep 100 recipes in memory
+        cache.totalCostLimit = 50 * 1024 * 1024 // 50MB limit
+        return cache
+    }()
 
     // Track which recipe IDs we already have locally
     private var localRecipeIDs: Set<UUID> = []

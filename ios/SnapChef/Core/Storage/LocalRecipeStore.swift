@@ -307,41 +307,72 @@ final class SyncQueueManager: ObservableObject {
         
         let recipesToSync = localStore.getRecipesForSync()
         
-        for localRecipe in recipesToSync {
+        // Batch sync for efficiency
+        let batchSize = 10
+        let batches = recipesToSync.chunked(into: batchSize)
+        
+        for batch in batches {
             guard !Task.isCancelled else { break }
             
-            do {
-                // Use the existing CloudKitSyncService to upload recipe
-                let cloudKitRecordID = try await CloudKitSyncService.shared.uploadRecipe(
-                    localRecipe.recipe,
-                    imageData: nil // Photos are handled separately by PhotoStorageManager
-                )
-                
-                // Mark as synced with the real CloudKit ID
-                localStore.markRecipeSynced(id: localRecipe.id, cloudKitRecordID: cloudKitRecordID)
-                
-            } catch {
-                syncErrors.append(SyncError(
-                    recipeID: localRecipe.id,
-                    error: error,
-                    timestamp: Date()
-                ))
-                
-                // Check if it's a conflict or just a network error
-                if let ckError = error as? CKError, ckError.code == .serverRecordChanged {
-                    // Mark as conflict for resolution
-                    localStore.markRecipeConflict(id: localRecipe.id)
-                    
-                    // Attempt conflict resolution
-                    await resolveConflict(localRecipe: localRecipe, error: ckError)
-                } else {
-                    // Keep as pending for retry
-                    print("⚠️ Sync failed for recipe \(localRecipe.recipe.name), will retry: \(error)")
+            // Process batch in parallel
+            await withTaskGroup(of: SyncResult.self) { group in
+                for localRecipe in batch {
+                    group.addTask {
+                        await self.syncSingleRecipe(localRecipe)
+                    }
                 }
+                
+                // Collect results
+                for await result in group {
+                    switch result {
+                    case .success(let recipeID, let cloudKitID):
+                        localStore.markRecipeSynced(id: recipeID, cloudKitRecordID: cloudKitID)
+                        print("✅ Synced recipe: \(recipeID)")
+                    case .conflict(let recipeID, let error):
+                        localStore.markRecipeConflict(id: recipeID)
+                        if let localRecipe = localStore.getRecipe(id: recipeID) {
+                            await resolveConflict(localRecipe: localRecipe, error: error)
+                        }
+                    case .failure(let recipeID, let error):
+                        syncErrors.append(SyncError(
+                            recipeID: recipeID,
+                            error: error,
+                            timestamp: Date()
+                        ))
+                        print("⚠️ Sync failed for recipe \(recipeID), will retry: \(error)")
+                    }
+                }
+            }
+            
+            // Small delay between batches to avoid rate limiting
+            if !batches.isEmpty {
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             }
         }
         
         localStore.updateLastSyncDate()
+    }
+    
+    private func syncSingleRecipe(_ localRecipe: LocalRecipe) async -> SyncResult {
+        do {
+            let cloudKitRecordID = try await CloudKitSyncService.shared.uploadRecipe(
+                localRecipe.recipe,
+                imageData: nil
+            )
+            return .success(recipeID: localRecipe.id, cloudKitID: cloudKitRecordID)
+        } catch {
+            if let ckError = error as? CKError, ckError.code == .serverRecordChanged {
+                return .conflict(recipeID: localRecipe.id, error: ckError)
+            } else {
+                return .failure(recipeID: localRecipe.id, error: error)
+            }
+        }
+    }
+    
+    private enum SyncResult {
+        case success(recipeID: UUID, cloudKitID: String)
+        case conflict(recipeID: UUID, error: CKError)
+        case failure(recipeID: UUID, error: Error)
     }
     
     // MARK: - Conflict Resolution
@@ -390,4 +421,13 @@ struct SyncError: Identifiable {
     let recipeID: UUID
     let error: Error
     let timestamp: Date
+}
+
+// MARK: - Array Extension for Chunking
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
+        }
+    }
 }

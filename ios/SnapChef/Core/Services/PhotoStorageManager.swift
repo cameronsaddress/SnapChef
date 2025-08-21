@@ -55,12 +55,15 @@ public final class PhotoStorageManager: ObservableObject {
     /// Store fridge photo for multiple recipes (called after recipe generation)
     public func storeFridgePhoto(_ photo: UIImage, for recipeIds: [UUID]) {
         logger.info("📸 Storing fridge photo for \(recipeIds.count) recipes")
+        
+        // Compress photo for storage efficiency
+        let compressedPhoto = compressPhoto(photo, maxSizeKB: 500)
 
         for recipeId in recipeIds {
             let existing = recipePhotos[recipeId]
             recipePhotos[recipeId] = RecipePhotos(
                 recipeId: recipeId,
-                fridgePhoto: photo,
+                fridgePhoto: compressedPhoto,
                 pantryPhoto: existing?.pantryPhoto,
                 mealPhoto: existing?.mealPhoto
             )
@@ -72,13 +75,16 @@ public final class PhotoStorageManager: ObservableObject {
     /// Store meal photo for a specific recipe (called after cooking)
     public func storeMealPhoto(_ photo: UIImage, for recipeId: UUID) {
         logger.info("📸 Storing meal photo for recipe \(recipeId)")
+        
+        // Compress photo for storage efficiency
+        let compressedPhoto = compressPhoto(photo, maxSizeKB: 500)
 
         let existing = recipePhotos[recipeId]
         recipePhotos[recipeId] = RecipePhotos(
             recipeId: recipeId,
             fridgePhoto: existing?.fridgePhoto,
             pantryPhoto: existing?.pantryPhoto,
-            mealPhoto: photo
+            mealPhoto: compressedPhoto
         )
     }
 
@@ -324,6 +330,60 @@ public final class PhotoStorageManager: ObservableObject {
             borderPath.lineWidth = 20
             borderPath.stroke()
         }
+    }
+    
+    // MARK: - Photo Compression
+    
+    /// Compress photo to target size in KB
+    private func compressPhoto(_ image: UIImage, maxSizeKB: Int) -> UIImage {
+        let maxBytes = maxSizeKB * 1024
+        var compression: CGFloat = 1.0
+        var imageData = image.jpegData(compressionQuality: compression)
+        
+        // Binary search for optimal compression
+        var minCompression: CGFloat = 0.0
+        var maxCompression: CGFloat = 1.0
+        
+        while let data = imageData, data.count > maxBytes && compression > 0.1 {
+            compression = (minCompression + maxCompression) / 2
+            
+            if data.count > maxBytes {
+                maxCompression = compression
+            } else {
+                minCompression = compression
+            }
+            
+            imageData = image.jpegData(compressionQuality: compression)
+            
+            // Break if we're close enough
+            if maxCompression - minCompression < 0.05 {
+                break
+            }
+        }
+        
+        // If still too large, resize the image
+        if let data = imageData, data.count > maxBytes {
+            let scale = CGFloat(maxBytes) / CGFloat(data.count)
+            let newSize = CGSize(
+                width: image.size.width * sqrt(scale),
+                height: image.size.height * sqrt(scale)
+            )
+            
+            UIGraphicsBeginImageContextWithOptions(newSize, false, 0.0)
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+            let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+            UIGraphicsEndImageContext()
+            
+            return resizedImage ?? image
+        }
+        
+        // Return compressed image
+        if let data = imageData, let compressedImage = UIImage(data: data) {
+            logger.info("📸 Compressed photo from \(image.jpegData(compressionQuality: 1.0)?.count ?? 0) to \(data.count) bytes")
+            return compressedImage
+        }
+        
+        return image
     }
     
     // MARK: - Migration Methods
