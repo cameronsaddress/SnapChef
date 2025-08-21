@@ -326,15 +326,15 @@ struct ActivityFeedView: View {
                 print("⚠️ Activity: \(activity)")
             }
         case .follow:
-            // Navigate to user profile
-            print("👥 Follow activity tapped - showing user profile sheet")
+            // Navigate to user profile - show the person who performed the follow action (actor)
+            print("👥 Follow activity tapped - showing profile of user who followed: \(activity.userName)")
             let userProfile = IdentifiableUserProfile(
                 id: activity.userID,
                 userID: activity.userID,
                 userName: activity.userName
             )
             sheetUserProfile = userProfile
-            print("✅ User profile sheet set for user: \(activity.userName)")
+            print("✅ User profile sheet set for follower: \(activity.userName)")
         case .challengeCompleted:
             // Show challenge detail popup
             print("🏆 Challenge activity tapped - showing challenge detail")
@@ -811,6 +811,11 @@ class ActivityFeedManager: ObservableObject {
     }
 
     private func fetchRecentPublicActivities(limit: Int) async throws -> [CKRecord] {
+        guard let currentUser = CloudKitAuthManager.shared.currentUser,
+              let currentUserID = currentUser.recordID else {
+            return []
+        }
+        
         // Since timestamp field may not be queryable, use a simpler query and filter in code
         // Query all activities and filter/sort client-side as a workaround
         let predicate = NSPredicate(format: "TRUEPREDICATE") // Get all records
@@ -826,13 +831,19 @@ class ActivityFeedManager: ObservableObject {
         
         let sevenDaysAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
         
-        // Collect all valid records first
+        // Collect all valid records first, excluding activities performed by current user
         for (_, result) in results.matchResults {
             if case .success(let record) = result {
                 // Filter by timestamp in code since it may not be queryable
                 if let timestamp = record[CKField.Activity.timestamp] as? Date,
                    timestamp >= sevenDaysAgo {
-                    activities.append(record)
+                    
+                    // IMPORTANT: Exclude activities where current user is the actor
+                    // This prevents showing "sisaccount followed you" when sisaccount is the logged-in user
+                    if let actorID = record[CKField.Activity.actorID] as? String,
+                       actorID != currentUserID {
+                        activities.append(record)
+                    }
                 }
             }
         }

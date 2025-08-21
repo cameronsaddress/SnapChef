@@ -21,10 +21,12 @@ class UserProfileViewModel: ObservableObject {
 
     func loadUserProfile(userID: String) async {
         isLoading = true
+        print("🔍 Loading user profile for userID: \(userID)")
 
         do {
-            // Load user profile from UserProfile record type
+            // Try to load user profile from UserProfile record type first
             if let userProfileRecord = try await cloudKitUserManager.fetchUserProfile(userID: userID) {
+                print("✅ Found UserProfile record for userID: \(userID)")
                 // Convert UserProfile record to CloudKitUser for compatibility
                 self.userProfile = UserProfileConverter.convertUserProfileToCloudKitUser(userProfileRecord)
                 
@@ -42,13 +44,45 @@ class UserProfileViewModel: ObservableObject {
                 // Load achievements after stats are calculated
                 loadAchievements()
             } else {
-                print("❌ User profile not found for userID: \(userID)")
+                print("⚠️ UserProfile record not found, trying User record type for userID: \(userID)")
+                // Fallback: Try to load from User record type directly by record ID
+                await loadFromUserRecordType(userID: userID)
             }
         } catch {
-            print("❌ Failed to load user profile: \(error)")
+            print("❌ Failed to load user profile from UserProfile: \(error)")
+            // Fallback: Try to load from User record type directly
+            await loadFromUserRecordType(userID: userID)
         }
 
         isLoading = false
+    }
+    
+    private func loadFromUserRecordType(userID: String) async {
+        do {
+            print("🔄 Attempting to load from User record type with ID: \(userID)")
+            let recordID = CKRecord.ID(recordName: userID)
+            let userRecord = try await database.record(for: recordID)
+            
+            print("✅ Found User record for userID: \(userID)")
+            self.userProfile = CloudKitUser(from: userRecord)
+            
+            // Check if following
+            if cloudKitAuth.isAuthenticated {
+                self.isFollowing = await checkIfFollowing(userID: userID)
+            }
+
+            // Load user's recipes
+            await loadUserRecipes(userID: userID)
+
+            // Load and apply dynamic stats first
+            await loadUserStats(userID: userID)
+            
+            // Load achievements after stats are calculated
+            loadAchievements()
+        } catch {
+            print("❌ Failed to load from User record type: \(error)")
+            print("❌ This might be due to record ID format mismatch or record not existing")
+        }
     }
 
     func toggleFollow(userID: String) async {
@@ -295,6 +329,7 @@ class UserProfileViewModel: ObservableObject {
     }
 
     func levelProgress(points: Int) -> Double {
+        guard points >= 0 else { return 0.0 }
         let currentLevelPoints = (points % 1_000)
         return Double(currentLevelPoints) / 1_000.0
     }

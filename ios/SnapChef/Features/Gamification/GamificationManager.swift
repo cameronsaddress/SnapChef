@@ -152,6 +152,7 @@ struct UserGameStats {
     }
 
     var levelProgress: Double {
+        guard nextLevelPoints > 0 else { return 0.0 }
         let currentLevelPoints = totalPoints % nextLevelPoints
         return Double(currentLevelPoints) / Double(nextLevelPoints)
     }
