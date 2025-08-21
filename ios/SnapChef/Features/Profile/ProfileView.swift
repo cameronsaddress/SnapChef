@@ -30,7 +30,7 @@ enum SubscriptionTier: String, CaseIterable {
 
 struct ProfileView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var authManager: UnifiedAuthManager
     @EnvironmentObject var deviceManager: DeviceManager
     @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
     @EnvironmentObject var gamificationManager: GamificationManager
@@ -184,7 +184,7 @@ struct EnhancedProfileHeader: View {
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var gamificationManager: GamificationManager
-    @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var authManager: UnifiedAuthManager
     @State private var userStats: UserStats?
     @State private var isLoadingStats = false
 
