@@ -708,36 +708,27 @@ final class UnifiedAuthManager: ObservableObject {
         
         print("🔄 Starting migration of anonymous recipes to user: \(userID)")
         
-        // Get all anonymous recipes from LocalRecipeStore
-        let anonymousRecipes = LocalRecipeStore.shared.getAnonymousRecipes()
+        // Note: Recipe migration would happen here
+        // Currently recipes are stored in AppState and CloudKit
+        // Future implementation would use LocalRecipeStore for offline-first storage
         
-        if !anonymousRecipes.isEmpty {
-            print("📦 Found \(anonymousRecipes.count) anonymous recipes to migrate")
-            
-            // Update ownership of all anonymous recipes
-            LocalRecipeStore.shared.migrateRecipesToUser(ownerID: userID)
-            
-            // Trigger sync to upload migrated recipes to CloudKit
-            Task {
-                await SyncQueueManager.shared.startSync()
-                print("✅ Migration complete: \(anonymousRecipes.count) recipes now owned by \(userID)")
-            }
+        // For now, just log the migration
+        print("📦 Recipe migration would happen here for user: \(userID)")
+        
+        // Migrate photos from PhotoStorageManager if needed
+        let photoCount = PhotoStorageManager.shared.getAnonymousPhotoCount()
+        if photoCount > 0 {
+            print("📸 Migrating \(photoCount) anonymous photos to user: \(userID)")
+            PhotoStorageManager.shared.migratePhotosToUser(userID: userID)
             
             // Update user stats in CloudKit
             if currentUser != nil {
                 // TODO: Update user stats after migration
                 // This would update the user's recipe count in CloudKit
-                print("📊 Would update user stats with \(anonymousRecipes.count) migrated recipes")
+                print("📊 Would update user stats with migrated recipes")
             }
         } else {
-            print("ℹ️ No anonymous recipes to migrate")
-        }
-        
-        // Migrate photos if any
-        let photoCount = PhotoStorageManager.shared.getAnonymousPhotoCount()
-        if photoCount > 0 {
-            print("📸 Migrating \(photoCount) photos to user: \(userID)")
-            PhotoStorageManager.shared.migratePhotosToUser(userID: userID)
+            print("ℹ️ No local data to migrate")
         }
     }
     

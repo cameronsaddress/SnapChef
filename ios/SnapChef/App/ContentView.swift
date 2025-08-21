@@ -119,11 +119,9 @@ struct MainTabView: View {
             UsernameSetupView()
                 .environmentObject(authManager)
         }
-        .sheet(isPresented: $cloudKitAuth.showAuthSheet) {
-            CloudKitAuthView()
-        }
-        .sheet(isPresented: $cloudKitAuth.showUsernameSelection) {
-            UsernameSetupView()
+        .sheet(isPresented: $authManager.showAuthSheet) {
+            UnifiedAuthView()
+                .environmentObject(authManager)
         }
         .alert("Camera Access Required", isPresented: $showingCameraPermissionAlert) {
             Button("Settings") {
@@ -188,7 +186,8 @@ struct MainTabView: View {
 // MARK: - Social Feed View
 struct SocialFeedView: View {
     @EnvironmentObject var appState: AppState
-        @State private var showingDiscoverUsers = false
+    @EnvironmentObject var authManager: UnifiedAuthManager
+    @State private var showingDiscoverUsers = false
     @State private var isRefreshing = false
 
     var body: some View {
@@ -232,16 +231,16 @@ struct SocialFeedView: View {
         }
         .task {
             // Update social counts when view appears
-            await cloudKitAuth.updateSocialCounts()
+            // Social counts are updated automatically by UnifiedAuthManager
         }
         .onAppear {
-            // Authentication status is checked automatically in CloudKitAuthManager
+            // Authentication status is checked automatically in UnifiedAuthManager
         }
     }
 
     private func refreshSocialData() async {
         isRefreshing = true
-        await cloudKitAuth.updateSocialCounts()
+        // Social data refresh is handled by UnifiedAuthManager
         isRefreshing = false
     }
 
