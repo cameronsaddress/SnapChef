@@ -38,6 +38,7 @@ struct UserProfile: Identifiable {
 struct DiscoverUsersView: View {
     @StateObject private var viewModel = DiscoverUsersViewModel()
     @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @EnvironmentObject var appState: AppState
     @State private var searchText = ""
     @State private var selectedCategory: DiscoverCategory = .suggested
 
@@ -146,6 +147,9 @@ struct DiscoverUsersView: View {
                             .padding(.horizontal, 20)
                             .padding(.bottom, 20)
                         }
+                        .refreshable {
+                            await viewModel.loadUsers(for: selectedCategory)
+                        }
                     }
                 }
             }
@@ -171,9 +175,11 @@ struct DiscoverUsersView: View {
             }
         }
         .sheet(item: $viewModel.selectedUser) { user in
-            // User profile view not implemented - showing basic info
-            Text("User Profile: \(user.username ?? user.displayName)")
-                .presentationDetents([.medium, .large])
+            UserProfileView(
+                userID: user.id,
+                userName: user.username ?? user.displayName
+            )
+            .environmentObject(appState)
         }
         .sheet(isPresented: $cloudKitAuth.showAuthSheet) {
             CloudKitAuthView()
@@ -540,9 +546,12 @@ class DiscoverUsersViewModel: ObservableObject {
 
 
     private func convertToUserProfile(_ cloudKitUser: CloudKitUser) -> UserProfile {
-        UserProfile(
+        // Ensure we use the most current username from CloudKit
+        let currentUsername = cloudKitUser.username ?? cloudKitUser.displayName.lowercased().replacingOccurrences(of: " ", with: "")
+        
+        return UserProfile(
             id: cloudKitUser.recordID ?? "",
-            username: cloudKitUser.username ?? cloudKitUser.displayName.lowercased().replacingOccurrences(of: " ", with: ""),
+            username: currentUsername,
             displayName: cloudKitUser.displayName,
             profileImageURL: cloudKitUser.profileImageURL,
             profileImage: nil,
@@ -642,6 +651,7 @@ class DiscoverUsersViewModel: ObservableObject {
             searchResults[i].isFollowing = await cloudKitAuth.isFollowing(userID: searchResults[i].id)
         }
     }
+    
 }
 
 #Preview {

@@ -14,6 +14,12 @@ struct IdentifiableChallenge: Identifiable {
     let challenge: Challenge
 }
 
+struct IdentifiableUserProfile: Identifiable {
+    let id: String
+    let userID: String
+    let userName: String
+}
+
 // MARK: - Activity Item Model
 struct ActivityItem: Identifiable {
     let id: String
@@ -120,6 +126,7 @@ struct ActivityFeedView: View {
     // Use identifiable wrappers for sheet presentation
     @State private var sheetRecipe: IdentifiableRecipe?
     @State private var sheetChallenge: IdentifiableChallenge?
+    @State private var sheetUserProfile: IdentifiableUserProfile?
 
     enum ActivityFilter: String, CaseIterable {
         case all = "All"
@@ -267,6 +274,18 @@ struct ActivityFeedView: View {
                     print("   - Type: \(identifiableChallenge.challenge.type)")
                 }
         }
+        .sheet(item: $sheetUserProfile) { identifiableUserProfile in
+            UserProfileView(
+                userID: identifiableUserProfile.userID,
+                userName: identifiableUserProfile.userName
+            )
+            .environmentObject(appState)
+            .onAppear {
+                print("🎯 USER PROFILE SHEET APPEARED")
+                print("   - User: \(identifiableUserProfile.userName)")
+                print("   - ID: \(identifiableUserProfile.userID)")
+            }
+        }
     }
 
     private var filteredActivities: [ActivityItem] {
@@ -308,8 +327,14 @@ struct ActivityFeedView: View {
             }
         case .follow:
             // Navigate to user profile
-            print("👥 Follow activity tapped - user profile navigation not implemented")
-            break
+            print("👥 Follow activity tapped - showing user profile sheet")
+            let userProfile = IdentifiableUserProfile(
+                id: activity.userID,
+                userID: activity.userID,
+                userName: activity.userName
+            )
+            sheetUserProfile = userProfile
+            print("✅ User profile sheet set for user: \(activity.userName)")
         case .challengeCompleted:
             // Show challenge detail popup
             print("🏆 Challenge activity tapped - showing challenge detail")
