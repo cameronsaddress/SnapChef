@@ -96,14 +96,38 @@ final class UnifiedAuthManager: ObservableObject {
         }
         
         isLoading = true
-        defer { isLoading = false }
+        defer { 
+            isLoading = false
+            showError = false
+            errorMessage = ""
+        }
         
         print("🔑 Starting unified CloudKit Sign in with Apple...")
         
         // CRITICAL FIX: Get the actual CloudKit userRecordID, not the Apple ID credential user ID
-        let accountStatus = try await cloudKitContainer.accountStatus()
+        let accountStatus: CKAccountStatus
+        do {
+            accountStatus = try await cloudKitContainer.accountStatus()
+        } catch {
+            print("❌ Failed to check CloudKit account status: \(error)")
+            errorMessage = "Unable to access iCloud. Please check your iCloud settings."
+            showError = true
+            throw UnifiedAuthError.cloudKitNotAvailable
+        }
+        
         guard accountStatus == .available else {
             print("⚠️ CloudKit account not available: \(accountStatus)")
+            switch accountStatus {
+            case .noAccount:
+                errorMessage = "Please sign in to iCloud in Settings to use this feature."
+            case .restricted:
+                errorMessage = "iCloud access is restricted on this device."
+            case .temporarilyUnavailable:
+                errorMessage = "iCloud is temporarily unavailable. Please try again later."
+            default:
+                errorMessage = "Unable to access iCloud. Please check your settings."
+            }
+            showError = true
             throw UnifiedAuthError.cloudKitNotAvailable
         }
         
@@ -116,11 +140,12 @@ final class UnifiedAuthManager: ObservableObject {
         let email = appleIDCredential.email
         let fullName = appleIDCredential.fullName
         
-        let recordID = CKRecord.ID(recordName: cloudKitUserID)
+        // Use compound key to avoid conflicts with CloudKit system records
+        let userRecordID = CKRecord.ID(recordName: "user_\(cloudKitUserID)")
         
         do {
             // Try to fetch existing user
-            let existingRecord = try await cloudKitDatabase.record(for: recordID)
+            let existingRecord = try await cloudKitDatabase.record(for: userRecordID)
             
             // Check if record has correct type
             if existingRecord.recordType == CloudKitConfig.userRecordType {
@@ -155,8 +180,11 @@ final class UnifiedAuthManager: ObservableObject {
             }
             
         } catch {
-            // Create new user
-            let newRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: recordID)
+            // Create new user with compound key
+            let newRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: userRecordID)
+            
+            // Store the actual CloudKit user ID in a field
+            newRecord["cloudKitUserID"] = cloudKitUserID
             
             // Set initial values
             newRecord[CKField.User.authProvider] = "apple"
@@ -590,8 +618,11 @@ final class UnifiedAuthManager: ObservableObject {
                 return
             }
             
+            // Use compound key for user records
+            let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
+            
             // Try to load the user record
-            let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: recordID))
+            let record = try await cloudKitDatabase.record(for: userRecordID)
             await MainActor.run {
                 self.currentUser = CloudKitUser(from: record)
                 self.isAuthenticated = true

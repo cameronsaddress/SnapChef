@@ -16,8 +16,7 @@ struct SnapChefApp: App {
 
     // Create new instances for @StateObject to manage their lifecycle.
     @StateObject private var appState = AppState()
-    @StateObject private var authManager = AuthenticationManager()
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var authManager = UnifiedAuthManager.shared
     @StateObject private var deviceManager = DeviceManager()
     @StateObject private var gamificationManager = GamificationManager()
 
@@ -33,7 +32,6 @@ struct SnapChefApp: App {
                 // Inject all dependencies into the environment.
                 .environmentObject(appState)
                 .environmentObject(authManager)
-                .environmentObject(cloudKitAuth)
                 .environmentObject(deviceManager)
                 .environmentObject(gamificationManager)
                 .environmentObject(socialShareManager)

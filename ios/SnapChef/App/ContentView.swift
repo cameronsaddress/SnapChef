@@ -3,7 +3,7 @@ import AVFoundation
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var authManager: AuthenticationManager
+    @EnvironmentObject var authManager: UnifiedAuthManager
     @EnvironmentObject var deviceManager: DeviceManager
     @State private var showingLaunchAnimation = true
 
@@ -44,9 +44,8 @@ struct ContentView: View {
 struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var pendingTabSelection: Int?
-    @EnvironmentObject var authManager: AuthenticationManager
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
-    @State private var showingCameraPermissionAlert = false
+    @EnvironmentObject var authManager: UnifiedAuthManager
+        @State private var showingCameraPermissionAlert = false
 
     var body: some View {
         // Single NavigationStack at the root level
@@ -189,8 +188,7 @@ struct MainTabView: View {
 // MARK: - Social Feed View
 struct SocialFeedView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
-    @State private var showingDiscoverUsers = false
+        @State private var showingDiscoverUsers = false
     @State private var isRefreshing = false
 
     var body: some View {
@@ -252,7 +250,7 @@ struct SocialFeedView: View {
             // User Info Row
             HStack(spacing: 16) {
                 // Profile Image
-                if let user = cloudKitAuth.currentUser {
+                if let user = authManager.currentUser {
                     Circle()
                         .fill(
                             LinearGradient(
@@ -272,17 +270,17 @@ struct SocialFeedView: View {
                 // Stats
                 HStack(spacing: 24) {
                     socialStatItem(
-                        count: cloudKitAuth.currentUser?.followerCount ?? 0,
+                        count: authManager.currentUser?.followerCount ?? 0,
                         label: "Followers"
                     )
 
                     socialStatItem(
-                        count: cloudKitAuth.currentUser?.followingCount ?? 0,
+                        count: authManager.currentUser?.followingCount ?? 0,
                         label: "Following"
                     )
 
                     socialStatItem(
-                        count: cloudKitAuth.currentUser?.recipesShared ?? 0,
+                        count: authManager.currentUser?.recipesShared ?? 0,
                         label: "Recipes"
                     )
                 }

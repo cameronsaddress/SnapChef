@@ -332,6 +332,20 @@ final class RecipesViewModel: ObservableObject {
         print("🔍 DEBUG: saveRecipeWithPhotos called for '\(recipe.name)'")
         print("🔍   - savedRecipes count before: \(savedRecipes.count)")
         
+        // Save to LocalRecipeStore first (local-first approach)
+        let ownerID = UnifiedAuthManager.shared.currentUser?.recordID
+        let localRecipe = LocalRecipeStore.shared.saveRecipe(recipe, ownerID: ownerID)
+        
+        // Store photos locally
+        if beforePhoto != nil || afterPhoto != nil {
+            PhotoStorageManager.shared.storePhotos(
+                fridgePhoto: beforePhoto,
+                mealPhoto: afterPhoto,
+                for: recipe.id
+            )
+        }
+        
+        // Update in-memory state for UI
         let savedRecipe = SavedRecipe(recipe: recipe, beforePhoto: beforePhoto, afterPhoto: afterPhoto)
         savedRecipesWithPhotos.append(savedRecipe)
         saveToDisk()
@@ -345,6 +359,13 @@ final class RecipesViewModel: ObservableObject {
         }
         
         print("🔍   - savedRecipes count after: \(savedRecipes.count)")
+        
+        // Trigger CloudKit sync if authenticated
+        if UnifiedAuthManager.shared.isAuthenticated {
+            Task {
+                SyncQueueManager.shared.startSync()
+            }
+        }
     }
     
     func updateAfterPhoto(for recipeId: UUID, afterPhoto: UIImage) {
