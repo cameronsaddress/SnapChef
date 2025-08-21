@@ -397,7 +397,7 @@ public final class PhotoStorageManager: ObservableObject {
     
     /// Migrate all photos to a specific user ID
     public func migratePhotosToUser(userID: String) {
-        logger.info("📸 Migrating \(recipePhotos.count) photo sets to user: \(userID)")
+        logger.info("📸 Migrating \(self.recipePhotos.count) photo sets to user: \(userID)")
         
         // In a production app, you would:
         // 1. Update photo metadata with user ownership

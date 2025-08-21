@@ -724,20 +724,10 @@ final class UnifiedAuthManager: ObservableObject {
             }
             
             // Update user stats in CloudKit
-            if let currentUser = currentUser {
-                let updates = UserStatUpdates(
-                    recipesCreated: anonymousRecipes.count
-                )
-                
-                // Update stats in background
-                Task {
-                    do {
-                        try await CloudKitAuthManager.shared.updateUserStats(updates)
-                        print("📊 Updated user stats with \(anonymousRecipes.count) migrated recipes")
-                    } catch {
-                        print("⚠️ Failed to update user stats: \(error)")
-                    }
-                }
+            if currentUser != nil {
+                // TODO: Update user stats after migration
+                // This would update the user's recipe count in CloudKit
+                print("📊 Would update user stats with \(anonymousRecipes.count) migrated recipes")
             }
         } else {
             print("ℹ️ No anonymous recipes to migrate")
