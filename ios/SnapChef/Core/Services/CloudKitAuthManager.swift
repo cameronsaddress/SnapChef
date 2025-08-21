@@ -549,10 +549,10 @@ final class CloudKitAuthManager: ObservableObject {
             
             // Convert map to array and sort by total points (highest activity first)
             var users = Array(userMap.values).sorted { user1, user2 in
-                let points1 = user1.totalPoints ?? 0
-                let points2 = user2.totalPoints ?? 0
+                let points1 = user1.totalPoints
+                let points2 = user2.totalPoints
                 if points1 == points2 {
-                    return (user1.recipesCreated ?? 0) > (user2.recipesCreated ?? 0)
+                    return user1.recipesShared > user2.recipesShared
                 }
                 return points1 > points2
             }

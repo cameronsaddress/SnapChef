@@ -5,6 +5,15 @@ import UIKit
 
 // MARK: - Supporting Types
 
+// Array extension for chunking (local to this file to avoid conflicts)
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
+        }
+    }
+}
+
 
 struct TikTokShareView: View {
     let content: ShareContent
@@ -1168,13 +1177,7 @@ struct ConnectorLine: View {
 }
 
 // Array extension for chunking
-extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
-        }
-    }
-}
+// Array chunked extension moved to CloudKitModules/RecipeModule.swift to avoid duplication
 
 // Simple wrapping layout using LazyVGrid for Swift 6 compatibility
 struct Wrap<Data: RandomAccessCollection, Content: View>: View where Data.Element: Hashable {

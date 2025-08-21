@@ -1,14 +1,7 @@
 import SwiftUI
 import CloudKit
 
-// MARK: - Array Extension for Batch Processing
-extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
-        }
-    }
-}
+// MARK: - Array Extension for Batch Processing (removed duplicate extension)
 
 // MARK: - Identifiable Wrappers for Sheet Presentation
 struct IdentifiableRecipe: Identifiable {
@@ -873,29 +866,30 @@ class ActivityFeedManager: ObservableObject {
         let recordIDs = userIDs.map { CKRecord.ID(recordName: $0) }
         
         do {
-            let fetchOperation = CKFetchRecordsOperation(recordIDs: recordIDs)
-            fetchOperation.database = publicDatabase
+            let recordResults = try await publicDatabase.records(for: recordIDs)
             
-            let (records, _) = try await publicDatabase.records(for: recordIDs)
-            
-            for (recordID, result) in records {
+            for (recordID, result) in recordResults {
                 switch result {
                 case .success(let record):
                     let user = CloudKitUser(from: record)
                     userCache[recordID.recordName] = user
                 case .failure(let error):
                     print("❌ Failed to fetch user \(recordID.recordName): \(error)")
-                    // Create placeholder user to avoid repeated failed fetches
-                    userCache[recordID.recordName] = CloudKitUser(
-                        recordID: recordID.recordName,
-                        username: "Unknown Chef",
-                        displayName: "Unknown Chef",
-                        email: nil,
-                        profilePicture: nil,
-                        totalPoints: 0,
-                        recipesCreated: 0,
-                        isVerified: false
-                    )
+                    // Create placeholder user using a CKRecord - avoid repeated failed fetches
+                    let placeholderRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: recordID)
+                    placeholderRecord[CKField.User.displayName] = "Unknown Chef"
+                    placeholderRecord[CKField.User.username] = "unknown_chef"
+                    placeholderRecord[CKField.User.totalPoints] = Int64(0)
+                    placeholderRecord[CKField.User.recipesCreated] = Int64(0)
+                    placeholderRecord[CKField.User.isVerified] = Int64(0)
+                    placeholderRecord[CKField.User.createdAt] = Date()
+                    placeholderRecord[CKField.User.lastLoginAt] = Date()
+                    placeholderRecord[CKField.User.currentStreak] = Int64(0)
+                    placeholderRecord[CKField.User.challengesCompleted] = Int64(0)
+                    placeholderRecord[CKField.User.recipesShared] = Int64(0)
+                    placeholderRecord[CKField.User.followerCount] = Int64(0)
+                    placeholderRecord[CKField.User.followingCount] = Int64(0)
+                    userCache[recordID.recordName] = CloudKitUser(from: placeholderRecord)
                 }
             }
             
