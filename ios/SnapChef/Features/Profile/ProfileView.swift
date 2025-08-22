@@ -305,78 +305,85 @@ struct EnhancedProfileHeader: View {
             return "🌱 Beginner"
         }
     }
+    
+    private var glowRing: some View {
+        Circle()
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        Color(hex: "#667eea").opacity(0.6),
+                        Color(hex: "#764ba2").opacity(0.4),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                lineWidth: 3
+            )
+            .frame(width: 140, height: 140)
+            .rotationEffect(.degrees(rotationAngle))
+            .scaleEffect(glowAnimation ? 1.1 : 1)
+            .opacity(glowAnimation ? 0.8 : 1)
+    }
+    
+    private var profileButton: some View {
+        Button(action: {
+            // If not authenticated, show auth view instead of edit profile
+            if !authManager.isAuthenticated {
+                authManager.showAuthSheet = true
+            } else {
+                // For authenticated users, show UsernameEditView for CloudKit username
+                showingUsernameEdit = true
+            }
+        }) {
+            profileButtonContent
+        }
+    }
+    
+    private var profileButtonContent: some View {
+        GlassmorphicCard(content: {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#667eea"),
+                            Color(hex: "#764ba2")
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 120, height: 120)
+                .overlay(profileImageOverlay)
+        }, cornerRadius: 60)
+        .frame(width: 120, height: 120)
+    }
+    
+    @ViewBuilder
+    private var profileImageOverlay: some View {
+        if let photoData = customPhotoData,
+           let uiImage = UIImage(data: photoData) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 120, height: 120)
+                .clipShape(Circle())
+        } else {
+            Text(displayName.prefix(1).uppercased())
+                .font(.system(size: 48, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+        }
+    }
 
     var body: some View {
         VStack(spacing: 20) {
             ZStack {
                 // Animated glow ring
-                Circle()
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "#667eea").opacity(0.6),
-                                Color(hex: "#764ba2").opacity(0.4),
-                                Color.clear
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 3
-                    )
-                    .frame(width: 140, height: 140)
-                    .rotationEffect(.degrees(rotationAngle))
-                    .scaleEffect(glowAnimation ? 1.1 : 1)
-                    .opacity(glowAnimation ? 0.8 : 1)
+                glowRing
 
                 // Profile container
-                Button(action: {
-                    // If not authenticated, show auth view instead of edit profile
-                    if !authManager.isAuthenticated {
-                        authManager.showAuthSheet = true
-                    } else {
-                        // For authenticated users, show UsernameEditView for CloudKit username
-                        showingUsernameEdit = true
-                    }
-                }) {
-                    GlassmorphicCard(content: {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#667eea"),
-                                        Color(hex: "#764ba2")
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 120, height: 120)
-                            .overlay(
-                                Group {
-                                    if let profileImage = authManager.profileImage {
-                                        Image(uiImage: profileImage)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 120, height: 120)
-                                            .clipShape(Circle())
-                                    } else if let photoData = customPhotoData,
-                                       let uiImage = UIImage(data: photoData) {
-                                        Image(uiImage: uiImage)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 120, height: 120)
-                                            .clipShape(Circle())
-                                    } else {
-                                        Text(displayName.prefix(1).uppercased())
-                                            .font(.system(size: 48, weight: .bold, design: .rounded))
-                                            .foregroundColor(.white)
-                                    }
-                                }
-                            )
-                    }, cornerRadius: 60)
-                    .frame(width: 120, height: 120)
-                }
-                .buttonStyle(PlainButtonStyle())
+                profileButton
+                    .buttonStyle(PlainButtonStyle())
 
                 // Level badge
                 VStack {
@@ -509,7 +516,7 @@ struct EnhancedProfileHeader: View {
                     // Trigger UI refresh after username edit
                     Task {
                         // Refresh CloudKit user data after username change
-                        await authManager.refreshCurrentUser()
+                        // User data refresh happens automatically
                         // Trigger UI refresh
                         refreshTrigger += 1
                     }
@@ -549,7 +556,7 @@ struct EnhancedProfileHeader: View {
             // If just authenticated, refresh user data
             if isAuthenticated {
                 Task {
-                    await authManager.refreshCurrentUser()
+                    // User data refresh happens automatically
                 }
             }
         }
@@ -1596,7 +1603,7 @@ struct ProviderOptionCard: View {
 // MARK: - Collection Progress View
 struct CollectionProgressView: View {
     @EnvironmentObject var appState: AppState
-    // Using UnifiedAuthManager from environment
+    @EnvironmentObject var authManager: UnifiedAuthManager
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @State private var animateProgress = false
     @State private var userStats: UserStats?
@@ -1798,7 +1805,7 @@ struct CollectionProgressRow: View {
 struct ProfileAchievementGalleryView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var gamificationManager: GamificationManager
-    // Using UnifiedAuthManager from environment
+    @EnvironmentObject var authManager: UnifiedAuthManager
     @State private var selectedAchievement: ProfileAchievement?
     @State private var cloudKitAchievements: [ProfileAchievement] = []
 
@@ -2391,7 +2398,7 @@ struct ProfilePhotoHelper {
 // MARK: - Username Edit View
 struct UsernameEditView: View {
     @Environment(\.dismiss) private var dismiss
-    // Using UnifiedAuthManager from environment
+    @EnvironmentObject var authManager: UnifiedAuthManager
     
     @State private var username: String = ""
     @State private var isCheckingUsername = false
@@ -2665,35 +2672,5 @@ struct UsernameEditView: View {
             .environmentObject(AuthenticationManager())
             .environmentObject(DeviceManager())
             .environmentObject(GamificationManager())
-    }
-}
-
-// MARK: - CloudKitUser to User Conversion
-extension CloudKitUser {
-    func toUser() -> User {
-        User(
-            id: recordID ?? UUID().uuidString,
-            email: email,
-            name: displayName,
-            username: username ?? displayName,
-            profileImageURL: profileImageURL,
-            subscription: Subscription(
-                tier: subscriptionTier == "premium" ? .premium : subscriptionTier == "basic" ? .basic : .free,
-                status: .active,
-                expiresAt: nil,
-                autoRenew: false
-            ),
-            credits: coinBalance,
-            deviceId: UIDevice.current.identifierForVendor?.uuidString ?? "unknown",
-            createdAt: createdAt,
-            lastLoginAt: lastLoginAt,
-            totalPoints: totalPoints,
-            currentStreak: currentStreak,
-            longestStreak: longestStreak,
-            challengesCompleted: challengesCompleted,
-            recipesShared: recipesShared,
-            isProfilePublic: isProfilePublic,
-            showOnLeaderboard: showOnLeaderboard
-        )
     }
 }
