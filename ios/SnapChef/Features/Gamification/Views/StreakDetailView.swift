@@ -409,6 +409,31 @@ struct QuickActionsSection: View {
             }
         }
     }
+    
+    private func getCurrentStreak() -> StreakData? {
+        if authManager.isAuthenticated {
+            return cloudKitStreaks[streakType]
+        }
+        return streakManager.currentStreaks[streakType]
+    }
+    
+    private func freezeStreak() {
+        if authManager.isAuthenticated {
+            // Update CloudKit streak with freeze
+            if var streak = cloudKitStreaks[streakType] {
+                streak.frozenUntil = Date().addingTimeInterval(86400) // 24 hours
+                streak.freezesRemaining -= 1
+                cloudKitStreaks[streakType] = streak
+                
+                // Sync to CloudKit
+                Task {
+                    await CloudKitStreakManager.shared.updateStreak(streak)
+                }
+            }
+        } else {
+            _ = streakManager.freezeStreak(type: streakType)
+        }
+    }
 }
 
 struct StreakActionButton: View {

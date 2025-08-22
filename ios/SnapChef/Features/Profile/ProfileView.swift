@@ -1622,17 +1622,16 @@ struct CollectionProgressView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var authManager: UnifiedAuthManager
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitUserManager = CloudKitUserManager.shared
     @State private var animateProgress = false
     @State private var userStats: UserStats?
     @State private var isLoadingStats = false
     @State private var refreshID = UUID() // Force view refresh
 
     var totalRecipes: Int {
-        // Use UserStats if available, otherwise CloudKit recipe counts when available
-        if let stats = userStats {
-            return stats.recipeCount
-        } else if authManager.isAuthenticated {
-            return cloudKitRecipeManager.userCreatedRecipeIDs.count + cloudKitRecipeManager.userSavedRecipeIDs.count
+        // Use real CloudKit data when authenticated
+        if authManager.isAuthenticated {
+            return authManager.currentUser?.recipesCreated ?? 0
         } else {
             return appState.allRecipes.count
         }
@@ -1648,8 +1647,9 @@ struct CollectionProgressView: View {
     }
 
     var sharedRecipes: Int {
-        if let cloudKitUser = authManager.currentUser {
-            return cloudKitUser.recipesShared
+        // Use real CloudKit data when authenticated
+        if authManager.isAuthenticated {
+            return authManager.currentUser?.recipesShared ?? 0
         } else {
             return appState.totalShares
         }
@@ -1744,15 +1744,9 @@ struct CollectionProgressView: View {
                     return
                 }
                 
-                // For now, create stats from current user data
-                let currentUser = authManager.currentUser
-                let stats = UserStats(
-                    followerCount: currentUser?.followerCount ?? 0,
-                    followingCount: currentUser?.followingCount ?? 0,
-                    recipeCount: currentUser?.recipesCreated ?? 0,
-                    achievementCount: 0,
-                    currentStreak: currentUser?.currentStreak ?? 0
-                )
+                // Load comprehensive stats from CloudKit
+                let stats = try await cloudKitUserManager.getUserStats(for: userID)
+                
                 await MainActor.run {
                     self.userStats = stats
                     self.isLoadingStats = false
@@ -1831,8 +1825,10 @@ struct ProfileAchievementGalleryView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var gamificationManager: GamificationManager
     @EnvironmentObject var authManager: UnifiedAuthManager
+    @StateObject private var cloudKitUserManager = CloudKitUserManager.shared
     @State private var selectedAchievement: ProfileAchievement?
     @State private var cloudKitAchievements: [ProfileAchievement] = []
+    @State private var isLoadingAchievements = false
 
     var achievements: [ProfileAchievement] {
         // Use CloudKit achievements if available, otherwise use defaults
@@ -1855,12 +1851,18 @@ struct ProfileAchievementGalleryView: View {
     }
 
     private func loadCloudKitAchievements() {
+        guard authManager.isAuthenticated else { return }
+        guard !isLoadingAchievements else { return }
+        isLoadingAchievements = true
+        
         Task {
             do {
-                guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { return }
+                guard let userID = authManager.currentUser?.recordID else {
+                    await MainActor.run { isLoadingAchievements = false }
+                    return
+                }
 
-                // TODO: Implement getUserAchievements in UnifiedAuthManager
-                let achievements: [CloudKitAchievement] = []
+                let achievements = try await cloudKitUserManager.getUserAchievements(for: userID)
                 
                 let loadedAchievements: [ProfileAchievement] = achievements.map { achievement in
                     ProfileAchievement(
@@ -1875,20 +1877,34 @@ struct ProfileAchievementGalleryView: View {
 
                 await MainActor.run {
                     self.cloudKitAchievements = loadedAchievements
+                    self.isLoadingAchievements = false
                 }
 
                 os_log("Loaded %d achievements from CloudKit", log: .default, type: .info, loadedAchievements.count)
             } catch {
                 os_log("Failed to load CloudKit achievements: %@", log: .default, type: .error, error.localizedDescription)
+                await MainActor.run {
+                    self.isLoadingAchievements = false
+                }
             }
         }
     }
 
     private func isAchievementUnlocked(_ achievement: ProfileAchievement) -> Bool {
-        // TODO: Fix CloudKitUser type compatibility
-        let recipeCount = appState.allRecipes.count // authManager.currentUser?.recipesCreated ?? appState.allRecipes.count
-        let sharedCount = authManager.currentUser?.recipesShared ?? appState.totalShares
-        let streak = authManager.currentUser?.currentStreak ?? 0
+        // Use real CloudKit data when authenticated
+        let recipeCount: Int
+        let sharedCount: Int
+        let streak: Int
+        
+        if authManager.isAuthenticated {
+            recipeCount = authManager.currentUser?.recipesCreated ?? 0
+            sharedCount = authManager.currentUser?.recipesShared ?? 0
+            streak = authManager.currentUser?.currentStreak ?? 0
+        } else {
+            recipeCount = appState.allRecipes.count
+            sharedCount = appState.totalShares
+            streak = 0
+        }
 
         switch achievement.id {
         case "first_recipe":
@@ -2104,85 +2120,38 @@ struct ProfileAchievementDetailView: View {
 // MARK: - Active Challenges Section
 struct ActiveChallengesSection: View {
     @StateObject private var gamificationManager = GamificationManager.shared
+    @StateObject private var cloudKitChallengeManager = CloudKitChallengeManager.shared
+    @EnvironmentObject var authManager: UnifiedAuthManager
     @State private var showingChallengeHub = false
-    @State private var cloudKitChallenges: [Challenge] = []
+    @State private var userChallenges: [CloudKitUserChallenge] = []
     @State private var isLoadingChallenges = false
 
-    private var allActiveChallenges: [Challenge] {
-        // Combine local and CloudKit challenges
-        var combined = gamificationManager.activeChallenges + cloudKitChallenges
-        // Remove duplicates by ID
-        var seenIds = Set<String>()
-        combined = combined.filter { challenge in
-            if seenIds.contains(challenge.id) {
-                return false
-            }
-            seenIds.insert(challenge.id)
-            return true
+    private var activeChallenges: [Challenge] {
+        // Filter challenges that user is actively participating in
+        let activeUserChallenges = userChallenges.filter { $0.status == "active" || $0.status == "in_progress" }
+        
+        return cloudKitChallengeManager.activeChallenges.filter { challenge in
+            activeUserChallenges.contains { $0.challengeID == challenge.id }
         }
-        return combined
     }
 
-    private func loadCloudKitChallenges() {
+    private func loadUserChallenges() {
+        guard authManager.isAuthenticated else { return }
         guard !isLoadingChallenges else { return }
         isLoadingChallenges = true
 
         Task {
             do {
-                guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else {
-                    await MainActor.run { isLoadingChallenges = false }
-                    return
-                }
-
-                let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-                let privateDB = container.privateCloudDatabase
-
-                let predicate = NSPredicate(format: "userID == %@ AND status == %@", userID, "active")
-                let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
-
-                let (results, _) = try await privateDB.records(matching: query)
-
-                var loadedChallenges: [Challenge] = []
-                for (_, result) in results {
-                    if let record = try? result.get(),
-                       let challengeRef = record["challengeID"] as? CKRecord.Reference {
-                        // Fetch the actual challenge details
-                        let challengeRecord = try await container.publicCloudDatabase.record(for: challengeRef.recordID)
-
-                        // Create Challenge object from CloudKit record
-                        let challenge = Challenge(
-                            id: challengeRecord["id"] as? String ?? UUID().uuidString,
-                            title: challengeRecord["title"] as? String ?? "Unknown Challenge",
-                            description: challengeRecord["description"] as? String ?? "",
-                            type: ChallengeType(rawValue: challengeRecord["type"] as? String ?? "Daily Challenge") ?? .daily,
-                            category: challengeRecord["category"] as? String ?? "general",
-                            difficulty: DifficultyLevel(rawValue: challengeRecord["difficulty"] as? Int ?? 1) ?? .easy,
-                            points: challengeRecord["points"] as? Int ?? 0,
-                            coins: challengeRecord["coins"] as? Int ?? 0,
-                            startDate: challengeRecord["startDate"] as? Date ?? Date(),
-                            endDate: challengeRecord["endDate"] as? Date ?? Date(),
-                            requirements: [],
-                            currentProgress: 0,
-                            isCompleted: false,
-                            isActive: true,
-                            isJoined: true, // User has joined if it's in their UserChallenge records
-                            participants: challengeRecord["participantCount"] as? Int ?? 0,
-                            completions: challengeRecord["completionCount"] as? Int ?? 0,
-                            imageURL: challengeRecord["imageURL"] as? String,
-                            isPremium: challengeRecord["isPremium"] as? Bool ?? false
-                        )
-                        loadedChallenges.append(challenge)
-                    }
-                }
-
+                let challenges = try await cloudKitChallengeManager.getUserChallengeProgress()
+                
                 await MainActor.run {
-                    self.cloudKitChallenges = loadedChallenges
+                    self.userChallenges = challenges
                     self.isLoadingChallenges = false
                 }
 
-                os_log("Loaded %d active challenges from CloudKit", log: .default, type: .info, loadedChallenges.count)
+                os_log("Loaded %d user challenges from CloudKit", log: .default, type: .info, challenges.count)
             } catch {
-                os_log("Failed to load CloudKit challenges: %@", log: .default, type: .error, error.localizedDescription)
+                os_log("Failed to load user challenges: %@", log: .default, type: .error, error.localizedDescription)
                 await MainActor.run {
                     self.isLoadingChallenges = false
                 }
@@ -2199,7 +2168,7 @@ struct ActiveChallengesSection: View {
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
 
-                    Text("\(allActiveChallenges.count) challenges active")
+                    Text("\(activeChallenges.count) challenges active")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
@@ -2214,7 +2183,7 @@ struct ActiveChallengesSection: View {
             }
 
             // Active Challenges List
-            if allActiveChallenges.isEmpty && !isLoadingChallenges {
+            if activeChallenges.isEmpty && !isLoadingChallenges {
                 HStack {
                     Spacer()
                     VStack(spacing: 12) {
@@ -2239,8 +2208,8 @@ struct ActiveChallengesSection: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
-                        ForEach(Array(allActiveChallenges.prefix(3))) { challenge in
-                            CompactChallengeCard(challenge: challenge) {
+                        ForEach(Array(activeChallenges.prefix(3))) { challenge in
+                            CompactChallengeCard(challenge: challenge, userChallenge: getUserChallenge(for: challenge.id)) {
                                 showingChallengeHub = true
                             }
                         }
@@ -2268,24 +2237,30 @@ struct ActiveChallengesSection: View {
                 )
         )
         .onAppear {
-            if UnifiedAuthManager.shared.isAuthenticated {
-                loadCloudKitChallenges()
-            }
+            loadUserChallenges()
+        }
+        .onChange(of: authManager.isAuthenticated) { _ in
+            loadUserChallenges()
         }
         .sheet(isPresented: $showingChallengeHub) {
             ChallengeHubView()
         }
+    }
+    
+    private func getUserChallenge(for challengeID: String) -> CloudKitUserChallenge? {
+        return userChallenges.first { $0.challengeID == challengeID }
     }
 }
 
 // MARK: - Compact Challenge Card
 struct CompactChallengeCard: View {
     let challenge: Challenge
+    let userChallenge: CloudKitUserChallenge?
     let action: () -> Void
     @StateObject private var progressTracker = ChallengeProgressTracker.shared
 
     private var progress: Double {
-        challenge.currentProgress
+        userChallenge?.progress ?? challenge.currentProgress
     }
 
     private var timeRemaining: String {

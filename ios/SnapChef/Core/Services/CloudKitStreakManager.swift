@@ -46,6 +46,7 @@ class CloudKitStreakManager: ObservableObject {
         record["frozenUntil"] = streak.frozenUntil
         record["insuranceActive"] = streak.insuranceActive ? 1 : 0
         record["multiplier"] = streak.multiplier
+        record["freezesRemaining"] = Int64(streak.freezesRemaining)
 
         let saveStartTime = Date()
         logger.logSaveStart(recordType: "UserStreak", database: privateDB.debugName)
@@ -147,8 +148,16 @@ class CloudKitStreakManager: ObservableObject {
                     streak.frozenUntil = record["frozenUntil"] as? Date
                     streak.insuranceActive = (record["insuranceActive"] as? Int64 ?? 0) == 1
                     streak.multiplier = record["multiplier"] as? Double ?? 1.0
+                    streak.freezesRemaining = Int(record["freezesRemaining"] as? Int64 ?? 1)
 
                     streaks[type] = streak
+                }
+            }
+            
+            // Initialize default streaks for any missing types
+            for streakType in StreakType.allCases {
+                if streaks[streakType] == nil {
+                    streaks[streakType] = StreakData(type: streakType)
                 }
             }
 
@@ -157,7 +166,13 @@ class CloudKitStreakManager: ObservableObject {
             let duration = Date().timeIntervalSince(startTime)
             logger.logQueryFailure(query: query, database: privateDB.debugName, error: error, duration: duration)
             print("❌ Failed to sync streaks: \(error)")
-            return [:]
+            
+            // Return default streaks on error
+            var defaultStreaks: [StreakType: StreakData] = [:]
+            for streakType in StreakType.allCases {
+                defaultStreaks[streakType] = StreakData(type: streakType)
+            }
+            return defaultStreaks
         }
     }
 

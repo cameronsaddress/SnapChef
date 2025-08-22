@@ -283,8 +283,20 @@ struct StreakSummaryCard: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onAppear {
-            loadRecipeStreak()
+            loadStreakData()
         }
+        .onChange(of: authManager.isAuthenticated) { _ in
+            loadStreakData()
+        }
+    }
+    
+    private func calculateGlobalMultiplier() -> Double {
+        if authManager.isAuthenticated {
+            return cloudKitStreaks.values.reduce(1.0) { result, streak in
+                result + (streak.isActive ? streak.multiplier - 1.0 : 0.0)
+            }
+        }
+        return streakManager.globalMultiplier
     }
     
     // MARK: - Data Loading Methods
