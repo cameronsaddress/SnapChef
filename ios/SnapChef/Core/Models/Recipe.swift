@@ -3,6 +3,7 @@ import SwiftUI
 
 public struct Recipe: Identifiable, Codable, Sendable {
     public let id: UUID
+    let ownerID: String? // User who created this recipe
     let name: String
     let description: String
     let ingredients: [Ingredient]

@@ -5,6 +5,7 @@ import SwiftUI
 /// A specialized recipe model that extends the base Recipe model for reverse-engineered recipes
 public struct DetectiveRecipe: Identifiable, Codable, Sendable {
     public let id: UUID
+    let ownerID: String? // User who created this detective recipe
 
     // Base recipe properties
     let name: String
@@ -42,6 +43,7 @@ public struct DetectiveRecipe: Identifiable, Codable, Sendable {
         restaurantStyle: String? = nil
     ) {
         self.id = baseRecipe.id
+        self.ownerID = baseRecipe.ownerID
         self.name = baseRecipe.name
         self.description = baseRecipe.description
         self.ingredients = baseRecipe.ingredients
@@ -73,6 +75,7 @@ public struct DetectiveRecipe: Identifiable, Codable, Sendable {
     /// Direct initializer for complete control
     init(
         id: UUID = UUID(),
+        ownerID: String? = nil,
         name: String,
         description: String,
         ingredients: [Ingredient],
@@ -98,6 +101,7 @@ public struct DetectiveRecipe: Identifiable, Codable, Sendable {
         shareCaption: String? = nil
     ) {
         self.id = id
+        self.ownerID = ownerID
         self.name = name
         self.description = description
         self.ingredients = ingredients
@@ -145,6 +149,7 @@ extension DetectiveRecipe {
         
         return Recipe(
             id: self.id,
+            ownerID: self.ownerID,
             name: self.name,
             description: self.description,
             ingredients: self.ingredients,

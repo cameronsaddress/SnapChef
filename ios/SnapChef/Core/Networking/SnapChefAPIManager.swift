@@ -1236,8 +1236,12 @@ final class SnapChefAPIManager {
             umami: apiRecipe.flavorProfile.umami
         )
         
+        // Get the current user's ID for ownership
+        let currentUserID = UnifiedAuthManager.shared.currentUser?.recordID
+        
         return DetectiveRecipe(
             id: UUID(uuidString: apiRecipe.id) ?? UUID(),
+            ownerID: currentUserID,
             name: apiRecipe.name,
             description: apiRecipe.description,
             ingredients: ingredients,
@@ -1333,8 +1337,12 @@ final class SnapChefAPIManager {
         print("🔍   - Raw share_caption from API: \"\(apiRecipe.share_caption ?? "")\"")
         print("🔍   - Converted flavor_profile: \(flavorProfile != nil ? "PRESENT" : "NIL")")
 
+        // Get the current user's ID for ownership
+        let currentUserID = UnifiedAuthManager.shared.currentUser?.recordID
+        
         let convertedRecipe = Recipe(
             id: UUID(uuidString: apiRecipe.id) ?? UUID(),
+            ownerID: currentUserID,
             name: apiRecipe.name,
             description: apiRecipe.description,
             ingredients: ingredients,

@@ -1522,8 +1522,12 @@ class CloudKitRecipeManager: ObservableObject {
         let visualClues = record["visualClues"] as? [String] ?? []
         let shareCaption = record["shareCaption"] as? String ?? ""
 
+        // Get owner ID from record
+        let ownerID = record["ownerID"] as? String
+        
         let recipe = Recipe(
             id: UUID(uuidString: id) ?? UUID(),
+            ownerID: ownerID,
             name: title,
             description: description,
             ingredients: ingredients,
