@@ -455,13 +455,25 @@ final class UnifiedAuthManager: ObservableObject {
                 switch result.1 {
                 case .success(let record):
                     return CloudKitUser(from: record)
-                case .failure:
+                case .failure(let error):
+                    print("  ⚠️ Failed to parse user record: \(error)")
                     return nil
                 }
             }
+            print("✅ CloudKit query succeeded. Found \(users.count) users")
+            if users.isEmpty {
+                print("  ℹ️ No users found matching criteria")
+            }
             return Array(users.prefix(limit))
         } catch {
-            throw UnifiedAuthError.networkError
+            print("❌ CloudKit query error: \(error)")
+            if let ckError = error as? CKError {
+                print("  CloudKit Error Code: \(ckError.code.rawValue)")
+                if ckError.code == .networkUnavailable || ckError.code == .networkFailure {
+                    throw UnifiedAuthError.networkError
+                }
+            }
+            throw UnifiedAuthError.cloudKitError(error)
         }
     }
     
@@ -477,13 +489,25 @@ final class UnifiedAuthManager: ObservableObject {
                 switch result.1 {
                 case .success(let record):
                     return CloudKitUser(from: record)
-                case .failure:
+                case .failure(let error):
+                    print("  ⚠️ Failed to parse user record: \(error)")
                     return nil
                 }
             }
+            print("✅ CloudKit query succeeded. Found \(users.count) users")
+            if users.isEmpty {
+                print("  ℹ️ No users found matching criteria")
+            }
             return Array(users.prefix(limit))
         } catch {
-            throw UnifiedAuthError.networkError
+            print("❌ CloudKit query error: \(error)")
+            if let ckError = error as? CKError {
+                print("  CloudKit Error Code: \(ckError.code.rawValue)")
+                if ckError.code == .networkUnavailable || ckError.code == .networkFailure {
+                    throw UnifiedAuthError.networkError
+                }
+            }
+            throw UnifiedAuthError.cloudKitError(error)
         }
     }
     
@@ -501,13 +525,25 @@ final class UnifiedAuthManager: ObservableObject {
                 switch result.1 {
                 case .success(let record):
                     return CloudKitUser(from: record)
-                case .failure:
+                case .failure(let error):
+                    print("  ⚠️ Failed to parse user record: \(error)")
                     return nil
                 }
             }
+            print("✅ CloudKit query succeeded. Found \(users.count) users")
+            if users.isEmpty {
+                print("  ℹ️ No users found matching criteria")
+            }
             return Array(users.prefix(limit))
         } catch {
-            throw UnifiedAuthError.networkError
+            print("❌ CloudKit query error: \(error)")
+            if let ckError = error as? CKError {
+                print("  CloudKit Error Code: \(ckError.code.rawValue)")
+                if ckError.code == .networkUnavailable || ckError.code == .networkFailure {
+                    throw UnifiedAuthError.networkError
+                }
+            }
+            throw UnifiedAuthError.cloudKitError(error)
         }
     }
     
@@ -523,13 +559,25 @@ final class UnifiedAuthManager: ObservableObject {
                 switch result.1 {
                 case .success(let record):
                     return CloudKitUser(from: record)
-                case .failure:
+                case .failure(let error):
+                    print("  ⚠️ Failed to parse user record: \(error)")
                     return nil
                 }
             }
+            print("✅ CloudKit query succeeded. Found \(users.count) users")
+            if users.isEmpty {
+                print("  ℹ️ No users found matching criteria")
+            }
             return Array(users.prefix(limit))
         } catch {
-            throw UnifiedAuthError.networkError
+            print("❌ CloudKit query error: \(error)")
+            if let ckError = error as? CKError {
+                print("  CloudKit Error Code: \(ckError.code.rawValue)")
+                if ckError.code == .networkUnavailable || ckError.code == .networkFailure {
+                    throw UnifiedAuthError.networkError
+                }
+            }
+            throw UnifiedAuthError.cloudKitError(error)
         }
     }
     
