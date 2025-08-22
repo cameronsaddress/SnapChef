@@ -30,6 +30,8 @@ final class CloudKitAuthManager: ObservableObject {
     
     /// Check if user is already authenticated with CloudKit
     private func checkExistingAuth() {
+        // DISABLED: Using UnifiedAuthManager instead
+        return
         Task {
             do {
                 let accountStatus = try await container.accountStatus()
@@ -94,7 +96,10 @@ final class CloudKitAuthManager: ObservableObject {
     
     /// Sign in with Apple ID for CloudKit authentication
     func signInWithApple(authorization: Any) async throws {
-        print("🔑 Starting CloudKit Sign in with Apple...")
+        print("🔑 CloudKitAuthManager.signInWithApple DISABLED - Using UnifiedAuthManager")
+        // DISABLED: Using UnifiedAuthManager instead to avoid conflicts
+        throw CloudKitAuthError.authenticationFailed
+        return
         
         // First check CloudKit account status
         let accountStatus = try await container.accountStatus()
