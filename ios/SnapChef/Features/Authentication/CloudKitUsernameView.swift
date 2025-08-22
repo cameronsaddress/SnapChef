@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct CloudKitUsernameView: View {
-    @StateObject private var authManager = CloudKitAuthManager.shared
+    @StateObject private var authManager = UnifiedAuthManager.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var username = ""

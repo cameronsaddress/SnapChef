@@ -117,8 +117,8 @@ final class AppState: ObservableObject {
     var challengeGenerator: ChallengeGenerator { gamificationViewModel.challengeGenerator }
     var challengeProgressTracker: ChallengeProgressTracker { gamificationViewModel.challengeProgressTracker }
     var challengeService: ChallengeService { gamificationViewModel.challengeService }
-    var cloudKitAuthManager: CloudKitAuthManager { authViewModel.cloudKitAuthManager }
-    var unifiedAuthManager: CloudKitAuthManager { authViewModel.unifiedAuthManager }
+    var cloudKitAuthManager: UnifiedAuthManager { authViewModel.cloudKitAuthManager }
+    var unifiedAuthManager: UnifiedAuthManager { authViewModel.unifiedAuthManager }
 
     init() {
         // Initialize isFirstLaunch from authViewModel after view models are initialized
@@ -286,7 +286,7 @@ final class RecipesViewModel: ObservableObject {
     private let favoritedRecipesKey = "favoritedRecipeIds"
     
     // Dependencies
-    private let unifiedAuthManager = CloudKitAuthManager.shared
+    private let unifiedAuthManager = UnifiedAuthManager.shared
     private let userLifecycle = UserLifecycleManager.shared
     private let usageTracker = UsageTracker.shared
     
@@ -518,8 +518,8 @@ final class AuthViewModel: ObservableObject {
     @Published var currentSessionID: String = ""
     
     // Unified Authentication
-    @Published var cloudKitAuthManager = CloudKitAuthManager.shared
-    @Published var unifiedAuthManager = CloudKitAuthManager.shared
+    @Published var cloudKitAuthManager = UnifiedAuthManager.shared
+    @Published var unifiedAuthManager = UnifiedAuthManager.shared
     
     // Progressive Premium Integration
     private let userLifecycle = UserLifecycleManager.shared

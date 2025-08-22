@@ -172,7 +172,7 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
         clearStoredTokens()
 
         // Also clear from CloudKit if integrated
-        if CloudKitAuthManager.shared.currentUser != nil {
+        if UnifiedAuthManager.shared.currentUser != nil {
             Task {
                 do {
                     try await clearTikTokIntegration()
@@ -376,7 +376,7 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
 
     /// Updates CloudKit with TikTok integration
     private func updateCloudKitIntegration(user: TikTokUser) async {
-        guard let cloudKitUser = CloudKitAuthManager.shared.currentUser else { return }
+        guard let cloudKitUser = UnifiedAuthManager.shared.currentUser else { return }
 
         // Store TikTok user info in CloudKit user profile
         // This would require adding TikTok fields to the CloudKit User schema

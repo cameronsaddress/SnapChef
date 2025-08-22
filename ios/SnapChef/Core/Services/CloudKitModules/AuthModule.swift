@@ -45,7 +45,7 @@ final class AuthModule: ObservableObject {
     // MARK: - Sign In Methods
     func signInWithApple(authorization: ASAuthorization) async throws {
         guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
-            throw CloudKitAuthError.invalidCredential
+            throw UnifiedAuthError.invalidCredential
         }
         
         isLoading = true
@@ -76,7 +76,7 @@ final class AuthModule: ObservableObject {
                 print("⚠️ User record has incorrect type '\(existingRecord.recordType)', expected '\(CloudKitConfig.userRecordType)'. Creating new record.")
                 // Delete the old record with wrong type and create a new one
                 _ = try await publicDatabase.deleteRecord(withID: existingRecord.recordID)
-                throw CloudKitAuthError.invalidRecordType // Will trigger creation of new record
+                throw UnifiedAuthError.invalidRecordType // Will trigger creation of new record
             }
             
             // Store user ID
@@ -178,7 +178,7 @@ final class AuthModule: ObservableObject {
                 print("⚠️ User record has incorrect type '\(existingRecord.recordType)', expected '\(CloudKitConfig.userRecordType)'. Creating new record.")
                 // Delete the old record with wrong type and create a new one
                 _ = try await publicDatabase.deleteRecord(withID: existingRecord.recordID)
-                throw CloudKitAuthError.invalidRecordType // Will trigger creation of new record
+                throw UnifiedAuthError.invalidRecordType // Will trigger creation of new record
             }
             parent?.isAuthenticated = true
             parent?.currentUser = self.currentUser
@@ -263,20 +263,20 @@ final class AuthModule: ObservableObject {
             let results = try await publicDatabase.records(matching: query)
             return results.matchResults.isEmpty
         } catch {
-            throw CloudKitAuthError.networkError
+            throw UnifiedAuthError.networkError
         }
     }
     
     func setUsername(_ username: String) async throws {
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID else {
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
         
         // Check availability first
         let isAvailable = try await checkUsernameAvailability(username)
         guard isAvailable else {
-            throw CloudKitAuthError.usernameUnavailable
+            throw UnifiedAuthError.usernameUnavailable
         }
         
         // Fetch current record
@@ -309,7 +309,7 @@ final class AuthModule: ObservableObject {
     func updateUserStats(_ updates: UserStatUpdates) async throws {
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID else {
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
         
         let record = try await publicDatabase.record(for: CKRecord.ID(recordName: recordID))
@@ -398,7 +398,7 @@ final class AuthModule: ObservableObject {
     func followUser(_ userID: String) async throws {
         guard let currentUserID = currentUser?.recordID,
               let currentUserName = currentUser?.displayName else {
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
         
         // Check if already following
@@ -434,7 +434,7 @@ final class AuthModule: ObservableObject {
     
     func unfollowUser(_ userID: String) async throws {
         guard let currentUserID = currentUser?.recordID else {
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
         
         // Find the follow record
@@ -463,7 +463,7 @@ final class AuthModule: ObservableObject {
     
     func isFollowing(_ userID: String) async throws -> Bool {
         guard let currentUserID = currentUser?.recordID else {
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
         
         let predicate = NSPredicate(format: "%K == %@ AND %K == %@ AND %K == %d",

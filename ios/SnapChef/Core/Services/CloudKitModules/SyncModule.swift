@@ -26,7 +26,7 @@ final class SyncModule: ObservableObject {
     func uploadRecipe(_ recipe: Recipe, imageData: Data? = nil) async throws -> String {
         guard let userID = parent?.currentUser?.recordID,
               let userName = parent?.currentUser?.displayName else {
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
         
         let recipeRecord = CKRecord(recordType: CloudKitConfig.recipeRecordType, recordID: CKRecord.ID(recordName: recipe.id.uuidString))
@@ -173,7 +173,7 @@ final class SyncModule: ObservableObject {
     func likeRecipe(_ recipeID: String, recipeOwnerID: String) async throws {
         guard let userID = parent?.currentUser?.recordID,
               let userName = parent?.currentUser?.displayName else {
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
         
         // Check if already liked
@@ -217,7 +217,7 @@ final class SyncModule: ObservableObject {
     
     func unlikeRecipe(_ recipeID: String) async throws {
         guard let userID = parent?.currentUser?.recordID else {
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
         
         // Find the like record
@@ -371,7 +371,7 @@ final class SyncModule: ObservableObject {
     func addComment(recipeID: String, content: String, parentCommentID: String? = nil) async throws {
         guard let userID = parent?.currentUser?.recordID,
               let userName = parent?.currentUser?.displayName else {
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
         
         let comment = CKRecord(recordType: CloudKitConfig.recipeCommentRecordType)
@@ -537,7 +537,7 @@ final class SyncModule: ObservableObject {
     // MARK: - Challenge Proof Submission
     func submitChallengeProof(challengeID: String, proofImage: UIImage, notes: String? = nil) async throws {
         guard let userID = parent?.currentUser?.recordID else {
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
         
         // Find or create UserChallenge record

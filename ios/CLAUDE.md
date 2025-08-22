@@ -1824,3 +1824,21 @@ If returning to challenge system work:
 2. **Then Premium Strategy** - Builds on top of user lifecycle data
 3. Both plans are designed to work together for maximum conversion
 
+## IMPORTANT: Authentication Manager Cleanup
+**TODO**: Remove CloudKitAuthManager completely - we are using UnifiedAuthManager
+- CloudKitAuthManager is legacy code that has been replaced by UnifiedAuthManager
+- UnifiedAuthManager consolidates all authentication functionality:
+  - Sign in with Apple/Google/Facebook/TikTok
+  - CloudKit user record management
+  - Token management and refresh
+  - User profile synchronization
+  - Error handling and recovery
+- Before removing CloudKitAuthManager, verify UnifiedAuthManager has:
+  - All authentication methods (Apple, Google, Facebook, TikTok)
+  - CloudKit record creation/updates
+  - Username management
+  - Profile photo handling
+  - Activity feed updates
+  - Challenge integration
+  - All error handling from CloudKitAuthManager
+

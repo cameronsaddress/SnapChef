@@ -9,7 +9,7 @@ struct ChallengeDetailView: View {
     @State private var isJoining = false
     @State private var joinSuccess = false
     @StateObject private var gamificationManager = GamificationManager.shared
-    @StateObject private var authManager = CloudKitAuthManager.shared
+    @StateObject private var authManager = UnifiedAuthManager.shared
 
     // Get the actual challenge from GamificationManager if it exists
     private var displayChallenge: Challenge {
@@ -89,13 +89,13 @@ struct ChallengeDetailView: View {
             }
         }
         .sheet(isPresented: $authManager.showAuthSheet) {
-            CloudKitAuthView(requiredFor: .challenges)
+            UnifiedAuthView(requiredFor: .challenges)
         }
     }
 
     private func joinChallenge() {
         // Check if authentication is required
-        let authManager = CloudKitAuthManager.shared
+        let authManager = UnifiedAuthManager.shared
         if authManager.isAuthRequiredFor(feature: .challenges) {
             authManager.promptAuthForFeature(.challenges)
             return

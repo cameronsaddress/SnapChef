@@ -741,7 +741,7 @@ class ActivityFeedManager: ObservableObject {
     }
 
     private func fetchActivitiesFromCloudKit(loadMore: Bool = false) async {
-        guard let currentUser = CloudKitAuthManager.shared.currentUser,
+        guard let currentUser = UnifiedAuthManager.shared.currentUser,
               let userID = currentUser.recordID else {
             print("❌ No authenticated user for activity feed")
             activities = generateMockActivities()
@@ -811,7 +811,7 @@ class ActivityFeedManager: ObservableObject {
     }
 
     private func fetchRecentPublicActivities(limit: Int) async throws -> [CKRecord] {
-        guard let currentUser = CloudKitAuthManager.shared.currentUser,
+        guard let currentUser = UnifiedAuthManager.shared.currentUser,
               let currentUserID = currentUser.recordID else {
             return []
         }

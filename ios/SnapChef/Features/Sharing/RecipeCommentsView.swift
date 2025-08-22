@@ -468,7 +468,7 @@ class RecipeCommentsViewModel: ObservableObject {
     @Published var hasMore = true
 
     private let cloudKitSync = CloudKitSyncService.shared
-    private let cloudKitAuth = CloudKitAuthManager.shared
+    private let cloudKitAuth = UnifiedAuthManager.shared
     private var lastFetchedRecord: CKRecord?
     private var recipeID: String = ""
 

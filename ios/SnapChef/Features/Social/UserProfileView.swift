@@ -7,7 +7,7 @@ struct UserProfileView: View {
 
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = UserProfileViewModel()
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @Environment(\.dismiss) var dismiss
 
     @State private var selectedTab = 0

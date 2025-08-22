@@ -2,7 +2,7 @@ import SwiftUI
 import AuthenticationServices
 
 struct CloudKitAuthView: View {
-    @StateObject private var cloudKitAuthManager = CloudKitAuthManager.shared
+    @StateObject private var cloudKitAuthManager = UnifiedAuthManager.shared
     @StateObject private var tikTokAuthManager = TikTokAuthManager.shared
     @Environment(\.dismiss) private var dismiss
 

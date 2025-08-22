@@ -145,9 +145,12 @@ struct UnifiedAuthView: View {
             }
         }
         .alert("Sign In Error", isPresented: $showError) {
-            Button("OK") { }
+            Button("OK") { 
+                showError = false
+                errorMessage = ""
+            }
         } message: {
-            Text(errorMessage)
+            Text(errorMessage.isEmpty ? "An error occurred. Please try again." : errorMessage)
         }
         .sheet(isPresented: $authManager.showUsernameSetup) {
             UsernameSetupView()
@@ -155,6 +158,7 @@ struct UnifiedAuthView: View {
         }
         .onAppear {
             print("🔍 DEBUG: [UnifiedAuthView] appeared")
+            // Don't reset error states on appear - this causes infinite loop with sheet presentations
         }
         .onChange(of: authManager.isAuthenticated) { isAuth in
             if isAuth {

@@ -178,6 +178,7 @@ struct EnhancedProfileHeader: View {
     @State private var rotationAngle: Double = 0
     @State private var showingEditProfile = false
     @State private var showingUsernameEdit = false
+    @State private var showingDeleteTool = false  // Temporary for CloudKit deletion
     @State private var customName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
     @State private var customPhotoData: Data? = ProfilePhotoHelper.loadCustomPhotoFromFile()
     @State private var refreshTrigger = 0
@@ -523,7 +524,7 @@ struct EnhancedProfileHeader: View {
                 }
         }
         .sheet(isPresented: $authManager.showAuthSheet) {
-            CloudKitAuthView()
+            UnifiedAuthView()
                 .onDisappear {
                     // Refresh profile data after authentication
                     if authManager.isAuthenticated {
@@ -2243,7 +2244,7 @@ struct ActiveChallengesSection: View {
                 )
         )
         .onAppear {
-            if CloudKitAuthManager.shared.isAuthenticated {
+            if UnifiedAuthManager.shared.isAuthenticated {
                 loadCloudKitChallenges()
             }
         }

@@ -319,8 +319,8 @@ struct TikTokShareView: View {
 
     // MARK: - Activity Creation
     private func createTikTokShareActivity() async {
-        guard CloudKitAuthManager.shared.isAuthenticated,
-              let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
+        guard UnifiedAuthManager.shared.isAuthenticated,
+              let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
             return
         }
         
@@ -666,7 +666,7 @@ struct TikTokShareView: View {
                 appState.trackAnonymousAction(.videoGenerated)
 
                 // If user is not authenticated, trigger progressive auth prompt
-                if !CloudKitAuthManager.shared.isAuthenticated {
+                if !UnifiedAuthManager.shared.isAuthenticated {
                     AuthPromptTrigger.shared.onViralContentCreated()
                 }
             }

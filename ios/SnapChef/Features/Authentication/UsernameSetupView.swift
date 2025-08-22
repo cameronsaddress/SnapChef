@@ -3,7 +3,7 @@ import PhotosUI
 import CloudKit
 
 struct UsernameSetupView: View {
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     // Use only CloudKitAuthManager - simplified authentication
     @Environment(\.dismiss) var dismiss
 

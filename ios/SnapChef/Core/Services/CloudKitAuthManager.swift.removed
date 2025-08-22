@@ -31,7 +31,9 @@ final class CloudKitAuthManager: ObservableObject {
     /// Check if user is already authenticated with CloudKit
     private func checkExistingAuth() {
         // DISABLED: Using UnifiedAuthManager instead
-        return
+        print("CloudKitAuthManager.checkExistingAuth() DISABLED - Using UnifiedAuthManager")
+        
+        /* Disabled code - keeping for reference
         Task {
             do {
                 let accountStatus = try await container.accountStatus()
@@ -87,6 +89,7 @@ final class CloudKitAuthManager: ObservableObject {
                 }
             }
         }
+        */
     }
     
     /// Calculate exponential backoff delay for auth operations
@@ -98,8 +101,7 @@ final class CloudKitAuthManager: ObservableObject {
     func signInWithApple(authorization: Any) async throws {
         print("🔑 CloudKitAuthManager.signInWithApple DISABLED - Using UnifiedAuthManager")
         // DISABLED: Using UnifiedAuthManager instead to avoid conflicts
-        throw CloudKitAuthError.authenticationFailed
-        return
+        throw CloudKitAuthError.notAuthenticated  // Use existing error case
         
         // First check CloudKit account status
         let accountStatus = try await container.accountStatus()

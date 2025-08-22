@@ -198,8 +198,8 @@ struct RecipeResultsView: View {
         
         // Create activity for recipe save if user is authenticated
         Task {
-            if CloudKitAuthManager.shared.isAuthenticated,
-               let userID = CloudKitAuthManager.shared.currentUser?.recordID {
+            if UnifiedAuthManager.shared.isAuthenticated,
+               let userID = UnifiedAuthManager.shared.currentUser?.recordID {
                 do {
                     try await CloudKitSyncService.shared.createActivity(
                         type: "recipeSaved",
@@ -806,18 +806,18 @@ struct MagicalRecipeCard: View {
             defer { isLoadingLike = false }
             
             do {
-                if CloudKitAuthManager.shared.isAuthenticated {
+                if UnifiedAuthManager.shared.isAuthenticated {
                     if previousLiked {
                         try await cloudKitSync.unlikeRecipe(recipe.id.uuidString)
                     } else {
-                        let ownerID = CloudKitAuthManager.shared.currentUser?.recordID ?? "anonymous"
+                        let ownerID = UnifiedAuthManager.shared.currentUser?.recordID ?? "anonymous"
                         try await cloudKitSync.likeRecipe(recipe.id.uuidString, recipeOwnerID: ownerID)
                     }
                 }
             } catch {
                 print("Failed to sync like with CloudKit: \(error)")
                 // Revert local changes on failure if authenticated
-                if CloudKitAuthManager.shared.isAuthenticated {
+                if UnifiedAuthManager.shared.isAuthenticated {
                     await MainActor.run {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                             isLiked = previousLiked
@@ -842,7 +842,7 @@ struct MagicalRecipeCard: View {
         }
         
         // Try to sync with CloudKit if authenticated
-        if CloudKitAuthManager.shared.isAuthenticated {
+        if UnifiedAuthManager.shared.isAuthenticated {
             do {
                 let cloudLiked = try await cloudKitSync.isRecipeLiked(recipe.id.uuidString)
                 let cloudCount = try await cloudKitSync.getRecipeLikeCount(recipe.id.uuidString)

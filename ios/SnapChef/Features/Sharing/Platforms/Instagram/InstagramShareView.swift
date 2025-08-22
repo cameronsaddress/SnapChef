@@ -470,8 +470,8 @@ struct InstagramShareView: View {
     
     // MARK: - Activity Creation
     private func createInstagramShareActivity(isStory: Bool) async {
-        guard CloudKitAuthManager.shared.isAuthenticated,
-              let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
+        guard UnifiedAuthManager.shared.isAuthenticated,
+              let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
             return
         }
         

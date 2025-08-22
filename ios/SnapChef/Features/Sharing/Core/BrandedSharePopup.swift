@@ -230,9 +230,9 @@ struct BrandedSharePopup: View {
     
     // MARK: - Activity Creation
     private func createShareActivity(platform: SharePlatformType) async {
-        guard CloudKitAuthManager.shared.isAuthenticated,
-              let userID = CloudKitAuthManager.shared.currentUser?.recordID,
-              let userName = CloudKitAuthManager.shared.currentUser?.displayName else {
+        guard UnifiedAuthManager.shared.isAuthenticated,
+              let userID = UnifiedAuthManager.shared.currentUser?.recordID,
+              let userName = UnifiedAuthManager.shared.currentUser?.displayName else {
             return
         }
         

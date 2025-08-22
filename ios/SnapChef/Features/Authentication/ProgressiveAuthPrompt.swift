@@ -16,7 +16,7 @@ struct ProgressiveAuthPrompt: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var authTrigger = AuthPromptTrigger.shared
-    @StateObject private var authManager = CloudKitAuthManager.shared
+    @StateObject private var authManager = UnifiedAuthManager.shared
     @StateObject private var tikTokAuthManager = TikTokAuthManager.shared
 
     // MARK: - State

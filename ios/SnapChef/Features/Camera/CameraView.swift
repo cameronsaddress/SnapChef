@@ -612,7 +612,7 @@ struct CameraView: View {
                                 var recipesToUpload: [Recipe] = []
                                 
                                 // Only proceed with CloudKit saving if user is authenticated
-                                guard await CloudKitAuthManager.shared.isAuthenticated else {
+                                guard await UnifiedAuthManager.shared.isAuthenticated else {
                                     print("📱 Background: User not authenticated - skipping CloudKit saving")
                                     return
                                 }
@@ -977,7 +977,7 @@ struct CameraView: View {
                                 var recipesToUpload: [Recipe] = []
                                 
                                 // Only proceed with CloudKit saving if user is authenticated
-                                guard await CloudKitAuthManager.shared.isAuthenticated else {
+                                guard await UnifiedAuthManager.shared.isAuthenticated else {
                                     print("📱 Background: User not authenticated - skipping CloudKit saving")
                                     return
                                 }

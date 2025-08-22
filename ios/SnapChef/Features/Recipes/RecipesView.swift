@@ -3,7 +3,7 @@ import SwiftUI
 struct RecipesView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitRecipeCache = CloudKitRecipeCache.shared
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @StateObject private var photoStorage = PhotoStorageManager.shared
     @State private var selectedCategory = "All"
     @State private var searchText = ""
@@ -627,7 +627,7 @@ struct RecipeGridCard: View {
     @State private var creatorUsername: String = "Anonymous"
     @State private var isLoadingUsername = false
     @EnvironmentObject var appState: AppState
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @StateObject private var cloudKitUserManager = CloudKitUserManager.shared
     @StateObject private var cloudKitRecipeCache = CloudKitRecipeCache.shared

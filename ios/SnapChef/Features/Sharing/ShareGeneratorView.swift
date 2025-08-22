@@ -172,7 +172,7 @@ struct ShareGeneratorView: View {
                             )
 
                             // Create activity for recipe sharing
-                            if let userID = CloudKitAuthManager.shared.currentUser?.recordID {
+                            if let userID = UnifiedAuthManager.shared.currentUser?.recordID {
                                 do {
                                     try await CloudKitSyncService.shared.createActivity(
                                         type: "recipeShared",

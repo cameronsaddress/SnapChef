@@ -327,8 +327,8 @@ struct MessagesShareView: View {
     
     // MARK: - Activity Creation
     private func createMessagesShareActivity() async {
-        guard CloudKitAuthManager.shared.isAuthenticated,
-              let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
+        guard UnifiedAuthManager.shared.isAuthenticated,
+              let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
             return
         }
         
@@ -658,8 +658,8 @@ struct MessageComposerWrapper: UIViewControllerRepresentable {
     
     // MARK: - Activity Creation
     func createMessagesShareActivity() async {
-        guard CloudKitAuthManager.shared.isAuthenticated,
-              let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
+        guard UnifiedAuthManager.shared.isAuthenticated,
+              let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
             return
         }
         

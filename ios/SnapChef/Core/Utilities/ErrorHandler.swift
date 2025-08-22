@@ -397,7 +397,7 @@ struct ErrorAnalytics {
             "memory_usage": ProcessInfo.processInfo.physicalMemory,
             "available_storage": getAvailableStorage(),
             "network_reachable": NetworkMonitor.shared.isReachable,
-            "authenticated": CloudKitAuthManager.shared.isAuthenticated
+            "authenticated": UnifiedAuthManager.shared.isAuthenticated
         ]
     }
     

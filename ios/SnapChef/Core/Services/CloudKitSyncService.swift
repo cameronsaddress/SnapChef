@@ -34,8 +34,8 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Recipe Upload Methods
 
     func uploadRecipe(_ recipe: Recipe, imageData: Data? = nil) async throws -> String {
-        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
-            throw CloudKitAuthError.notAuthenticated
+        guard let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
+            throw UnifiedAuthError.notAuthenticated
         }
 
         let recipeRecord = CKRecord(recordType: CloudKitConfig.recipeRecordType, recordID: CKRecord.ID(recordName: recipe.id.uuidString))
@@ -183,8 +183,8 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Recipe Like Methods
 
     func likeRecipe(_ recipeID: String, recipeOwnerID: String) async throws {
-        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
-            throw CloudKitAuthError.notAuthenticated
+        guard let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
+            throw UnifiedAuthError.notAuthenticated
         }
 
         // Check if already liked
@@ -227,8 +227,8 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     func unlikeRecipe(_ recipeID: String) async throws {
-        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
-            throw CloudKitAuthError.notAuthenticated
+        guard let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
+            throw UnifiedAuthError.notAuthenticated
         }
 
         // Find the like record
@@ -251,7 +251,7 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     func isRecipeLiked(_ recipeID: String) async throws -> Bool {
-        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
+        guard let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
             return false
         }
 
@@ -402,9 +402,9 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Comment Methods
 
     func addComment(recipeID: String, content: String, parentCommentID: String? = nil) async throws {
-        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
+        guard let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
             print("❌ Cannot add comment: User not authenticated")
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
 
         print("📝 Creating comment for recipe: \(recipeID)")
@@ -528,8 +528,8 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Comment Like Methods
     
     func likeComment(_ commentID: String) async throws {
-        guard CloudKitAuthManager.shared.currentUser?.recordID != nil else {
-            throw CloudKitAuthError.notAuthenticated
+        guard UnifiedAuthManager.shared.currentUser?.recordID != nil else {
+            throw UnifiedAuthError.notAuthenticated
         }
 
         // Check if already liked
@@ -544,8 +544,8 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     func unlikeComment(_ commentID: String) async throws {
-        guard CloudKitAuthManager.shared.currentUser?.recordID != nil else {
-            throw CloudKitAuthError.notAuthenticated
+        guard UnifiedAuthManager.shared.currentUser?.recordID != nil else {
+            throw UnifiedAuthError.notAuthenticated
         }
 
         // Remove like and update count
@@ -761,8 +761,8 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Challenge Proof Submission
 
     func submitChallengeProof(challengeID: String, proofImage: UIImage, notes: String? = nil) async throws {
-        guard let userID = CloudKitAuthManager.shared.currentUser?.recordID else {
-            throw CloudKitAuthError.notAuthenticated
+        guard let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
+            throw UnifiedAuthError.notAuthenticated
         }
 
         // Find or create UserChallenge record
@@ -858,15 +858,15 @@ final class CloudKitSyncService: ObservableObject {
         // Update user points and coins
         var updates = UserStatUpdates()
 
-        if let currentUser = CloudKitAuthManager.shared.currentUser {
-            // Note: CloudKitAuthManager.currentUser uses experiencePoints instead of totalPoints
+        if let currentUser = UnifiedAuthManager.shared.currentUser {
+            // Note: UnifiedAuthManager.currentUser uses experiencePoints instead of totalPoints
             // and doesn't have coinBalance property
             updates.experiencePoints = currentUser.experiencePoints + challenge.points
             // Coin balance functionality not available in current CloudKitAuthManager user model
             updates.challengesCompleted = currentUser.challengesCompleted + 1
 
             do {
-                try await CloudKitAuthManager.shared.updateUserStats(updates)
+                try await UnifiedAuthManager.shared.updateUserStats(updates)
 
                 // Update leaderboard
                 try await updateLeaderboardEntry(
@@ -933,9 +933,9 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Social Recipe Feed Methods
     
     func fetchSocialRecipeFeed(lastDate: Date? = nil, limit: Int = 20) async throws -> [SocialRecipeCard] {
-        guard let currentUser = CloudKitAuthManager.shared.currentUser,
+        guard let currentUser = UnifiedAuthManager.shared.currentUser,
               let currentUserID = currentUser.recordID else {
-            throw CloudKitAuthError.notAuthenticated
+            throw UnifiedAuthError.notAuthenticated
         }
         
         // Step 1: Get list of users that the current user follows

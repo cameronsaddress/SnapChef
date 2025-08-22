@@ -20,7 +20,7 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
     // MARK: - Dependencies
 
     private let profileManager = KeychainProfileManager.shared
-    private let authManager = CloudKitAuthManager.shared
+    private let authManager = UnifiedAuthManager.shared
 
     // MARK: - State
 

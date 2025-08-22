@@ -1271,7 +1271,7 @@ struct DetectiveFeatureTile: View {
     @State private var showingDetective = false
     @State private var isAnimating = false
     @StateObject private var userLifecycle = UserLifecycleManager.shared
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @State private var showingCameraPermissionAlert = false
     
     // Track detective uses (10 for testing, should be 3 for production)

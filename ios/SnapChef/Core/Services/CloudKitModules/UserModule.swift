@@ -196,7 +196,7 @@ final class UserModule: ObservableObject {
     // MARK: - Search Users
     func searchUsers(query: String) async throws -> [CloudKitUserProfile] {
         let predicate = NSPredicate(format: "username CONTAINS[cd] %@ OR displayName CONTAINS[cd] %@", query, query)
-        let ckQuery = CKQuery(recordType: CloudKitConfig.userProfileRecordType, predicate: predicate)
+        let ckQuery = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         ckQuery.sortDescriptors = [NSSortDescriptor(key: "totalPoints", ascending: false)]
         
         do {

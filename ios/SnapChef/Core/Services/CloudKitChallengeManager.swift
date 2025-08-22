@@ -294,7 +294,7 @@ class CloudKitChallengeManager: ObservableObject {
     /// Update leaderboard
     func updateLeaderboard(points: Int) async throws {
         guard let userID = getCurrentUserID(),
-              let userName = CloudKitAuthManager.shared.currentUser?.displayName else { return }
+              let userName = UnifiedAuthManager.shared.currentUser?.displayName else { return }
 
         let recordID = CKRecord.ID(recordName: "leaderboard_\(userID)")
 

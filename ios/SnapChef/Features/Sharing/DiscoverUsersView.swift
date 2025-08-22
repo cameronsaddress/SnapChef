@@ -37,7 +37,7 @@ struct UserProfile: Identifiable {
 // MARK: - Discover Users View
 struct DiscoverUsersView: View {
     @StateObject private var viewModel = DiscoverUsersViewModel()
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @EnvironmentObject var appState: AppState
     @State private var searchText = ""
     @State private var selectedCategory: DiscoverCategory = .suggested
@@ -182,7 +182,7 @@ struct DiscoverUsersView: View {
             .environmentObject(appState)
         }
         .sheet(isPresented: $cloudKitAuth.showAuthSheet) {
-            CloudKitAuthView()
+            UnifiedAuthView()
         }
     }
 
@@ -488,7 +488,7 @@ class DiscoverUsersViewModel: ObservableObject {
     @Published var searchResults: [UserProfile] = []
     @Published var isSearching = false
 
-    private let cloudKitAuth = CloudKitAuthManager.shared
+    private let cloudKitAuth = UnifiedAuthManager.shared
     private let cloudKitSync = CloudKitSyncService.shared
     private var lastFetchedRecord: CKRecord?
     private var cloudKitUsers: [UserProfile] = []

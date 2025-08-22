@@ -55,7 +55,7 @@ class CloudKitRecipeCache: ObservableObject {
     private var localRecipeIDs: Set<UUID> = []
 
     private let cloudKitManager = CloudKitRecipeManager.shared
-    private let authManager = CloudKitAuthManager.shared
+    private let authManager = UnifiedAuthManager.shared
 
     private init() {
         loadCachedData()
@@ -258,7 +258,7 @@ class CloudKitRecipeCache: ObservableObject {
         }
         
         // If no owner info cached, check if it's current user's recipe
-        if let currentUser = CloudKitAuthManager.shared.currentUser {
+        if let currentUser = UnifiedAuthManager.shared.currentUser {
             return currentUser.username ?? currentUser.displayName
         }
         

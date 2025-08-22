@@ -66,22 +66,22 @@ extension UnifiedAuthManager {
 // MARK: - Convenience Accessors for Easy Migration
 
 extension UnifiedAuthManager {
-    /// Drop-in replacement for CloudKitAuthManager.shared.isAuthenticated
+    /// Drop-in replacement for UnifiedAuthManager.shared.isAuthenticated
     var legacyIsAuthenticated: Bool {
         return isAuthenticated
     }
     
-    /// Drop-in replacement for CloudKitAuthManager.shared.currentUser
+    /// Drop-in replacement for UnifiedAuthManager.shared.currentUser
     var legacyCurrentUser: CloudKitUser? {
         return currentUser
     }
     
-    /// Drop-in replacement for CloudKitAuthManager.shared.promptAuthForFeature
+    /// Drop-in replacement for UnifiedAuthManager.shared.promptAuthForFeature
     func legacyPromptAuthForFeature(_ feature: AuthRequiredFeature, completion: (() -> Void)? = nil) {
         promptAuthForFeature(feature, completion: completion)
     }
     
-    /// Drop-in replacement for CloudKitAuthManager.shared.signOut
+    /// Drop-in replacement for UnifiedAuthManager.shared.signOut
     func legacySignOut() {
         signOut()
     }

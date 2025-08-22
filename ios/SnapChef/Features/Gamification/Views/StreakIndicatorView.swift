@@ -187,7 +187,7 @@ struct StreakBadge: View {
 /// Streak summary card for profile
 struct StreakSummaryCard: View {
     @StateObject private var streakManager = StreakManager.shared
-    @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
+    @ObservedObject var cloudKitAuthManager = UnifiedAuthManager.shared
     @State private var recipeStreak: Int = 0
     @State private var isLoadingStreak = false
 

@@ -3,7 +3,7 @@ import CloudKit
 
 struct FeedView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @StateObject private var gamificationManager = GamificationManager.shared
     @State private var showingDiscoverUsers = false
     @State private var showingChallengePopup = false
@@ -283,7 +283,7 @@ struct ChallengeQuickPopup: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var appState: AppState
     @StateObject private var gamificationManager = GamificationManager.shared
-    @StateObject private var authManager = CloudKitAuthManager.shared
+    @StateObject private var authManager = UnifiedAuthManager.shared
     @State private var selectedChallenge: Challenge?
     @State private var animationScale: CGFloat = 0.8
     @State private var animationOpacity: Double = 0

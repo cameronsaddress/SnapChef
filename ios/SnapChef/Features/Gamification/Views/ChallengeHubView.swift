@@ -3,7 +3,7 @@ import SwiftUI
 struct ChallengeHubView: View {
     @StateObject private var gamificationManager = GamificationManager.shared
     @StateObject private var premiumManager = PremiumChallengeManager.shared
-    @StateObject private var authManager = CloudKitAuthManager.shared
+    @StateObject private var authManager = UnifiedAuthManager.shared
     @StateObject private var authTrigger = AuthPromptTrigger.shared
     @EnvironmentObject var appState: AppState
     @State private var selectedFilter: ChallengeFilter = .all
@@ -118,7 +118,7 @@ struct ChallengeHubView: View {
                 PremiumFeaturesView()
             }
             .sheet(isPresented: $authManager.showAuthSheet) {
-                CloudKitAuthView(requiredFor: .challenges)
+                UnifiedAuthView(requiredFor: .challenges)
             }
             .sheet(isPresented: $showingAuthPrompt) {
                 ProgressiveAuthPrompt()

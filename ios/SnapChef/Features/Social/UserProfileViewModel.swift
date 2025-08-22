@@ -14,7 +14,7 @@ class UserProfileViewModel: ObservableObject {
     @Published var totalCookingTime = 0
     @Published var dynamicStats: UserStats?
 
-    private let cloudKitAuth = CloudKitAuthManager.shared
+    private let cloudKitAuth = UnifiedAuthManager.shared
     private let cloudKitSync = CloudKitSyncService.shared
     private let cloudKitUserManager = CloudKitUserManager.shared
     private let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase

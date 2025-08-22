@@ -21,7 +21,7 @@ struct RecipeDetailView: View {
     @State private var selectedUserName = ""
     @State private var showingDeleteAlert = false
     @StateObject private var cloudKitSync = CloudKitSyncService.shared
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @StateObject private var commentsViewModel = RecipeCommentsViewModel()
 
@@ -873,7 +873,7 @@ struct RecipeDetailView: View {
                     }
                 } else {
                     // For demo purposes, use current user ID as owner ID
-                    let ownerID = CloudKitAuthManager.shared.currentUser?.recordID ?? "anonymous"
+                    let ownerID = UnifiedAuthManager.shared.currentUser?.recordID ?? "anonymous"
                     try await cloudKitSync.likeRecipe(recipe.id.uuidString, recipeOwnerID: ownerID)
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                         isLiked = true

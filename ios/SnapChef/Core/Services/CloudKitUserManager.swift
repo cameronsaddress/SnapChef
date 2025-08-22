@@ -424,7 +424,7 @@ struct UserStats {
 
 // MARK: - CloudKitUserProfile Model
 
-struct CloudKitUserProfile {
+public struct CloudKitUserProfile {
     let recordID: CKRecord.ID
     let username: String
     let userID: String

@@ -238,7 +238,7 @@ struct CloudKitConfig {
 
     // Record Types
     static let userRecordType = "User"
-    static let userProfileRecordType = "UserProfile"
+    // static let userProfileRecordType = "UserProfile"  // REMOVED: Use userRecordType instead
     static let challengeRecordType = "Challenge"
     static let userChallengeRecordType = "UserChallenge"
     static let teamRecordType = "Team"
@@ -268,13 +268,26 @@ struct CloudKitConfig {
 
 // MARK: - CloudKit Field Names
 struct CKField {
-    // User Fields
+    // User Fields - EXACT production field names from CloudKit
     struct User {
-        static let username = "username"
-        static let displayName = "displayName"
-        static let email = "email"
-        static let profileImageURL = "profileImageURL"
+        // Authentication
         static let authProvider = "authProvider"
+        static let appleUserId = "appleUserId"  // NEW: Store Apple Sign In ID
+        static let tiktokUserId = "tiktokUserId"  // NEW: Store TikTok ID
+        static let userID = "userID"  // This is a regular field in production
+        static let username = "username"
+        static let email = "email"
+        
+        // Profile
+        static let displayName = "displayName"
+        static let bio = "bio"
+        static let profileImageURL = "profileImageURL"
+        static let profilePictureAsset = "profilePictureAsset"  // NEW: Store actual photo
+        
+        // Timestamps
+        static let createdAt = "createdAt"
+        static let lastActiveAt = "lastActiveAt"
+        static let lastLoginAt = "lastLoginAt"
         static let totalPoints = "totalPoints"
         static let currentStreak = "currentStreak"
         static let longestStreak = "longestStreak"
@@ -288,9 +301,6 @@ struct CKField {
         static let isProfilePublic = "isProfilePublic"
         static let showOnLeaderboard = "showOnLeaderboard"
         static let subscriptionTier = "subscriptionTier"
-        static let createdAt = "createdAt"
-        static let lastLoginAt = "lastLoginAt"
-        static let lastActiveAt = "lastActiveAt"
     }
 
     // Challenge Fields

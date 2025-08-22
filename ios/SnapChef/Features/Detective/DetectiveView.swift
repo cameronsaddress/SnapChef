@@ -6,7 +6,7 @@ import Foundation
 struct DetectiveView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var cameraModel = CameraModel()
-    @StateObject private var cloudKitAuth = CloudKitAuthManager.shared
+    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @StateObject private var userLifecycle = UserLifecycleManager.shared
     @Environment(\.dismiss) private var dismiss
     
@@ -1433,7 +1433,7 @@ struct DetectiveRecipeDetailView: View {
             appState.savedRecipes.remove(at: index)
             
             // Remove from CloudKit if authenticated
-            if CloudKitAuthManager.shared.isAuthenticated {
+            if UnifiedAuthManager.shared.isAuthenticated {
                 Task {
                     try? await CloudKitRecipeManager.shared.removeRecipeFromUserProfile(
                         baseRecipe.id.uuidString,
@@ -1450,7 +1450,7 @@ struct DetectiveRecipeDetailView: View {
             appState.savedRecipes.append(baseRecipe)
             
             // Save to CloudKit if authenticated (will sync later if not)
-            if CloudKitAuthManager.shared.isAuthenticated {
+            if UnifiedAuthManager.shared.isAuthenticated {
                 Task {
                     _ = try? await CloudKitRecipeManager.shared.uploadRecipe(baseRecipe)
                 }

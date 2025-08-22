@@ -222,7 +222,7 @@ final class GamificationManager: ObservableObject {
             .assign(to: &$activeChallenges)
 
         // Also sync with CloudKit if authenticated
-        if CloudKitAuthManager.shared.isAuthenticated {
+        if UnifiedAuthManager.shared.isAuthenticated {
             Task {
                 await syncChallengesFromCloudKit()
             }
@@ -569,7 +569,7 @@ final class GamificationManager: ObservableObject {
 
     func joinChallenge(_ challenge: Challenge) {
         // Check if authentication is required
-        let authManager = CloudKitAuthManager.shared
+        let authManager = UnifiedAuthManager.shared
         if authManager.isAuthRequiredFor(feature: .challenges) {
             authManager.promptAuthForFeature(.challenges)
             return
@@ -761,7 +761,7 @@ final class GamificationManager: ObservableObject {
         print("Awarded badge: \(badgeName)")
 
         // Save achievement to CloudKit if authenticated
-        if CloudKitAuthManager.shared.isAuthenticated {
+        if UnifiedAuthManager.shared.isAuthenticated {
             Task {
                 do {
                     guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { return }

@@ -527,7 +527,7 @@ final class SocialRecipeFeedManager: ObservableObject {
     @Published var showingSkeletonViews = false
     
     private let cloudKitSync = CloudKitSyncService.shared
-    private let cloudKitAuth = CloudKitAuthManager.shared
+    private let cloudKitAuth = UnifiedAuthManager.shared
     private var lastLoadedDate: Date?
     private let pageSize = 20
     

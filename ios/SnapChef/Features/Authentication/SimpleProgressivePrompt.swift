@@ -10,7 +10,7 @@ import SwiftUI
 import AuthenticationServices
 
 struct SimpleProgressivePrompt: View {
-    @StateObject private var authManager = CloudKitAuthManager.shared
+    @StateObject private var authManager = UnifiedAuthManager.shared
     @Environment(\.dismiss) private var dismiss
     
     let context: PromptContext

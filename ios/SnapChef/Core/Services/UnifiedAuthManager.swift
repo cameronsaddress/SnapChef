@@ -29,6 +29,7 @@ final class UnifiedAuthManager: ObservableObject {
     @Published var isLoading = false
     @Published var showAuthSheet = false
     @Published var showUsernameSetup = false
+    @Published var showUsernameSelection = false  // Added for CloudKitAuthView compatibility
     @Published var showError = false
     @Published var errorMessage = ""
     
@@ -61,16 +62,16 @@ final class UnifiedAuthManager: ObservableObject {
     // MARK: - Auth Status Management
     
     func checkAuthStatus() {
-        // Check CloudKit auth
+        // Check CloudKit auth - silently on app launch
         if let storedUserID = UserDefaults.standard.string(forKey: "currentUserRecordID") {
             print("🔍 Found stored CloudKit userRecordID: \(storedUserID)")
             Task {
-                await loadCloudKitUser(recordID: storedUserID)
+                await loadCloudKitUser(recordID: storedUserID, silent: true)
             }
         } else if let legacyUserID = UserDefaults.standard.string(forKey: "currentUserID") {
             print("🔍 Found legacy currentUserID: \(legacyUserID)")
             Task {
-                await loadCloudKitUser(recordID: legacyUserID)
+                await loadCloudKitUser(recordID: legacyUserID, silent: true)
             }
         } else {
             print("ℹ️ No stored CloudKit user ID found")
@@ -139,6 +140,7 @@ final class UnifiedAuthManager: ObservableObject {
         
         let email = appleIDCredential.email
         let fullName = appleIDCredential.fullName
+        let appleUserID = appleIDCredential.user  // The Apple ID user identifier
         
         // Use compound key to avoid conflicts with CloudKit system records
         let userRecordID = CKRecord.ID(recordName: "user_\(cloudKitUserID)")
@@ -166,7 +168,7 @@ final class UnifiedAuthManager: ObservableObject {
                     print("⚠️ Could not delete old record: \(error.localizedDescription)")
                     // Continue anyway - we'll create a new record with a different ID
                 }
-                throw CloudKitAuthError.invalidRecordType // Will trigger creation of new record
+                throw UnifiedAuthError.cloudKitNotAvailable // Will trigger creation of new record
             }
             
             // Store the CloudKit user ID (this is the persistent ID we need)
@@ -186,18 +188,30 @@ final class UnifiedAuthManager: ObservableObject {
             }
             
         } catch {
+            print("📝 Creating new user record for CloudKit ID: \(cloudKitUserID)")
+            print("📝 Using record ID: \(userRecordID)")
+            
             // Create new user with compound key
             let newRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: userRecordID)
             
-            // Store the actual CloudKit user ID in a field
-            newRecord["cloudKitUserID"] = cloudKitUserID
+            // Note: cloudKitUserID is already encoded in the recordID as "user_<cloudKitUserID>"
+            // No need to store it separately since that field doesn't exist in production
             
-            // Set initial values
+            // Set initial values - ONLY fields that exist in production!
+            print("📝 Setting CloudKit User fields (production schema):")
+            print("   authProvider: apple")
+            print("   appleUserId: \(appleUserID)")
+            print("   email: \(email ?? "none")")
+            print("   displayName: \(fullName?.formatted() ?? "Anonymous Chef")")
+            
             newRecord[CKField.User.authProvider] = "apple"
+            newRecord[CKField.User.appleUserId] = appleUserID  // Store Apple Sign In ID
             newRecord[CKField.User.email] = email ?? ""
             newRecord[CKField.User.displayName] = fullName?.formatted() ?? "Anonymous Chef"
             newRecord[CKField.User.createdAt] = Date()
             newRecord[CKField.User.lastLoginAt] = Date()
+            
+            // Set default values for integer fields
             newRecord[CKField.User.totalPoints] = Int64(0)
             newRecord[CKField.User.currentStreak] = Int64(0)
             newRecord[CKField.User.longestStreak] = Int64(0)
@@ -219,9 +233,18 @@ final class UnifiedAuthManager: ObservableObject {
             }
             
             do {
+                print("📤 Attempting to save new user record to CloudKit...")
+                print("   Database: \(cloudKitDatabase == cloudKitContainer.publicCloudDatabase ? "Public" : "Private")")
+                print("   Record Type: \(newRecord.recordType)")
+                print("   Record ID: \(newRecord.recordID)")
+                
                 try await cloudKitDatabase.save(newRecord)
+                print("✅ Successfully saved new user record")
             } catch let saveError as CKError {
                 // Handle specific CloudKit errors
+                print("❌ CloudKit save error code: \(saveError.code)")
+                print("❌ CloudKit save error: \(saveError.localizedDescription)")
+                
                 if saveError.code == .invalidArguments {
                     print("❌ Invalid record save attempt: \(saveError.localizedDescription)")
                     errorMessage = "Unable to create user profile. Please try again."
@@ -662,13 +685,16 @@ final class UnifiedAuthManager: ObservableObject {
     
     // MARK: - Private Helpers
     
-    private func loadCloudKitUser(recordID: String) async {
+    private func loadCloudKitUser(recordID: String, silent: Bool = false) async {
         do {
             // First verify CloudKit account is still available
             let accountStatus = try await cloudKitContainer.accountStatus()
             guard accountStatus == .available else {
                 print("⚠️ CloudKit account not available, status: \(accountStatus)")
-                await clearStoredAuth()
+                // Only clear auth and show errors if not silent (user-initiated action)
+                if !silent {
+                    await clearStoredAuth()
+                }
                 return
             }
             
@@ -695,7 +721,10 @@ final class UnifiedAuthManager: ObservableObject {
             }
         } catch {
             print("❌ Failed to load CloudKit user \(recordID): \(error)")
-            await clearStoredAuth()
+            // Only clear auth if not silent (user-initiated action)
+            if !silent {
+                await clearStoredAuth()
+            }
         }
     }
     
@@ -767,6 +796,155 @@ final class UnifiedAuthManager: ObservableObject {
             authCompletionHandler = nil
         }
     }
+    
+    // MARK: - Functions Ported from CloudKitAuthManager
+    
+    /// Update user statistics in CloudKit
+    func updateUserStats(_ updates: UserStatUpdates) async throws {
+        guard let currentUser = currentUser else {
+            throw UnifiedAuthError.notAuthenticated
+        }
+        
+        let userRecordID = CKRecord.ID(recordName: "user_\(currentUser.recordID)")
+        let record = try await cloudKitDatabase.record(for: userRecordID)
+        
+        // Apply updates - only for fields that exist in production
+        if let totalPoints = updates.totalPoints {
+            record[CKField.User.totalPoints] = Int64(totalPoints)
+        }
+        if let currentStreak = updates.currentStreak {
+            record[CKField.User.currentStreak] = Int64(currentStreak)
+        }
+        if let longestStreak = updates.longestStreak {
+            record[CKField.User.longestStreak] = Int64(longestStreak)
+        }
+        if let challengesCompleted = updates.challengesCompleted {
+            record[CKField.User.challengesCompleted] = Int64(challengesCompleted)
+        }
+        if let recipesShared = updates.recipesShared {
+            record[CKField.User.recipesShared] = Int64(recipesShared)
+        }
+        if let recipesCreated = updates.recipesCreated {
+            record[CKField.User.recipesCreated] = Int64(recipesCreated)
+        }
+        if let coinBalance = updates.coinBalance {
+            record[CKField.User.coinBalance] = Int64(coinBalance)
+        }
+        if let followerCount = updates.followerCount {
+            record[CKField.User.followerCount] = Int64(followerCount)
+        }
+        if let followingCount = updates.followingCount {
+            record[CKField.User.followingCount] = Int64(followingCount)
+        }
+        
+        // Update last active time
+        record[CKField.User.lastActiveAt] = Date()
+        
+        _ = try await cloudKitDatabase.save(record)
+        
+        // Update local user object
+        await MainActor.run {
+            if var updatedUser = self.currentUser {
+                // Update local properties based on what's in UserStatUpdates
+                // Note: CloudKitUser might need to be extended to include these properties
+                self.currentUser = updatedUser
+            }
+        }
+    }
+    
+    /// Refresh current user data from CloudKit
+    func refreshCurrentUser() async {
+        guard let currentUser = currentUser else { return }
+        
+        do {
+            let userRecordID = CKRecord.ID(recordName: "user_\(currentUser.recordID)")
+            let record = try await cloudKitDatabase.record(for: userRecordID)
+            
+            await MainActor.run {
+                self.currentUser = CloudKitUser(from: record)
+            }
+        } catch {
+            print("❌ Failed to refresh current user: \(error)")
+        }
+    }
+    
+    /// Update social counts (followers/following)
+    func updateSocialCounts() async {
+        guard let currentUser = currentUser else { return }
+        
+        do {
+            // Count followers
+            let followerPredicate = NSPredicate(format: "followingID == %@", currentUser.recordID ?? "")
+            let followerQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
+            
+            let (followerResults, _) = try await cloudKitDatabase.records(
+                matching: followerQuery,
+                desiredKeys: nil,
+                resultsLimit: 1000
+            )
+            
+            let followerCount = followerResults.count
+            
+            // Count following
+            let followingPredicate = NSPredicate(format: "followerID == %@", currentUser.recordID ?? "")
+            let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
+            
+            let (followingResults, _) = try await cloudKitDatabase.records(
+                matching: followingQuery,
+                desiredKeys: nil,
+                resultsLimit: 1000
+            )
+            
+            let followingCount = followingResults.count
+            
+            // Update user record
+            let updates = UserStatUpdates(
+                followerCount: followerCount,
+                followingCount: followingCount
+            )
+            
+            try await updateUserStats(updates)
+            
+        } catch {
+            print("❌ Failed to update social counts: \(error)")
+        }
+    }
+    
+    /// Get list of users followed by a specific user
+    func getUsersFollowedBy(userID: String) async -> [CloudKitUser] {
+        do {
+            let predicate = NSPredicate(format: "followerID == %@", userID)
+            let query = CKQuery(recordType: "Follow", predicate: predicate)
+            
+            let (results, _) = try await cloudKitDatabase.records(
+                matching: query,
+                desiredKeys: ["followingID"],
+                resultsLimit: 100
+            )
+            
+            var users: [CloudKitUser] = []
+            
+            for (_, result) in results {
+                if case .success(let record) = result,
+                   let followingID = record["followingID"] as? String {
+                    // Fetch the user record
+                    do {
+                        let userRecordID = CKRecord.ID(recordName: "user_\(followingID)")
+                        let userRecord = try await cloudKitDatabase.record(for: userRecordID)
+                        users.append(CloudKitUser(from: userRecord))
+                    } catch {
+                        print("Failed to fetch user \(followingID): \(error)")
+                    }
+                }
+            }
+            
+            return users
+            
+        } catch {
+            print("❌ Failed to get users followed by \(userID): \(error)")
+            return []
+        }
+    }
 }
 
 // MARK: - Error Types
@@ -835,4 +1013,178 @@ enum AnonymousAction: String, CaseIterable, Sendable {
     case appOpened = "app_opened"
     case challengeViewed = "challenge_viewed"
     case socialExplored = "social_explored"
+}
+
+// MARK: - CloudKitUser
+
+public struct CloudKitUser: Identifiable {
+    public let id = UUID()
+    public let recordID: String?
+    public var username: String?
+    public var displayName: String
+    public var email: String
+    public var profileImageURL: String?
+    public var authProvider: String
+    public var totalPoints: Int
+    public var currentStreak: Int
+    public var longestStreak: Int
+    public var challengesCompleted: Int
+    public var recipesShared: Int
+    public var recipesCreated: Int
+    public var coinBalance: Int
+    public var followerCount: Int
+    public var followingCount: Int
+    public var isVerified: Bool
+    public var isProfilePublic: Bool
+    public var showOnLeaderboard: Bool
+    public var subscriptionTier: String
+    public var createdAt: Date
+    public var lastLoginAt: Date
+    public var lastActiveAt: Date
+    public var bio: String
+    
+    // Additional properties for compatibility
+    public var profilePictureData: Data?
+    public var totalLikes: Int
+    public var totalShares: Int
+    public var streakCount: Int
+    public var joinDate: Date
+    public var lastActiveDate: Date
+    public var favoriteRecipes: [String] // Recipe IDs
+    public var level: Int
+    public var experiencePoints: Int
+    
+    public init(from record: CKRecord) {
+        self.recordID = record.recordID.recordName
+        self.username = record[CKField.User.username] as? String
+        self.displayName = record[CKField.User.displayName] as? String ?? "Anonymous Chef"
+        self.email = record[CKField.User.email] as? String ?? ""
+        self.profileImageURL = record[CKField.User.profileImageURL] as? String
+        self.authProvider = record[CKField.User.authProvider] as? String ?? "unknown"
+        self.totalPoints = Int(record[CKField.User.totalPoints] as? Int64 ?? 0)
+        self.currentStreak = Int(record[CKField.User.currentStreak] as? Int64 ?? 0)
+        self.longestStreak = Int(record[CKField.User.longestStreak] as? Int64 ?? 0)
+        self.challengesCompleted = Int(record[CKField.User.challengesCompleted] as? Int64 ?? 0)
+        self.recipesShared = Int(record[CKField.User.recipesShared] as? Int64 ?? 0)
+        self.recipesCreated = Int(record[CKField.User.recipesCreated] as? Int64 ?? 0)
+        self.coinBalance = Int(record[CKField.User.coinBalance] as? Int64 ?? 0)
+        self.followerCount = Int(record[CKField.User.followerCount] as? Int64 ?? 0)
+        self.followingCount = Int(record[CKField.User.followingCount] as? Int64 ?? 0)
+        self.isVerified = (record[CKField.User.isVerified] as? Int64 ?? 0) == 1
+        self.isProfilePublic = (record[CKField.User.isProfilePublic] as? Int64 ?? 1) == 1
+        self.showOnLeaderboard = (record[CKField.User.showOnLeaderboard] as? Int64 ?? 1) == 1
+        self.subscriptionTier = record[CKField.User.subscriptionTier] as? String ?? "free"
+        self.createdAt = record[CKField.User.createdAt] as? Date ?? Date()
+        self.lastLoginAt = record[CKField.User.lastLoginAt] as? Date ?? Date()
+        self.lastActiveAt = record[CKField.User.lastActiveAt] as? Date ?? Date()
+        self.bio = record["bio"] as? String ?? ""
+        
+        // Additional properties initialization
+        self.profilePictureData = nil // Will be loaded separately if needed
+        self.totalLikes = 0 // Not stored in CloudKit currently
+        self.totalShares = 0 // Not stored in CloudKit currently
+        self.streakCount = self.currentStreak // Use currentStreak
+        self.joinDate = self.createdAt
+        self.lastActiveDate = self.lastActiveAt
+        self.favoriteRecipes = [] // Will be loaded separately if needed
+        self.level = 1 // Calculate from experience or default
+        self.experiencePoints = self.totalPoints // Use totalPoints as experience
+    }
+    
+    public init(recordID: String?,
+         userID: String,
+         username: String?,
+         displayName: String,
+         email: String,
+         profileImageURL: String?,
+         authProvider: String,
+         totalPoints: Int,
+         currentStreak: Int,
+         longestStreak: Int,
+         challengesCompleted: Int,
+         recipesShared: Int,
+         recipesCreated: Int,
+         coinBalance: Int,
+         isProfilePublic: Bool,
+         showOnLeaderboard: Bool,
+         subscriptionTier: String,
+         createdAt: Date,
+         lastLoginAt: Date,
+         lastActiveAt: Date,
+         followerCount: Int,
+         followingCount: Int,
+         isVerified: Bool,
+         bio: String) {
+        self.recordID = recordID
+        self.username = username
+        self.displayName = displayName
+        self.email = email
+        self.profileImageURL = profileImageURL
+        self.authProvider = authProvider
+        self.totalPoints = totalPoints
+        self.currentStreak = currentStreak
+        self.longestStreak = longestStreak
+        self.challengesCompleted = challengesCompleted
+        self.recipesShared = recipesShared
+        self.recipesCreated = recipesCreated
+        self.coinBalance = coinBalance
+        self.followerCount = followerCount
+        self.followingCount = followingCount
+        self.isVerified = isVerified
+        self.isProfilePublic = isProfilePublic
+        self.showOnLeaderboard = showOnLeaderboard
+        self.subscriptionTier = subscriptionTier
+        self.createdAt = createdAt
+        self.lastLoginAt = lastLoginAt
+        self.lastActiveAt = lastActiveAt
+        self.bio = bio
+        
+        // Additional properties initialization
+        self.profilePictureData = nil
+        self.totalLikes = 0
+        self.totalShares = 0
+        self.streakCount = currentStreak
+        self.joinDate = createdAt
+        self.lastActiveDate = lastActiveAt
+        self.favoriteRecipes = []
+        self.level = 1
+        self.experiencePoints = totalPoints
+    }
+}
+
+// MARK: - UserStatUpdates
+
+public struct UserStatUpdates {
+    public var totalPoints: Int?
+    public var currentStreak: Int?
+    public var longestStreak: Int?
+    public var challengesCompleted: Int?
+    public var recipesShared: Int?
+    public var recipesCreated: Int?
+    public var coinBalance: Int?
+    public var followerCount: Int?
+    public var followingCount: Int?
+    public var experiencePoints: Int?  // Added for CloudKitSyncService compatibility
+    
+    public init(totalPoints: Int? = nil,
+         currentStreak: Int? = nil,
+         longestStreak: Int? = nil,
+         challengesCompleted: Int? = nil,
+         recipesShared: Int? = nil,
+         recipesCreated: Int? = nil,
+         coinBalance: Int? = nil,
+         followerCount: Int? = nil,
+         followingCount: Int? = nil,
+         experiencePoints: Int? = nil) {
+        self.totalPoints = totalPoints
+        self.currentStreak = currentStreak
+        self.longestStreak = longestStreak
+        self.challengesCompleted = challengesCompleted
+        self.recipesShared = recipesShared
+        self.recipesCreated = recipesCreated
+        self.coinBalance = coinBalance
+        self.followerCount = followerCount
+        self.followingCount = followingCount
+        self.experiencePoints = experiencePoints
+    }
 }
