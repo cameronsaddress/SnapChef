@@ -27,6 +27,7 @@ public enum ShareType {
     case achievement(String)
     case profile
     case teamInvite(teamName: String, joinCode: String)
+    case leaderboard
 }
 
 // MARK: - Share Content
@@ -64,15 +65,15 @@ public struct ShareContent {
         return (recipe: viralRecipe, media: media)
     }
 
-    init(type: ShareType, beforeImage: UIImage? = nil, afterImage: UIImage? = nil) {
+    init(type: ShareType, beforeImage: UIImage? = nil, afterImage: UIImage? = nil, text: String? = nil) {
         self.type = type
         self.beforeImage = beforeImage
         self.afterImage = afterImage
 
-        // Generate content based on type
+        // Generate content based on type or use provided text
         switch type {
         case .recipe(let recipe):
-            self.text = """
+            self.text = text ?? """
             🔥 MY FRIDGE CHALLENGE 🔥
             I just turned these random ingredients into \(recipe.name)!
             ⏱ Ready in just \(recipe.prepTime + recipe.cookTime) minutes
@@ -81,7 +82,7 @@ public struct ShareContent {
             self.deepLink = URL(string: "snapchef://recipe/\(recipe.id)")
 
         case .challenge(let challenge):
-            self.text = """
+            self.text = text ?? """
             🏆 CHALLENGE COMPLETED 🏆
             Just crushed the "\(challenge.title)" challenge on SnapChef!
             """
@@ -89,7 +90,7 @@ public struct ShareContent {
             self.deepLink = URL(string: "snapchef://challenge/\(challenge.id)")
 
         case .achievement(let badge):
-            self.text = """
+            self.text = text ?? """
             🎯 NEW ACHIEVEMENT UNLOCKED 🎯
             Just earned the \(badge) badge on SnapChef!
             """
@@ -97,7 +98,7 @@ public struct ShareContent {
             self.deepLink = URL(string: "snapchef://achievements")
 
         case .profile:
-            self.text = """
+            self.text = text ?? """
             👨‍🍳 Check out my SnapChef profile!
             Follow me for amazing recipes and cooking challenges.
             """
@@ -105,7 +106,7 @@ public struct ShareContent {
             self.deepLink = URL(string: "snapchef://profile")
 
         case .teamInvite(let teamName, let joinCode):
-            self.text = """
+            self.text = text ?? """
             🏆 Join my SnapChef team!
             Team: \(teamName)
             Code: \(joinCode)
@@ -114,6 +115,14 @@ public struct ShareContent {
             """
             self.hashtags = ["SnapChef", "TeamChallenge", "CookingTeam"]
             self.deepLink = URL(string: "snapchef://team/join/\(joinCode)")
+            
+        case .leaderboard:
+            self.text = text ?? """
+            🏆 Check out the SnapChef leaderboard!
+            See who's the top chef this week!
+            """
+            self.hashtags = ["SnapChef", "Leaderboard", "TopChef", "CookingChallenge"]
+            self.deepLink = URL(string: "snapchef://leaderboard")
         }
     }
 }

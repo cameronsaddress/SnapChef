@@ -7,6 +7,7 @@ struct LeaderboardView: View {
     @State private var selectedRegion: LeaderboardRegion = .global
     @State private var isLoading = false
     @State private var showShareSheet = false
+    @State private var shareContent: ShareContent?
     @State private var searchText = ""
     @State private var animateRankChange = false
 
@@ -163,7 +164,15 @@ struct LeaderboardView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showShareSheet = true }) {
+                    Button(action: {
+                        shareContent = ShareContent(
+                            type: .leaderboard,
+                            beforeImage: nil,
+                            afterImage: nil,
+                            text: generateShareText()
+                        )
+                        showShareSheet = true
+                    }) {
                         Image(systemName: "square.and.arrow.up")
                             .foregroundColor(.white)
                     }
@@ -171,7 +180,9 @@ struct LeaderboardView: View {
             }
         }
         .sheet(isPresented: $showShareSheet) {
-            LeaderboardShareSheet(items: [generateShareText()])
+            if let content = shareContent {
+                BrandedSharePopup(content: content)
+            }
         }
         .onAppear {
             print("🔍 DEBUG: LeaderboardView appeared")
@@ -576,16 +587,7 @@ struct LeaderboardRow: View {
     }
 }
 
-// Share sheet helper
-struct LeaderboardShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
+// Removed LeaderboardShareSheet - now using BrandedSharePopup
 
 #Preview {
     LeaderboardView()
