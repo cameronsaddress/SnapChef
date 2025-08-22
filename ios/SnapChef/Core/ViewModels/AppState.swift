@@ -360,12 +360,39 @@ final class RecipesViewModel: ObservableObject {
         
         print("🔍   - savedRecipes count after: \(savedRecipes.count)")
         
-        // Trigger CloudKit sync if authenticated
+        // Immediately upload to CloudKit if authenticated (don't wait for sync)
         if UnifiedAuthManager.shared.isAuthenticated {
             Task {
-                // Note: Future implementation would trigger sync queue
-                // Currently CloudKit sync happens directly in recipe save
-                print("📤 Would trigger CloudKit sync for saved recipes")
+                do {
+                    print("📤 Immediately uploading recipe to CloudKit: '\(recipe.name)'")
+                    
+                    // Upload the recipe with before photo if available
+                    let recipeID = try await CloudKitRecipeManager.shared.uploadRecipe(
+                        recipe,
+                        fromLLM: false,
+                        beforePhoto: beforePhoto
+                    )
+                    print("✅ Recipe uploaded to CloudKit with ID: \(recipeID)")
+                    
+                    // If we have an after photo, update it immediately
+                    if let afterPhoto = afterPhoto {
+                        let recipeExists = await CloudKitRecipeManager.shared.checkRecipeExists(recipeID)
+                        if recipeExists {
+                            try await CloudKitRecipeManager.shared.updateAfterPhoto(
+                                for: recipeID,
+                                afterPhoto: afterPhoto
+                            )
+                            print("✅ After photo uploaded to CloudKit")
+                        }
+                    }
+                    
+                    // Add to user's saved recipes list
+                    try await CloudKitRecipeManager.shared.addRecipeToUserProfile(recipeID, type: .saved)
+                    print("✅ Recipe added to user's CloudKit profile")
+                } catch {
+                    print("❌ CloudKit upload failed (will retry on next sync): \(error)")
+                    // Don't show error to user - recipe is saved locally
+                }
             }
         }
     }
@@ -380,6 +407,47 @@ final class RecipesViewModel: ObservableObject {
             )
             savedRecipesWithPhotos[index] = updatedRecipe
             saveToDisk()
+            
+            // Also store in PhotoStorageManager (single source of truth)
+            PhotoStorageManager.shared.storeMealPhoto(afterPhoto, for: recipeId)
+            
+            // Immediately upload to CloudKit if authenticated
+            if UnifiedAuthManager.shared.isAuthenticated {
+                Task {
+                    do {
+                        print("📤 Immediately uploading after photo to CloudKit for recipe ID: \(recipeId)")
+                        
+                        // Check if recipe exists in CloudKit first
+                        let recipeExists = await CloudKitRecipeManager.shared.checkRecipeExists(recipeId.uuidString)
+                        
+                        if recipeExists {
+                            try await CloudKitRecipeManager.shared.updateAfterPhoto(
+                                for: recipeId.uuidString,
+                                afterPhoto: afterPhoto
+                            )
+                            print("✅ After photo uploaded to CloudKit")
+                        } else {
+                            // Recipe doesn't exist in CloudKit yet, upload the whole recipe
+                            print("📤 Recipe not in CloudKit, uploading full recipe with photos")
+                            let recipeID = try await CloudKitRecipeManager.shared.uploadRecipe(
+                                existingRecipe.recipe,
+                                fromLLM: false,
+                                beforePhoto: existingRecipe.beforePhoto
+                            )
+                            
+                            // Now update with after photo
+                            try await CloudKitRecipeManager.shared.updateAfterPhoto(
+                                for: recipeID,
+                                afterPhoto: afterPhoto
+                            )
+                            print("✅ Recipe and after photo uploaded to CloudKit")
+                        }
+                    } catch {
+                        print("❌ CloudKit after photo upload failed: \(error)")
+                        // Don't show error - photo is saved locally
+                    }
+                }
+            }
         }
     }
     
