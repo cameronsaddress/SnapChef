@@ -187,9 +187,11 @@ struct StreakBadge: View {
 /// Streak summary card for profile
 struct StreakSummaryCard: View {
     @StateObject private var streakManager = StreakManager.shared
-    @ObservedObject var cloudKitAuthManager = UnifiedAuthManager.shared
+    @ObservedObject var authManager = UnifiedAuthManager.shared
+    @State private var cloudKitStreaks: [StreakType: StreakData] = [:]
     @State private var recipeStreak: Int = 0
     @State private var isLoadingStreak = false
+    @State private var isLoadingCloudKitStreaks = false
 
     private var activeStreakCount: Int {
         streakManager.currentStreaks.values.filter { $0.isActive }.count
@@ -301,8 +303,37 @@ struct StreakSummaryCard: View {
     
     // MARK: - Data Loading Methods
     
+    private func loadStreakData() {
+        if authManager.isAuthenticated {
+            loadCloudKitStreaks()
+            loadRecipeStreak()
+        }
+    }
+    
+    private func loadCloudKitStreaks() {
+        guard authManager.isAuthenticated else { return }
+        guard !isLoadingCloudKitStreaks else { return }
+        
+        isLoadingCloudKitStreaks = true
+        
+        Task {
+            do {
+                let streaks = await CloudKitStreakManager.shared.syncStreaks()
+                await MainActor.run {
+                    self.cloudKitStreaks = streaks
+                    self.isLoadingCloudKitStreaks = false
+                }
+            } catch {
+                print("Error loading CloudKit streaks: \(error)")
+                await MainActor.run {
+                    self.isLoadingCloudKitStreaks = false
+                }
+            }
+        }
+    }
+    
     private func loadRecipeStreak() {
-        guard cloudKitAuthManager.isAuthenticated else {
+        guard authManager.isAuthenticated else {
             return
         }
         

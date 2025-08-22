@@ -364,6 +364,9 @@ struct QuickActionsSection: View {
     @Binding var showingPowerUpStore: Bool
     @Binding var showingInsuranceOptions: Bool
     @StateObject private var streakManager = StreakManager.shared
+    @ObservedObject var authManager = UnifiedAuthManager.shared
+    @State private var cloudKitStreaks: [StreakType: StreakData] = [:]
+    @State private var isLoadingCloudKitStreaks = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -406,6 +409,34 @@ struct QuickActionsSection: View {
                     )
                 }
                 .padding(.horizontal)
+            }
+        }
+        .onAppear {
+            loadCloudKitStreaks()
+        }
+        .onChange(of: authManager.isAuthenticated) { _ in
+            loadCloudKitStreaks()
+        }
+    }
+    
+    private func loadCloudKitStreaks() {
+        guard authManager.isAuthenticated else { return }
+        guard !isLoadingCloudKitStreaks else { return }
+        
+        isLoadingCloudKitStreaks = true
+        
+        Task {
+            do {
+                let streaks = await CloudKitStreakManager.shared.syncStreaks()
+                await MainActor.run {
+                    self.cloudKitStreaks = streaks
+                    self.isLoadingCloudKitStreaks = false
+                }
+            } catch {
+                print("Error loading CloudKit streaks: \(error)")
+                await MainActor.run {
+                    self.isLoadingCloudKitStreaks = false
+                }
             }
         }
     }
