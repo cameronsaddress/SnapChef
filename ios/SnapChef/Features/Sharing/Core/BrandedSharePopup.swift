@@ -310,82 +310,44 @@ struct BrandedSharePopup: View {
             activityType = "recipeShared"
             recipeID = recipe.id.uuidString
             recipeName = recipe.name
-            print("📤 Sharing recipe '\(recipe.name)' to followers' feeds")
+            print("📤 Creating activity for recipe '\(recipe.name)'")
             
         case .challenge(let challenge):
             activityType = "challengeShared"
             challengeID = challenge.id
             challengeName = challenge.title
-            print("📤 Sharing challenge '\(challenge.title)' to followers' feeds")
+            print("📤 Creating activity for challenge '\(challenge.title)'")
             
         case .achievement(let achievementName):
             activityType = "achievementShared"
-            print("📤 Sharing achievement '\(achievementName)' to followers' feeds")
+            print("📤 Creating activity for achievement '\(achievementName)'")
             
         case .leaderboard:
             activityType = "leaderboardShared"
-            print("📤 Sharing leaderboard position to followers' feeds")
+            print("📤 Creating activity for leaderboard share")
             
         default:
-            print("📤 Sharing content to followers' feeds")
+            print("📤 Creating activity for content share")
         }
         
         do {
-            // Get the user's followers
-            let followersQuery = CKQuery(
-                recordType: "Follow",
-                predicate: NSPredicate(format: "followingID == %@ AND isActive == %d", currentUserID, 1)
-            )
-            
-            let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-            let publicDB = container.publicCloudDatabase
-            
-            let (matchResults, _) = try await publicDB.records(matching: followersQuery)
-            
-            var followerIDs: [String] = []
-            for (_, result) in matchResults {
-                if case .success(let record) = result,
-                   let followerID = record["followerID"] as? String {
-                    followerIDs.append(followerID)
-                }
-            }
-            
-            print("📊 Found \(followerIDs.count) followers to share with")
-            
-            // Create an activity for each follower's feed
-            for followerID in followerIDs {
-                do {
-                    // Create activity record for this follower's feed
-                    try await CloudKitSyncService.shared.createActivity(
-                        type: activityType,
-                        actorID: currentUserID,
-                        targetUserID: followerID,  // This follower will see it in their feed
-                        recipeID: recipeID,
-                        recipeName: recipeName,
-                        challengeID: challengeID,
-                        challengeName: challengeName
-                    )
-                } catch {
-                    print("⚠️ Failed to create activity for follower \(followerID): \(error)")
-                    // Continue with other followers even if one fails
-                }
-            }
-            
-            // Also create an activity for the user's own feed (for their profile)
+            // Create a single public activity that will appear in followers' feeds
+            // The feed system will automatically show this to followers
+            // No targetUserID means it's a public activity from this user
             try await CloudKitSyncService.shared.createActivity(
                 type: activityType,
                 actorID: currentUserID,
-                targetUserID: currentUserID,  // User's own feed
+                targetUserID: nil,  // No specific target - this is a public activity
                 recipeID: recipeID,
                 recipeName: recipeName,
                 challengeID: challengeID,
                 challengeName: challengeName
             )
             
-            print("✅ Successfully shared to \(followerIDs.count) followers' feeds")
+            print("✅ Activity created successfully - will appear in followers' feeds")
             
         } catch {
-            print("❌ Failed to share to followers' feeds: \(error)")
+            print("❌ Failed to create activity: \(error)")
         }
     }
 }
