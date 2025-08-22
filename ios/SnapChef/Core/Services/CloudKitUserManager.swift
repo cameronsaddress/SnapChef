@@ -19,13 +19,22 @@ class CloudKitUserManager: ObservableObject {
     // MARK: - Username Availability
 
     func isUsernameAvailable(_ username: String) async throws -> Bool {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
         let predicate = NSPredicate(format: "\(CKField.User.username) == %@", username.lowercased())
         let query = CKQuery(recordType: userRecordType, predicate: predicate)
+        
+        logger.logQueryStart(query: query, database: database.debugName)
 
         do {
             let results = try await database.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: database.debugName, duration: duration)
             return results.matchResults.isEmpty
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: database.debugName, error: error, duration: duration)
             print("Error checking username availability: \(error)")
             throw error
         }
@@ -64,10 +73,18 @@ class CloudKitUserManager: ObservableObject {
             record[CKField.User.subscriptionTier] = "free"
         }
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: userRecordType, database: database.debugName)
+        
         do {
             _ = try await database.save(record)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: userRecordType, recordID: record.recordID.recordName, database: database.debugName, duration: duration)
             print("Successfully saved user profile for username: \(username)")
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: userRecordType, database: database.debugName, error: error, duration: duration)
             print("Error saving user profile: \(error)")
             throw error
         }
@@ -76,11 +93,19 @@ class CloudKitUserManager: ObservableObject {
     // MARK: - Fetch User Profile
 
     func fetchUserProfile(userID: String) async throws -> CKRecord? {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
         let predicate = NSPredicate(format: "userID == %@", userID)
         let query = CKQuery(recordType: userRecordType, predicate: predicate)
+        
+        logger.logQueryStart(query: query, database: database.debugName)
 
         do {
             let results = try await database.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: database.debugName, duration: duration)
+            
             if let firstResult = results.matchResults.first {
                 switch firstResult.1 {
                 case .success(let record):
@@ -91,17 +116,27 @@ class CloudKitUserManager: ObservableObject {
             }
             return nil
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: database.debugName, error: error, duration: duration)
             print("Error fetching user profile: \(error)")
             throw error
         }
     }
 
     func fetchUserProfile(username: String) async throws -> CKRecord? {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
         let predicate = NSPredicate(format: "\(CKField.User.username) == %@", username.lowercased())
         let query = CKQuery(recordType: userRecordType, predicate: predicate)
+        
+        logger.logQueryStart(query: query, database: database.debugName)
 
         do {
             let results = try await database.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: database.debugName, duration: duration)
+            
             if let firstResult = results.matchResults.first {
                 switch firstResult.1 {
                 case .success(let record):
@@ -112,6 +147,8 @@ class CloudKitUserManager: ObservableObject {
             }
             return nil
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: database.debugName, error: error, duration: duration)
             print("Error fetching user profile by username: \(error)")
             throw error
         }
@@ -129,7 +166,19 @@ class CloudKitUserManager: ObservableObject {
         // TODO: Upload image and set profile[CKField.User.profileImageURL] = imageURL
         profile[CKField.User.lastActiveAt] = Date()
 
-        _ = try await database.save(profile)
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: userRecordType, database: database.debugName)
+        
+        do {
+            _ = try await database.save(profile)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: userRecordType, recordID: profile.recordID.recordName, database: database.debugName, duration: duration)
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: userRecordType, database: database.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     func updateBio(_ bio: String) async throws {
@@ -141,7 +190,19 @@ class CloudKitUserManager: ObservableObject {
         profile["bio"] = bio
         profile[CKField.User.lastActiveAt] = Date()
 
-        _ = try await database.save(profile)
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: userRecordType, database: database.debugName)
+        
+        do {
+            _ = try await database.save(profile)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: userRecordType, recordID: profile.recordID.recordName, database: database.debugName, duration: duration)
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: userRecordType, database: database.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     // MARK: - Profile Stats
@@ -156,7 +217,19 @@ class CloudKitUserManager: ObservableObject {
         profile[CKField.User.recipesShared] = currentCount + 1
         profile[CKField.User.lastActiveAt] = Date()
 
-        _ = try await database.save(profile)
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: userRecordType, database: database.debugName)
+        
+        do {
+            _ = try await database.save(profile)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: userRecordType, recordID: profile.recordID.recordName, database: database.debugName, duration: duration)
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: userRecordType, database: database.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     func updatePoints(_ points: Int) async throws {
@@ -168,7 +241,19 @@ class CloudKitUserManager: ObservableObject {
         profile[CKField.User.totalPoints] = points
         profile[CKField.User.lastActiveAt] = Date()
 
-        _ = try await database.save(profile)
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: userRecordType, database: database.debugName)
+        
+        do {
+            _ = try await database.save(profile)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: userRecordType, recordID: profile.recordID.recordName, database: database.debugName, duration: duration)
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: userRecordType, database: database.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     // MARK: - Helper Methods
@@ -201,8 +286,15 @@ class CloudKitUserManager: ObservableObject {
         let ckQuery = CKQuery(recordType: userRecordType, predicate: predicate)
         ckQuery.sortDescriptors = [NSSortDescriptor(key: CKField.User.totalPoints, ascending: false)]
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logQueryStart(query: ckQuery, database: database.debugName)
+        
         do {
             let results = try await database.records(matching: ckQuery)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: ckQuery, resultCount: results.matchResults.count, database: database.debugName, duration: duration)
+            
             return results.matchResults.compactMap { _, result in
                 switch result {
                 case .success(let record):
@@ -212,6 +304,8 @@ class CloudKitUserManager: ObservableObject {
                 }
             }
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: ckQuery, database: database.debugName, error: error, duration: duration)
             print("Error searching users: \(error)")
             throw error
         }
@@ -246,10 +340,18 @@ class CloudKitUserManager: ObservableObject {
         let predicate = NSPredicate(format: "\(CKField.Follow.followingID) == %@ AND \(CKField.Follow.isActive) == %d", userID, 1)
         let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
         
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logQueryStart(query: query, database: database.debugName)
+        
         do {
             let results = try await database.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: database.debugName, duration: duration)
             return results.matchResults.count
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: database.debugName, error: error, duration: duration)
             print("Error fetching follower count: \(error)")
             throw error
         }
@@ -260,10 +362,18 @@ class CloudKitUserManager: ObservableObject {
         let predicate = NSPredicate(format: "\(CKField.Follow.followerID) == %@ AND \(CKField.Follow.isActive) == %d", userID, 1)
         let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
         
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logQueryStart(query: query, database: database.debugName)
+        
         do {
             let results = try await database.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: database.debugName, duration: duration)
             return results.matchResults.count
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: database.debugName, error: error, duration: duration)
             print("Error fetching following count: \(error)")
             throw error
         }
@@ -274,10 +384,18 @@ class CloudKitUserManager: ObservableObject {
         let predicate = NSPredicate(format: "\(CKField.Recipe.ownerID) == %@ AND \(CKField.Recipe.isPublic) == %d", userID, 1)
         let query = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: predicate)
         
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logQueryStart(query: query, database: database.debugName)
+        
         do {
             let results = try await database.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: database.debugName, duration: duration)
             return results.matchResults.count
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: database.debugName, error: error, duration: duration)
             print("Error fetching recipe count: \(error)")
             throw error
         }
@@ -289,8 +407,15 @@ class CloudKitUserManager: ObservableObject {
         let query = CKQuery(recordType: CloudKitConfig.achievementRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.Achievement.earnedAt, ascending: false)]
         
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logQueryStart(query: query, database: database.debugName)
+        
         do {
             let results = try await database.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: database.debugName, duration: duration)
+            
             return results.matchResults.compactMap { _, result in
                 switch result {
                 case .success(let record):
@@ -300,6 +425,8 @@ class CloudKitUserManager: ObservableObject {
                 }
             }
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: database.debugName, error: error, duration: duration)
             print("Error fetching user achievements: \(error)")
             throw error
         }
@@ -315,7 +442,19 @@ class CloudKitUserManager: ObservableObject {
         profile[CKField.User.followingCount] = followingCount
         profile[CKField.User.lastActiveAt] = Date()
         
-        _ = try await database.save(profile)
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: userRecordType, database: database.debugName)
+        
+        do {
+            _ = try await database.save(profile)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: userRecordType, recordID: profile.recordID.recordName, database: database.debugName, duration: duration)
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: userRecordType, database: database.debugName, error: error, duration: duration)
+            throw error
+        }
     }
     
     /// Update recipe count in user profile for performance
@@ -327,7 +466,19 @@ class CloudKitUserManager: ObservableObject {
         profile[CKField.User.recipesShared] = recipeCount
         profile[CKField.User.lastActiveAt] = Date()
         
-        _ = try await database.save(profile)
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: userRecordType, database: database.debugName)
+        
+        do {
+            _ = try await database.save(profile)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: userRecordType, recordID: profile.recordID.recordName, database: database.debugName, duration: duration)
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: userRecordType, database: database.debugName, error: error, duration: duration)
+            throw error
+        }
     }
     
     /// Calculate current recipe creation streak based on consecutive days

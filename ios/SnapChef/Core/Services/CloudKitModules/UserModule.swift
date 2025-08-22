@@ -26,10 +26,18 @@ final class UserModule: ObservableObject {
         let predicate = NSPredicate(format: "username == %@", username.lowercased())
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logQueryStart(query: query, database: publicDatabase.debugName)
+        
         do {
             let results = try await publicDatabase.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: publicDatabase.debugName, duration: duration)
             return results.matchResults.isEmpty
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: publicDatabase.debugName, error: error, duration: duration)
             print("Error checking username availability: \(error)")
             throw error
         }
@@ -69,10 +77,18 @@ final class UserModule: ObservableObject {
             record["isPremium"] = false
         }
         
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: CloudKitConfig.userRecordType, database: publicDatabase.debugName)
+        
         do {
             _ = try await publicDatabase.save(record)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: CloudKitConfig.userRecordType, recordID: record.recordID.recordName, database: publicDatabase.debugName, duration: duration)
             print("Successfully saved user profile for username: \(username)")
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: CloudKitConfig.userRecordType, database: publicDatabase.debugName, error: error, duration: duration)
             print("Error saving user profile: \(error)")
             throw error
         }
@@ -83,8 +99,15 @@ final class UserModule: ObservableObject {
         let predicate = NSPredicate(format: "userID == %@", userID)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logQueryStart(query: query, database: publicDatabase.debugName)
+        
         do {
             let results = try await publicDatabase.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: publicDatabase.debugName, duration: duration)
+            
             if let firstResult = results.matchResults.first {
                 switch firstResult.1 {
                 case .success(let record):
@@ -95,6 +118,8 @@ final class UserModule: ObservableObject {
             }
             return nil
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: publicDatabase.debugName, error: error, duration: duration)
             print("Error fetching user profile: \(error)")
             throw error
         }
@@ -132,7 +157,13 @@ final class UserModule: ObservableObject {
         profile["profileImageAsset"] = imageAsset
         profile["updatedAt"] = Date()
         
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: CloudKitConfig.userRecordType, database: publicDatabase.debugName)
+        
         _ = try await publicDatabase.save(profile)
+        let duration = Date().timeIntervalSince(startTime)
+        logger.logSaveSuccess(recordType: CloudKitConfig.userRecordType, recordID: profile.recordID.recordName, database: publicDatabase.debugName, duration: duration)
     }
     
     func updateBio(_ bio: String) async throws {
@@ -144,7 +175,13 @@ final class UserModule: ObservableObject {
         profile["bio"] = bio
         profile["updatedAt"] = Date()
         
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: CloudKitConfig.userRecordType, database: publicDatabase.debugName)
+        
         _ = try await publicDatabase.save(profile)
+        let duration = Date().timeIntervalSince(startTime)
+        logger.logSaveSuccess(recordType: CloudKitConfig.userRecordType, recordID: profile.recordID.recordName, database: publicDatabase.debugName, duration: duration)
     }
     
     // MARK: - Profile Stats
@@ -158,7 +195,13 @@ final class UserModule: ObservableObject {
         profile["recipesShared"] = currentCount + 1
         profile["updatedAt"] = Date()
         
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: CloudKitConfig.userRecordType, database: publicDatabase.debugName)
+        
         _ = try await publicDatabase.save(profile)
+        let duration = Date().timeIntervalSince(startTime)
+        logger.logSaveSuccess(recordType: CloudKitConfig.userRecordType, recordID: profile.recordID.recordName, database: publicDatabase.debugName, duration: duration)
     }
     
     func updatePoints(_ points: Int) async throws {
@@ -170,7 +213,13 @@ final class UserModule: ObservableObject {
         profile["totalPoints"] = points
         profile["updatedAt"] = Date()
         
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: CloudKitConfig.userRecordType, database: publicDatabase.debugName)
+        
         _ = try await publicDatabase.save(profile)
+        let duration = Date().timeIntervalSince(startTime)
+        logger.logSaveSuccess(recordType: CloudKitConfig.userRecordType, recordID: profile.recordID.recordName, database: publicDatabase.debugName, duration: duration)
     }
     
     // MARK: - Helper Methods

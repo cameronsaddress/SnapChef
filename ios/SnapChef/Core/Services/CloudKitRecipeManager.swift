@@ -29,10 +29,56 @@ class CloudKitRecipeManager: ObservableObject {
         loadUserRecipeReferences()
     }
 
+    // MARK: - Debug Methods
+    
+    /// Debug method to list all recipes and their owners
+    @MainActor
+    public func debugListAllRecipes() async {
+        print("🔍 DEBUG: Listing ALL recipes in CloudKit...")
+        print("==========================================")
+        
+        let query = CKQuery(recordType: "Recipe", predicate: NSPredicate(value: true))
+        query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        
+        do {
+            let (matchResults, _) = try await publicDB.records(matching: query, resultsLimit: 100)
+            
+            print("Found \(matchResults.count) recipes in CloudKit:")
+            print("")
+            
+            for (id, result) in matchResults {
+                if case .success(let record) = result {
+                    let title = record["title"] as? String ?? "Unknown"
+                    let ownerID = record["ownerID"] as? String ?? "No Owner"
+                    let recipeID = record["id"] as? String ?? id.recordName
+                    let isPublic = record["isPublic"] as? Int64 ?? 0
+                    
+                    print("🍴 Recipe: \(title)")
+                    print("   ID: \(recipeID)")
+                    print("   Owner ID: \(ownerID)")
+                    print("   Is Public: \(isPublic == 1 ? "Yes" : "No")")
+                    print("")
+                }
+            }
+            
+            // Also show current user for comparison
+            if let currentUserID = getCurrentUserID() {
+                print("==========================================")
+                print("👤 Current User ID: \(currentUserID)")
+                print("==========================================")
+            }
+            
+        } catch {
+            print("❌ Error listing recipes: \(error)")
+        }
+    }
+    
     // MARK: - Recipe Upload (Single Instance)
 
     /// Upload a recipe to CloudKit (creates single master record)
     func uploadRecipe(_ recipe: Recipe, fromLLM: Bool = false, beforePhoto: UIImage? = nil) async throws -> String {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
         // Only upload to CloudKit if user is authenticated
         guard UnifiedAuthManager.shared.isAuthenticated else {
             print("📱 User not authenticated - skipping CloudKit upload")
@@ -50,9 +96,17 @@ class CloudKitRecipeManager: ObservableObject {
         let recipeID = recipe.id.uuidString
         let record = CKRecord(recordType: "Recipe", recordID: CKRecord.ID(recordName: recipeID))
 
+        // Get the current user's ID - this is critical for ownership
+        guard let currentUserID = getCurrentUserID() else {
+            print("❌ Cannot upload recipe without authenticated user")
+            throw SnapChefError.authenticationError("User must be authenticated to upload recipes")
+        }
+        
+        print("🔑 Setting recipe owner to user: \(currentUserID)")
+        
         // Set recipe fields
         record["id"] = recipeID
-        record["ownerID"] = getCurrentUserID() ?? "anonymous"
+        record["ownerID"] = currentUserID  // This associates the recipe with the user
         record["ownerName"] = UnifiedAuthManager.shared.currentUser?.displayName ?? "Anonymous Chef"
         record["title"] = recipe.name
         record["description"] = recipe.description
@@ -104,11 +158,16 @@ class CloudKitRecipeManager: ObservableObject {
         }
 
         // Save to CloudKit with enhanced error handling and retry logic
+        logger.logSaveStart(recordType: "Recipe", database: "publicDB")
         do {
             let savedRecord = try await saveRecordWithRetry(record: record, database: publicDB, maxRetries: 3)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: "Recipe", recordID: savedRecord.recordID.recordName, database: "publicDB", duration: duration)
             print("✅ Recipe saved to CloudKit with ID: \(savedRecord.recordID.recordName)")
         } catch let error as CKError {
             // Handle specific CloudKit errors
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: "Recipe", database: "publicDB", error: error, duration: duration)
             let snapChefError = CloudKitErrorHandler.snapChefError(from: error)
             ErrorAnalytics.logError(snapChefError, context: "recipe_upload_\(recipeID)")
             
@@ -486,6 +545,8 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Fetch a recipe by ID (checks cache first, then CloudKit)
     func fetchRecipe(by recipeID: String) async throws -> Recipe {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
         print("🔍 DEBUG CloudKitRecipeManager: fetchRecipe starting for recipeID: \(recipeID)")
         // Check local cache first
         if let cached = cachedRecipes[recipeID] {
@@ -501,6 +562,7 @@ class CloudKitRecipeManager: ObservableObject {
         do {
             // Try public database first (recipes are stored in public for social features)
             print("🔍 DEBUG CloudKitRecipeManager: Trying public database for recipeID: \(recipeID)")
+            logger.logFetchStart(recordType: "Recipe", query: "byID: \(recipeID)", database: "publicDB")
             let record = try await fetchRecordWithRetry(recordID: recordID, database: publicDB, maxRetries: 2)
             let recipe = try parseRecipeFromRecord(record)
             cachedRecipes[recipeID] = recipe
@@ -511,10 +573,14 @@ class CloudKitRecipeManager: ObservableObject {
             print("🔍 DEBUG CloudKitRecipeManager: Recipe fetched from public DB - ownerID: '\(ownerID)', ownerName: '\(ownerName)'")
             CloudKitRecipeCache.shared.addRecipeToCache(recipe, ownerID: ownerID, ownerName: ownerName)
             
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: "Recipe", recordCount: 1, database: "publicDB", duration: duration)
             print("☁️ Recipe fetched from public CloudKit: \(recipeID)")
             return recipe
         } catch let publicError as CKError {
             // If not in public, try private database for user's own recipes
+            let publicDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: "Recipe", database: "publicDB", error: publicError, duration: publicDuration)
             print("🔍 DEBUG CloudKitRecipeManager: Public DB failed with CKError, trying private database for recipeID: \(recipeID)")
             print("🔍 DEBUG CloudKitRecipeManager: Public DB error: \(publicError)")
             do {
@@ -535,6 +601,8 @@ class CloudKitRecipeManager: ObservableObject {
                 //     await incrementViewCount(for: recipeID)
                 // }
                 
+                let duration = Date().timeIntervalSince(startTime)
+                logger.logFetchSuccess(recordType: "Recipe", recordCount: 1, database: "privateDB", duration: duration)
                 print("☁️ Recipe fetched from private CloudKit after public error: \(recipeID)")
                 return recipe
             } catch let publicError as CKError {
@@ -643,11 +711,26 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Fetch recipes for a specific user (for viewing other users' profiles)
     func fetchRecipesForUser(_ userID: String, limit: Int = 50) async throws -> [Recipe] {
-        print("🔍 DEBUG CloudKitRecipeManager: Starting fetchRecipesForUser for userID: '\(userID)'")
-        print("🔍 DEBUG CloudKitRecipeManager: Query limit: \(limit)")
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
+        // Handle different userID formats
+        var queryUserID = userID
+        if userID.hasPrefix("user_") {
+            // Remove the "user_" prefix to get the raw CloudKit ID
+            queryUserID = String(userID.dropFirst(5))
+            print("🔍 Fetching recipes for user profile")
+            print("   Original ID: \(userID)")
+            print("   Cleaned ID: \(queryUserID)")
+        } else {
+            print("🔍 Fetching recipes for user")
+            print("   User ID: \(userID)")
+        }
+        
+        print("   Query: ownerID == '\(queryUserID)'")
         
         // Create predicate to find recipes by ownerID
-        let predicate = NSPredicate(format: "ownerID == %@", userID)
+        let predicate = NSPredicate(format: "ownerID == %@", queryUserID)
         print("🔍 DEBUG CloudKitRecipeManager: Predicate: \(predicate)")
         
         let query = CKQuery(recordType: "Recipe", predicate: predicate)
@@ -694,6 +777,7 @@ class CloudKitRecipeManager: ObservableObject {
                     }
                     
                     // Try public database for recipes
+                    logger.logQueryStart(query: query, database: "publicDB")
                     publicDB.add(operation)
                 }
                 
@@ -830,7 +914,18 @@ class CloudKitRecipeManager: ObservableObject {
         profileRecord["lastUpdated"] = Date()
 
         // Save to CloudKit
-        _ = try await privateDB.save(profileRecord)
+        let logger = CloudKitDebugLogger.shared
+        let saveStartTime = Date()
+        logger.logSaveStart(recordType: CloudKitConfig.userRecordType, database: "privateDB")
+        do {
+            _ = try await privateDB.save(profileRecord)
+            let saveDuration = Date().timeIntervalSince(saveStartTime)
+            logger.logSaveSuccess(recordType: CloudKitConfig.userRecordType, recordID: profileRecord.recordID.recordName, database: "privateDB", duration: saveDuration)
+        } catch {
+            let saveDuration = Date().timeIntervalSince(saveStartTime)
+            logger.logSaveFailure(recordType: CloudKitConfig.userRecordType, database: "privateDB", error: error, duration: saveDuration)
+            throw error
+        }
 
         // Update save count on recipe
         if type == .saved {
@@ -872,7 +967,18 @@ class CloudKitRecipeManager: ObservableObject {
         profileRecord["lastUpdated"] = Date()
 
         // Save to CloudKit
-        _ = try await privateDB.save(profileRecord)
+        let logger = CloudKitDebugLogger.shared
+        let saveStartTime = Date()
+        logger.logSaveStart(recordType: CloudKitConfig.userRecordType, database: "privateDB")
+        do {
+            _ = try await privateDB.save(profileRecord)
+            let saveDuration = Date().timeIntervalSince(saveStartTime)
+            logger.logSaveSuccess(recordType: CloudKitConfig.userRecordType, recordID: profileRecord.recordID.recordName, database: "privateDB", duration: saveDuration)
+        } catch {
+            let saveDuration = Date().timeIntervalSince(saveStartTime)
+            logger.logSaveFailure(recordType: CloudKitConfig.userRecordType, database: "privateDB", error: error, duration: saveDuration)
+            throw error
+        }
 
         print("✅ Removed recipe \(recipeID) from user's \(type) list")
     }
@@ -998,8 +1104,9 @@ class CloudKitRecipeManager: ObservableObject {
             return []
         }
         
-        print("🔍 DEBUG CloudKitRecipeManager: Getting created recipes for userID: \(currentUserID)")
-        print("🍳 Getting user's created recipes...")
+        print("🍳 Getting user's CREATED recipes...")
+        print("   Current User ID: \(currentUserID)")
+        print("   This will query: ownerID == '\(currentUserID)'")
 
         // Ensure references are loaded first
         if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
@@ -1116,6 +1223,8 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Search for recipes by query - FILTERED BY CURRENT USER AND PUBLIC RECIPES
     func searchRecipes(query: String, limit: Int = 20) async throws -> [Recipe] {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
         print("🔍 DEBUG CloudKitRecipeManager: Starting searchRecipes with query: '\(query)', limit: \(limit)")
         // CRITICAL PRIVACY FIX: Only search user's own recipes and explicitly public recipes
         guard let currentUserID = getCurrentUserID() else {
@@ -1139,8 +1248,13 @@ class CloudKitRecipeManager: ObservableObject {
     
     /// Helper method to perform search queries with consistent handling
     private func performSearchQuery(_ ckQuery: CKQuery, limit: Int) async throws -> [Recipe] {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
         print("🔍 DEBUG CloudKitRecipeManager: Executing search query with limit: \(limit)")
+        logger.logQueryStart(query: ckQuery, database: "publicDB")
         let (matchResults, _) = try await publicDB.records(matching: ckQuery, resultsLimit: limit)
+        let duration = Date().timeIntervalSince(startTime)
+        logger.logQuerySuccess(query: ckQuery, resultCount: matchResults.count, database: "publicDB", duration: duration)
         print("🔍 DEBUG CloudKitRecipeManager: Search query returned \(matchResults.count) results")
 
         var recipes: [Recipe] = []
@@ -1271,14 +1385,18 @@ class CloudKitRecipeManager: ObservableObject {
             return nil
         }
         
-        // Try both keys for compatibility - prefer the CloudKit recordID
+        // Get the CloudKit user record ID - this should be the single source of truth
         if let userID = UserDefaults.standard.string(forKey: "currentUserRecordID") {
-            print("📱 CloudKitRecipeManager: Using currentUserRecordID: \(userID)")
+            // Return the raw CloudKit ID without any prefix
+            // This ensures consistency between saving and querying
+            print("📱 CloudKitRecipeManager: Using CloudKit userID: \(userID)")
+            print("📱 This ID will be used for ownerID field in Recipe records")
             return userID
         }
         
+        // Fallback to legacy key if needed
         if let userID = UserDefaults.standard.string(forKey: "currentUserID") {
-            print("📱 CloudKitRecipeManager: Using legacy currentUserID: \(userID)")
+            print("📱 CloudKitRecipeManager: Using legacy userID: \(userID)")
             return userID
         }
         
@@ -1331,6 +1449,8 @@ class CloudKitRecipeManager: ObservableObject {
     }
 
     private func fetchOrCreateUserProfile(_ userID: String) async throws -> CKRecord {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
         print("🔍 DEBUG CloudKitRecipeManager: fetchOrCreateUserProfile starting for userID: \(userID)")
         let recordID = CKRecord.ID(recordName: "profile_\(userID)")
         print("🔍 DEBUG CloudKitRecipeManager: Looking for UserProfile record: \(recordID.recordName)")
@@ -1338,11 +1458,16 @@ class CloudKitRecipeManager: ObservableObject {
         do {
             // Try to fetch existing profile
             print("🔍 DEBUG CloudKitRecipeManager: Attempting to fetch existing UserProfile record")
+            logger.logFetchStart(recordType: CloudKitConfig.userRecordType, query: "profile_\(userID)", database: "privateDB")
             let existingRecord = try await privateDB.record(for: recordID)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: CloudKitConfig.userRecordType, recordCount: 1, database: "privateDB", duration: duration)
             print("🔍 DEBUG CloudKitRecipeManager: Found existing UserProfile record: \(existingRecord.recordID.recordName)")
             return existingRecord
         } catch {
             // Create new profile
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: CloudKitConfig.userRecordType, database: "privateDB", error: error, duration: fetchDuration)
             print("🔍 DEBUG CloudKitRecipeManager: UserProfile record not found, creating new one")
             print("🔍 DEBUG CloudKitRecipeManager: Fetch error: \(error)")
             let record = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: recordID)
@@ -1353,7 +1478,11 @@ class CloudKitRecipeManager: ObservableObject {
             record["lastActiveAt"] = Date()
 
             print("🔍 DEBUG CloudKitRecipeManager: Saving new UserProfile record")
+            logger.logSaveStart(recordType: CloudKitConfig.userRecordType, database: "privateDB")
+            let saveStartTime = Date()
             let savedRecord = try await privateDB.save(record)
+            let saveDuration = Date().timeIntervalSince(saveStartTime)
+            logger.logSaveSuccess(recordType: CloudKitConfig.userRecordType, recordID: savedRecord.recordID.recordName, database: "privateDB", duration: saveDuration)
             print("🔍 DEBUG CloudKitRecipeManager: Created new UserProfile record: \(savedRecord.recordID.recordName)")
             return savedRecord
         }

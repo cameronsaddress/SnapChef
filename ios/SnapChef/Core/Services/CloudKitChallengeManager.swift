@@ -27,6 +27,10 @@ class CloudKitChallengeManager: ObservableObject {
 
     /// Upload a challenge to CloudKit
     func uploadChallenge(_ challenge: Challenge) async throws -> String {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: "Challenge", database: publicDB.debugName)
+        
         let record = CKRecord(recordType: "Challenge", recordID: CKRecord.ID(recordName: challenge.id))
 
         record["id"] = challenge.id
@@ -50,17 +54,30 @@ class CloudKitChallengeManager: ObservableObject {
         record["minTeamSize"] = Int64(1)
         record["maxTeamSize"] = Int64(5)
 
-        let savedRecord = try await publicDB.save(record)
-        return savedRecord.recordID.recordName
+        do {
+            let savedRecord = try await publicDB.save(record)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: "Challenge", recordID: savedRecord.recordID.recordName, database: publicDB.debugName, duration: duration)
+            return savedRecord.recordID.recordName
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: "Challenge", database: publicDB.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     /// Sync all active challenges from CloudKit
     func syncChallenges() async {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
+        let predicate = NSPredicate(format: "isActive == 1")
+        let query = CKQuery(recordType: "Challenge", predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: "endDate", ascending: true)]
+        
+        logger.logQueryStart(query: query, database: publicDB.debugName)
+        
         do {
-            let predicate = NSPredicate(format: "isActive == 1")
-            let query = CKQuery(recordType: "Challenge", predicate: predicate)
-            query.sortDescriptors = [NSSortDescriptor(key: "endDate", ascending: true)]
-
             let (matchResults, _) = try await publicDB.records(matching: query)
 
             var challenges: [Challenge] = []
@@ -74,9 +91,13 @@ class CloudKitChallengeManager: ObservableObject {
             await MainActor.run {
                 self.activeChallenges = challenges
             }
-
+            
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: challenges.count, database: publicDB.debugName, duration: duration)
             print("✅ Synced \(challenges.count) active challenges from CloudKit")
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: publicDB.debugName, error: error, duration: duration)
             print("❌ Failed to sync challenges: \(error)")
         }
     }
@@ -86,13 +107,22 @@ class CloudKitChallengeManager: ObservableObject {
     /// Track user's challenge progress
     func updateUserProgress(challengeID: String, progress: Double) async throws {
         guard let userID = getCurrentUserID() else { return }
-
+        
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
         let recordID = CKRecord.ID(recordName: "\(userID)_\(challengeID)")
+        
+        logger.logFetchStart(recordType: "UserChallenge", database: privateDB.debugName)
 
         let record: CKRecord
         do {
             record = try await privateDB.record(for: recordID)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: "UserChallenge", recordCount: 1, database: privateDB.debugName, duration: duration)
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: "UserChallenge", database: privateDB.debugName, error: error, duration: duration)
+            
             // Create new progress record
             record = CKRecord(recordType: "UserChallenge", recordID: recordID)
             record["userID"] = userID
@@ -117,41 +147,65 @@ class CloudKitChallengeManager: ObservableObject {
             }
         }
 
-        _ = try await privateDB.save(record)
-        print("✅ Updated progress for challenge \(challengeID): \(progress * 100)%")
+        let saveStartTime = Date()
+        logger.logSaveStart(recordType: "UserChallenge", database: privateDB.debugName)
+        
+        do {
+            _ = try await privateDB.save(record)
+            let duration = Date().timeIntervalSince(saveStartTime)
+            logger.logSaveSuccess(recordType: "UserChallenge", recordID: recordID.recordName, database: privateDB.debugName, duration: duration)
+            print("✅ Updated progress for challenge \(challengeID): \(progress * 100)%")
+        } catch {
+            let duration = Date().timeIntervalSince(saveStartTime)
+            logger.logSaveFailure(recordType: "UserChallenge", database: privateDB.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     /// Get user's challenge progress
     func getUserChallengeProgress() async throws -> [CloudKitUserChallenge] {
         guard let userID = getCurrentUserID() else { return [] }
+        
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
 
         let predicate = NSPredicate(format: "userID == %@", userID)
         let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
+        
+        logger.logQueryStart(query: query, database: privateDB.debugName)
 
-        let (matchResults, _) = try await privateDB.records(matching: query)
+        do {
+            let (matchResults, _) = try await privateDB.records(matching: query)
 
-        var userChallenges: [CloudKitUserChallenge] = []
-        for (_, result) in matchResults {
-            if let record = try? result.get() {
-                let userChallenge = CloudKitUserChallenge(
-                    userID: record["userID"] as? String ?? "",
-                    challengeID: (record["challengeID"] as? CKRecord.Reference)?.recordID.recordName ?? "",
-                    status: record["status"] as? String ?? "pending",
-                    progress: record["progress"] as? Double ?? 0,
-                    startedAt: record["startedAt"] as? Date,
-                    completedAt: record["completedAt"] as? Date,
-                    earnedPoints: Int(record["earnedPoints"] as? Int64 ?? 0),
-                    earnedCoins: Int(record["earnedCoins"] as? Int64 ?? 0)
-                )
-                userChallenges.append(userChallenge)
+            var userChallenges: [CloudKitUserChallenge] = []
+            for (_, result) in matchResults {
+                if let record = try? result.get() {
+                    let userChallenge = CloudKitUserChallenge(
+                        userID: record["userID"] as? String ?? "",
+                        challengeID: (record["challengeID"] as? CKRecord.Reference)?.recordID.recordName ?? "",
+                        status: record["status"] as? String ?? "pending",
+                        progress: record["progress"] as? Double ?? 0,
+                        startedAt: record["startedAt"] as? Date,
+                        completedAt: record["completedAt"] as? Date,
+                        earnedPoints: Int(record["earnedPoints"] as? Int64 ?? 0),
+                        earnedCoins: Int(record["earnedCoins"] as? Int64 ?? 0)
+                    )
+                    userChallenges.append(userChallenge)
+                }
             }
-        }
 
-        await MainActor.run {
-            self.userChallenges = userChallenges
+            await MainActor.run {
+                self.userChallenges = userChallenges
+            }
+            
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: userChallenges.count, database: privateDB.debugName, duration: duration)
+            return userChallenges
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: privateDB.debugName, error: error, duration: duration)
+            throw error
         }
-
-        return userChallenges
     }
 
     // MARK: - Team Management
@@ -159,6 +213,10 @@ class CloudKitChallengeManager: ObservableObject {
     /// Create a new team
     func createTeam(name: String, description: String, challengeID: String) async throws -> CloudKitTeam {
         guard let userID = getCurrentUserID() else { throw CloudKitTeamError.notAuthenticated }
+        
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: "Team", database: publicDB.debugName)
 
         let teamID = UUID().uuidString
         let record = CKRecord(recordType: "Team", recordID: CKRecord.ID(recordName: teamID))
@@ -175,101 +233,171 @@ class CloudKitChallengeManager: ObservableObject {
         record["isPublic"] = 1
         record["maxMembers"] = Int64(5)
 
-        let savedRecord = try await publicDB.save(record)
+        do {
+            let savedRecord = try await publicDB.save(record)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: "Team", recordID: savedRecord.recordID.recordName, database: publicDB.debugName, duration: duration)
+            
+            let team = CloudKitTeam(
+                id: teamID,
+                name: name,
+                description: description,
+                captainID: userID,
+                memberIDs: [userID],
+                challengeID: challengeID,
+                totalPoints: 0,
+                createdAt: Date(),
+                inviteCode: record["inviteCode"] as? String ?? "",
+                isPublic: true,
+                maxMembers: 5
+            )
 
-        let team = CloudKitTeam(
-            id: teamID,
-            name: name,
-            description: description,
-            captainID: userID,
-            memberIDs: [userID],
-            challengeID: challengeID,
-            totalPoints: 0,
-            createdAt: Date(),
-            inviteCode: record["inviteCode"] as? String ?? "",
-            isPublic: true,
-            maxMembers: 5
-        )
+            await MainActor.run {
+                self.teams.append(team)
+            }
 
-        await MainActor.run {
-            self.teams.append(team)
+            return team
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: "Team", database: publicDB.debugName, error: error, duration: duration)
+            throw error
         }
-
-        return team
     }
 
     /// Join a team
     func joinTeam(inviteCode: String) async throws -> CloudKitTeam {
         guard let userID = getCurrentUserID() else { throw CloudKitTeamError.notAuthenticated }
+        
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
 
         let predicate = NSPredicate(format: "inviteCode == %@", inviteCode)
         let query = CKQuery(recordType: "Team", predicate: predicate)
+        
+        logger.logQueryStart(query: query, database: publicDB.debugName)
 
-        let (matchResults, _) = try await publicDB.records(matching: query)
+        do {
+            let (matchResults, _) = try await publicDB.records(matching: query)
+            
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: matchResults.count, database: publicDB.debugName, duration: duration)
 
-        guard let record = try? matchResults.first?.1.get() else {
-            throw CloudKitTeamError.invalidInviteCode
-        }
-
-        var memberIDs = (record["memberIDs"] as? [String]) ?? []
-        let maxMembers = Int(record["maxMembers"] as? Int64 ?? 5)
-
-        guard !memberIDs.contains(userID) else {
-            throw CloudKitTeamError.alreadyMember
-        }
-
-        guard memberIDs.count < maxMembers else {
-            throw CloudKitTeamError.teamFull
-        }
-
-        memberIDs.append(userID)
-        record["memberIDs"] = memberIDs
-
-        _ = try await publicDB.save(record)
-
-        let team = parseTeamFromRecord(record)
-
-        await MainActor.run {
-            if let index = self.teams.firstIndex(where: { $0.id == team.id }) {
-                self.teams[index] = team
-            } else {
-                self.teams.append(team)
+            guard let record = try? matchResults.first?.1.get() else {
+                throw CloudKitTeamError.invalidInviteCode
             }
-        }
 
-        return team
+            var memberIDs = (record["memberIDs"] as? [String]) ?? []
+            let maxMembers = Int(record["maxMembers"] as? Int64 ?? 5)
+
+            guard !memberIDs.contains(userID) else {
+                throw CloudKitTeamError.alreadyMember
+            }
+
+            guard memberIDs.count < maxMembers else {
+                throw CloudKitTeamError.teamFull
+            }
+
+            memberIDs.append(userID)
+            record["memberIDs"] = memberIDs
+            
+            let saveStartTime = Date()
+            logger.logSaveStart(recordType: "Team", database: publicDB.debugName)
+            
+            do {
+                _ = try await publicDB.save(record)
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveSuccess(recordType: "Team", recordID: record.recordID.recordName, database: publicDB.debugName, duration: saveDuration)
+                
+                let team = parseTeamFromRecord(record)
+
+                await MainActor.run {
+                    if let index = self.teams.firstIndex(where: { $0.id == team.id }) {
+                        self.teams[index] = team
+                    } else {
+                        self.teams.append(team)
+                    }
+                }
+
+                return team
+            } catch {
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveFailure(recordType: "Team", database: publicDB.debugName, error: error, duration: saveDuration)
+                throw error
+            }
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: publicDB.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     /// Update team points
     func updateTeamPoints(teamID: String, additionalPoints: Int) async throws {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
         let recordID = CKRecord.ID(recordName: teamID)
-        let record = try await publicDB.record(for: recordID)
-
-        let currentPoints = Int(record["totalPoints"] as? Int64 ?? 0)
-        record["totalPoints"] = Int64(currentPoints + additionalPoints)
-
-        _ = try await publicDB.save(record)
-
-        // Send notification to team members
-        await notifyTeamMembers(teamID: teamID, message: "Your team earned \(additionalPoints) points!")
+        
+        logger.logFetchStart(recordType: "Team", database: publicDB.debugName)
+        
+        do {
+            let record = try await publicDB.record(for: recordID)
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: "Team", recordCount: 1, database: publicDB.debugName, duration: fetchDuration)
+            
+            let currentPoints = Int(record["totalPoints"] as? Int64 ?? 0)
+            record["totalPoints"] = Int64(currentPoints + additionalPoints)
+            
+            let saveStartTime = Date()
+            logger.logSaveStart(recordType: "Team", database: publicDB.debugName)
+            
+            do {
+                _ = try await publicDB.save(record)
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveSuccess(recordType: "Team", recordID: recordID.recordName, database: publicDB.debugName, duration: saveDuration)
+                
+                // Send notification to team members
+                await notifyTeamMembers(teamID: teamID, message: "Your team earned \(additionalPoints) points!")
+            } catch {
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveFailure(recordType: "Team", database: publicDB.debugName, error: error, duration: saveDuration)
+                throw error
+            }
+        } catch {
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: "Team", database: publicDB.debugName, error: error, duration: fetchDuration)
+            throw error
+        }
     }
 
     /// Get team leaderboard
     func getTeamLeaderboard(challengeID: String) async throws -> [CloudKitTeam] {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
         let predicate = NSPredicate(format: "challengeID == %@", CKRecord.Reference(recordID: CKRecord.ID(recordName: challengeID), action: .none))
         let query = CKQuery(recordType: "Team", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "totalPoints", ascending: false)]
+        
+        logger.logQueryStart(query: query, database: publicDB.debugName)
 
-        let (matchResults, _) = try await publicDB.records(matching: query, resultsLimit: 100)
+        do {
+            let (matchResults, _) = try await publicDB.records(matching: query, resultsLimit: 100)
 
-        var teams: [CloudKitTeam] = []
-        for (_, result) in matchResults {
-            if let record = try? result.get() {
-                teams.append(parseTeamFromRecord(record))
+            var teams: [CloudKitTeam] = []
+            for (_, result) in matchResults {
+                if let record = try? result.get() {
+                    teams.append(parseTeamFromRecord(record))
+                }
             }
+            
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: teams.count, database: publicDB.debugName, duration: duration)
+            return teams
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: publicDB.debugName, error: error, duration: duration)
+            throw error
         }
-
-        return teams
     }
 
     // MARK: - Awards and Metrics
@@ -277,6 +405,10 @@ class CloudKitChallengeManager: ObservableObject {
     /// Track achievement earned
     func trackAchievement(type: String, name: String, description: String) async throws {
         guard let userID = getCurrentUserID() else { return }
+        
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: "Achievement", database: privateDB.debugName)
 
         let record = CKRecord(recordType: "Achievement")
         record["id"] = UUID().uuidString
@@ -287,21 +419,38 @@ class CloudKitChallengeManager: ObservableObject {
         record["earnedAt"] = Date()
         record["rarity"] = calculateRarity(type: type)
 
-        _ = try await privateDB.save(record)
-        print("✅ Achievement tracked: \(name)")
+        do {
+            _ = try await privateDB.save(record)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: "Achievement", recordID: record.recordID.recordName, database: privateDB.debugName, duration: duration)
+            print("✅ Achievement tracked: \(name)")
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: "Achievement", database: privateDB.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     /// Update leaderboard
     func updateLeaderboard(points: Int) async throws {
         guard let userID = getCurrentUserID(),
               let userName = UnifiedAuthManager.shared.currentUser?.displayName else { return }
-
+        
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
         let recordID = CKRecord.ID(recordName: "leaderboard_\(userID)")
+        
+        logger.logFetchStart(recordType: "Leaderboard", database: publicDB.debugName)
 
         let record: CKRecord
         do {
             record = try await publicDB.record(for: recordID)
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: "Leaderboard", recordCount: 1, database: publicDB.debugName, duration: fetchDuration)
         } catch {
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: "Leaderboard", database: publicDB.debugName, error: error, duration: fetchDuration)
+            
             record = CKRecord(recordType: "Leaderboard", recordID: recordID)
             record["userID"] = userID
             record["userName"] = userName
@@ -317,9 +466,20 @@ class CloudKitChallengeManager: ObservableObject {
 
         let monthlyPoints = Int(record["monthlyPoints"] as? Int64 ?? 0)
         record["monthlyPoints"] = Int64(monthlyPoints + points)
-
-        _ = try await publicDB.save(record)
-        print("✅ Leaderboard updated with \(points) points")
+        
+        let saveStartTime = Date()
+        logger.logSaveStart(recordType: "Leaderboard", database: publicDB.debugName)
+        
+        do {
+            _ = try await publicDB.save(record)
+            let saveDuration = Date().timeIntervalSince(saveStartTime)
+            logger.logSaveSuccess(recordType: "Leaderboard", recordID: recordID.recordName, database: publicDB.debugName, duration: saveDuration)
+            print("✅ Leaderboard updated with \(points) points")
+        } catch {
+            let saveDuration = Date().timeIntervalSince(saveStartTime)
+            logger.logSaveFailure(recordType: "Leaderboard", database: publicDB.debugName, error: error, duration: saveDuration)
+            throw error
+        }
     }
 
     // MARK: - Helper Methods
@@ -397,13 +557,35 @@ class CloudKitChallengeManager: ObservableObject {
     }
 
     private func incrementChallengeCompletions(_ challengeID: String) async {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        let recordID = CKRecord.ID(recordName: challengeID)
+        
+        logger.logFetchStart(recordType: "Challenge", database: publicDB.debugName)
+        
         do {
-            let recordID = CKRecord.ID(recordName: challengeID)
             let record = try await publicDB.record(for: recordID)
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: "Challenge", recordCount: 1, database: publicDB.debugName, duration: fetchDuration)
+            
             let currentCount = record["completionCount"] as? Int64 ?? 0
             record["completionCount"] = currentCount + 1
-            _ = try await publicDB.save(record)
+            
+            let saveStartTime = Date()
+            logger.logSaveStart(recordType: "Challenge", database: publicDB.debugName)
+            
+            do {
+                _ = try await publicDB.save(record)
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveSuccess(recordType: "Challenge", recordID: recordID.recordName, database: publicDB.debugName, duration: saveDuration)
+            } catch {
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveFailure(recordType: "Challenge", database: publicDB.debugName, error: error, duration: saveDuration)
+                print("Failed to increment challenge completions: \(error)")
+            }
         } catch {
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: "Challenge", database: publicDB.debugName, error: error, duration: fetchDuration)
             print("Failed to increment challenge completions: \(error)")
         }
     }

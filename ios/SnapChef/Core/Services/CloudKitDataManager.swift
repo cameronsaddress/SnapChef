@@ -53,16 +53,26 @@ final class CloudKitDataManager: ObservableObject {
         record["mealPlanningGoals"] = preferences.mealPlanningGoals
         record["lastUpdated"] = Date()
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: "FoodPreference", database: privateDB.debugName)
+        
         do {
             _ = try await saveRecordWithRetry(record: record, database: privateDB, maxRetries: 2)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: "FoodPreference", recordID: record.recordID.recordName, database: privateDB.debugName, duration: duration)
             print("✅ Preferences synced to CloudKit")
         } catch let error as CKError {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: "FoodPreference", database: privateDB.debugName, error: error, duration: duration)
             let snapChefError = CloudKitErrorHandler.snapChefError(from: error)
             let errorMessage = "Failed to sync preferences: \(snapChefError.userFriendlyMessage)"
             syncErrors.append(errorMessage)
             ErrorAnalytics.logError(snapChefError, context: "user_preferences_sync")
             throw snapChefError
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: "FoodPreference", database: privateDB.debugName, error: error, duration: duration)
             let errorMessage = "Failed to sync preferences: \(error.localizedDescription)"
             syncErrors.append(errorMessage)
             let snapChefError = SnapChefError.syncError(errorMessage)
@@ -78,8 +88,15 @@ final class CloudKitDataManager: ObservableObject {
         let query = CKQuery(recordType: "FoodPreference", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "lastUpdated", ascending: false)]
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logQueryStart(query: query, database: privateDB.debugName)
+        
         do {
             let (matchResults, _) = try await fetchRecordsWithRetry(query: query, database: privateDB, maxRetries: 2)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: matchResults.count, database: privateDB.debugName, duration: duration)
+            
             guard let recordResult = matchResults.first?.1,
                   let record = try? recordResult.get() else { 
                 print("No preferences found in CloudKit, returning local cache")
@@ -102,12 +119,16 @@ final class CloudKitDataManager: ObservableObject {
 
             return preferences
         } catch let error as CKError {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: privateDB.debugName, error: error, duration: duration)
             let snapChefError = CloudKitErrorHandler.snapChefError(from: error)
             print("❌ Failed to fetch preferences: \(snapChefError.userFriendlyMessage)")
             ErrorAnalytics.logError(snapChefError, context: "user_preferences_fetch")
             // Return cached version on CloudKit errors
             return loadLocalPreferences()
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: privateDB.debugName, error: error, duration: duration)
             print("❌ Failed to fetch preferences: \(error.localizedDescription)")
             let snapChefError = SnapChefError.syncError("Failed to fetch preferences: \(error.localizedDescription)")
             ErrorAnalytics.logError(snapChefError, context: "user_preferences_fetch_unexpected")
@@ -134,10 +155,18 @@ final class CloudKitDataManager: ObservableObject {
 
         // Fire and forget
         Task {
+            let logger = CloudKitDebugLogger.shared
+            let startTime = Date()
+            logger.logSaveStart(recordType: "CameraSession", database: privateDB.debugName)
+            
             do {
                 _ = try await privateDB.save(record)
+                let duration = Date().timeIntervalSince(startTime)
+                logger.logSaveSuccess(recordType: "CameraSession", recordID: record.recordID.recordName, database: privateDB.debugName, duration: duration)
                 print("📸 Camera session tracked")
             } catch {
+                let duration = Date().timeIntervalSince(startTime)
+                logger.logSaveFailure(recordType: "CameraSession", database: privateDB.debugName, error: error, duration: duration)
                 print("Failed to track camera session: \(error)")
             }
         }
@@ -159,10 +188,18 @@ final class CloudKitDataManager: ObservableObject {
         record["timestamp"] = Date()
 
         Task {
+            let logger = CloudKitDebugLogger.shared
+            let startTime = Date()
+            logger.logSaveStart(recordType: "RecipeGeneration", database: privateDB.debugName)
+            
             do {
                 _ = try await privateDB.save(record)
+                let duration = Date().timeIntervalSince(startTime)
+                logger.logSaveSuccess(recordType: "RecipeGeneration", recordID: record.recordID.recordName, database: privateDB.debugName, duration: duration)
                 print("🍳 Recipe generation tracked")
             } catch {
+                let duration = Date().timeIntervalSince(startTime)
+                logger.logSaveFailure(recordType: "RecipeGeneration", database: privateDB.debugName, error: error, duration: duration)
                 print("Failed to track recipe generation: \(error)")
             }
         }
@@ -203,10 +240,18 @@ final class CloudKitDataManager: ObservableObject {
         record["appVersion"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
 
         Task {
+            let logger = CloudKitDebugLogger.shared
+            let startTime = Date()
+            logger.logSaveStart(recordType: "AppSession", database: privateDB.debugName)
+            
             do {
                 _ = try await privateDB.save(record)
+                let logDuration = Date().timeIntervalSince(startTime)
+                logger.logSaveSuccess(recordType: "AppSession", recordID: record.recordID.recordName, database: privateDB.debugName, duration: logDuration)
                 print("📱 App session tracked: \(duration)s")
             } catch {
+                let logDuration = Date().timeIntervalSince(startTime)
+                logger.logSaveFailure(recordType: "AppSession", database: privateDB.debugName, error: error, duration: logDuration)
                 print("Failed to track app session: \(error)")
             }
         }
@@ -245,9 +290,17 @@ final class CloudKitDataManager: ObservableObject {
         record["timestamp"] = Date()
 
         Task {
+            let logger = CloudKitDebugLogger.shared
+            let startTime = Date()
+            logger.logSaveStart(recordType: "SearchHistory", database: privateDB.debugName)
+            
             do {
                 _ = try await privateDB.save(record)
+                let duration = Date().timeIntervalSince(startTime)
+                logger.logSaveSuccess(recordType: "SearchHistory", recordID: record.recordID.recordName, database: privateDB.debugName, duration: duration)
             } catch {
+                let duration = Date().timeIntervalSince(startTime)
+                logger.logSaveFailure(recordType: "SearchHistory", database: privateDB.debugName, error: error, duration: duration)
                 print("Failed to track search: \(error)")
             }
         }
@@ -269,10 +322,18 @@ final class CloudKitDataManager: ObservableObject {
         record["resolved"] = 0
 
         Task {
+            let logger = CloudKitDebugLogger.shared
+            let startTime = Date()
+            logger.logSaveStart(recordType: "ErrorLog", database: privateDB.debugName)
+            
             do {
                 _ = try await privateDB.save(record)
+                let duration = Date().timeIntervalSince(startTime)
+                logger.logSaveSuccess(recordType: "ErrorLog", recordID: record.recordID.recordName, database: privateDB.debugName, duration: duration)
                 print("🚨 Error logged: \(error.type)")
             } catch {
+                let duration = Date().timeIntervalSince(startTime)
+                logger.logSaveFailure(recordType: "ErrorLog", database: privateDB.debugName, error: error, duration: duration)
                 print("Failed to log error: \(error)")
             }
         }
@@ -294,10 +355,18 @@ final class CloudKitDataManager: ObservableObject {
         record["appVersion"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         record["lastSync"] = Date()
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: "DeviceSync", database: privateDB.debugName)
+        
         do {
             _ = try await privateDB.save(record)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: "DeviceSync", recordID: record.recordID.recordName, database: privateDB.debugName, duration: duration)
             print("📱 Device registered: \(deviceID)")
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: "DeviceSync", database: privateDB.debugName, error: error, duration: duration)
             throw error
         }
     }
@@ -317,10 +386,13 @@ final class CloudKitDataManager: ObservableObject {
         notificationInfo.shouldSendContentAvailable = true
         preferenceSubscription.notificationInfo = notificationInfo
 
-        privateDB.save(preferenceSubscription) { _, error in
+        privateDB.save(preferenceSubscription) { subscription, error in
+            let logger = CloudKitDebugLogger.shared
             if let error = error {
+                logger.logSubscriptionFailed(subscriptionID: "preference-updates-subscription", recordType: "FoodPreference", database: self.privateDB.debugName, error: error)
                 print("Failed to setup subscription: \(error)")
             } else {
+                logger.logSubscriptionCreated(subscriptionID: "preference-updates-subscription", recordType: "FoodPreference", database: self.privateDB.debugName)
                 print("✅ Subscribed to preference updates")
             }
         }

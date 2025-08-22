@@ -37,6 +37,10 @@ final class CloudKitSyncService: ObservableObject {
         guard let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
             throw UnifiedAuthError.notAuthenticated
         }
+        
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
 
         let recipeRecord = CKRecord(recordType: CloudKitConfig.recipeRecordType, recordID: CKRecord.ID(recordName: recipe.id.uuidString))
 
@@ -73,35 +77,56 @@ final class CloudKitSyncService: ObservableObject {
         }
 
         // Save to CloudKit
-        let savedRecord = try await publicDatabase.save(recipeRecord)
+        do {
+            let savedRecord = try await publicDatabase.save(recipeRecord)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: CloudKitConfig.recipeRecordType, recordID: savedRecord.recordID.recordName, database: publicDatabase.debugName, duration: duration)
+            
+            // Update share count
+            await incrementShareCount(for: recipe.id.uuidString)
 
-        // Update share count
-        await incrementShareCount(for: recipe.id.uuidString)
+            // Create activity for followers
+            // Note: In a real app, you'd create activities for all followers
+            // For now, we'll just log it
+            try await createActivity(
+                type: "recipeShared",
+                actorID: userID,
+                recipeID: recipe.id.uuidString,
+                recipeName: recipe.name
+            )
 
-        // Create activity for followers
-        // Note: In a real app, you'd create activities for all followers
-        // For now, we'll just log it
-        try await createActivity(
-            type: "recipeShared",
-            actorID: userID,
-            recipeID: recipe.id.uuidString,
-            recipeName: recipe.name
-        )
-
-        return savedRecord.recordID.recordName
+            return savedRecord.recordID.recordName
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     func fetchRecipe(by recordID: String) async throws -> (Recipe, CKRecord) {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
         let recipeRecordID = CKRecord.ID(recordName: recordID)
-        let record = try await publicDatabase.record(for: recipeRecordID)
+        
+        logger.logFetchStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
+        
+        do {
+            let record = try await publicDatabase.record(for: recipeRecordID)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: CloudKitConfig.recipeRecordType, recordCount: 1, database: publicDatabase.debugName, duration: duration)
+            
+            // Parse recipe from CloudKit record
+            let recipe = try parseRecipeFromRecord(record)
 
-        // Parse recipe from CloudKit record
-        let recipe = try parseRecipeFromRecord(record)
+            // Increment view count
+            await incrementViewCount(for: recordID)
 
-        // Increment view count
-        await incrementViewCount(for: recordID)
-
-        return (recipe, record)
+            return (recipe, record)
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     private func parseRecipeFromRecord(_ record: CKRecord) throws -> Recipe {
@@ -159,23 +184,67 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     private func incrementShareCount(for recipeID: String) async {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
+        logger.logFetchStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
+        
         do {
             let record = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: CloudKitConfig.recipeRecordType, recordCount: 1, database: publicDatabase.debugName, duration: fetchDuration)
+            
             let currentCount = record[CKField.Recipe.shareCount] as? Int64 ?? 0
             record[CKField.Recipe.shareCount] = currentCount + 1
-            try await publicDatabase.save(record)
+            
+            let saveStartTime = Date()
+            logger.logSaveStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
+            
+            do {
+                try await publicDatabase.save(record)
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveSuccess(recordType: CloudKitConfig.recipeRecordType, recordID: recipeID, database: publicDatabase.debugName, duration: saveDuration)
+            } catch {
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveFailure(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName, error: error, duration: saveDuration)
+                print("Failed to increment share count: \(error)")
+            }
         } catch {
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName, error: error, duration: fetchDuration)
             print("Failed to increment share count: \(error)")
         }
     }
 
     private func incrementViewCount(for recipeID: String) async {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
+        logger.logFetchStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
+        
         do {
             let record = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: CloudKitConfig.recipeRecordType, recordCount: 1, database: publicDatabase.debugName, duration: fetchDuration)
+            
             let currentCount = record[CKField.Recipe.viewCount] as? Int64 ?? 0
             record[CKField.Recipe.viewCount] = currentCount + 1
-            try await publicDatabase.save(record)
+            
+            let saveStartTime = Date()
+            logger.logSaveStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
+            
+            do {
+                try await publicDatabase.save(record)
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveSuccess(recordType: CloudKitConfig.recipeRecordType, recordID: recipeID, database: publicDatabase.debugName, duration: saveDuration)
+            } catch {
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveFailure(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName, error: error, duration: saveDuration)
+                print("Failed to increment view count: \(error)")
+            }
         } catch {
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName, error: error, duration: fetchDuration)
             print("Failed to increment view count: \(error)")
         }
     }
@@ -192,6 +261,10 @@ final class CloudKitSyncService: ObservableObject {
         if isLiked {
             return // Already liked
         }
+        
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: CloudKitConfig.recipeLikeRecordType, database: publicDatabase.debugName)
 
         // Create like record
         let like = CKRecord(recordType: CloudKitConfig.recipeLikeRecordType)
@@ -200,29 +273,37 @@ final class CloudKitSyncService: ObservableObject {
         like[CKField.RecipeLike.recipeOwnerID] = recipeOwnerID
         like[CKField.RecipeLike.likedAt] = Date()
 
-        try await publicDatabase.save(like)
-
-        // Update recipe like count
-        await updateRecipeLikeCount(recipeID, increment: true)
-
-        // Create activity for recipe owner
-        if userID != recipeOwnerID {
-            // Get recipe name for the activity
-            var recipeName: String?
-            do {
-                let recipeRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
-                recipeName = recipeRecord[CKField.Recipe.title] as? String
-            } catch {
-                print("⚠️ Could not fetch recipe name for activity: \(error)")
-            }
+        do {
+            try await publicDatabase.save(like)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: CloudKitConfig.recipeLikeRecordType, recordID: like.recordID.recordName, database: publicDatabase.debugName, duration: duration)
             
-            try await createActivity(
-                type: "recipeLiked",
-                actorID: userID,
-                targetUserID: recipeOwnerID,
-                recipeID: recipeID,
-                recipeName: recipeName
-            )
+            // Update recipe like count
+            await updateRecipeLikeCount(recipeID, increment: true)
+
+            // Create activity for recipe owner
+            if userID != recipeOwnerID {
+                // Get recipe name for the activity
+                var recipeName: String?
+                do {
+                    let recipeRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
+                    recipeName = recipeRecord[CKField.Recipe.title] as? String
+                } catch {
+                    print("⚠️ Could not fetch recipe name for activity: \(error)")
+                }
+                
+                try await createActivity(
+                    type: "recipeLiked",
+                    actorID: userID,
+                    targetUserID: recipeOwnerID,
+                    recipeID: recipeID,
+                    recipeName: recipeName
+                )
+            }
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: CloudKitConfig.recipeLikeRecordType, database: publicDatabase.debugName, error: error, duration: duration)
+            throw error
         }
     }
 
@@ -230,60 +311,126 @@ final class CloudKitSyncService: ObservableObject {
         guard let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
             throw UnifiedAuthError.notAuthenticated
         }
+        
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
 
         // Find the like record
         let predicate = NSPredicate(format: "%K == %@ AND %K == %@",
                                   CKField.RecipeLike.userID, userID,
                                   CKField.RecipeLike.recipeID, recipeID)
         let query = CKQuery(recordType: CloudKitConfig.recipeLikeRecordType, predicate: predicate)
+        
+        logger.logQueryStart(query: query, database: publicDatabase.debugName)
 
-        let results = try await publicDatabase.records(matching: query)
+        do {
+            let results = try await publicDatabase.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: publicDatabase.debugName, duration: duration)
 
-        // Delete the like record
-        for (recordID, result) in results.matchResults {
-            if case .success = result {
-                try await publicDatabase.deleteRecord(withID: recordID)
+            // Delete the like record
+            for (recordID, result) in results.matchResults {
+                if case .success = result {
+                    let deleteStartTime = Date()
+                    logger.logDeleteStart(recordType: CloudKitConfig.recipeLikeRecordType, recordID: recordID.recordName, database: publicDatabase.debugName)
+                    
+                    do {
+                        try await publicDatabase.deleteRecord(withID: recordID)
+                        let deleteDuration = Date().timeIntervalSince(deleteStartTime)
+                        logger.logDeleteSuccess(recordType: CloudKitConfig.recipeLikeRecordType, recordID: recordID.recordName, database: publicDatabase.debugName, duration: deleteDuration)
+                    } catch {
+                        let deleteDuration = Date().timeIntervalSince(deleteStartTime)
+                        logger.logDeleteFailure(recordType: CloudKitConfig.recipeLikeRecordType, recordID: recordID.recordName, database: publicDatabase.debugName, error: error, duration: deleteDuration)
+                        throw error
+                    }
+                }
             }
-        }
 
-        // Update recipe like count
-        await updateRecipeLikeCount(recipeID, increment: false)
+            // Update recipe like count
+            await updateRecipeLikeCount(recipeID, increment: false)
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: publicDatabase.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     func isRecipeLiked(_ recipeID: String) async throws -> Bool {
         guard let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
             return false
         }
+        
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
 
         let predicate = NSPredicate(format: "%K == %@ AND %K == %@",
                                   CKField.RecipeLike.userID, userID,
                                   CKField.RecipeLike.recipeID, recipeID)
         let query = CKQuery(recordType: CloudKitConfig.recipeLikeRecordType, predicate: predicate)
+        
+        logger.logQueryStart(query: query, database: publicDatabase.debugName)
 
-        let results = try await publicDatabase.records(matching: query)
-        return !results.matchResults.isEmpty
+        do {
+            let results = try await publicDatabase.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: publicDatabase.debugName, duration: duration)
+            return !results.matchResults.isEmpty
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: publicDatabase.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     func getRecipeLikeCount(_ recipeID: String) async throws -> Int {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
         // Get like count directly from Recipe record for efficiency
+        logger.logFetchStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
+        
         do {
             let recordID = CKRecord.ID(recordName: recipeID)
             let record = try await publicDatabase.record(for: recordID)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: CloudKitConfig.recipeRecordType, recordCount: 1, database: publicDatabase.debugName, duration: duration)
             return Int(record[CKField.Recipe.likeCount] as? Int64 ?? 0)
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName, error: error, duration: duration)
+            
             // Fallback to counting RecipeLike records if Recipe record not found
+            let fallbackStartTime = Date()
             let predicate = NSPredicate(format: "%K == %@", CKField.RecipeLike.recipeID, recipeID)
             let query = CKQuery(recordType: CloudKitConfig.recipeLikeRecordType, predicate: predicate)
-            let results = try await publicDatabase.records(matching: query)
-            return results.matchResults.count
+            
+            logger.logQueryStart(query: query, database: publicDatabase.debugName)
+            
+            do {
+                let results = try await publicDatabase.records(matching: query)
+                let fallbackDuration = Date().timeIntervalSince(fallbackStartTime)
+                logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: publicDatabase.debugName, duration: fallbackDuration)
+                return results.matchResults.count
+            } catch {
+                let fallbackDuration = Date().timeIntervalSince(fallbackStartTime)
+                logger.logQueryFailure(query: query, database: publicDatabase.debugName, error: error, duration: fallbackDuration)
+                throw error
+            }
         }
     }
 
     private func updateRecipeLikeCount(_ recipeID: String, increment: Bool) async {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
+        logger.logFetchStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
+        
         do {
             // Fetch the recipe record from CloudKit
             let recordID = CKRecord.ID(recordName: recipeID)
             let record = try await publicDatabase.record(for: recordID)
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: CloudKitConfig.recipeRecordType, recordCount: 1, database: publicDatabase.debugName, duration: fetchDuration)
             
             // Update the like count
             let currentCount = record[CKField.Recipe.likeCount] as? Int64 ?? 0
@@ -291,10 +438,24 @@ final class CloudKitSyncService: ObservableObject {
             record[CKField.Recipe.likeCount] = newCount
             
             // Save the updated record back to CloudKit
-            try await publicDatabase.save(record)
+            let saveStartTime = Date()
+            logger.logSaveStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
             
-            print("✅ Recipe \(recipeID) like count \(increment ? "incremented" : "decremented") to \(newCount)")
+            do {
+                try await publicDatabase.save(record)
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveSuccess(recordType: CloudKitConfig.recipeRecordType, recordID: recipeID, database: publicDatabase.debugName, duration: saveDuration)
+                print("✅ Recipe \(recipeID) like count \(increment ? "incremented" : "decremented") to \(newCount)")
+            } catch {
+                let saveDuration = Date().timeIntervalSince(saveStartTime)
+                logger.logSaveFailure(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName, error: error, duration: saveDuration)
+                print("❌ Failed to update recipe like count for \(recipeID): \(error)")
+                // If updating fails, try to sync from RecipeLike records
+                await syncRecipeLikeCountFromRecords(recipeID)
+            }
         } catch {
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName, error: error, duration: fetchDuration)
             print("❌ Failed to update recipe like count for \(recipeID): \(error)")
             // If updating fails, try to sync from RecipeLike records
             await syncRecipeLikeCountFromRecords(recipeID)
@@ -304,21 +465,55 @@ final class CloudKitSyncService: ObservableObject {
     /// Syncs the like count for a recipe by counting RecipeLike records
     /// This method can be used for data consistency and recovery
     private func syncRecipeLikeCountFromRecords(_ recipeID: String) async {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
+        // Count actual RecipeLike records
+        let predicate = NSPredicate(format: "%K == %@", CKField.RecipeLike.recipeID, recipeID)
+        let query = CKQuery(recordType: CloudKitConfig.recipeLikeRecordType, predicate: predicate)
+        
+        logger.logQueryStart(query: query, database: publicDatabase.debugName)
+        
         do {
-            // Count actual RecipeLike records
-            let predicate = NSPredicate(format: "%K == %@", CKField.RecipeLike.recipeID, recipeID)
-            let query = CKQuery(recordType: CloudKitConfig.recipeLikeRecordType, predicate: predicate)
             let results = try await publicDatabase.records(matching: query)
+            let queryDuration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: publicDatabase.debugName, duration: queryDuration)
+            
             let actualLikeCount = Int64(results.matchResults.count)
             
             // Update Recipe record with actual count
-            let recordID = CKRecord.ID(recordName: recipeID)
-            let record = try await publicDatabase.record(for: recordID)
-            record[CKField.Recipe.likeCount] = actualLikeCount
-            try await publicDatabase.save(record)
+            let fetchStartTime = Date()
+            logger.logFetchStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
             
-            print("♾️ Synced recipe \(recipeID) like count to \(actualLikeCount) from RecipeLike records")
+            do {
+                let recordID = CKRecord.ID(recordName: recipeID)
+                let record = try await publicDatabase.record(for: recordID)
+                let fetchDuration = Date().timeIntervalSince(fetchStartTime)
+                logger.logFetchSuccess(recordType: CloudKitConfig.recipeRecordType, recordCount: 1, database: publicDatabase.debugName, duration: fetchDuration)
+                
+                record[CKField.Recipe.likeCount] = actualLikeCount
+                
+                let saveStartTime = Date()
+                logger.logSaveStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
+                
+                do {
+                    try await publicDatabase.save(record)
+                    let saveDuration = Date().timeIntervalSince(saveStartTime)
+                    logger.logSaveSuccess(recordType: CloudKitConfig.recipeRecordType, recordID: recipeID, database: publicDatabase.debugName, duration: saveDuration)
+                    print("♾️ Synced recipe \(recipeID) like count to \(actualLikeCount) from RecipeLike records")
+                } catch {
+                    let saveDuration = Date().timeIntervalSince(saveStartTime)
+                    logger.logSaveFailure(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName, error: error, duration: saveDuration)
+                    print("❌ Failed to sync recipe like count from records for \(recipeID): \(error)")
+                }
+            } catch {
+                let fetchDuration = Date().timeIntervalSince(fetchStartTime)
+                logger.logFetchFailure(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName, error: error, duration: fetchDuration)
+                print("❌ Failed to sync recipe like count from records for \(recipeID): \(error)")
+            }
         } catch {
+            let queryDuration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: publicDatabase.debugName, error: error, duration: queryDuration)
             print("❌ Failed to sync recipe like count from records for \(recipeID): \(error)")
         }
     }
@@ -334,6 +529,10 @@ final class CloudKitSyncService: ObservableObject {
                        targetUserID: String? = nil,
                        recipeID: String? = nil, recipeName: String? = nil,
                        challengeID: String? = nil, challengeName: String? = nil) async throws {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: CloudKitConfig.activityRecordType, database: publicDatabase.debugName)
+        
         let activity = CKRecord(recordType: CloudKitConfig.activityRecordType)
         activity[CKField.Activity.id] = UUID().uuidString
         activity[CKField.Activity.type] = type
@@ -347,37 +546,63 @@ final class CloudKitSyncService: ObservableObject {
         activity[CKField.Activity.timestamp] = Date()
         activity[CKField.Activity.isRead] = Int64(0)
 
-        try await publicDatabase.save(activity)
+        do {
+            try await publicDatabase.save(activity)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: CloudKitConfig.activityRecordType, recordID: activity.recordID.recordName, database: publicDatabase.debugName, duration: duration)
+        } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: CloudKitConfig.activityRecordType, database: publicDatabase.debugName, error: error, duration: duration)
+            throw error
+        }
     }
 
     func fetchActivityFeed(for userID: String, limit: Int = 20) async throws -> [CKRecord] {
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        
         // Fetch activities where user is the target or activities from users they follow
         let predicate = NSPredicate(format: "%K == %@", CKField.Activity.targetUserID, userID)
         let query = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: predicate)
         // Remove timestamp sort descriptor since it may not be sortable in CloudKit
         // query.sortDescriptors = [NSSortDescriptor(key: CKField.Activity.timestamp, ascending: false)]
+        
+        logger.logQueryStart(query: query, database: publicDatabase.debugName)
 
         let operation = CKQueryOperation(query: query)
         operation.resultsLimit = limit
 
         var activities: [CKRecord] = []
 
-        operation.recordMatchedBlock = { _, result in
-            if case .success(let record) = result {
-                activities.append(record)
+        return try await withCheckedThrowingContinuation { continuation in
+            operation.recordMatchedBlock = { _, result in
+                if case .success(let record) = result {
+                    activities.append(record)
+                }
             }
-        }
+            
+            operation.queryResultBlock = { result in
+                let duration = Date().timeIntervalSince(startTime)
+                switch result {
+                case .success:
+                    logger.logQuerySuccess(query: query, resultCount: activities.count, database: self.publicDatabase.debugName, duration: duration)
+                    
+                    // Sort by timestamp in code since it may not be sortable in CloudKit
+                    activities.sort { record1, record2 in
+                        let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+                        let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+                        return date1 > date2 // Descending order (newest first)
+                    }
+                    
+                    continuation.resume(returning: activities)
+                case .failure(let error):
+                    logger.logQueryFailure(query: query, database: self.publicDatabase.debugName, error: error, duration: duration)
+                    continuation.resume(throwing: error)
+                }
+            }
 
-        publicDatabase.add(operation)
-        
-        // Sort by timestamp in code since it may not be sortable in CloudKit
-        activities.sort { record1, record2 in
-            let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
-            let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
-            return date1 > date2 // Descending order (newest first)
+            publicDatabase.add(operation)
         }
-        
-        return activities
     }
 
     func markActivityAsRead(_ activityID: String) async throws {

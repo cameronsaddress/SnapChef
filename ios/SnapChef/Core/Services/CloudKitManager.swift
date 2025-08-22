@@ -253,7 +253,13 @@ class CloudKitManager: ObservableObject {
         record["imageURL"] = challenge.imageURL
         record["teamBased"] = Int64(0)  // Currently no team-based challenges
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: challengeRecordType, database: publicDatabase.debugName)
+        
         _ = try await publicDatabase.save(record)
+        let duration = Date().timeIntervalSince(startTime)
+        logger.logSaveSuccess(recordType: challengeRecordType, recordID: record.recordID.recordName, database: publicDatabase.debugName, duration: duration)
     }
 
     /// Create or update user challenge participation
@@ -275,7 +281,13 @@ class CloudKitManager: ObservableObject {
         record["notes"] = userChallenge.notes
         record["teamID"] = userChallenge.teamID
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: userChallengeRecordType, database: privateDatabase.debugName)
+        
         _ = try await privateDatabase.save(record)
+        let duration = Date().timeIntervalSince(startTime)
+        logger.logSaveSuccess(recordType: userChallengeRecordType, recordID: record.recordID.recordName, database: privateDatabase.debugName, duration: duration)
     }
 
     /// Update or create leaderboard entry
@@ -314,7 +326,14 @@ class CloudKitManager: ObservableObject {
         }
 
         record["lastUpdated"] = Date()
+        
+        let saveLogger = CloudKitDebugLogger.shared
+        let saveStartTime = Date()
+        saveLogger.logSaveStart(recordType: leaderboardRecordType, database: publicDatabase.debugName)
+        
         _ = try await publicDatabase.save(record)
+        let saveDuration = Date().timeIntervalSince(saveStartTime)
+        saveLogger.logSaveSuccess(recordType: leaderboardRecordType, recordID: record.recordID.recordName, database: publicDatabase.debugName, duration: saveDuration)
     }
 
     /// Save achievement earned by user

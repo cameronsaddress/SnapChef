@@ -22,9 +22,17 @@ class CloudKitStreakManager: ObservableObject {
         let recordID = CKRecord.ID(recordName: "streak_\(streak.type.rawValue)_\(getCurrentUserID())")
 
         let record: CKRecord
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logFetchStart(recordType: "UserStreak", database: privateDB.debugName)
+        
         do {
             record = try await privateDB.record(for: recordID)
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: "UserStreak", recordCount: 1, database: privateDB.debugName, duration: fetchDuration)
         } catch {
+            let fetchDuration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: "UserStreak", database: privateDB.debugName, error: error, duration: fetchDuration)
             record = CKRecord(recordType: "UserStreak", recordID: recordID)
         }
 
@@ -39,10 +47,17 @@ class CloudKitStreakManager: ObservableObject {
         record["insuranceActive"] = streak.insuranceActive ? 1 : 0
         record["multiplier"] = streak.multiplier
 
+        let saveStartTime = Date()
+        logger.logSaveStart(recordType: "UserStreak", database: privateDB.debugName)
+        
         do {
             _ = try await privateDB.save(record)
+            let saveDuration = Date().timeIntervalSince(saveStartTime)
+            logger.logSaveSuccess(recordType: "UserStreak", recordID: recordID.recordName, database: privateDB.debugName, duration: saveDuration)
             print("✅ Streak synced to CloudKit")
         } catch {
+            let saveDuration = Date().timeIntervalSince(saveStartTime)
+            logger.logSaveFailure(recordType: "UserStreak", database: privateDB.debugName, error: error, duration: saveDuration)
             print("❌ Failed to sync streak: \(error)")
         }
     }
@@ -59,10 +74,18 @@ class CloudKitStreakManager: ObservableObject {
         record["breakReason"] = history.breakReason?.rawValue ?? ""
         record["restored"] = history.wasRestored ? 1 : 0
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: "StreakHistory", database: privateDB.debugName)
+        
         do {
             _ = try await privateDB.save(record)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: "StreakHistory", recordID: record.recordID.recordName, database: privateDB.debugName, duration: duration)
             print("📝 Streak break recorded")
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: "StreakHistory", database: privateDB.debugName, error: error, duration: duration)
             print("❌ Failed to record streak break: \(error)")
         }
     }
@@ -78,10 +101,18 @@ class CloudKitStreakManager: ObservableObject {
         record["rewardsClaimed"] = achievement.rewardsClaimed ? 1 : 0
         record["badgeIcon"] = achievement.milestoneBadge
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logSaveStart(recordType: "StreakAchievement", database: publicDB.debugName)
+        
         do {
             _ = try await publicDB.save(record)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveSuccess(recordType: "StreakAchievement", recordID: record.recordID.recordName, database: publicDB.debugName, duration: duration)
             print("🏆 Achievement recorded")
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logSaveFailure(recordType: "StreakAchievement", database: publicDB.debugName, error: error, duration: duration)
             print("❌ Failed to record achievement: \(error)")
         }
     }
@@ -93,8 +124,14 @@ class CloudKitStreakManager: ObservableObject {
         let predicate = NSPredicate(format: "userID == %@", userID)
         let query = CKQuery(recordType: "UserStreak", predicate: predicate)
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logQueryStart(query: query, database: privateDB.debugName)
+        
         do {
             let (matchResults, _) = try await privateDB.records(matching: query)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: matchResults.count, database: privateDB.debugName, duration: duration)
 
             var streaks: [StreakType: StreakData] = [:]
             for (_, result) in matchResults {
@@ -117,6 +154,8 @@ class CloudKitStreakManager: ObservableObject {
 
             return streaks
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: privateDB.debugName, error: error, duration: duration)
             print("❌ Failed to sync streaks: \(error)")
             return [:]
         }
@@ -130,8 +169,14 @@ class CloudKitStreakManager: ObservableObject {
         let query = CKQuery(recordType: "UserStreak", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "currentStreak", ascending: false)]
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logQueryStart(query: query, database: publicDB.debugName)
+        
         do {
             let (matchResults, _) = try await publicDB.records(matching: query, resultsLimit: limit)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQuerySuccess(query: query, resultCount: matchResults.count, database: publicDB.debugName, duration: duration)
 
             var leaderboard: [(userID: String, streak: Int, username: String)] = []
             for (_, result) in matchResults {
@@ -145,6 +190,8 @@ class CloudKitStreakManager: ObservableObject {
 
             return leaderboard
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logQueryFailure(query: query, database: publicDB.debugName, error: error, duration: duration)
             print("❌ Failed to get leaderboard: \(error)")
             return []
         }
@@ -160,10 +207,18 @@ class CloudKitStreakManager: ObservableObject {
         // Fetch username from User record
         let recordID = CKRecord.ID(recordName: userID)
 
+        let logger = CloudKitDebugLogger.shared
+        let startTime = Date()
+        logger.logFetchStart(recordType: "User", database: publicDB.debugName)
+        
         do {
             let record = try await publicDB.record(for: recordID)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: "User", recordCount: 1, database: publicDB.debugName, duration: duration)
             return record["displayName"] as? String ?? "Unknown Chef"
         } catch {
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logFetchFailure(recordType: "User", database: publicDB.debugName, error: error, duration: duration)
             return "Unknown Chef"
         }
     }
