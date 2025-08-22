@@ -1286,6 +1286,26 @@ class CloudKitRecipeManager: ObservableObject {
         return nil
     }
 
+    /// Check if a recipe exists by its ID
+    func checkRecipeExists(_ recipeID: String) async -> Bool {
+        let recordID = CKRecord.ID(recordName: recipeID)
+        
+        do {
+            // Try to fetch from public database first
+            _ = try await publicDB.record(for: recordID)
+            return true
+        } catch {
+            // If not in public, try private database
+            do {
+                _ = try await privateDB.record(for: recordID)
+                return true
+            } catch {
+                // Recipe doesn't exist in either database
+                return false
+            }
+        }
+    }
+    
     func checkRecipeExists(_ name: String, _ description: String) async -> String? {
         // CRITICAL PRIVACY FIX: Only check current user's recipes for duplicates
         guard let currentUserID = getCurrentUserID() else {

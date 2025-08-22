@@ -123,26 +123,49 @@ struct AfterPhotoCaptureView: View {
         guard let photo = afterPhoto else { return }
 
         print("📷 AfterPhotoCapture: User captured after photo for recipe ID: \(recipeID)")
-        isUploading = true
-
-        Task {
-            do {
-                print("📷 AfterPhotoCapture: Starting upload to CloudKit...")
-                // Save the after photo to CloudKit
-                try await CloudKitRecipeManager.shared.updateAfterPhoto(for: recipeID, afterPhoto: photo)
-
-                print("📷 AfterPhotoCapture: Upload successful, dismissing view")
-                await MainActor.run {
-                    isUploading = false
-                    dismiss()
-                }
-            } catch {
-                print("📷 AfterPhotoCapture: Upload failed - \(error.localizedDescription)")
-                await MainActor.run {
-                    isUploading = false
-                    uploadError = "Failed to save photo: \(error.localizedDescription)"
+        
+        // Always save locally first (local-first architecture)
+        PhotoStorageManager.shared.storeMealPhoto(photo, for: UUID(uuidString: recipeID) ?? UUID())
+        print("📷 AfterPhotoCapture: Photo saved locally")
+        
+        // Try to upload to CloudKit if authenticated
+        if UnifiedAuthManager.shared.isAuthenticated {
+            isUploading = true
+            
+            Task {
+                do {
+                    print("📷 AfterPhotoCapture: Attempting CloudKit upload...")
+                    
+                    // First check if the recipe exists in CloudKit
+                    let recipeExists = await CloudKitRecipeManager.shared.checkRecipeExists(recipeID)
+                    
+                    if recipeExists {
+                        // Recipe exists, update it with the after photo
+                        try await CloudKitRecipeManager.shared.updateAfterPhoto(for: recipeID, afterPhoto: photo)
+                        print("📷 AfterPhotoCapture: CloudKit upload successful")
+                    } else {
+                        print("📷 AfterPhotoCapture: Recipe not in CloudKit yet (likely due to earlier permission issues), skipping CloudKit upload")
+                    }
+                    
+                    await MainActor.run {
+                        isUploading = false
+                        dismiss()
+                    }
+                } catch {
+                    print("📷 AfterPhotoCapture: CloudKit upload failed - \(error.localizedDescription)")
+                    print("📷 AfterPhotoCapture: Photo is saved locally, continuing without CloudKit")
+                    
+                    // Don't show error to user since photo is saved locally
+                    await MainActor.run {
+                        isUploading = false
+                        dismiss() // Dismiss anyway since photo is saved locally
+                    }
                 }
             }
+        } else {
+            // Not authenticated, just dismiss after local save
+            print("📷 AfterPhotoCapture: User not authenticated, saved locally only")
+            dismiss()
         }
     }
 }

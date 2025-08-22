@@ -1038,6 +1038,7 @@ enum UnifiedAuthError: LocalizedError {
     case tikTokAuthFailed(String)
     case networkError
     case cloudKitNotAvailable
+    case cloudKitError(Error)
     case authenticationFailed
     case unknown
     
@@ -1055,6 +1056,8 @@ enum UnifiedAuthError: LocalizedError {
             return "Network error. Please try again."
         case .cloudKitNotAvailable:
             return "Please sign in to iCloud in Settings to use this feature"
+        case .cloudKitError(let underlyingError):
+            return "CloudKit error: \(underlyingError.localizedDescription)"
         case .authenticationFailed:
             return "Authentication failed. Please try again."
         case .unknown:
