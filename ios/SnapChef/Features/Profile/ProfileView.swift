@@ -1,6 +1,7 @@
 import SwiftUI
 import os.log
 import CloudKit
+import UIKit
 
 enum SubscriptionTier: String, CaseIterable {
     case free = "Free"
@@ -32,7 +33,7 @@ struct ProfileView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var authManager: UnifiedAuthManager
     @EnvironmentObject var deviceManager: DeviceManager
-    @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
+    // Using UnifiedAuthManager from environment
     @EnvironmentObject var gamificationManager: GamificationManager
     @State private var showingSubscriptionView = false
     @State private var showingRecipes = false
@@ -52,7 +53,7 @@ struct ProfileView: View {
             ScrollView {
                 VStack(spacing: 30) {
                     // Enhanced Profile Header
-                    EnhancedProfileHeader(user: authManager.currentUser)
+                    EnhancedProfileHeader(user: authManager.currentUser?.toUser())
                         .scaleEffect(profileImageScale)
 
                     // Streak Summary
@@ -82,9 +83,9 @@ struct ProfileView: View {
 
 
                     // Sign Out Button (only if authenticated)
-                    if cloudKitAuthManager.isAuthenticated {
+                    if authManager.isAuthenticated {
                         EnhancedSignOutButton(action: {
-                            cloudKitAuthManager.signOut()
+                            authManager.signOut()
                         })
                         .staggeredFade(index: 6, isShowing: contentVisible)
                         .padding(.top, 10)
@@ -139,7 +140,7 @@ struct ProfileView: View {
     // MARK: - Data Loading Methods
     
     private func loadUserStats() {
-        guard cloudKitAuthManager.isAuthenticated else {
+        guard authManager.isAuthenticated else {
             return
         }
         
@@ -180,7 +181,7 @@ struct EnhancedProfileHeader: View {
     @State private var customName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
     @State private var customPhotoData: Data? = ProfilePhotoHelper.loadCustomPhotoFromFile()
     @State private var refreshTrigger = 0
-    @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
+    // Using UnifiedAuthManager from environment
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var gamificationManager: GamificationManager
@@ -194,7 +195,7 @@ struct EnhancedProfileHeader: View {
         _ = refreshTrigger
         
         // Priority: CloudKit username > CloudKit display name > Auth username > Custom name > User name > Guest
-        if let cloudKitUser = cloudKitAuthManager.currentUser {
+        if let cloudKitUser = authManager.currentUser {
             // Prefer username if set, otherwise use display name
             if let username = cloudKitUser.username, !username.isEmpty {
                 return username
@@ -204,13 +205,13 @@ struct EnhancedProfileHeader: View {
         }
         
         if let authUser = authManager.currentUser {
-            return authUser.username
+            return authUser.username ?? authUser.displayName
         } else if !customName.isEmpty {
             return customName
         } else if let userName = user?.name {
             return userName
         } else {
-            return authManager.temporaryUsername
+            return "Anonymous Chef"
         }
     }
 
@@ -219,7 +220,7 @@ struct EnhancedProfileHeader: View {
     }
 
     private var emailDisplay: String {
-        if cloudKitAuthManager.currentUser != nil {
+        if authManager.currentUser != nil {
             // TODO: Fix CloudKitUser type compatibility
             return "Start your culinary journey" // cloudKitUser.email ?? "Start your culinary journey"
         } else if let userEmail = user?.email {
@@ -233,7 +234,7 @@ struct EnhancedProfileHeader: View {
         // Use UserStats streak if available, otherwise CloudKit, otherwise calculate from local data
         if let stats = userStats {
             return stats.currentStreak
-        } else if let cloudKitUser = cloudKitAuthManager.currentUser {
+        } else if let cloudKitUser = authManager.currentUser {
             return cloudKitUser.currentStreak
         } else {
             return calculateStreak()
@@ -242,7 +243,7 @@ struct EnhancedProfileHeader: View {
 
     private func calculateLevel() -> Int {
         // Calculate level from total points
-        if let cloudKitUser = cloudKitAuthManager.currentUser {
+        if let cloudKitUser = authManager.currentUser {
             let points = cloudKitUser.totalPoints
             return min(1 + (points / 1_000), 99) // Level up every 1000 points, max level 99
         } else {
@@ -330,8 +331,8 @@ struct EnhancedProfileHeader: View {
                 // Profile container
                 Button(action: {
                     // If not authenticated, show auth view instead of edit profile
-                    if !cloudKitAuthManager.isAuthenticated {
-                        cloudKitAuthManager.showAuthSheet = true
+                    if !authManager.isAuthenticated {
+                        authManager.showAuthSheet = true
                     } else {
                         // For authenticated users, show UsernameEditView for CloudKit username
                         showingUsernameEdit = true
@@ -393,8 +394,8 @@ struct EnhancedProfileHeader: View {
             VStack(spacing: 8) {
                 Button(action: {
                     // If not authenticated, show auth view instead of edit profile
-                    if !cloudKitAuthManager.isAuthenticated {
-                        cloudKitAuthManager.showAuthSheet = true
+                    if !authManager.isAuthenticated {
+                        authManager.showAuthSheet = true
                     } else {
                         // For authenticated users, always show username edit for CloudKit username
                         // EditProfile is for local customization only
@@ -414,7 +415,7 @@ struct EnhancedProfileHeader: View {
                             .id("displayName-\(refreshTrigger)") // Force refresh when trigger changes
                         
                         // Show edit icon for authenticated users
-                        if cloudKitAuthManager.isAuthenticated {
+                        if authManager.isAuthenticated {
                             Image(systemName: "pencil.circle.fill")
                                 .font(.system(size: 20))
                                 .foregroundColor(.white.opacity(0.6))
@@ -434,9 +435,9 @@ struct EnhancedProfileHeader: View {
                 }
 
                 // Sign In button if not authenticated
-                if !cloudKitAuthManager.isAuthenticated {
+                if !authManager.isAuthenticated {
                     Button(action: {
-                        cloudKitAuthManager.showAuthSheet = true
+                        authManager.showAuthSheet = true
                     }) {
                         HStack(spacing: 12) {
                             Image(systemName: "sparkles")
@@ -508,17 +509,17 @@ struct EnhancedProfileHeader: View {
                     // Trigger UI refresh after username edit
                     Task {
                         // Refresh CloudKit user data after username change
-                        await cloudKitAuthManager.refreshCurrentUser()
+                        await authManager.refreshCurrentUser()
                         // Trigger UI refresh
                         refreshTrigger += 1
                     }
                 }
         }
-        .sheet(isPresented: $cloudKitAuthManager.showAuthSheet) {
+        .sheet(isPresented: $authManager.showAuthSheet) {
             CloudKitAuthView()
                 .onDisappear {
                     // Refresh profile data after authentication
-                    if cloudKitAuthManager.isAuthenticated {
+                    if authManager.isAuthenticated {
                         // Trigger UI refresh by updating the refresh trigger
                         refreshTrigger += 1
                     }
@@ -533,13 +534,13 @@ struct EnhancedProfileHeader: View {
                 glowAnimation = true
             }
         }
-        .onChange(of: cloudKitAuthManager.currentUser?.username) { _ in
+        .onChange(of: authManager.currentUser?.username) { _ in
             // Refresh when CloudKit username changes
             DispatchQueue.main.async {
                 refreshTrigger += 1
             }
         }
-        .onChange(of: cloudKitAuthManager.isAuthenticated) { isAuthenticated in
+        .onChange(of: authManager.isAuthenticated) { isAuthenticated in
             // Refresh when authentication status changes
             DispatchQueue.main.async {
                 refreshTrigger += 1
@@ -548,7 +549,7 @@ struct EnhancedProfileHeader: View {
             // If just authenticated, refresh user data
             if isAuthenticated {
                 Task {
-                    await cloudKitAuthManager.refreshCurrentUser()
+                    await authManager.refreshCurrentUser()
                 }
             }
         }
@@ -557,7 +558,7 @@ struct EnhancedProfileHeader: View {
     // MARK: - Data Loading Methods
     
     private func loadUserStats() {
-        guard cloudKitAuthManager.isAuthenticated else {
+        guard authManager.isAuthenticated else {
             return
         }
         
@@ -1595,7 +1596,7 @@ struct ProviderOptionCard: View {
 // MARK: - Collection Progress View
 struct CollectionProgressView: View {
     @EnvironmentObject var appState: AppState
-    @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
+    // Using UnifiedAuthManager from environment
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @State private var animateProgress = false
     @State private var userStats: UserStats?
@@ -1606,7 +1607,7 @@ struct CollectionProgressView: View {
         // Use UserStats if available, otherwise CloudKit recipe counts when available
         if let stats = userStats {
             return stats.recipeCount
-        } else if cloudKitAuthManager.isAuthenticated {
+        } else if authManager.isAuthenticated {
             return cloudKitRecipeManager.userCreatedRecipeIDs.count + cloudKitRecipeManager.userSavedRecipeIDs.count
         } else {
             return appState.allRecipes.count
@@ -1615,7 +1616,7 @@ struct CollectionProgressView: View {
 
     var favoriteRecipes: Int {
         // Use CloudKit favorites when available
-        if cloudKitAuthManager.isAuthenticated {
+        if authManager.isAuthenticated {
             return cloudKitRecipeManager.userFavoritedRecipeIDs.count
         } else {
             return appState.favoritedRecipeIds.count
@@ -1623,7 +1624,7 @@ struct CollectionProgressView: View {
     }
 
     var sharedRecipes: Int {
-        if let cloudKitUser = cloudKitAuthManager.currentUser {
+        if let cloudKitUser = authManager.currentUser {
             return cloudKitUser.recipesShared
         } else {
             return appState.totalShares
@@ -1687,7 +1688,7 @@ struct CollectionProgressView: View {
             }
             loadUserStats()
         }
-        .onChange(of: cloudKitAuthManager.isAuthenticated) { _ in
+        .onChange(of: authManager.isAuthenticated) { _ in
             // Refresh data when authentication changes
             loadUserStats()
             refreshID = UUID()
@@ -1703,7 +1704,7 @@ struct CollectionProgressView: View {
     // MARK: - Data Loading Methods
     
     private func loadUserStats() {
-        guard cloudKitAuthManager.isAuthenticated else {
+        guard authManager.isAuthenticated else {
             return
         }
         
@@ -1797,7 +1798,7 @@ struct CollectionProgressRow: View {
 struct ProfileAchievementGalleryView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var gamificationManager: GamificationManager
-    @ObservedObject var cloudKitAuthManager = CloudKitAuthManager.shared
+    // Using UnifiedAuthManager from environment
     @State private var selectedAchievement: ProfileAchievement?
     @State private var cloudKitAchievements: [ProfileAchievement] = []
 
@@ -1853,9 +1854,9 @@ struct ProfileAchievementGalleryView: View {
 
     private func isAchievementUnlocked(_ achievement: ProfileAchievement) -> Bool {
         // TODO: Fix CloudKitUser type compatibility
-        let recipeCount = appState.allRecipes.count // cloudKitAuthManager.currentUser?.recipesCreated ?? appState.allRecipes.count
-        let sharedCount = cloudKitAuthManager.currentUser?.recipesShared ?? appState.totalShares
-        let streak = cloudKitAuthManager.currentUser?.currentStreak ?? 0
+        let recipeCount = appState.allRecipes.count // authManager.currentUser?.recipesCreated ?? appState.allRecipes.count
+        let sharedCount = authManager.currentUser?.recipesShared ?? appState.totalShares
+        let streak = authManager.currentUser?.currentStreak ?? 0
 
         switch achievement.id {
         case "first_recipe":
@@ -1899,7 +1900,7 @@ struct ProfileAchievementGalleryView: View {
             }
         }
         .onAppear {
-            if cloudKitAuthManager.isAuthenticated {
+            if authManager.isAuthenticated {
                 loadCloudKitAchievements()
             }
         }
@@ -2390,7 +2391,7 @@ struct ProfilePhotoHelper {
 // MARK: - Username Edit View
 struct UsernameEditView: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var cloudKitAuthManager = CloudKitAuthManager.shared
+    // Using UnifiedAuthManager from environment
     
     @State private var username: String = ""
     @State private var isCheckingUsername = false
@@ -2559,7 +2560,7 @@ struct UsernameEditView: View {
         }
         .onAppear {
             // Pre-fill with current username
-            if let currentUsername = cloudKitAuthManager.currentUser?.username {
+            if let currentUsername = authManager.currentUser?.username {
                 username = currentUsername
                 usernameStatus = .current
             }
@@ -2578,7 +2579,7 @@ struct UsernameEditView: View {
         }
         
         // Check if it's the current username
-        if username == cloudKitAuthManager.currentUser?.username {
+        if username == authManager.currentUser?.username {
             usernameStatus = .current
             return
         }
@@ -2608,7 +2609,7 @@ struct UsernameEditView: View {
 
         Task {
             do {
-                let isAvailable = try await cloudKitAuthManager.checkUsernameAvailability(username)
+                let isAvailable = try await authManager.checkUsernameAvailability(username)
 
                 await MainActor.run {
                     isCheckingUsername = false
@@ -2638,7 +2639,7 @@ struct UsernameEditView: View {
 
         Task {
             do {
-                try await cloudKitAuthManager.setUsername(username)
+                try await authManager.setUsername(username)
                 
                 await MainActor.run {
                     dismiss()
@@ -2664,5 +2665,35 @@ struct UsernameEditView: View {
             .environmentObject(AuthenticationManager())
             .environmentObject(DeviceManager())
             .environmentObject(GamificationManager())
+    }
+}
+
+// MARK: - CloudKitUser to User Conversion
+extension CloudKitUser {
+    func toUser() -> User {
+        User(
+            id: recordID ?? UUID().uuidString,
+            email: email,
+            name: displayName,
+            username: username ?? displayName,
+            profileImageURL: profileImageURL,
+            subscription: Subscription(
+                tier: subscriptionTier == "premium" ? .premium : subscriptionTier == "basic" ? .basic : .free,
+                status: .active,
+                expiresAt: nil,
+                autoRenew: false
+            ),
+            credits: coinBalance,
+            deviceId: UIDevice.current.identifierForVendor?.uuidString ?? "unknown",
+            createdAt: createdAt,
+            lastLoginAt: lastLoginAt,
+            totalPoints: totalPoints,
+            currentStreak: currentStreak,
+            longestStreak: longestStreak,
+            challengesCompleted: challengesCompleted,
+            recipesShared: recipesShared,
+            isProfilePublic: isProfilePublic,
+            showOnLeaderboard: showOnLeaderboard
+        )
     }
 }
