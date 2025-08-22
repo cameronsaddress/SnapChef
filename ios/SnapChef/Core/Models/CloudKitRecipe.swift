@@ -76,6 +76,7 @@ struct CloudKitRecipe {
         // Create Recipe object
         self.recipe = Recipe(
             id: id,
+            ownerID: record[CKField.Recipe.ownerID] as? String,
             name: name,
             description: description,
             ingredients: ingredients,

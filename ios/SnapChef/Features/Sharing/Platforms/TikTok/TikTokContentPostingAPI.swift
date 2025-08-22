@@ -377,6 +377,8 @@ public final class TikTokContentPostingAPI: ObservableObject {
             title = "👨‍🍳 Check out my SnapChef profile!"
         case .teamInvite(let teamName, _):
             title = "🏆 Join my cooking team: \(teamName)"
+        case .leaderboard:
+            title = "🏆 Check out the SnapChef leaderboard!"
         }
 
         // Initialize direct post

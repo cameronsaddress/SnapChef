@@ -7,13 +7,16 @@
 
 import SwiftUI
 import Combine
+import CloudKit
 
 struct BrandedSharePopup: View {
     @StateObject private var shareService = ShareService.shared
+    @ObservedObject var authManager = UnifiedAuthManager.shared
     @State private var selectedPlatform: SharePlatformType?
     @State private var showingPlatformView = false
     @State private var animationScale: CGFloat = 0.8
     @State private var animationOpacity: Double = 0
+    @State private var hasSharedToFeed = false
     @Environment(\.dismiss) var dismiss
 
     let content: ShareContent
@@ -118,6 +121,13 @@ struct BrandedSharePopup: View {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                     animationScale = 1.0
                     animationOpacity = 1.0
+                }
+                
+                // Automatically share to user's followers' feeds when popup opens
+                if !hasSharedToFeed {
+                    Task {
+                        await shareToFollowersFeed()
+                    }
                 }
             }
         }
@@ -258,6 +268,8 @@ struct BrandedSharePopup: View {
             activityType = "teamInviteShared"
             metadata["teamName"] = teamName
             metadata["joinCode"] = joinCode
+        case .leaderboard:
+            activityType = "leaderboardShared"
         }
         
         do {
@@ -271,6 +283,109 @@ struct BrandedSharePopup: View {
             )
         } catch {
             print("Failed to create share activity: \(error)")
+        }
+    }
+    
+    // MARK: - Share to Followers Feed
+    private func shareToFollowersFeed() async {
+        guard authManager.isAuthenticated,
+              let currentUserID = authManager.currentUser?.recordID,
+              let currentUserName = authManager.currentUser?.displayName else {
+            print("❌ Cannot share to feed: User not authenticated")
+            return
+        }
+        
+        // Mark that we've shared to prevent duplicate shares
+        hasSharedToFeed = true
+        
+        // Determine the activity type and metadata based on content type
+        var activityType = "recipeShared"
+        var recipeID: String?
+        var recipeName: String?
+        var challengeID: String?
+        var challengeName: String?
+        
+        switch content.type {
+        case .recipe(let recipe):
+            activityType = "recipeShared"
+            recipeID = recipe.id.uuidString
+            recipeName = recipe.name
+            print("📤 Sharing recipe '\(recipe.name)' to followers' feeds")
+            
+        case .challenge(let challenge):
+            activityType = "challengeShared"
+            challengeID = challenge.id
+            challengeName = challenge.title
+            print("📤 Sharing challenge '\(challenge.title)' to followers' feeds")
+            
+        case .achievement(let achievementName):
+            activityType = "achievementShared"
+            print("📤 Sharing achievement '\(achievementName)' to followers' feeds")
+            
+        case .leaderboard:
+            activityType = "leaderboardShared"
+            print("📤 Sharing leaderboard position to followers' feeds")
+            
+        default:
+            print("📤 Sharing content to followers' feeds")
+        }
+        
+        do {
+            // Get the user's followers
+            let followersQuery = CKQuery(
+                recordType: "Follow",
+                predicate: NSPredicate(format: "followingID == %@ AND isActive == %d", currentUserID, 1)
+            )
+            
+            let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+            let publicDB = container.publicCloudDatabase
+            
+            let (matchResults, _) = try await publicDB.records(matching: followersQuery)
+            
+            var followerIDs: [String] = []
+            for (_, result) in matchResults {
+                if case .success(let record) = result,
+                   let followerID = record["followerID"] as? String {
+                    followerIDs.append(followerID)
+                }
+            }
+            
+            print("📊 Found \(followerIDs.count) followers to share with")
+            
+            // Create an activity for each follower's feed
+            for followerID in followerIDs {
+                do {
+                    // Create activity record for this follower's feed
+                    try await CloudKitSyncService.shared.createActivity(
+                        type: activityType,
+                        actorID: currentUserID,
+                        targetUserID: followerID,  // This follower will see it in their feed
+                        recipeID: recipeID,
+                        recipeName: recipeName,
+                        challengeID: challengeID,
+                        challengeName: challengeName
+                    )
+                } catch {
+                    print("⚠️ Failed to create activity for follower \(followerID): \(error)")
+                    // Continue with other followers even if one fails
+                }
+            }
+            
+            // Also create an activity for the user's own feed (for their profile)
+            try await CloudKitSyncService.shared.createActivity(
+                type: activityType,
+                actorID: currentUserID,
+                targetUserID: currentUserID,  // User's own feed
+                recipeID: recipeID,
+                recipeName: recipeName,
+                challengeID: challengeID,
+                challengeName: challengeName
+            )
+            
+            print("✅ Successfully shared to \(followerIDs.count) followers' feeds")
+            
+        } catch {
+            print("❌ Failed to share to followers' feeds: \(error)")
         }
     }
 }

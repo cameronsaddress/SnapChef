@@ -39,6 +39,7 @@ extension InfluencerRecipe {
             recipe: InfluencerShowcaseRecipe(
                 recipe: Recipe(
                     id: UUID(),
+                    ownerID: nil,  // Mock data
                     name: "Gluten-Free Rainbow Veggie Wraps",
                     description: "Colorful, healthy wraps that Stormi actually asks for! Packed with hidden veggies and her favorite hummus.",
                     ingredients: [
@@ -119,6 +120,7 @@ extension InfluencerRecipe {
             recipe: InfluencerShowcaseRecipe(
                 recipe: Recipe(
                     id: UUID(),
+                    ownerID: nil,  // Mock data
                     name: "Thai-Inspired Chicken Lettuce Cups",
                     description: "A family favorite that's ready in 20 minutes! Sweet, savory, and the kids love assembling their own cups.",
                     ingredients: [
@@ -203,6 +205,7 @@ extension InfluencerRecipe {
             recipe: InfluencerShowcaseRecipe(
                 recipe: Recipe(
                     id: UUID(),
+                    ownerID: nil,  // Mock data
                     name: "Harvest Goddess Bowl",
                     description: "A beautiful, nourishing bowl that looks as good as it tastes. My girls love picking their own toppings!",
                     ingredients: [
@@ -286,6 +289,7 @@ extension InfluencerRecipe {
             recipe: InfluencerShowcaseRecipe(
                 recipe: Recipe(
                     id: UUID(),
+                    ownerID: nil,  // Mock data
                     name: "Southern Peach Pie Smoothie Bowl",
                     description: "A healthy breakfast that tastes like dessert! Tennessee peaches make all the difference.",
                     ingredients: [
@@ -367,6 +371,7 @@ extension InfluencerRecipe {
             recipe: InfluencerShowcaseRecipe(
                 recipe: Recipe(
                     id: UUID(),
+                    ownerID: nil,  // Mock data
                     name: "Superfood Energy Balls",
                     description: "No-bake, vegan, and loaded with nutrients. Perfect for lunch boxes or post-workout!",
                     ingredients: [

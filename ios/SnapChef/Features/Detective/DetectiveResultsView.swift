@@ -469,6 +469,7 @@ struct DetectiveResultsView: View {
         // Add detective badge to recipe
         let recipeWithBadge = Recipe(
             id: detectedRecipe.reconstructedRecipe.id,
+            ownerID: UnifiedAuthManager.shared.currentUser?.recordID,  // Set current user as owner
             name: detectedRecipe.reconstructedRecipe.name,
             description: detectedRecipe.reconstructedRecipe.description,
             ingredients: detectedRecipe.reconstructedRecipe.ingredients,
@@ -588,6 +589,7 @@ struct DetectiveShareSheet: UIViewControllerRepresentable {
             ],
             reconstructedRecipe: Recipe(
                 id: UUID(),
+                ownerID: nil,  // Preview data doesn't need owner
                 name: "Classic Chicken Parmesan",
                 description: "Crispy breaded chicken breast topped with marinara sauce and melted cheese",
                 ingredients: [

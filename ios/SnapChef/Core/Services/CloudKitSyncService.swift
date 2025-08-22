@@ -160,6 +160,7 @@ final class CloudKitSyncService: ObservableObject {
         // Create recipe
         return Recipe(
             id: UUID(uuidString: id) ?? UUID(),
+            ownerID: record[CKField.Recipe.ownerID] as? String,
             name: title,
             description: description,
             ingredients: ingredients,

@@ -497,6 +497,8 @@ struct InstagramShareView: View {
             activityType = isStory ? "teamInviteInstagramStoryShared" : "teamInviteInstagramFeedShared"
             metadata["teamName"] = teamName
             metadata["joinCode"] = joinCode
+        case .leaderboard:
+            activityType = isStory ? "leaderboardInstagramStoryShared" : "leaderboardInstagramFeedShared"
         }
         
         do {

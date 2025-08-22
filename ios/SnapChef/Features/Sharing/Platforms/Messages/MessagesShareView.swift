@@ -354,6 +354,8 @@ struct MessagesShareView: View {
             activityType = "teamInviteMessagesCardShared"
             metadata["teamName"] = teamName
             metadata["joinCode"] = joinCode
+        case .leaderboard:
+            activityType = "leaderboardMessagesCardShared"
         }
         
         do {
@@ -685,6 +687,8 @@ struct MessageComposerWrapper: UIViewControllerRepresentable {
             activityType = "teamInviteMessagesCardShared"
             metadata["teamName"] = teamName
             metadata["joinCode"] = joinCode
+        case .leaderboard:
+            activityType = "leaderboardMessagesCardShared"
         }
         
         do {

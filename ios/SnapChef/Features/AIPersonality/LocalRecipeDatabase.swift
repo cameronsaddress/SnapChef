@@ -28,6 +28,7 @@ struct LocalRecipeDatabase {
         [
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Classic Spaghetti Carbonara",
             description: "Creamy pasta with crispy pancetta and parmesan",
             ingredients: createIngredients(from: ["400g spaghetti", "200g pancetta", "4 egg yolks", "100g Parmigiano Reggiano", "Black pepper", "Salt"]),
@@ -51,6 +52,7 @@ struct LocalRecipeDatabase {
         ),
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Margherita Pizza",
             description: "Traditional Italian pizza with fresh mozzarella and basil",
             ingredients: createIngredients(from: ["Pizza dough", "200g mozzarella", "400g tomato sauce", "Fresh basil", "Olive oil", "Salt"]),
@@ -80,6 +82,7 @@ struct LocalRecipeDatabase {
         [
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Chicken Tacos al Pastor",
             description: "Marinated chicken with pineapple and cilantro",
             ingredients: createIngredients(from: ["Chicken thighs", "Corn tortillas", "Pineapple", "Onion", "Cilantro", "Lime", "Chili powder"]),
@@ -103,6 +106,7 @@ struct LocalRecipeDatabase {
         ),
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Enchiladas Verdes",
             description: "Chicken enchiladas with green salsa",
             ingredients: createIngredients(from: ["Corn tortillas", "Shredded chicken", "Green salsa", "Sour cream", "Cheese", "Cilantro"]),
@@ -132,6 +136,7 @@ struct LocalRecipeDatabase {
         [
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Kung Pao Chicken",
             description: "Spicy chicken with peanuts and peppers",
             ingredients: createIngredients(from: ["Chicken breast", "Peanuts", "Dried chilies", "Bell peppers", "Soy sauce", "Rice vinegar", "Cornstarch"]),
@@ -155,6 +160,7 @@ struct LocalRecipeDatabase {
         ),
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Sweet and Sour Pork",
             description: "Crispy pork in tangy sauce",
             ingredients: createIngredients(from: ["Pork shoulder", "Pineapple", "Bell peppers", "Onion", "Vinegar", "Sugar", "Ketchup"]),
@@ -184,6 +190,7 @@ struct LocalRecipeDatabase {
         [
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Chicken Teriyaki",
             description: "Glazed chicken with sweet soy sauce",
             ingredients: createIngredients(from: ["Chicken thighs", "Soy sauce", "Mirin", "Sugar", "Sake", "Ginger", "Green onions"]),
@@ -207,6 +214,7 @@ struct LocalRecipeDatabase {
         ),
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Beef Gyudon",
             description: "Simmered beef over rice",
             ingredients: createIngredients(from: ["Thinly sliced beef", "Onions", "Dashi", "Soy sauce", "Mirin", "Sugar", "Rice"]),
@@ -236,6 +244,7 @@ struct LocalRecipeDatabase {
         [
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Pad Thai",
             description: "Stir-fried rice noodles with tamarind",
             ingredients: createIngredients(from: ["Rice noodles", "Shrimp", "Tofu", "Bean sprouts", "Peanuts", "Tamarind", "Fish sauce"]),
@@ -259,6 +268,7 @@ struct LocalRecipeDatabase {
         ),
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Green Curry",
             description: "Spicy coconut curry with vegetables",
             ingredients: createIngredients(from: ["Green curry paste", "Coconut milk", "Chicken", "Thai eggplant", "Basil", "Fish sauce"]),
@@ -288,6 +298,7 @@ struct LocalRecipeDatabase {
         [
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Chicken Tikka Masala",
             description: "Creamy tomato curry with grilled chicken",
             ingredients: createIngredients(from: ["Chicken", "Yogurt", "Tomatoes", "Cream", "Garam masala", "Ginger", "Garlic"]),
@@ -311,6 +322,7 @@ struct LocalRecipeDatabase {
         ),
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Palak Paneer",
             description: "Spinach curry with cottage cheese",
             ingredients: createIngredients(from: ["Spinach", "Paneer", "Onions", "Tomatoes", "Cream", "Cumin", "Garlic"]),
@@ -340,6 +352,7 @@ struct LocalRecipeDatabase {
         [
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Coq au Vin",
             description: "Chicken braised in red wine",
             ingredients: createIngredients(from: ["Chicken", "Red wine", "Bacon", "Pearl onions", "Mushrooms", "Thyme", "Bay leaves"]),
@@ -363,6 +376,7 @@ struct LocalRecipeDatabase {
         ),
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Quiche Lorraine",
             description: "Savory custard tart with bacon",
             ingredients: createIngredients(from: ["Pie crust", "Eggs", "Heavy cream", "Bacon", "Gruyere cheese", "Nutmeg"]),
@@ -392,6 +406,7 @@ struct LocalRecipeDatabase {
         [
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Classic Cheeseburger",
             description: "Juicy beef patty with melted cheese",
             ingredients: createIngredients(from: ["Ground beef", "Burger buns", "Cheddar cheese", "Lettuce", "Tomato", "Onion", "Pickles"]),
@@ -415,6 +430,7 @@ struct LocalRecipeDatabase {
         ),
         Recipe(
             id: UUID(),
+            ownerID: nil,
             name: "Mac and Cheese",
             description: "Creamy baked pasta with cheese",
             ingredients: createIngredients(from: ["Elbow macaroni", "Cheddar", "Butter", "Flour", "Milk", "Breadcrumbs"]),

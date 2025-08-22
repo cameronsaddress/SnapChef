@@ -18,6 +18,7 @@ class MockDataProvider {
         let recipes = [
             Recipe(
                 id: UUID(),
+                ownerID: nil,  // Mock data
                 name: "Garden Fresh Salad",
                 description: "A colorful and nutritious salad with fresh vegetables",
                 ingredients: [
@@ -71,6 +72,7 @@ class MockDataProvider {
             ),
             Recipe(
                 id: UUID(),
+                ownerID: nil,  // Mock data
                 name: "Quick Chicken Stir-Fry",
                 description: "A fast and flavorful Asian-inspired dish perfect for busy weeknights",
                 ingredients: [
@@ -125,6 +127,7 @@ class MockDataProvider {
             ),
             Recipe(
                 id: UUID(),
+                ownerID: nil,  // Mock data
                 name: "Hearty Vegetable Soup",
                 description: "A warming and comforting soup packed with seasonal vegetables",
                 ingredients: [
@@ -228,6 +231,7 @@ class MockDataProvider {
     func mockRecipe() -> Recipe {
         return Recipe(
             id: UUID(),
+            ownerID: nil,  // Mock data
             name: "Garden Fresh Salad",
             description: "A colorful and nutritious salad with fresh vegetables",
             ingredients: [

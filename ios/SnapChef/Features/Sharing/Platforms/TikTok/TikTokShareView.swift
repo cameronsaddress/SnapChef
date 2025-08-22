@@ -308,6 +308,8 @@ struct TikTokShareView: View {
             title = "👨‍🍳 Check out my SnapChef profile!"
         case .teamInvite(let teamName, _):
             title = "🏆 Join my cooking team: \(teamName)"
+        case .leaderboard:
+            title = "🏆 Check out the SnapChef leaderboard!"
         }
 
         return contentAPI.buildCaption(
@@ -346,6 +348,8 @@ struct TikTokShareView: View {
             activityType = "teamInviteTikTokVideoShared"
             metadata["teamName"] = teamName
             metadata["joinCode"] = joinCode
+        case .leaderboard:
+            activityType = "leaderboardTikTokVideoShared"
         }
         
         do {

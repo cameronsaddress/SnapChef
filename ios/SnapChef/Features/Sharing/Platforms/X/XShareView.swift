@@ -464,6 +464,8 @@ struct XShareView: View {
             activityType = "teamInviteXPostShared"
             metadata["teamName"] = teamName
             metadata["joinCode"] = joinCode
+        case .leaderboard:
+            activityType = "leaderboardXPostShared"
         }
         
         do {

@@ -250,6 +250,7 @@ struct InfluencerDetailView: View {
         let originalRecipe = influencer.recipe.recipe
         let modifiedRecipe = Recipe(
             id: UUID(), // New ID for the saved version
+            ownerID: UnifiedAuthManager.shared.currentUser?.recordID,
             name: "\(influencer.influencerName)'s \(originalRecipe.name)",
             description: originalRecipe.description,
             ingredients: originalRecipe.ingredients,

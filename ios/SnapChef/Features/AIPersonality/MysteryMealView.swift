@@ -241,6 +241,7 @@ struct MysteryMealView: View {
             recipes = recipes.map { recipe in
                 Recipe(
                     id: recipe.id,
+                    ownerID: recipe.ownerID,
                     name: recipe.name + " with a Twist",
                     description: recipe.description,
                     ingredients: recipe.ingredients,
@@ -268,6 +269,7 @@ struct MysteryMealView: View {
             recipes = recipes.map { recipe in
                 Recipe(
                     id: recipe.id,
+                    ownerID: recipe.ownerID,
                     name: "Fusion " + recipe.name,
                     description: recipe.description,
                     ingredients: recipe.ingredients,
@@ -295,6 +297,7 @@ struct MysteryMealView: View {
             recipes = recipes.map { recipe in
                 Recipe(
                     id: recipe.id,
+                    ownerID: recipe.ownerID,
                     name: "Wild " + recipe.name + " Adventure",
                     description: recipe.description,
                     ingredients: recipe.ingredients,
@@ -322,6 +325,7 @@ struct MysteryMealView: View {
             recipes = recipes.map { recipe in
                 Recipe(
                     id: recipe.id,
+                    ownerID: recipe.ownerID,
                     name: "Insane " + recipe.name + " Experiment",
                     description: recipe.description,
                     ingredients: recipe.ingredients,
