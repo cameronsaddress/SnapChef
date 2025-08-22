@@ -157,9 +157,15 @@ final class UnifiedAuthManager: ObservableObject {
                 self.currentUser = CloudKitUser(from: existingRecord)
                 self.isAuthenticated = true
             } else {
-                print("⚠️ User record has incorrect type '\(existingRecord.recordType)', expected '\(CloudKitConfig.userRecordType)'. Creating new record.")
-                // Delete the old record with wrong type and create a new one
-                _ = try await cloudKitDatabase.deleteRecord(withID: existingRecord.recordID)
+                print("⚠️ User record has incorrect type '\(existingRecord.recordType)', expected '\(CloudKitConfig.userRecordType)'. Will delete and recreate.")
+                // Try to delete the old record with wrong type
+                do {
+                    _ = try await cloudKitDatabase.deleteRecord(withID: existingRecord.recordID)
+                    print("✅ Deleted old record with incorrect type")
+                } catch {
+                    print("⚠️ Could not delete old record: \(error.localizedDescription)")
+                    // Continue anyway - we'll create a new record with a different ID
+                }
                 throw CloudKitAuthError.invalidRecordType // Will trigger creation of new record
             }
             
@@ -212,7 +218,19 @@ final class UnifiedAuthManager: ObservableObject {
                 newRecord[CKField.User.totalPoints] = Int64(anonymous.engagementScore * 100) // Convert engagement to points
             }
             
-            try await cloudKitDatabase.save(newRecord)
+            do {
+                try await cloudKitDatabase.save(newRecord)
+            } catch let saveError as CKError {
+                // Handle specific CloudKit errors
+                if saveError.code == .invalidArguments {
+                    print("❌ Invalid record save attempt: \(saveError.localizedDescription)")
+                    errorMessage = "Unable to create user profile. Please try again."
+                    showError = true
+                    throw UnifiedAuthError.authenticationFailed
+                } else {
+                    throw saveError
+                }
+            }
             
             // Update state
             self.currentUser = CloudKitUser(from: newRecord)
@@ -760,6 +778,7 @@ enum UnifiedAuthError: LocalizedError {
     case tikTokAuthFailed(String)
     case networkError
     case cloudKitNotAvailable
+    case authenticationFailed
     case unknown
     
     var errorDescription: String? {
@@ -776,6 +795,8 @@ enum UnifiedAuthError: LocalizedError {
             return "Network error. Please try again."
         case .cloudKitNotAvailable:
             return "Please sign in to iCloud in Settings to use this feature"
+        case .authenticationFailed:
+            return "Authentication failed. Please try again."
         case .unknown:
             return "An unknown error occurred"
         }
