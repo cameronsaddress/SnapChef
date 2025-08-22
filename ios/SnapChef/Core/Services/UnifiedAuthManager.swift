@@ -868,6 +868,26 @@ final class UnifiedAuthManager: ObservableObject {
         }
     }
     
+    /// Update recipe counts for the current user
+    func updateRecipeCounts() async {
+        guard let currentUser = currentUser,
+              let userID = currentUser.recordID else { return }
+        
+        do {
+            // Count recipes created by this user
+            let recipePredicate = NSPredicate(format: "%K == %@", CKField.Recipe.ownerID, userID)
+            let recipeQuery = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: recipePredicate)
+            
+            let recipeResults = try await cloudKitDatabase.records(matching: recipeQuery)
+            let recipeCount = recipeResults.matchResults.count
+            
+            // Update the user's recipe count
+            try await updateUserStats(UserStatUpdates(recipesCreated: recipeCount, experiencePoints: nil))
+        } catch {
+            print("Error updating recipe counts: \(error)")
+        }
+    }
+    
     /// Update social counts (followers/following)
     func updateSocialCounts() async {
         guard let currentUser = currentUser else { return }

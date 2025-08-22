@@ -149,14 +149,22 @@ struct ProfileView: View {
         
         Task {
             do {
-                guard let userID = try await CloudKitUserManager.shared.getCurrentUserID() else {
+                guard let userID = authManager.currentUser?.recordID else {
                     await MainActor.run {
                         self.isLoadingStats = false
                     }
                     return
                 }
                 
-                let stats = try await CloudKitUserManager.shared.getUserStats(for: userID)
+                // For now, create stats from current user data
+                let currentUser = authManager.currentUser
+                let stats = UserStats(
+                    followerCount: currentUser?.followerCount ?? 0,
+                    followingCount: currentUser?.followingCount ?? 0,
+                    recipeCount: currentUser?.recipesCreated ?? 0,
+                    achievementCount: 0,
+                    currentStreak: currentUser?.currentStreak ?? 0
+                )
                 await MainActor.run {
                     self.userStats = stats
                     self.isLoadingStats = false
@@ -575,14 +583,22 @@ struct EnhancedProfileHeader: View {
         
         Task {
             do {
-                guard let userID = try await CloudKitUserManager.shared.getCurrentUserID() else {
+                guard let userID = authManager.currentUser?.recordID else {
                     await MainActor.run {
                         self.isLoadingStats = false
                     }
                     return
                 }
                 
-                let stats = try await CloudKitUserManager.shared.getUserStats(for: userID)
+                // For now, create stats from current user data
+                let currentUser = authManager.currentUser
+                let stats = UserStats(
+                    followerCount: currentUser?.followerCount ?? 0,
+                    followingCount: currentUser?.followingCount ?? 0,
+                    recipeCount: currentUser?.recipesCreated ?? 0,
+                    achievementCount: 0,
+                    currentStreak: currentUser?.currentStreak ?? 0
+                )
                 await MainActor.run {
                     self.userStats = stats
                     self.isLoadingStats = false
@@ -1721,14 +1737,22 @@ struct CollectionProgressView: View {
         
         Task {
             do {
-                guard let userID = try await CloudKitUserManager.shared.getCurrentUserID() else {
+                guard let userID = authManager.currentUser?.recordID else {
                     await MainActor.run {
                         self.isLoadingStats = false
                     }
                     return
                 }
                 
-                let stats = try await CloudKitUserManager.shared.getUserStats(for: userID)
+                // For now, create stats from current user data
+                let currentUser = authManager.currentUser
+                let stats = UserStats(
+                    followerCount: currentUser?.followerCount ?? 0,
+                    followingCount: currentUser?.followingCount ?? 0,
+                    recipeCount: currentUser?.recipesCreated ?? 0,
+                    achievementCount: 0,
+                    currentStreak: currentUser?.currentStreak ?? 0
+                )
                 await MainActor.run {
                     self.userStats = stats
                     self.isLoadingStats = false
@@ -1835,8 +1859,8 @@ struct ProfileAchievementGalleryView: View {
             do {
                 guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { return }
 
-                // Use CloudKitUserManager which handles proper achievement queries
-                let achievements = try await CloudKitUserManager.shared.getUserAchievements(for: userID)
+                // TODO: Implement getUserAchievements in UnifiedAuthManager
+                let achievements: [CloudKitAchievement] = []
                 
                 let loadedAchievements: [ProfileAchievement] = achievements.map { achievement in
                     ProfileAchievement(
@@ -2679,19 +2703,17 @@ struct UsernameEditView: View {
 // MARK: - Helper function to convert CloudKitUser to User
 // Since CloudKitUser isn't accessible here, we'll create a simple conversion
 @MainActor
-private func cloudKitUserToUser(_ cloudKitUser: Any?) -> User? {
-    // For now, return a default user since we can't access CloudKitUser properties
-    // This needs to be properly refactored when CloudKitUser is made accessible
-    guard cloudKitUser != nil else { return nil }
+private func cloudKitUserToUser(_ cloudKitUser: CloudKitUser?) -> User? {
+    guard let cloudKitUser = cloudKitUser else { return nil }
     
     return User(
-        id: UUID().uuidString,
-        email: nil,
-        name: "SnapChef User",
-        username: "snapchef_user",
-        profileImageURL: nil,
+        id: cloudKitUser.recordID ?? UUID().uuidString,
+        email: cloudKitUser.email,
+        name: cloudKitUser.displayName,
+        username: cloudKitUser.username ?? "snapchef_user",
+        profileImageURL: cloudKitUser.profileImageURL,
         subscription: Subscription(
-            tier: .free,
+            tier: .free,  // TODO: Map from cloudKitUser.subscriptionTier
             status: .active,
             expiresAt: nil,
             autoRenew: false
