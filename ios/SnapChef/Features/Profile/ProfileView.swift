@@ -552,13 +552,13 @@ struct EnhancedProfileHeader: View {
         }
         .onChange(of: authManager.currentUser?.username) { _ in
             // Refresh when CloudKit username changes
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 refreshTrigger += 1
             }
         }
         .onChange(of: authManager.isAuthenticated) { isAuthenticated in
             // Refresh when authentication status changes
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 refreshTrigger += 1
             }
             

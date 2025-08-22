@@ -539,7 +539,16 @@ class DiscoverUsersViewModel: ObservableObject {
             
             cloudKitUsers = convertedUsers
         } catch {
-            print("Failed to load CloudKit users: \(error)")
+            print("❌ Failed to load CloudKit users: \(error.localizedDescription)")
+            if let ckError = error as? CKError {
+                print("  CloudKit Error Code: \(ckError.code.rawValue)")
+                print("  CloudKit Error: \(ckError.localizedDescription)")
+                if ckError.code == .notAuthenticated {
+                    print("  ⚠️ User is not signed into iCloud")
+                } else if ckError.code == .networkUnavailable || ckError.code == .networkFailure {
+                    print("  ⚠️ Network is unavailable")
+                }
+            }
             cloudKitUsers = []
         }
     }

@@ -431,6 +431,20 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Get suggested users for discovery
     func getSuggestedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        // Check CloudKit availability first
+        do {
+            let status = try await cloudKitContainer.accountStatus()
+            if status != .available {
+                print("⚠️ CloudKit not available. Status: \(status.rawValue)")
+                if status == .noAccount {
+                    throw UnifiedAuthError.cloudKitNotAvailable
+                }
+            }
+        } catch {
+            print("❌ Failed to check CloudKit status: \(error)")
+            throw UnifiedAuthError.cloudKitNotAvailable
+        }
+        
         let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
