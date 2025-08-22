@@ -340,6 +340,7 @@ struct RecipeDetectiveView: View {
                         ],
                         reconstructedRecipe: Recipe(
                             id: UUID(),
+                            ownerID: nil,
                             name: "Classic Chicken Parmesan",
                             description: "Crispy breaded chicken breast topped with marinara sauce and melted cheese",
                             ingredients: [
