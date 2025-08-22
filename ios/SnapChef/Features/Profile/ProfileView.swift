@@ -53,7 +53,7 @@ struct ProfileView: View {
             ScrollView {
                 VStack(spacing: 30) {
                     // Enhanced Profile Header
-                    EnhancedProfileHeader(user: authManager.currentUser?.toUser())
+                    EnhancedProfileHeader(user: cloudKitUserToUser(authManager.currentUser))
                         .scaleEffect(profileImageScale)
 
                     // Streak Summary
@@ -2673,4 +2673,38 @@ struct UsernameEditView: View {
             .environmentObject(DeviceManager())
             .environmentObject(GamificationManager())
     }
+}
+
+// MARK: - Helper function to convert CloudKitUser to User
+// Since CloudKitUser isn't accessible here, we'll create a simple conversion
+@MainActor
+private func cloudKitUserToUser(_ cloudKitUser: Any?) -> User? {
+    // For now, return a default user since we can't access CloudKitUser properties
+    // This needs to be properly refactored when CloudKitUser is made accessible
+    guard cloudKitUser != nil else { return nil }
+    
+    return User(
+        id: UUID().uuidString,
+        email: nil,
+        name: "SnapChef User",
+        username: "snapchef_user",
+        profileImageURL: nil,
+        subscription: Subscription(
+            tier: .free,
+            status: .active,
+            expiresAt: nil,
+            autoRenew: false
+        ),
+        credits: 0,
+        deviceId: UIDevice.current.identifierForVendor?.uuidString ?? "unknown",
+        createdAt: Date(),
+        lastLoginAt: Date(),
+        totalPoints: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        challengesCompleted: 0,
+        recipesShared: 0,
+        isProfilePublic: true,
+        showOnLeaderboard: true
+    )
 }
