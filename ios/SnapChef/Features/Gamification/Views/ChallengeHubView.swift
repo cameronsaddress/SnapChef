@@ -142,6 +142,8 @@ struct ChallengeHubView: View {
             // Trigger challenge sync when challenges page is visited
             Task {
                 await CloudKitSyncService.shared.triggerChallengeSync()
+                // Also sync challenge join status from CloudKit
+                await gamificationManager.syncChallengesFromCloudKit()
             }
 
             // Prompt for notifications if not already enabled

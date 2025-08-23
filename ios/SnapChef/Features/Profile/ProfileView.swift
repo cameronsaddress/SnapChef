@@ -2137,11 +2137,9 @@ struct ActiveChallengesSection: View {
     @State private var isLoadingChallenges = false
 
     private var activeChallenges: [Challenge] {
-        // Filter challenges that user is actively participating in
-        let activeUserChallenges = userChallenges.filter { $0.status == "active" || $0.status == "in_progress" }
-        
-        return cloudKitChallengeManager.activeChallenges.filter { challenge in
-            activeUserChallenges.contains { $0.challengeID == challenge.id }
+        // Get challenges from GamificationManager that the user has joined
+        return GamificationManager.shared.activeChallenges.filter { challenge in
+            challenge.isJoined && !challenge.isCompleted
         }
     }
 

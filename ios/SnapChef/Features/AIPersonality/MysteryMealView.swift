@@ -100,7 +100,9 @@ struct MysteryMealView: View {
             .navigationBarHidden(true)
         }
         .onAppear {
-            print("🔍 DEBUG: [MysteryMealView] appeared")
+            print("🔍 DEBUG: [MysteryMealView] appeared - Start")
+            // No state modifications directly in onAppear
+            print("🔍 DEBUG: [MysteryMealView] appeared - End")
         }
         .fullScreenCover(isPresented: $showingResults) {
             RecipeResultsView(
@@ -399,8 +401,10 @@ struct MysteryMealHeaderView: View {
                 .padding(.horizontal, 40)
         }
         .onAppear {
-            withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
-                sparkleAnimation = true
+            DispatchQueue.main.async {
+                withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
+                    sparkleAnimation = true
+                }
             }
         }
     }
@@ -884,8 +888,10 @@ struct SpinWheelButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                pulseAnimation = true
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    pulseAnimation = true
+                }
             }
         }
     }
@@ -945,14 +951,16 @@ struct MysteryGeneratingView: View {
                 .id(messageIndex)
         }
         .onAppear {
-            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                chefRotation = 360
-            }
-
-            Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
-                Task { @MainActor in
-                    withAnimation {
-                        messageIndex = (messageIndex + 1) % messages.count
+            DispatchQueue.main.async {
+                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                    chefRotation = 360
+                }
+                
+                Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
+                    Task { @MainActor in
+                        withAnimation {
+                            messageIndex = (messageIndex + 1) % messages.count
+                        }
                     }
                 }
             }

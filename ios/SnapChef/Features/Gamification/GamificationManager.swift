@@ -240,35 +240,62 @@ final class GamificationManager: ObservableObject {
     // MARK: - CloudKit Sync
 
     @MainActor
-    private func syncChallengesFromCloudKit() async {
+    func syncChallengesFromCloudKit() async {
         do {
             // Sync challenges from CloudKit
             try await CloudKitManager.shared.syncChallenges()
 
-            // Also sync user's challenge progress
-            if let userID = UserDefaults.standard.string(forKey: "currentUserID") {
-                let predicate = NSPredicate(format: "userID == %@ AND status != %@", userID, "completed")
-                let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-                let privateDB = container.privateCloudDatabase
+            // Get the current user ID from UnifiedAuthManager
+            let authManager = UnifiedAuthManager.shared
+            guard authManager.isAuthenticated,
+                  let userID = authManager.currentUser?.recordID else {
+                print("⚠️ User not authenticated, skipping challenge sync")
+                return
+            }
 
-                let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
-                let (results, _) = try await privateDB.records(matching: query)
+            // Sync user's challenge progress and joined status
+            let predicate = NSPredicate(format: "userID == %@ AND status != %@", userID, "completed")
+            let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+            let privateDB = container.privateCloudDatabase
 
-                var userChallengeCount = 0
-                for (_, result) in results {
-                    if let record = try? result.get() {
-                        // Update local challenge progress
-                        if let challengeIDRef = record["challengeID"] as? CKRecord.Reference,
-                           let progress = record["progress"] as? Double {
-                            let challengeID = challengeIDRef.recordID.recordName
-                            updateChallengeProgress(challengeID, progress: progress)
-                            userChallengeCount += 1
+            let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
+            let (results, _) = try await privateDB.records(matching: query)
+
+            var userChallengeCount = 0
+            var joinedChallengeIDs = Set<String>()
+            
+            for (_, result) in results {
+                if let record = try? result.get() {
+                    // Update local challenge progress and joined status
+                    if let challengeIDRef = record["challengeID"] as? CKRecord.Reference,
+                       let progress = record["progress"] as? Double {
+                        let challengeID = challengeIDRef.recordID.recordName
+                        
+                        // Mark this challenge as joined
+                        joinedChallengeIDs.insert(challengeID)
+                        
+                        // Update progress
+                        updateChallengeProgress(challengeID, progress: progress)
+                        
+                        // Mark the challenge as joined in local state
+                        if let index = activeChallenges.firstIndex(where: { $0.id == challengeID }) {
+                            activeChallenges[index].isJoined = true
+                            activeChallenges[index].currentProgress = progress
                         }
+                        
+                        userChallengeCount += 1
                     }
                 }
-
-                print("✅ Synced \(userChallengeCount) active challenges from CloudKit")
             }
+
+            // Update any challenges that weren't found in UserChallenge records as not joined
+            for index in activeChallenges.indices {
+                if !joinedChallengeIDs.contains(activeChallenges[index].id) {
+                    activeChallenges[index].isJoined = false
+                }
+            }
+
+            print("✅ Synced \(userChallengeCount) joined challenges from CloudKit")
         } catch {
             print("❌ Failed to sync challenges from CloudKit: \(error)")
         }
@@ -575,23 +602,58 @@ final class GamificationManager: ObservableObject {
             return
         }
 
-        // Join challenge logic
-        print("Joined challenge: \(challenge.title)")
+        guard let userID = authManager.currentUser?.recordID else {
+            print("❌ Cannot join challenge: User not authenticated")
+            return
+        }
 
-        // Check if already joined by ID or title
-        if !activeChallenges.contains(where: { $0.id == challenge.id || $0.title == challenge.title }) {
+        // Join challenge logic
+        print("Joining challenge: \(challenge.title)")
+
+        // Check if already joined by ID
+        if let existingIndex = activeChallenges.firstIndex(where: { $0.id == challenge.id }) {
+            // Already in active challenges, just update the joined status
+            activeChallenges[existingIndex].isJoined = true
+            activeChallenges[existingIndex].currentProgress = 0
+        } else {
+            // Add new challenge to active challenges
             var joinedChallenge = challenge
             joinedChallenge.isJoined = true
             joinedChallenge.currentProgress = 0
             activeChallenges.append(joinedChallenge)
+        }
 
-            // Track analytics
-            ChallengeAnalyticsService.shared.trackChallengeInteraction(
-                challengeId: challenge.id,
-                action: "started",
-                metadata: [
-                    "challengeType": challenge.type.rawValue,
-                    "difficulty": challenge.difficulty.rawValue,
+        // Save to CloudKit UserChallenge record
+        Task {
+            do {
+                let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+                let privateDB = container.privateCloudDatabase
+                
+                // Create UserChallenge record
+                let userChallengeRecord = CKRecord(recordType: "UserChallenge")
+                userChallengeRecord["userID"] = userID
+                userChallengeRecord["challengeID"] = CKRecord.Reference(
+                    recordID: CKRecord.ID(recordName: challenge.id),
+                    action: .none
+                )
+                userChallengeRecord["status"] = "active"
+                userChallengeRecord["progress"] = 0.0
+                userChallengeRecord["joinedAt"] = Date()
+                
+                _ = try await privateDB.save(userChallengeRecord)
+                print("✅ Saved challenge join to CloudKit")
+            } catch {
+                print("❌ Failed to save challenge join to CloudKit: \(error)")
+            }
+        }
+
+        // Track analytics
+        ChallengeAnalyticsService.shared.trackChallengeInteraction(
+            challengeId: challenge.id,
+            action: "started",
+            metadata: [
+                "challengeType": challenge.type.rawValue,
+                "difficulty": challenge.difficulty.rawValue,
                     "category": challenge.category
                 ]
             )
@@ -601,16 +663,23 @@ final class GamificationManager: ObservableObject {
                 await syncChallengeProgress(for: challenge.id, progress: 0)
             }
         }
-    }
 
     func isChallengeJoined(_ challengeId: String) -> Bool {
-        return activeChallenges.contains(where: { $0.id == challengeId }) ||
-               completedChallenges.contains(where: { $0.id == challengeId })
+        // Check if the challenge is joined (not just in the list)
+        if let challenge = activeChallenges.first(where: { $0.id == challengeId }) {
+            return challenge.isJoined
+        }
+        // Completed challenges are considered joined
+        return completedChallenges.contains(where: { $0.id == challengeId })
     }
 
     func isChallengeJoinedByTitle(_ title: String) -> Bool {
-        return activeChallenges.contains(where: { $0.title == title }) ||
-               completedChallenges.contains(where: { $0.title == title })
+        // Check if the challenge is joined (not just in the list)
+        if let challenge = activeChallenges.first(where: { $0.title == title }) {
+            return challenge.isJoined
+        }
+        // Completed challenges are considered joined
+        return completedChallenges.contains(where: { $0.title == title })
     }
 
     func completeChallenge(challengeId: String) {

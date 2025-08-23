@@ -148,35 +148,47 @@ struct HomeView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .particleExplosion(trigger: $particleTrigger)
         .onAppear {
-            print("🔍 DEBUG: HomeView appeared")
+            print("🔍 DEBUG: HomeView appeared - Start")
             
-            // Track screen view
-            Task {
-                await cloudKitDataManager.trackScreenView("Home")
-            }
-
-            // Simple fade in for mystery meal animation (only if animations enabled)
-            if deviceManager.animationsEnabled {
+            // Defer state modifications to avoid "Modifying state during view update" warnings
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: HomeView - Async block started")
+                
+                // Track screen view
+                Task {
+                    await cloudKitDataManager.trackScreenView("Home")
+                }
+                
+                // Simple fade in for mystery meal animation (only if animations enabled)
+                if deviceManager.animationsEnabled {
+                    print("🔍 DEBUG: HomeView - Setting mysteryMealAnimation")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     withAnimation(.easeInOut(duration: deviceManager.recommendedAnimationDuration * 2)) {
                         mysteryMealAnimation = true
                     }
+                    }
+                } else {
+                    mysteryMealAnimation = true
                 }
-            } else {
-                mysteryMealAnimation = true
-            }
-
-            // Start button shake after 3 seconds (only if continuous animations enabled)
-            if deviceManager.shouldUseContinuousAnimations {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    startButtonShake()
+                
+                // Start button shake after 3 seconds (only if continuous animations enabled)
+                if deviceManager.shouldUseContinuousAnimations {
+                    print("🔍 DEBUG: HomeView - Scheduling button shake")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        startButtonShake()
+                    }
                 }
+                
+                // Start falling food animation (only if particles enabled)
+                if deviceManager.shouldShowParticles {
+                    print("🔍 DEBUG: HomeView - Starting falling food animation")
+                    fallingFoodManager.startFallingFood()
+                }
+                
+                print("🔍 DEBUG: HomeView - Async block completed")
             }
-
-            // Start falling food animation (only if particles enabled)
-            if deviceManager.shouldShowParticles {
-                fallingFoodManager.startFallingFood()
-            }
+            
+            print("🔍 DEBUG: HomeView appeared - End")
         }
         .onDisappear {
             fallingFoodManager.cleanup()
@@ -474,8 +486,10 @@ struct ViralChallengeSection: View {
             .frame(height: 540)
         }
         .onAppear {
-            sparkleAnimation = true
-            startAutoScroll()
+            DispatchQueue.main.async {
+                sparkleAnimation = true
+                startAutoScroll()
+            }
         }
         .onDisappear {
             stopAutoScroll()
@@ -487,7 +501,8 @@ struct ViralChallengeSection: View {
 
     private func startAutoScroll() {
         autoTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { _ in
-            Task { @MainActor in
+            // Defer state updates to avoid "Modifying state during view update"
+            DispatchQueue.main.async {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                     currentChallenge = (currentChallenge + 1) % max(displayChallenges.count, 1)
                 }
@@ -664,8 +679,10 @@ struct EnhancedChallengeCard: View {
                 }
                 .scaleEffect(isPressed ? 0.95 : 1)
                 .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
-                    withAnimation(.easeInOut(duration: 0.1)) {
-                        isPressed = pressing
+                    DispatchQueue.main.async {
+                        withAnimation(.easeInOut(duration: 0.1)) {
+                            isPressed = pressing
+                        }
                     }
                 }, perform: {})
             }
@@ -700,11 +717,14 @@ struct EnhancedChallengeCard: View {
         .padding(.vertical, 20)
         .shadow(color: Color.black.opacity(0.3), radius: 20, y: 10)
         .onAppear {
-            particleAnimation = true
-            updateTimeRemaining()
+            DispatchQueue.main.async {
+                particleAnimation = true
+                updateTimeRemaining()
+            }
         }
         .onReceive(timer) { _ in
-            Task { @MainActor in
+            // Defer state updates to avoid "Modifying state during view update"
+            DispatchQueue.main.async {
                 updateTimeRemaining()
             }
         }
@@ -927,14 +947,18 @@ struct MysteryMealButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isPressed = pressing
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isPressed = pressing
+                }
             }
         }, perform: {})
         .onAppear {
             // Single rotation on appear
-            withAnimation(.easeInOut(duration: 1.2)) {
-                diceRotation = 360
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 1.2)) {
+                    diceRotation = 360
+                }
             }
         }
     }
@@ -994,14 +1018,19 @@ final class FallingFoodManager: ObservableObject {
     }
 
     @objc private func updateAnimation() {
-        updatePhysics()
+        // Defer state updates to avoid "Modifying state during view update"
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            self.updatePhysics()
 
-        // Handle emoji dropping
-        let currentTime = CACurrentMediaTime()
-        if currentTime - lastDropTime >= nextDropDelay {
-            dropEmoji()
-            lastDropTime = currentTime
-            nextDropDelay = Double.random(in: 0.5...3)
+            // Handle emoji dropping
+            let currentTime = CACurrentMediaTime()
+            if currentTime - self.lastDropTime >= self.nextDropDelay {
+                self.dropEmoji()
+                self.lastDropTime = currentTime
+                self.nextDropDelay = Double.random(in: 0.5...3)
+            }
         }
     }
 
@@ -1257,8 +1286,10 @@ struct RecipeDetectiveTile: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onAppear {
-            isAnimating = true
-            mysteryGlow = true
+            DispatchQueue.main.async {
+                isAnimating = true
+                mysteryGlow = true
+            }
         }
         .fullScreenCover(isPresented: $showingDetectiveView) {
             RecipeDetectiveView()
@@ -1391,8 +1422,10 @@ struct DetectiveFeatureTile: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onAppear {
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                isAnimating = true
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    isAnimating = true
+                }
             }
         }
         .fullScreenCover(isPresented: $showingDetective) {

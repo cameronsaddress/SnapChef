@@ -66,17 +66,29 @@ struct PhysicsLoadingOverlay: View {
             }
             .onAppear {
                 print("🔍 DEBUG: [PhysicsLoadingOverlay] appeared")
-                startAnimations(in: geometry.size)
+                // Defer state updates to avoid "Modifying state during view update"
+                DispatchQueue.main.async {
+                    startAnimations(in: geometry.size)
+                }
             }
             .onReceive(Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()) { _ in
-                updatePhysics(in: geometry.size)
+                // Defer state updates to avoid "Modifying state during view update"
+                DispatchQueue.main.async {
+                    updatePhysics(in: geometry.size)
+                }
             }
             .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
-                addNewEmoji(in: geometry.size)
+                // Defer state updates to avoid "Modifying state during view update"
+                DispatchQueue.main.async {
+                    addNewEmoji(in: geometry.size)
+                }
             }
             .onReceive(Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()) { _ in
-                withAnimation {
-                    messageIndex = (messageIndex + 1) % messages.count
+                // Defer state updates to avoid "Modifying state during view update"
+                DispatchQueue.main.async {
+                    withAnimation {
+                        messageIndex = (messageIndex + 1) % messages.count
+                    }
                 }
             }
         }
@@ -289,18 +301,21 @@ struct OriginalProcessingOverlay: View {
             }
         }
         .onAppear {
-            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                rotation = 360
-            }
+            // Defer all animations to avoid "Modifying state during view update"
+            DispatchQueue.main.async {
+                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                    rotation = 360
+                }
 
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                scale = 1.2
-            }
+                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                    scale = 1.2
+                }
 
-            Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
-                Task { @MainActor in
-                    withAnimation {
-                        messageIndex = (messageIndex + 1) % messages.count
+                Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
+                    Task { @MainActor in
+                        withAnimation {
+                            messageIndex = (messageIndex + 1) % messages.count
+                        }
                     }
                 }
             }

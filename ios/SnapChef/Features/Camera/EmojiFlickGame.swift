@@ -167,21 +167,30 @@ struct EmojiFlickGame: View {
             }
         }
         .onReceive(gameTimer) { _ in
-            updateGame()
+            // Defer state updates to avoid "Modifying state during view update"
+            DispatchQueue.main.async {
+                updateGame()
+            }
         }
         .onReceive(spawnTimer) { _ in
-            spawnEmoji()
+            // Defer state updates to avoid "Modifying state during view update"
+            DispatchQueue.main.async {
+                spawnEmoji()
+            }
         }
         .onAppear {
             print("🔍 DEBUG: [EmojiFlickGame] appeared")
-            spawnInitialEmojis()
-            if deviceManager.shouldShowParticles {
-                createAmbientParticles()
-            }
-            if deviceManager.animationsEnabled {
-                startTutorialAnimation()
-            } else {
-                showTutorial = false
+            // Defer state updates to avoid "Modifying state during view update"
+            DispatchQueue.main.async {
+                spawnInitialEmojis()
+                if deviceManager.shouldShowParticles {
+                    createAmbientParticles()
+                }
+                if deviceManager.animationsEnabled {
+                    startTutorialAnimation()
+                } else {
+                    showTutorial = false
+                }
             }
         }
     }
@@ -1324,24 +1333,30 @@ struct AIAnalyzingIndicator: View {
         }
         .shadow(color: .purple.opacity(0.3), radius: 10)
         .onReceive(timer) { _ in
-            withAnimation(.easeInOut(duration: 0.3)) {
-                dots = dots.count >= 3 ? "." : dots + "."
+            // Defer state updates to avoid "Modifying state during view update"
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    dots = dots.count >= 3 ? "." : dots + "."
+                }
             }
         }
         .onAppear {
-            // Brain pulse animation
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                pulseScale = 1.2
-            }
+            // Defer animations to avoid "Modifying state during view update"
+            DispatchQueue.main.async {
+                // Brain pulse animation
+                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                    pulseScale = 1.2
+                }
 
-            // Scanner animation
-            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                scannerOffset = 40
-            }
+                // Scanner animation
+                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                    scannerOffset = 40
+                }
 
-            // Scanner fade animation
-            withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
-                scannerOpacity = 0.3
+                // Scanner fade animation
+                withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
+                    scannerOpacity = 0.3
+                }
             }
         }
     }
@@ -1375,8 +1390,11 @@ struct TutorialFingerView: View {
                 .rotationEffect(.degrees(45)) // Angle for swiping
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                pulseScale = 1.2
+            // Defer animations to avoid "Modifying state during view update"
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                    pulseScale = 1.2
+                }
             }
         }
     }
@@ -1403,11 +1421,14 @@ struct MagneticFieldView: View {
             }
         }
         .onAppear {
-            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
-                rotation = 360
-            }
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                scale = 1.2
+            // Defer animations to avoid "Modifying state during view update"
+            DispatchQueue.main.async {
+                withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+                    rotation = 360
+                }
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    scale = 1.2
+                }
             }
         }
     }
