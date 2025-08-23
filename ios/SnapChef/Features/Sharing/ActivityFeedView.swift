@@ -826,11 +826,11 @@ class ActivityFeedManager: ObservableObject {
                 // Continue without targeted activities
             }
             
-            // Fetch activities from users they follow
+            // Fetch activities from users they follow (including their own)
             var followedUserActivities: [CKRecord] = []
             do {
                 followedUserActivities = try await fetchFollowedUserActivities(limit: 25)
-                print("✅ Fetched \(followedUserActivities.count) activities from followed users")
+                print("✅ Fetched \(followedUserActivities.count) activities from followed users and self")
             } catch {
                 print("⚠️ Failed to fetch followed user activities: \(error)")
                 // Continue without followed activities
@@ -933,7 +933,10 @@ class ActivityFeedManager: ObservableObject {
             
             print("📊 Found \(followedUserIDs.count) followed users")
             
-            // If not following anyone, return empty
+            // Add the current user to see their own activities in the feed
+            followedUserIDs.append(currentUserID)
+            
+            // If not following anyone (except themselves), still show own activities
             guard !followedUserIDs.isEmpty else {
                 return []
             }
