@@ -242,6 +242,15 @@ try await UnifiedAuthManager.shared.refreshCurrentUserData()
 
 ## 🔄 Latest Updates (Aug 23, 2025)
 
+### SocialFeedView Recipe Count Fixed (Aug 23)
+- ✅ Fixed recipe count showing 0 in SocialFeedView header
+- ✅ Changed from `recipesShared` to `recipesCreated` to show actual recipes created
+- ✅ Added `updateRecipeCounts()` to count recipes from CloudKit
+- ✅ Recipe count now accurately reflects user's created recipes
+- ✅ Enhanced refresh logic to update counts on view load and pull-to-refresh
+
+## 📅 Previous Updates (Aug 23, 2025)
+
 ### SwiftUI State Update Warnings COMPLETELY RESOLVED (Aug 23)
 - ✅ **Fixed ALL "Modifying state during view update" warnings** - App now runs clean!
 - ✅ **Root cause found**: ParticleExplosion in MagicalTransitions.swift was modifying state in body

@@ -187,6 +187,7 @@ struct SocialFeedView: View {
     @EnvironmentObject var authManager: UnifiedAuthManager
     @State private var showingDiscoverUsers = false
     @State private var isRefreshing = false
+    @State private var hasLoadedInitialData = false
 
     var body: some View {
         let _ = print("🔍 DEBUG: SocialFeedView body called")
@@ -235,29 +236,60 @@ struct SocialFeedView: View {
                 .environmentObject(appState)
         }
         .task {
-            // Refresh user data to get latest follower/following counts
-            if authManager.isAuthenticated {
+            // Initial data load
+            if !hasLoadedInitialData && authManager.isAuthenticated {
+                print("🔍 DEBUG: SocialFeedView initial data load")
                 do {
                     try await authManager.refreshCurrentUserData()
+                    await authManager.updateRecipeCounts()
+                    hasLoadedInitialData = true
+                    print("✅ DEBUG: User data loaded - Followers: \(authManager.currentUser?.followerCount ?? 0), Following: \(authManager.currentUser?.followingCount ?? 0), Recipes Created: \(authManager.currentUser?.recipesCreated ?? 0)")
                 } catch {
-                    print("Failed to refresh user data: \(error)")
+                    print("❌ Failed to refresh user data: \(error)")
                 }
             }
         }
         .onAppear {
-            // Authentication status is checked automatically in UnifiedAuthManager
+            print("🔍 DEBUG: SocialFeedView appeared")
+            print("🔍 DEBUG: Current user: \(authManager.currentUser?.username ?? "nil")")
+            print("🔍 DEBUG: Followers: \(authManager.currentUser?.followerCount ?? 0)")
+            print("🔍 DEBUG: Following: \(authManager.currentUser?.followingCount ?? 0)")
+            print("🔍 DEBUG: Recipes Created: \(authManager.currentUser?.recipesCreated ?? 0)")
+            
+            // Force refresh if data looks stale
+            if authManager.isAuthenticated && authManager.currentUser != nil {
+                let needsRefresh = (authManager.currentUser?.followerCount ?? 0) == 0 &&
+                                  (authManager.currentUser?.followingCount ?? 0) == 0 &&
+                                  (authManager.currentUser?.recipesCreated ?? 0) == 0
+                
+                if needsRefresh && !isRefreshing {
+                    print("🔍 DEBUG: Data looks stale, forcing refresh")
+                    Task {
+                        await refreshSocialData()
+                    }
+                }
+            }
         }
     }
 
     private func refreshSocialData() async {
+        guard !isRefreshing else { return }
         isRefreshing = true
+        
+        print("🔍 DEBUG: Refreshing social data...")
         
         // Refresh user data to get latest counts
         if authManager.isAuthenticated {
             do {
+                // First refresh user data
                 try await authManager.refreshCurrentUserData()
+                
+                // Then update recipe counts from CloudKit
+                await authManager.updateRecipeCounts()
+                
+                print("✅ DEBUG: Social data refreshed - Followers: \(authManager.currentUser?.followerCount ?? 0), Following: \(authManager.currentUser?.followingCount ?? 0), Recipes Created: \(authManager.currentUser?.recipesCreated ?? 0)")
             } catch {
-                print("Failed to refresh user data: \(error)")
+                print("❌ Failed to refresh user data: \(error)")
             }
         }
         
@@ -299,7 +331,7 @@ struct SocialFeedView: View {
                     )
 
                     socialStatItem(
-                        count: authManager.currentUser?.recipesShared ?? 0,
+                        count: authManager.currentUser?.recipesCreated ?? 0,
                         label: "Recipes"
                     )
                 }
