@@ -119,6 +119,12 @@ struct FeedView: View {
     }
 
     private func refreshUserStats() async {
+        // Only refresh if authenticated
+        guard cloudKitAuth.isAuthenticated else {
+            print("⚠️ FeedView: Skipping refresh - user not authenticated")
+            return
+        }
+        
         isRefreshing = true
         // Update social counts (followers/following)
         await cloudKitAuth.updateSocialCounts()

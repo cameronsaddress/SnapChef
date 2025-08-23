@@ -952,11 +952,16 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Update social counts (followers/following)
     func updateSocialCounts() async {
-        guard let currentUser = currentUser else { return }
+        guard let currentUser = currentUser,
+              let recordID = currentUser.recordID,
+              !recordID.isEmpty else { 
+            print("⚠️ updateSocialCounts: No valid user record ID")
+            return 
+        }
         
         do {
             // Count followers
-            let followerPredicate = NSPredicate(format: "followingID == %@", currentUser.recordID ?? "")
+            let followerPredicate = NSPredicate(format: "followingID == %@", recordID)
             let followerQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
             
             let (followerResults, _) = try await cloudKitDatabase.records(
