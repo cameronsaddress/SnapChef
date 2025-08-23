@@ -671,6 +671,9 @@ class ActivityFeedManager: ObservableObject {
     @Published var isLoading = false
     @Published var hasMore = true
     @Published var showingSkeletonViews = false
+    
+    // Prevent concurrent refreshes
+    private var isRefreshing = false
 
     // Lazy initialization to prevent crashes
     private var cloudKitSync: CloudKitSyncService {
@@ -689,6 +692,12 @@ class ActivityFeedManager: ObservableObject {
 
     func loadInitialActivities() async {
         print("🔍 DEBUG: loadInitialActivities started")
+        
+        // Prevent concurrent loads
+        guard !isLoading else {
+            print("⚠️ Already loading activities, skipping")
+            return
+        }
         
         await MainActor.run {
             print("🔍 DEBUG: Setting showingSkeletonViews = true")
@@ -732,6 +741,15 @@ class ActivityFeedManager: ObservableObject {
     }
 
     func refresh() async {
+        // Prevent concurrent refreshes
+        guard !isRefreshing else { 
+            print("⚠️ Refresh already in progress, skipping")
+            return 
+        }
+        
+        isRefreshing = true
+        defer { isRefreshing = false }
+        
         await loadInitialActivities()
     }
 
@@ -949,36 +967,29 @@ class ActivityFeedManager: ObservableObject {
             let activityPredicate = NSPredicate(format: "actorID IN %@", limitedFollowedUsers)
             let activityQuery = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: activityPredicate)
             
-            // Fetch activities
-            let operation = CKQueryOperation(query: activityQuery)
-            operation.resultsLimit = limit
-            
+            // Use the modern async API instead of operation-based API
             var activities: [CKRecord] = []
             
-            return try await withCheckedThrowingContinuation { continuation in
-                operation.recordMatchedBlock = { _, result in
-                    if case .success(let record) = result {
-                        activities.append(record)
-                    }
+            let queryOperation = CKQueryOperation(query: activityQuery)
+            queryOperation.resultsLimit = limit
+            
+            // Use record results directly instead of continuations
+            let results = try await database.records(matching: activityQuery, resultsLimit: limit)
+            
+            for (_, result) in results.matchResults {
+                if case .success(let record) = result {
+                    activities.append(record)
                 }
-                
-                operation.queryResultBlock = { result in
-                    switch result {
-                    case .success:
-                        // Sort by timestamp
-                        activities.sort { record1, record2 in
-                            let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
-                            let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
-                            return date1 > date2
-                        }
-                        continuation.resume(returning: activities)
-                    case .failure(let error):
-                        continuation.resume(throwing: error)
-                    }
-                }
-                
-                database.add(operation)
             }
+            
+            // Sort by timestamp
+            activities.sort { record1, record2 in
+                let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+                let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+                return date1 > date2
+            }
+            
+            return activities
             
         } catch {
             print("⚠️ Failed to fetch followed user activities: \(error)")
