@@ -1044,7 +1044,8 @@ class ActivityFeedManager: ObservableObject {
             return
         }
         
-        let recordIDs = validUserIDs.map { CKRecord.ID(recordName: $0) }
+        // User records in CloudKit have "user_" prefix
+        let recordIDs = validUserIDs.map { CKRecord.ID(recordName: "user_\($0)") }
         
         do {
             let recordResults = try await publicDatabase.records(for: recordIDs)
@@ -1055,7 +1056,11 @@ class ActivityFeedManager: ObservableObject {
                     // Safely create user from record
                     do {
                         let user = CloudKitUser(from: record)
-                        userCache[recordID.recordName] = user
+                        // Store in cache using the raw userID (without "user_" prefix)
+                        // CloudKitUser init already strips the prefix
+                        if let userID = user.recordID {
+                            userCache[userID] = user
+                        }
                     } catch {
                         print("⚠️ Failed to parse user record \(recordID.recordName): \(error)")
                         // Create placeholder user
@@ -1092,7 +1097,12 @@ class ActivityFeedManager: ObservableObject {
         placeholderRecord[CKField.User.recipesShared] = Int64(0)
         placeholderRecord[CKField.User.followerCount] = Int64(0)
         placeholderRecord[CKField.User.followingCount] = Int64(0)
-        userCache[recordID.recordName] = CloudKitUser(from: placeholderRecord)
+        
+        let placeholderUser = CloudKitUser(from: placeholderRecord)
+        // Store using the raw userID (without "user_" prefix)
+        if let userID = placeholderUser.recordID {
+            userCache[userID] = placeholderUser
+        }
     }
 
     /// Fetches user display name by userID, using cache when available
@@ -1104,7 +1114,9 @@ class ActivityFeedManager: ObservableObject {
         
         // This should rarely happen now with batch fetching, but fallback just in case
         do {
-            let userRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: userID))
+            // User records in CloudKit have "user_" prefix
+            let userRecordID = CKRecord.ID(recordName: "user_\(userID)")
+            let userRecord = try await publicDatabase.record(for: userRecordID)
             let user = CloudKitUser(from: userRecord)
             
             // Update cache with fresh data
