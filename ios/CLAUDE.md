@@ -128,6 +128,22 @@ All authentication goes through UnifiedAuthManager:
 - Use CloudKitRecipeManager for recipe operations
 - Use CloudKitChallengeManager for challenge operations
 
+### Social Follow Implementation
+```swift
+// Follow a user
+try await UnifiedAuthManager.shared.followUser(userID: "user_id")
+
+// Unfollow a user
+try await UnifiedAuthManager.shared.unfollowUser(userID: "user_id")
+
+// Check if following
+let isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: "user_id")
+
+// Refresh current user data (updates counts)
+try await UnifiedAuthManager.shared.refreshCurrentUserData()
+```
+**Important**: Always refresh user data when views appear to show accurate follower/following counts
+
 ## 🚫 Anti-Patterns to Avoid
 
 ❌ Creating duplicate authentication managers
@@ -225,6 +241,20 @@ All authentication goes through UnifiedAuthManager:
 - **FILE_USAGE_ANALYSIS.md** - File usage status
 
 ## 🔄 Latest Updates (Aug 23, 2025)
+
+### Social Follow System (Fixed Aug 23)
+- ✅ Follow/unfollow properly updates CloudKit User records
+- ✅ Both follower and following counts update immediately
+- ✅ Counts persist correctly after app restart
+- ✅ All views refresh to show accurate counts
+- ✅ Follow relationships stored in CloudKit Follow records
+
+#### How Follow System Works:
+1. **Follow Action**: Creates Follow record + updates both users' counts in CloudKit
+2. **Unfollow Action**: Soft deletes Follow record (isActive=0) + updates counts
+3. **Count Updates**: Current user's followingCount and target user's followerCount both updated
+4. **Data Refresh**: Views call `refreshCurrentUserData()` on appear to show latest counts
+5. **Persistence**: All counts stored in CloudKit User records, survive app restarts
 
 ### Social Sharing & Feed System (Fixed Aug 23)
 - ✅ BrandedSharePopup used consistently across all share buttons

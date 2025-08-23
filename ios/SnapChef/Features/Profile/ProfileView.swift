@@ -99,6 +99,16 @@ struct ProfileView: View {
         }
         .navigationBarHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .task {
+            // Refresh user data to get latest follower/following counts
+            if authManager.isAuthenticated {
+                do {
+                    try await authManager.refreshCurrentUserData()
+                } catch {
+                    print("Failed to refresh user data: \(error)")
+                }
+            }
+        }
         .onAppear {
             print("🔍 DEBUG: ProfileView appeared")
             

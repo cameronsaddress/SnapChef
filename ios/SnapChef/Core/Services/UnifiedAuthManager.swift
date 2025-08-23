@@ -672,6 +672,7 @@ final class UnifiedAuthManager: ObservableObject {
         // Check if already following
         let isAlreadyFollowing = await isFollowing(userID: userID)
         if isAlreadyFollowing {
+            print("⚠️ Already following user: \(userID)")
             return // Already following
         }
         
@@ -686,8 +687,15 @@ final class UnifiedAuthManager: ObservableObject {
         
         print("✅ User followed: \(userID)")
         
-        // Update local follower count
+        // Update local follower count immediately
         self.currentUser?.followingCount += 1
+        
+        // Update CloudKit User record with new following count
+        let newFollowingCount = self.currentUser?.followingCount ?? 1
+        try await updateUserStats(UserStatUpdates(followingCount: newFollowingCount))
+        
+        // Also update the followed user's follower count
+        await updateFollowedUserFollowerCount(userID: userID, increment: true)
     }
     
     /// Unfollow a user
@@ -722,10 +730,40 @@ final class UnifiedAuthManager: ObservableObject {
             
             print("✅ User unfollowed: \(userID)")
             
-            // Update local follower count
+            // Update local follower count immediately
             self.currentUser?.followingCount = max(0, (self.currentUser?.followingCount ?? 0) - 1)
+            
+            // Update CloudKit User record with new following count
+            let newFollowingCount = self.currentUser?.followingCount ?? 0
+            try await updateUserStats(UserStatUpdates(followingCount: newFollowingCount))
+            
+            // Also update the unfollowed user's follower count
+            await updateFollowedUserFollowerCount(userID: userID, increment: false)
         } catch {
             throw UnifiedAuthError.networkError
+        }
+    }
+    
+    /// Helper method to update the followed/unfollowed user's follower count
+    private func updateFollowedUserFollowerCount(userID: String, increment: Bool) async {
+        do {
+            // Fetch the user's record
+            let userRecordID = CKRecord.ID(recordName: "user_\(userID)")
+            let userRecord = try await cloudKitDatabase.record(for: userRecordID)
+            
+            // Get current follower count
+            let currentCount = Int(userRecord[CKField.User.followerCount] as? Int64 ?? 0)
+            
+            // Update the count
+            let newCount = increment ? currentCount + 1 : max(0, currentCount - 1)
+            userRecord[CKField.User.followerCount] = Int64(newCount)
+            
+            // Save the updated record
+            _ = try await cloudKitDatabase.save(userRecord)
+            
+            print("✅ Updated user \(userID) follower count to \(newCount)")
+        } catch {
+            print("❌ Failed to update followed user's follower count: \(error)")
         }
     }
     
@@ -969,6 +1007,29 @@ final class UnifiedAuthManager: ObservableObject {
             try await updateUserStats(UserStatUpdates(recipesCreated: recipeCount, experiencePoints: nil))
         } catch {
             print("Error updating recipe counts: \(error)")
+        }
+    }
+    
+    /// Refresh current user data from CloudKit
+    func refreshCurrentUserData() async throws {
+        guard let currentUser = currentUser,
+              let recordID = currentUser.recordID else {
+            throw UnifiedAuthError.notAuthenticated
+        }
+        
+        do {
+            // Fetch the latest user record from CloudKit
+            let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
+            let userRecord = try await cloudKitDatabase.record(for: userRecordID)
+            
+            // Update the current user with fresh data
+            let refreshedUser = CloudKitUser(from: userRecord)
+            self.currentUser = refreshedUser
+            
+            print("✅ Refreshed current user data - Followers: \(refreshedUser.followerCount), Following: \(refreshedUser.followingCount)")
+        } catch {
+            print("❌ Failed to refresh user data: \(error)")
+            throw error
         }
     }
     

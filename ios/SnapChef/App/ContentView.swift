@@ -237,8 +237,14 @@ struct SocialFeedView: View {
                 .environmentObject(appState)
         }
         .task {
-            // Update social counts when view appears
-            // Social counts are updated automatically by UnifiedAuthManager
+            // Refresh user data to get latest follower/following counts
+            if authManager.isAuthenticated {
+                do {
+                    try await authManager.refreshCurrentUserData()
+                } catch {
+                    print("Failed to refresh user data: \(error)")
+                }
+            }
         }
         .onAppear {
             // Authentication status is checked automatically in UnifiedAuthManager
@@ -247,7 +253,16 @@ struct SocialFeedView: View {
 
     private func refreshSocialData() async {
         isRefreshing = true
-        // Social data refresh is handled by UnifiedAuthManager
+        
+        // Refresh user data to get latest counts
+        if authManager.isAuthenticated {
+            do {
+                try await authManager.refreshCurrentUserData()
+            } catch {
+                print("Failed to refresh user data: \(error)")
+            }
+        }
+        
         isRefreshing = false
     }
 
