@@ -1145,7 +1145,13 @@ public struct CloudKitUser: Identifiable {
     public var experiencePoints: Int
     
     public init(from record: CKRecord) {
-        self.recordID = record.recordID.recordName
+        // Remove "user_" prefix if present to get the actual CloudKit user ID
+        let fullRecordID = record.recordID.recordName
+        if fullRecordID.hasPrefix("user_") {
+            self.recordID = String(fullRecordID.dropFirst(5))  // Remove "user_" prefix
+        } else {
+            self.recordID = fullRecordID
+        }
         self.username = record[CKField.User.username] as? String
         self.displayName = record[CKField.User.displayName] as? String ?? "Anonymous Chef"
         self.email = record[CKField.User.email] as? String ?? ""
