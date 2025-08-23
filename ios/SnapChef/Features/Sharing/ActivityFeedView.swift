@@ -688,20 +688,37 @@ class ActivityFeedManager: ObservableObject {
     private let cacheExpirationTime: TimeInterval = 300 // 5 minutes
 
     func loadInitialActivities() async {
-        showingSkeletonViews = true
-        isLoading = true
-        activities = []
-        lastFetchedRecord = nil
+        print("🔍 DEBUG: loadInitialActivities started")
+        
+        await MainActor.run {
+            print("🔍 DEBUG: Setting showingSkeletonViews = true")
+            showingSkeletonViews = true
+            print("🔍 DEBUG: Setting isLoading = true")
+            isLoading = true
+            print("🔍 DEBUG: Clearing activities")
+            activities = []
+            lastFetchedRecord = nil
+        }
 
+        print("🔍 DEBUG: Loading cached activities")
         // Try loading from cache first
         await loadCachedActivities()
         
         if activities.isEmpty {
+            print("🔍 DEBUG: No cached activities, fetching from CloudKit")
             await fetchActivitiesFromCloudKit()
+        } else {
+            print("🔍 DEBUG: Found \(activities.count) cached activities")
         }
         
-        showingSkeletonViews = false
-        isLoading = false
+        await MainActor.run {
+            print("🔍 DEBUG: Setting showingSkeletonViews = false")
+            showingSkeletonViews = false
+            print("🔍 DEBUG: Setting isLoading = false")
+            isLoading = false
+        }
+        
+        print("🔍 DEBUG: loadInitialActivities completed")
     }
 
     func loadMore() async {
@@ -755,13 +772,27 @@ class ActivityFeedManager: ObservableObject {
     }
 
     private func fetchActivitiesFromCloudKit(loadMore: Bool = false) async {
-        guard let currentUser = UnifiedAuthManager.shared.currentUser,
-              let userID = currentUser.recordID else {
-            print("❌ No authenticated user for activity feed")
-            activities = generateMockActivities()
-            hasMore = false
+        print("🔍 DEBUG: fetchActivitiesFromCloudKit started")
+        
+        guard let currentUser = UnifiedAuthManager.shared.currentUser else {
+            print("❌ No current user found")
+            await MainActor.run {
+                activities = generateMockActivities()
+                hasMore = false
+            }
             return
         }
+        
+        guard let userID = currentUser.recordID else {
+            print("❌ Current user has no recordID")
+            await MainActor.run {
+                activities = generateMockActivities()
+                hasMore = false
+            }
+            return
+        }
+        
+        print("🔍 DEBUG: User authenticated with ID: \(userID)")
 
         do {
             // Fetch activities where current user is the target (activities for them)
@@ -1174,20 +1205,43 @@ class ActivityFeedManager: ObservableObject {
     // MARK: - Caching Methods
     
     private func loadCachedActivities() async {
-        guard let data = UserDefaults.standard.data(forKey: cacheKey),
-              let timestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date,
-              Date().timeIntervalSince(timestamp) < cacheExpirationTime else {
+        print("🔍 DEBUG: loadCachedActivities - checking for cache")
+        
+        guard let data = UserDefaults.standard.data(forKey: cacheKey) else {
+            print("🔍 DEBUG: No cached data found")
             return
         }
+        
+        guard let timestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date else {
+            print("🔍 DEBUG: No cache timestamp found")
+            return
+        }
+        
+        let cacheAge = Date().timeIntervalSince(timestamp)
+        if cacheAge >= cacheExpirationTime {
+            print("🔍 DEBUG: Cache expired (age: \(cacheAge)s)")
+            return
+        }
+        
+        print("🔍 DEBUG: Cache is valid, attempting to decode")
         
         do {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
+            print("🔍 DEBUG: Decoding cached data of size: \(data.count) bytes")
             let cachedData = try decoder.decode(CachedActivityData.self, from: data)
-            activities = cachedData.activities
+            print("🔍 DEBUG: Successfully decoded \(cachedData.activities.count) activities")
+            
+            await MainActor.run {
+                activities = cachedData.activities
+            }
+            
             print("✅ Loaded \(activities.count) cached activities")
         } catch {
             print("❌ Failed to load cached activities: \(error)")
+            // Clear corrupt cache
+            UserDefaults.standard.removeObject(forKey: cacheKey)
+            UserDefaults.standard.removeObject(forKey: cacheTimestampKey)
         }
     }
     
