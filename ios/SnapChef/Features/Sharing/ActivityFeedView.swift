@@ -112,7 +112,10 @@ struct ActivityItem: Identifiable {
 
 // MARK: - Activity Feed View
 struct ActivityFeedView: View {
-    @StateObject private var feedManager = ActivityFeedManager()
+    @StateObject private var feedManager = {
+        print("🔍 DEBUG: Creating ActivityFeedManager")
+        return ActivityFeedManager()
+    }()
     @EnvironmentObject var appState: AppState
     @State private var selectedFilter: ActivityFilter = .all
     @State private var showingRecipeDetail = false
@@ -145,7 +148,8 @@ struct ActivityFeedView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        let _ = print("🔍 DEBUG: ActivityFeedView body called")
+        return NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
@@ -236,8 +240,13 @@ struct ActivityFeedView: View {
                 await feedManager.refresh()
             }
         }
+        .onAppear {
+            print("🔍 DEBUG: ActivityFeedView appeared")
+        }
         .task {
+            print("🔍 DEBUG: ActivityFeedView task starting")
             await feedManager.loadInitialActivities()
+            print("🔍 DEBUG: ActivityFeedView task completed")
         }
         .sheet(item: $sheetRecipe) { identifiableRecipe in
             NavigationStack {
@@ -663,10 +672,15 @@ class ActivityFeedManager: ObservableObject {
     @Published var hasMore = true
     @Published var showingSkeletonViews = false
 
-    private let cloudKitSync = CloudKitSyncService.shared
+    // Lazy initialization to prevent crashes
+    private var cloudKitSync: CloudKitSyncService {
+        CloudKitSyncService.shared
+    }
     private var lastFetchedRecord: CKRecord?
     private var userCache: [String: CloudKitUser] = [:] // Cache for user details
-    private let publicDatabase = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+    private var publicDatabase: CKDatabase {
+        CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+    }
     
     // Cache configuration
     private let cacheKey = "ActivityFeedCache"

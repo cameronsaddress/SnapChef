@@ -191,21 +191,28 @@ struct SocialFeedView: View {
     @State private var isRefreshing = false
 
     var body: some View {
-        NavigationStack {
+        let _ = print("🔍 DEBUG: SocialFeedView body called")
+        return NavigationStack {
             ZStack {
                 MagicalBackground()
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     // Social Stats Header
-                    socialStatsHeader
-                        .padding(.horizontal, 20)
-                        .padding(.top, 10)
-                        .padding(.bottom, 16)
+                    Group {
+                        let _ = print("🔍 DEBUG: Building socialStatsHeader")
+                        socialStatsHeader
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    .padding(.bottom, 16)
 
                     // Activity Feed Content
-                    ActivityFeedView()
-                        .environmentObject(appState)
+                    Group {
+                        let _ = print("🔍 DEBUG: Building ActivityFeedView")
+                        ActivityFeedView()
+                            .environmentObject(appState)
+                    }
                 }
             }
             .navigationTitle("Feed")
