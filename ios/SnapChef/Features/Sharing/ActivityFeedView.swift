@@ -816,47 +816,18 @@ class ActivityFeedManager: ObservableObject {
             return []
         }
         
-        // Since timestamp field may not be queryable, use a simpler query and filter in code
-        // Query all activities and filter/sort client-side as a workaround
-        let predicate = NSPredicate(format: "TRUEPREDICATE") // Get all records
+        // For now, return empty array to avoid fetching all records
+        // This should be replaced with a proper query once we have:
+        // 1. A way to query activities from followed users
+        // 2. Proper indexing on timestamp field
+        print("⚠️ Skipping public activities fetch - needs proper implementation")
+        return []
         
-        let query = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: predicate)
-        // Remove sort descriptor since timestamp may not be sortable in CloudKit
-        // query.sortDescriptors = [NSSortDescriptor(key: CKField.Activity.timestamp, ascending: false)]
-
-        var activities: [CKRecord] = []
-
-        // Use a direct query to fetch activities
-        let results = try await CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase.records(matching: query)
-        
-        let sevenDaysAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
-        
-        // Collect all valid records first, excluding activities performed by current user
-        for (_, result) in results.matchResults {
-            if case .success(let record) = result {
-                // Filter by timestamp in code since it may not be queryable
-                if let timestamp = record[CKField.Activity.timestamp] as? Date,
-                   timestamp >= sevenDaysAgo {
-                    
-                    // IMPORTANT: Exclude activities where current user is the actor
-                    // This prevents showing "sisaccount followed you" when sisaccount is the logged-in user
-                    if let actorID = record[CKField.Activity.actorID] as? String,
-                       actorID != currentUserID {
-                        activities.append(record)
-                    }
-                }
-            }
-        }
-        
-        // Sort by timestamp in code since it may not be sortable in CloudKit
-        activities.sort { record1, record2 in
-            let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
-            let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
-            return date1 > date2 // Descending order (newest first)
-        }
-        
-        // Return only the requested number of activities
-        return Array(activities.prefix(limit))
+        // TODO: Implement proper query like:
+        // 1. Get list of users this person follows
+        // 2. Query activities where actorID is in that list
+        // 3. Sort by timestamp descending
+        // 4. Limit to recent activities
     }
     
     /// Batch fetch users to populate cache and avoid redundant individual fetches
