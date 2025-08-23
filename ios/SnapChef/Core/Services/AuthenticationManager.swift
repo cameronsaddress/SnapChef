@@ -113,8 +113,8 @@ final class AuthenticationManager: ObservableObject {
 
     // Update username after setup
     func updateUsername(_ username: String) {
-        if var user = currentUser {
-            var updatedUser = user
+        if let user = currentUser {
+            _ = user
             // Create a new user with updated username
             currentUser = User(
                 id: user.id,

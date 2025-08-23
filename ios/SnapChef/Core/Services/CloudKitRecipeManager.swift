@@ -712,7 +712,7 @@ class CloudKitRecipeManager: ObservableObject {
     /// Fetch recipes for a specific user (for viewing other users' profiles)
     func fetchRecipesForUser(_ userID: String, limit: Int = 50) async throws -> [Recipe] {
         let logger = CloudKitDebugLogger.shared
-        let startTime = Date()
+        let _ = Date()
         
         // Handle different userID formats
         var queryUserID = userID
@@ -1223,8 +1223,8 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Search for recipes by query - FILTERED BY CURRENT USER AND PUBLIC RECIPES
     func searchRecipes(query: String, limit: Int = 20) async throws -> [Recipe] {
-        let logger = CloudKitDebugLogger.shared
-        let startTime = Date()
+        let _ = CloudKitDebugLogger.shared
+        let _ = Date()
         print("🔍 DEBUG CloudKitRecipeManager: Starting searchRecipes with query: '\(query)', limit: \(limit)")
         // CRITICAL PRIVACY FIX: Only search user's own recipes and explicitly public recipes
         guard let currentUserID = getCurrentUserID() else {

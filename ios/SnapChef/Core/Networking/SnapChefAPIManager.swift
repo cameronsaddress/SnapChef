@@ -323,7 +323,7 @@ final class SnapChefAPIManager {
         existingRecipeNames: [String] = [],
         foodPreferences: [String] = [],
         llmProvider: String? = nil,
-        completion: @escaping (Result<APIResponse, Error>) -> Void
+        completion: @escaping @Sendable (Result<APIResponse, Error>) -> Void
     ) {
         guard let url = URL(string: "\(serverBaseURL)/analyze_fridge_image") else {
             completion(.failure(APIError.invalidURL))
@@ -484,7 +484,7 @@ final class SnapChefAPIManager {
         existingRecipeNames: [String] = [],
         foodPreferences: [String] = [],
         llmProvider: String? = nil,
-        completion: @escaping (Result<APIResponse, Error>) -> Void
+        completion: @escaping @Sendable (Result<APIResponse, Error>) -> Void
     ) {
         // For now, use the same endpoint but send both images
         // The backend should be updated to handle both images

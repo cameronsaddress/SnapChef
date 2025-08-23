@@ -318,7 +318,7 @@ final class UnifiedAuthManager: ObservableObject {
             let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: fullRecordID))
             record[CKField.User.username] = username.lowercased()
             
-            let savedRecord = try await cloudKitDatabase.save(record)
+            let _ = try await cloudKitDatabase.save(record)
             print("✅ Successfully saved username '\(username)' to CloudKit record")
             
             // Update local state
@@ -927,7 +927,7 @@ final class UnifiedAuthManager: ObservableObject {
             throw UnifiedAuthError.notAuthenticated
         }
         
-        let userRecordID = CKRecord.ID(recordName: "user_\(currentUser.recordID)")
+        let userRecordID = CKRecord.ID(recordName: "user_\(String(describing: currentUser.recordID))")
         let record = try await cloudKitDatabase.record(for: userRecordID)
         
         // Apply updates - only for fields that exist in production
@@ -966,7 +966,7 @@ final class UnifiedAuthManager: ObservableObject {
         
         // Update local user object
         await MainActor.run {
-            if var updatedUser = self.currentUser {
+            if let updatedUser = self.currentUser {
                 // Update local properties based on what's in UserStatUpdates
                 // Note: CloudKitUser might need to be extended to include these properties
                 self.currentUser = updatedUser
@@ -979,7 +979,7 @@ final class UnifiedAuthManager: ObservableObject {
         guard let currentUser = currentUser else { return }
         
         do {
-            let userRecordID = CKRecord.ID(recordName: "user_\(currentUser.recordID)")
+            let userRecordID = CKRecord.ID(recordName: "user_\(String(describing: currentUser.recordID))")
             let record = try await cloudKitDatabase.record(for: userRecordID)
             
             await MainActor.run {

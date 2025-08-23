@@ -379,6 +379,7 @@ final class CloudKitDataManager: ObservableObject {
         let preferenceSubscription = CKQuerySubscription(
             recordType: "FoodPreference",
             predicate: preferencePredicate,
+            subscriptionID: "preference-updates-subscription",
             options: [.firesOnRecordUpdate, .firesOnRecordCreation]
         )
 

@@ -101,7 +101,6 @@
 		8FE69C1272F075334D6051EB /* SafeVideoSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6074E73628C7740879D4B558 /* SafeVideoSaver.swift */; };
 		90F4B326E442F3BEAA8FD619 /* MockDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56DF24D3280D9F5229B2C67C /* MockDataProvider.swift */; };
 		9289037A18EC7A2E123C947D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDFFE3F7768F84376E9232D /* AppDelegate.swift */; };
-		95D60A4B82A76A430DD9CDDC /* ChallengeModels.xcdatamodeld in Resources */ = {isa = PBXBuildFile; fileRef = 1CDBD7787F7A05B2501F144E /* ChallengeModels.xcdatamodeld */; };
 		95F0BA545EB8C9DE5E5F92D4 /* ViralVideoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34771E7E9C40635B7CE1F7AA /* ViralVideoEngine.swift */; };
 		9654016E762E43BDA1AF349A /* ChallengeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9654016E762E43BDA1AF349B /* ChallengeDetailView.swift */; };
 		987825C3548C087B1F64E39E /* CloudKitRecipeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023CAA81A548F3B6C27BEDD8 /* CloudKitRecipeCache.swift */; };
@@ -1204,7 +1203,6 @@
 				51157FB9736D98368A6CCEB1 /* meal3.jpg in Resources */,
 				E739AFE884D1320D76A37B42 /* meal4.jpg in Resources */,
 				4D6163356F7941027B77621C /* meal5.jpg in Resources */,
-				95D60A4B82A76A430DD9CDDC /* ChallengeModels.xcdatamodeld in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1375,9 +1373,6 @@
 				3C3A897A6EC886A851F0BA65 /* SimpleProgressivePrompt.swift in Sources */,
 				1E8B950947D3AEFB0027E551 /* UnifiedAuthView.swift in Sources */,
 				8932E37863CBF9D920958E17 /* PhotoDiskCache.swift in Sources */,
-				2F02FE42806FCA75689A7717 /* UsageCounterView.swift in Sources */,
-				15207D7AF352B88E61A69DF1 /* HoneymoonBanner.swift in Sources */,
-				34591D6014C7A8B3EC6588D0 /* PaywallTriggerManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

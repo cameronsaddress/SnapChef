@@ -156,7 +156,7 @@ struct HomeView: View {
                 
                 // Track screen view
                 Task {
-                    await cloudKitDataManager.trackScreenView("Home")
+                    cloudKitDataManager.trackScreenView("Home")
                 }
                 
                 // Simple fade in for mystery meal animation (only if animations enabled)

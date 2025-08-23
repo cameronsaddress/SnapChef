@@ -677,7 +677,6 @@ struct EmojiFlickGame: View {
                 guard !readyEmojis.isEmpty else { return }
 
                 tutorialTimer?.invalidate()
-                tutorialTimer = nil
 
                 // Flick first emoji
                 if let firstEmoji = readyEmojis.first {

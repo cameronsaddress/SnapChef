@@ -778,7 +778,7 @@ struct RecipeDetailView: View {
                 print("🔍   - secretIngredients: \(recipe.secretIngredients.isEmpty ? "EMPTY" : "\(recipe.secretIngredients)")")
                 print("🔍   - proTips: \(recipe.proTips.isEmpty ? "EMPTY" : "\(recipe.proTips)")")
                 print("🔍   - visualClues: \(recipe.visualClues.isEmpty ? "EMPTY" : "\(recipe.visualClues)")")
-                print("🔍   - shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : "\"\(recipe.shareCaption)\"")")
+                print("🔍   - shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : String(describing: recipe.shareCaption))")
                 print("🔍   - isDetectiveRecipe: \(recipe.isDetectiveRecipe)")
                 
                 print("🔍 DIETARY INFO:")
@@ -813,7 +813,7 @@ struct RecipeDetailView: View {
                 print("🔍 RecipeDetailView: Loading comments for recipe: \(recipe.name) (ID: \(recipe.id.uuidString))")
                 print("🔍 Authentication status: \(cloudKitAuth.isAuthenticated)")
                 if let user = cloudKitAuth.currentUser {
-                    print("🔍 Current user: \(user.displayName) (ID: \(user.recordID))")
+                    print("🔍 Current user: \(String(describing: user.displayName)) (ID: \(String(describing: user.recordID)))")
                 } else {
                     print("🔍 No current user found")
                 }

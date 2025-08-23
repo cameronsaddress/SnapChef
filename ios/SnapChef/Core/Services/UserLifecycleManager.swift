@@ -76,7 +76,7 @@ final class UserLifecycleManager: ObservableObject, @unchecked Sendable {
 
         // Also update AnonymousUserProfile
         Task {
-            await keychainManager.incrementCounter(\AnonymousUserProfile.recipesCreatedCount)
+            keychainManager.incrementCounter(\AnonymousUserProfile.recipesCreatedCount)
         }
 
         updateLastActive()
@@ -89,7 +89,7 @@ final class UserLifecycleManager: ObservableObject, @unchecked Sendable {
 
         // Also update AnonymousUserProfile
         Task {
-            await keychainManager.incrementCounter(\AnonymousUserProfile.videosSharedCount)
+            keychainManager.incrementCounter(\AnonymousUserProfile.videosSharedCount)
         }
 
         updateLastActive()

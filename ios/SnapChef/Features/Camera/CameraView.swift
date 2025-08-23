@@ -494,7 +494,7 @@ struct CameraView: View {
             let sessionId = UUID().uuidString
 
             // Track camera session start
-            let sessionData = CameraSessionData(
+            let _ = CameraSessionData(
                 sessionID: sessionId,
                 captureType: "fridge_snap",
                 flashEnabled: cameraModel.flashMode == .on,
@@ -684,11 +684,8 @@ struct CameraView: View {
                                 if let suggestedContext = await MainActor.run { self.paywallTriggerManager.getSuggestedPaywallContext() } {
                                     if await MainActor.run { self.paywallTriggerManager.shouldShowPaywall(for: suggestedContext) } {
                                         await MainActor.run {
-                                            Task { @MainActor in
-                                                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-                                                self.premiumPromptReason = .dailyLimitReached
-                                                self.showPremiumPrompt = true
-                                            }
+                                            self.premiumPromptReason = .dailyLimitReached
+                                            self.showPremiumPrompt = true
                                         }
                                     }
                                 }
@@ -1589,7 +1586,7 @@ extension CameraView {
 
         // Track screen view
         Task {
-            await cloudKitDataManager.trackScreenView("Camera")
+            cloudKitDataManager.trackScreenView("Camera")
         }
 
         // Check if this is the first time

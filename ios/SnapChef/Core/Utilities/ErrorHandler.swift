@@ -371,23 +371,19 @@ struct ErrorAnalytics {
     private static func reportCriticalError(_ error: SnapChefError, context: String, userId: String?) {
         // Send critical errors to monitoring service
         Task {
-            do {
-                let crashData: [String: String] = await MainActor.run {
-                    let appState = getCurrentAppState()
-                    return [
-                        "error": String(describing: error),
-                        "context": context,
-                        "user_id": userId ?? "anonymous",
-                        "timestamp": String(Date().timeIntervalSince1970),
-                        "app_state": String(describing: appState)
-                    ]
-                }
-                
-                // Send to crash reporting service
-                await CrashReportingService.shared.reportCriticalError(crashData)
-            } catch {
-                logger.error("Failed to report critical error: \(error)")
+            let crashData: [String: String] = await MainActor.run {
+                let appState = getCurrentAppState()
+                return [
+                    "error": String(describing: error),
+                    "context": context,
+                    "user_id": userId ?? "anonymous",
+                    "timestamp": String(Date().timeIntervalSince1970),
+                    "app_state": String(describing: appState)
+                ]
             }
+            
+            // Send to crash reporting service
+            await CrashReportingService.shared.reportCriticalError(crashData)
         }
     }
     

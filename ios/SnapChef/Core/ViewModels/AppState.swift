@@ -479,13 +479,10 @@ final class RecipesViewModel: ObservableObject {
     // MARK: - Favorites Management
     
     func toggleFavorite(_ recipeId: UUID) {
-        let wasAdded: Bool
         if favoritedRecipeIds.contains(recipeId) {
             favoritedRecipeIds.remove(recipeId)
-            wasAdded = false
         } else {
             favoritedRecipeIds.insert(recipeId)
-            wasAdded = true
         }
         
         // Save to UserDefaults
@@ -496,26 +493,22 @@ final class RecipesViewModel: ObservableObject {
         // Sync with CloudKit if authenticated
         if unifiedAuthManager.isAuthenticated {
             Task {
-                do {
-                    // CloudKitService integration temporarily commented out
-                    // TODO: Implement CloudKitService integration
-                    /*
-                    if wasAdded {
-                        try await CloudKitService.shared.addRecipeToUserProfile(
-                            recipeId.uuidString,
-                            type: .favorited
-                        )
-                    } else {
-                        try await CloudKitService.shared.removeRecipeFromUserProfile(
-                            recipeId.uuidString,
-                            type: .favorited
-                        )
-                    }
-                    */
-                    print("✅ Synced favorite status to CloudKit")
-                } catch {
-                    print("❌ Failed to sync favorite to CloudKit: \(error)")
+                // CloudKitService integration temporarily commented out
+                // TODO: Implement CloudKitService integration
+                /*
+                if wasAdded {
+                    try await CloudKitService.shared.addRecipeToUserProfile(
+                        recipeId.uuidString,
+                        type: .favorited
+                    )
+                } else {
+                    try await CloudKitService.shared.removeRecipeFromUserProfile(
+                        recipeId.uuidString,
+                        type: .favorited
+                    )
                 }
+                */
+                print("✅ Synced favorite status to CloudKit")
             }
         }
     }
@@ -628,14 +621,10 @@ final class AuthViewModel: ObservableObject {
         // Update CloudKit user profile if authenticated
         if unifiedAuthManager.isAuthenticated {
             Task {
-                do {
-                    // CloudKitService integration temporarily commented out
+                // CloudKitService integration temporarily commented out
                 // TODO: Implement CloudKitService integration
                 // try await CloudKitService.shared.incrementRecipesShared()
-                    print("✅ Updated share count in CloudKit")
-                } catch {
-                    print("❌ Failed to update share count in CloudKit: \(error)")
-                }
+                print("✅ Updated share count in CloudKit")
             }
         }
     }

@@ -67,10 +67,21 @@ class ChallengeAnalyticsService: ObservableObject {
         analyticsQueue.async { [weak self] in
             guard let self = self else { return }
 
+            // Create sendable copy of parameters to avoid capture issues
+            let sendableParameters: [String: String] = Dictionary(uniqueKeysWithValues: parameters.compactMap { key, value in
+                let stringValue: String
+                if let str = value as? String { stringValue = str }
+                else if let int = value as? Int { stringValue = String(int) }
+                else if let double = value as? Double { stringValue = String(double) }
+                else if let bool = value as? Bool { stringValue = String(bool) }
+                else { stringValue = String(describing: value) }
+                return (key, stringValue)
+            })
+
             let eventData = AnalyticsEventData(
                 event: event,
                 timestamp: Date(),
-                parameters: parameters
+                parameters: sendableParameters
             )
 
             // Update metrics based on event
@@ -125,7 +136,7 @@ class ChallengeAnalyticsService: ObservableObject {
             dailyMetrics.challengesAbandoned += 1
 
         case .rewardClaimed:
-            if let amount = event.parameters["amount"] as? Int {
+            if let amountString = event.parameters["amount"], let amount = Int(amountString) {
                 dailyMetrics.coinsEarned += amount
                 userEngagement.totalCoinsEarned += amount
             }
@@ -138,13 +149,13 @@ class ChallengeAnalyticsService: ObservableObject {
             userEngagement.totalShares += 1
 
         case .coinsEarned:
-            if let amount = event.parameters["amount"] as? Int {
+            if let amountString = event.parameters["amount"], let amount = Int(amountString) {
                 dailyMetrics.coinsEarned += amount
                 userEngagement.totalCoinsEarned += amount
             }
 
         case .coinsSpent:
-            if let amount = event.parameters["amount"] as? Int {
+            if let amountString = event.parameters["amount"], let amount = Int(amountString) {
                 dailyMetrics.coinsSpent += amount
                 userEngagement.totalCoinsSpent += amount
             }
@@ -412,7 +423,7 @@ class ChallengeAnalyticsService: ObservableObject {
 struct AnalyticsEventData {
     let event: ChallengeAnalyticsService.AnalyticsEvent
     let timestamp: Date
-    let parameters: [String: Any]
+    let parameters: [String: String]
 }
 
 struct DailyChallengeMetrics: Codable {

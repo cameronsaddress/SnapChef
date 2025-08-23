@@ -192,8 +192,8 @@ struct RecipePhotoView: View {
             .fill(
                 LinearGradient(
                     colors: [
-                        Color(hex: "#667eea") ?? .purple,
-                        Color(hex: "#764ba2") ?? .purple
+                        Color(hex: "#667eea"),
+                        Color(hex: "#764ba2")
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
