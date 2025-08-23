@@ -67,7 +67,7 @@ struct ParticleExplosion: ViewModifier {
     @EnvironmentObject var deviceManager: DeviceManager
 
     @State private var particles: [TransitionExplosionParticle] = []
-    @State private var lastUpdateTime: TimeInterval = 0
+    @State private var animationTimer: Timer?
 
     func body(content: Content) -> some View {
         content
@@ -76,27 +76,21 @@ struct ParticleExplosion: ViewModifier {
                     // Skip rendering if particles are disabled
                     guard deviceManager.shouldShowParticles else { return }
                     
-                    let currentTime = CACurrentMediaTime()
-                    let shouldUpdate = currentTime - lastUpdateTime > (1.0 / 30.0) // 30 FPS max
-                    
-                    if shouldUpdate {
-                        lastUpdateTime = currentTime
-                        
-                        for particle in particles {
-                            context.opacity = particle.opacity
+                    // Simply render current particle state without modifying anything
+                    for particle in particles {
+                        context.opacity = particle.opacity
 
-                            let rect = CGRect(
-                                x: particle.position.x - particle.size / 2,
-                                y: particle.position.y - particle.size / 2,
-                                width: particle.size,
-                                height: particle.size
-                            )
+                        let rect = CGRect(
+                            x: particle.position.x - particle.size / 2,
+                            y: particle.position.y - particle.size / 2,
+                            width: particle.size,
+                            height: particle.size
+                        )
 
-                            context.fill(
-                                Circle().path(in: rect),
-                                with: .color(particle.color)
-                            )
-                        }
+                        context.fill(
+                            Circle().path(in: rect),
+                            with: .color(particle.color)
+                        )
                     }
                 }
                 .allowsHitTesting(false)
@@ -105,6 +99,12 @@ struct ParticleExplosion: ViewModifier {
                 if trigger && deviceManager.shouldShowParticles {
                     explode()
                 }
+            }
+            .onDisappear {
+                // Clean up timer when view disappears
+                animationTimer?.invalidate()
+                animationTimer = nil
+                particles.removeAll()
             }
     }
 
@@ -140,17 +140,19 @@ struct ParticleExplosion: ViewModifier {
             )
         }
 
+        // Clean up any existing timer
+        animationTimer?.invalidate()
+        
         // Use adaptive frame rate based on device capabilities
         let updateInterval = deviceManager.isLowPowerModeEnabled ? 0.033 : 0.016 // 30fps vs 60fps
         
-        var particleTimer: Timer?
-        particleTimer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { _ in
+        animationTimer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { _ in
             Task { @MainActor in
                 updateParticles()
 
                 if particles.isEmpty {
-                    particleTimer?.invalidate()
-                    particleTimer = nil
+                    animationTimer?.invalidate()
+                    animationTimer = nil
                     trigger = false
                 }
             }

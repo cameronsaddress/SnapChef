@@ -34,7 +34,6 @@ struct ContentView: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
-        .animation(.easeInOut(duration: 0.5), value: showingLaunchAnimation)
         .onAppear {
             print("🔍 DEBUG: ContentView appeared")
         }
@@ -94,7 +93,6 @@ struct MainTabView: View {
                         HomeView()
                     }
                 }
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedTab)
 
                 // Custom morphing tab bar (hide when camera is selected)
                 if selectedTab != 1 {

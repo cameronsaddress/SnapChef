@@ -251,9 +251,14 @@ struct CameraView: View {
             }
         }
         .onAppear {
-            print("🔍 DEBUG: CameraView appeared")
-            // Performance optimization: Progressive loading
-            setupViewProgressively()
+            print("🔍 DEBUG: CameraView appeared - Start")
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: CameraView - Async block started")
+                // Performance optimization: Progressive loading
+                setupViewProgressively()
+                print("🔍 DEBUG: CameraView - Async block completed")
+            }
+            print("🔍 DEBUG: CameraView appeared - End")
         }
         // Particle explosion only if effects are enabled
         .modifier(ConditionalParticleExplosion(
@@ -1344,9 +1349,15 @@ struct PantryStepOverlay: View {
             }
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                pulseAnimation = true
+            print("🔍 DEBUG: PantryStepOverlay appeared - Start")
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: PantryStepOverlay - Async block started")
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    pulseAnimation = true
+                }
+                print("🔍 DEBUG: PantryStepOverlay - Async block completed")
             }
+            print("🔍 DEBUG: PantryStepOverlay appeared - End")
         }
     }
 }
@@ -1488,9 +1499,15 @@ struct ScanningOverlay: View {
             }
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                cornerAnimation = true
+            print("🔍 DEBUG: ScanningOverlay appeared - Start")
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: ScanningOverlay - Async block started")
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    cornerAnimation = true
+                }
+                print("🔍 DEBUG: ScanningOverlay - Async block completed")
             }
+            print("🔍 DEBUG: ScanningOverlay appeared - End")
         }
     }
 
@@ -1555,8 +1572,12 @@ extension CameraView {
             try? await Task.sleep(nanoseconds: UInt64(loadDelay * 1_000_000_000))
             
             await MainActor.run {
-                withAnimation(.easeIn(duration: 0.3)) {
-                    shouldShowFullUI = true
+                DispatchQueue.main.async {
+                    print("🔍 DEBUG: setupViewProgressively - Async block started")
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        shouldShowFullUI = true
+                    }
+                    print("🔍 DEBUG: setupViewProgressively - Async block completed")
                 }
             }
         }

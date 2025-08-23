@@ -189,6 +189,11 @@ struct HomeView: View {
             }
             
             print("🔍 DEBUG: HomeView appeared - End")
+            
+            // Additional delayed check
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                print("🔍 DEBUG: HomeView - 0.5s after appear")
+            }
         }
         .onDisappear {
             fallingFoodManager.cleanup()
@@ -442,7 +447,6 @@ struct ViralChallengeSection: View {
                                 .stroke(Color.red.opacity(0.3), lineWidth: 8)
                                 .scaleEffect(sparkleAnimation ? 2 : 1)
                                 .opacity(sparkleAnimation ? 0 : 1)
-                                .animation(.easeOut(duration: 1.5).repeatForever(autoreverses: false), value: sparkleAnimation)
                         )
 
                     Text("LIVE")
@@ -478,7 +482,6 @@ struct ViralChallengeSection: View {
                         )
                         .frame(width: UIScreen.main.bounds.width - 60)
                         .scaleEffect(currentChallenge == index ? 1 : 0.9)
-                        .animation(.spring(response: 0.3), value: currentChallenge)
                     }
                 }
                 .padding(.horizontal, 30)
@@ -487,7 +490,9 @@ struct ViralChallengeSection: View {
         }
         .onAppear {
             DispatchQueue.main.async {
-                sparkleAnimation = true
+                withAnimation(.easeOut(duration: 1.5).repeatForever(autoreverses: false)) {
+                    sparkleAnimation = true
+                }
                 startAutoScroll()
             }
         }
@@ -570,7 +575,6 @@ struct EnhancedChallengeCard: View {
                         .frame(width: 120, height: 120)
                         .scaleEffect(particleAnimation ? 1.2 : 1)
                         .opacity(particleAnimation ? 0.5 : 0.8)
-                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: particleAnimation)
 
                     VStack(spacing: 8) {
                         Text(emoji)
@@ -718,7 +722,9 @@ struct EnhancedChallengeCard: View {
         .shadow(color: Color.black.opacity(0.3), radius: 20, y: 10)
         .onAppear {
             DispatchQueue.main.async {
-                particleAnimation = true
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    particleAnimation = true
+                }
                 updateTimeRemaining()
             }
         }
@@ -990,6 +996,7 @@ final class FallingFoodManager: ObservableObject {
     private var nextDropDelay: TimeInterval = 0
     private var maxParticles: Int = 15
     private var isRunning: Bool = false
+    private var initialDelayComplete: Bool = false
 
     struct FallingFoodEmoji: Identifiable {
         let id = UUID()
@@ -1008,16 +1015,26 @@ final class FallingFoodManager: ObservableObject {
         
         isRunning = true
         maxParticles = maxCount
+        initialDelayComplete = false
         
-        // Use CADisplayLink for smooth animation that doesn't pause during scrolling
-        displayLink = CADisplayLink(target: self, selector: #selector(updateAnimation))
-        displayLink?.add(to: .current, forMode: .common) // .common mode ensures it runs during scrolling
-
-        // Set initial drop delay
-        nextDropDelay = Double.random(in: 1.0...4.0) // Longer delays for better performance
+        // Delay the start of animations to avoid view update conflicts
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self = self else { return }
+            self.initialDelayComplete = true
+            
+            // Use CADisplayLink for smooth animation that doesn't pause during scrolling
+            self.displayLink = CADisplayLink(target: self, selector: #selector(self.updateAnimation))
+            self.displayLink?.add(to: .current, forMode: .common) // .common mode ensures it runs during scrolling
+            
+            // Set initial drop delay
+            self.nextDropDelay = Double.random(in: 1.0...4.0) // Longer delays for better performance
+        }
     }
 
     @objc private func updateAnimation() {
+        // Skip updates until initial delay is complete
+        guard initialDelayComplete else { return }
+        
         // Defer state updates to avoid "Modifying state during view update"
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -1150,7 +1167,6 @@ struct RecipeDetectiveTile: View {
                         )
                         .frame(width: 80, height: 80)
                         .scaleEffect(mysteryGlow ? 1.2 : 1)
-                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: mysteryGlow)
                     
                     // Magnifying glass icon with premium styling
                     ZStack {
@@ -1188,7 +1204,6 @@ struct RecipeDetectiveTile: View {
                                 )
                             )
                             .scaleEffect(isAnimating ? 1.1 : 1)
-                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isAnimating)
                     }
                     
                     // Premium lock badge if needed
@@ -1287,8 +1302,12 @@ struct RecipeDetectiveTile: View {
         .buttonStyle(PlainButtonStyle())
         .onAppear {
             DispatchQueue.main.async {
-                isAnimating = true
-                mysteryGlow = true
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    isAnimating = true
+                }
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    mysteryGlow = true
+                }
             }
         }
         .fullScreenCover(isPresented: $showingDetectiveView) {

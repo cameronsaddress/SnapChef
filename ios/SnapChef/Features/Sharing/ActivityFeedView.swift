@@ -241,7 +241,13 @@ struct ActivityFeedView: View {
             }
         }
         .onAppear {
-            print("🔍 DEBUG: ActivityFeedView appeared")
+            print("🔍 DEBUG: ActivityFeedView appeared - Start")
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: ActivityFeedView - Async block started")
+                // No state modifications here, just logging
+                print("🔍 DEBUG: ActivityFeedView - Async block completed")
+            }
+            print("🔍 DEBUG: ActivityFeedView appeared - End")
         }
         .task {
             print("🔍 DEBUG: ActivityFeedView task starting")
@@ -1521,9 +1527,15 @@ struct SkeletonActivityView: View {
                 )
         )
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                isAnimating = true
+            print("🔍 DEBUG: SkeletonActivityView appeared - Start")
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: SkeletonActivityView - Async block started")
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    isAnimating = true
+                }
+                print("🔍 DEBUG: SkeletonActivityView - Async block completed")
             }
+            print("🔍 DEBUG: SkeletonActivityView appeared - End")
         }
     }
 }

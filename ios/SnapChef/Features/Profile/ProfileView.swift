@@ -110,17 +110,21 @@ struct ProfileView: View {
             }
         }
         .onAppear {
-            print("🔍 DEBUG: ProfileView appeared")
-            
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                profileImageScale = 1
+            print("🔍 DEBUG: ProfileView appeared - Start")
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: ProfileView - Async block started")
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                    profileImageScale = 1
+                }
+                withAnimation(.easeOut(duration: 0.5).delay(0.2)) {
+                    contentVisible = true
+                }
+                
+                // Load user stats if authenticated
+                loadUserStats()
+                print("🔍 DEBUG: ProfileView - Async block completed")
             }
-            withAnimation(.easeOut(duration: 0.5).delay(0.2)) {
-                contentVisible = true
-            }
-            
-            // Load user stats if authenticated
-            loadUserStats()
+            print("🔍 DEBUG: ProfileView appeared - End")
         }
         .sheet(isPresented: $showingSubscriptionView) {
             SubscriptionView()
@@ -552,13 +556,19 @@ struct EnhancedProfileHeader: View {
                 }
         }
         .onAppear {
-            withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
-                rotationAngle = 360
+            print("🔍 DEBUG: EnhancedProfileHeader appeared - Start")
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: EnhancedProfileHeader - Async block started")
+                withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
+                    rotationAngle = 360
+                }
+                loadUserStats()
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    glowAnimation = true
+                }
+                print("🔍 DEBUG: EnhancedProfileHeader - Async block completed")
             }
-            loadUserStats()
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                glowAnimation = true
-            }
+            print("🔍 DEBUG: EnhancedProfileHeader appeared - End")
         }
         .onChange(of: authManager.currentUser?.username) { _ in
             // Refresh when CloudKit username changes
@@ -837,11 +847,17 @@ struct EnhancedSubscriptionCard: View {
         .buttonStyle(PlainButtonStyle())
         .particleExplosion(trigger: $particleTrigger)
         .onAppear {
-            if tier != .premium {
-                withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
-                    shimmerPhase = 2
+            print("🔍 DEBUG: EnhancedSubscriptionCard appeared - Start")
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: EnhancedSubscriptionCard - Async block started")
+                if tier != .premium {
+                    withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+                        shimmerPhase = 2
+                    }
                 }
+                print("🔍 DEBUG: EnhancedSubscriptionCard - Async block completed")
             }
+            print("🔍 DEBUG: EnhancedSubscriptionCard appeared - End")
         }
     }
 }
@@ -874,9 +890,15 @@ struct PremiumBadge: View {
         )
         .scaleEffect(isAnimating ? 1.05 : 1)
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                isAnimating = true
+            print("🔍 DEBUG: PremiumBadge appeared - Start")
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: PremiumBadge - Async block started")
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    isAnimating = true
+                }
+                print("🔍 DEBUG: PremiumBadge - Async block completed")
             }
+            print("🔍 DEBUG: PremiumBadge appeared - End")
         }
     }
 }
@@ -1452,9 +1474,15 @@ struct FoodPreferencesCard: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onAppear {
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                isAnimating = true
+            print("🔍 DEBUG: FoodPreferencesCard appeared - Start")
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: FoodPreferencesCard - Async block started")
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    isAnimating = true
+                }
+                print("🔍 DEBUG: FoodPreferencesCard - Async block completed")
             }
+            print("🔍 DEBUG: FoodPreferencesCard appeared - End")
         }
         .fullScreenCover(isPresented: $showingPreferencesView) {
             FoodPreferencesView()
@@ -1715,12 +1743,16 @@ struct CollectionProgressView: View {
             )
         }
         .onAppear {
+            print("🔍 DEBUG: CollectionProgressView appeared - Start")
             DispatchQueue.main.async {
+                print("🔍 DEBUG: CollectionProgressView - Async block started")
                 withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.5)) {
                     animateProgress = true
                 }
+                loadUserStats()
+                print("🔍 DEBUG: CollectionProgressView - Async block completed")
             }
-            loadUserStats()
+            print("🔍 DEBUG: CollectionProgressView appeared - End")
         }
         .onChange(of: authManager.isAuthenticated) { _ in
             // Refresh data when authentication changes
@@ -2031,11 +2063,17 @@ struct ProfileAchievementBadge: View {
                 .lineLimit(2)
         }
         .onAppear {
-            if isUnlocked {
-                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                    isAnimating = true
+            print("🔍 DEBUG: ProfileAchievementBadge appeared - Start")
+            DispatchQueue.main.async {
+                print("🔍 DEBUG: ProfileAchievementBadge - Async block started")
+                if isUnlocked {
+                    withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                        isAnimating = true
+                    }
                 }
+                print("🔍 DEBUG: ProfileAchievementBadge - Async block completed")
             }
+            print("🔍 DEBUG: ProfileAchievementBadge appeared - End")
         }
     }
 }
