@@ -751,33 +751,62 @@ class ActivityFeedManager: ObservableObject {
 
         do {
             // Fetch activities where current user is the target (activities for them)
-            let targetActivities = try await cloudKitSync.fetchActivityFeed(for: userID, limit: 25)
+            var targetActivities: [CKRecord] = []
+            do {
+                targetActivities = try await cloudKitSync.fetchActivityFeed(for: userID, limit: 25)
+                print("✅ Fetched \(targetActivities.count) targeted activities")
+            } catch {
+                print("⚠️ Failed to fetch targeted activities: \(error)")
+                // Continue without targeted activities
+            }
             
             // Fetch activities from users they follow
-            // Note: This is a simplified implementation. In a real app, you'd:
-            // 1. First query Follow records to get followingIDs for current user
-            // 2. Then query Activity records where actorID is in followingIDs
-            // For now, we'll fetch recent public activities as a demonstration
-            let publicActivities = try await fetchRecentPublicActivities(limit: 25)
+            var followedUserActivities: [CKRecord] = []
+            do {
+                followedUserActivities = try await fetchFollowedUserActivities(limit: 25)
+                print("✅ Fetched \(followedUserActivities.count) activities from followed users")
+            } catch {
+                print("⚠️ Failed to fetch followed user activities: \(error)")
+                // Continue without followed activities
+            }
             
             // Combine and sort activities by timestamp
-            let allActivityRecords = targetActivities + publicActivities
-            let sortedRecords = allActivityRecords.sorted { record1, record2 in
+            let allActivityRecords = targetActivities + followedUserActivities
+            
+            // Remove duplicates based on record ID
+            var seenRecordIDs = Set<String>()
+            var uniqueRecords: [CKRecord] = []
+            for record in allActivityRecords {
+                if !seenRecordIDs.contains(record.recordID.recordName) {
+                    seenRecordIDs.insert(record.recordID.recordName)
+                    uniqueRecords.append(record)
+                }
+            }
+            
+            let sortedRecords = uniqueRecords.sorted { record1, record2 in
                 let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
                 let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
                 return date1 > date2
             }
             
-            // Take only the most recent 50 activities to avoid duplicates
-            let limitedRecords = Array(sortedRecords.prefix(50))
+            // Take only the most recent activities
+            let limitedRecords = Array(sortedRecords.prefix(30))
             
             // Batch fetch all unique user IDs to avoid redundant fetches
-            await batchFetchUsers(from: limitedRecords)
+            if !limitedRecords.isEmpty {
+                await batchFetchUsers(from: limitedRecords)
+            }
             
+            // Map records to activity items with error handling
             let newActivities = await withTaskGroup(of: ActivityItem?.self) { group in
                 for record in limitedRecords {
                     group.addTask {
-                        await self.mapCloudKitRecordToActivityItem(record)
+                        do {
+                            return await self.mapCloudKitRecordToActivityItem(record)
+                        } catch {
+                            print("⚠️ Failed to map activity record: \(error)")
+                            return nil
+                        }
                     }
                 }
                 
@@ -797,37 +826,95 @@ class ActivityFeedManager: ObservableObject {
             }
 
             // Check if there are more activities to load
-            hasMore = newActivities.count >= 50
+            hasMore = newActivities.count >= 25
 
-            print("✅ Loaded \(newActivities.count) activities from CloudKit (target: \(targetActivities.count), public: \(publicActivities.count))")
+            print("✅ Loaded \(newActivities.count) total activities")
             
             // Save to cache
             await saveCachedActivities()
         } catch {
             print("❌ CloudKit activity fetch error: \(error)")
-            // Don't throw here - just fallback to existing behavior
+            // Fallback to cached or mock data
+            if activities.isEmpty {
+                activities = generateMockActivities()
+            }
             hasMore = false
         }
     }
 
-    private func fetchRecentPublicActivities(limit: Int) async throws -> [CKRecord] {
+    private func fetchFollowedUserActivities(limit: Int) async throws -> [CKRecord] {
         guard let currentUser = UnifiedAuthManager.shared.currentUser,
               let currentUserID = currentUser.recordID else {
             return []
         }
         
-        // For now, return empty array to avoid fetching all records
-        // This should be replaced with a proper query once we have:
-        // 1. A way to query activities from followed users
-        // 2. Proper indexing on timestamp field
-        print("⚠️ Skipping public activities fetch - needs proper implementation")
-        return []
+        // Step 1: Get list of users this person follows
+        let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == %d", currentUserID, 1)
+        let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
         
-        // TODO: Implement proper query like:
-        // 1. Get list of users this person follows
-        // 2. Query activities where actorID is in that list
-        // 3. Sort by timestamp descending
-        // 4. Limit to recent activities
+        var followedUserIDs: [String] = []
+        
+        do {
+            let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+            let followRecords = try await database.records(matching: followingQuery)
+            
+            for (_, result) in followRecords.matchResults {
+                if case .success(let record) = result,
+                   let followingID = record["followingID"] as? String {
+                    followedUserIDs.append(followingID)
+                }
+            }
+            
+            print("📊 Found \(followedUserIDs.count) followed users")
+            
+            // If not following anyone, return empty
+            guard !followedUserIDs.isEmpty else {
+                return []
+            }
+            
+            // Step 2: Query activities from those users (limit to prevent crash)
+            // CloudKit has a limit on predicate size, so we'll only query for first 10 followed users
+            let limitedFollowedUsers = Array(followedUserIDs.prefix(10))
+            
+            // Create predicate for activities from followed users
+            let activityPredicate = NSPredicate(format: "actorID IN %@", limitedFollowedUsers)
+            let activityQuery = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: activityPredicate)
+            
+            // Fetch activities
+            let operation = CKQueryOperation(query: activityQuery)
+            operation.resultsLimit = limit
+            
+            var activities: [CKRecord] = []
+            
+            return try await withCheckedThrowingContinuation { continuation in
+                operation.recordMatchedBlock = { _, result in
+                    if case .success(let record) = result {
+                        activities.append(record)
+                    }
+                }
+                
+                operation.queryResultBlock = { result in
+                    switch result {
+                    case .success:
+                        // Sort by timestamp
+                        activities.sort { record1, record2 in
+                            let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+                            let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+                            return date1 > date2
+                        }
+                        continuation.resume(returning: activities)
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+                
+                database.add(operation)
+            }
+            
+        } catch {
+            print("⚠️ Failed to fetch followed user activities: \(error)")
+            return []
+        }
     }
     
     /// Batch fetch users to populate cache and avoid redundant individual fetches
