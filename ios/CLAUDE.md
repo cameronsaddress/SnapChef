@@ -148,10 +148,13 @@ All authentication goes through UnifiedAuthManager:
 ✅ Progressive premium features
 ✅ Gamification system
 
-### Recent Changes
+### Recent Changes (Aug 23, 2025)
 - **Migration Complete**: CloudKitAuthManager removed, using UnifiedAuthManager exclusively
 - **CloudKit Schema Updated**: Added appleUserId, tiktokUserId, profilePictureAsset fields
 - **Build Verified**: All compilation errors fixed, app builds successfully
+- **Social Feed Fixed**: Username display and duplicate activities resolved
+- **New User Experience**: Fixed username setup errors for first-time users
+- **Share Consistency**: All share buttons use BrandedSharePopup with auto-feed sharing
 
 ## 📝 API Integration
 
@@ -221,7 +224,20 @@ All authentication goes through UnifiedAuthManager:
 - **COMPLETE_CODE_TRACE.md** - App flow analysis
 - **FILE_USAGE_ANALYSIS.md** - File usage status
 
-## 🔄 Latest Updates (Aug 22, 2025)
+## 🔄 Latest Updates (Aug 23, 2025)
+
+### Social Sharing & Feed System (Fixed Aug 23)
+- ✅ BrandedSharePopup used consistently across all share buttons
+- ✅ Automatic sharing to followers' feeds when popup opens
+- ✅ Activity feed displays correct usernames (not "Anonymous User")
+- ✅ Duplicate activity IDs filtered out in feed
+- ✅ User's own activities appear in their feed
+
+### CloudKit User Management (Fixed Aug 23)
+- ✅ Username setup for new users works correctly
+- ✅ Proper handling of CloudKit record IDs with "user_" prefix
+- ✅ CloudKitUser strips prefix internally for consistency
+- ✅ Better error handling with informative messages
 
 ### CloudKit Debug System Complete
 - ✅ Comprehensive debug logging for all CloudKit operations
@@ -229,12 +245,6 @@ All authentication goes through UnifiedAuthManager:
 - ✅ Critical error assertions for immediate debugging
 - ✅ Recipe ownership system fixed - proper user association
 - ✅ Added `debugListAllRecipes()` method for troubleshooting
-
-### Recipe Ownership Fixed
-- ✅ Each recipe has unique ID and proper owner ID
-- ✅ Recipes correctly associated with creating user
-- ✅ Query system handles user ID formats correctly
-- ✅ Users can view their own recipes and shared public recipes
 
 ### ProfileView CloudKit Integration (NEEDS FIXING)
 **Components Not Syncing with CloudKit:**

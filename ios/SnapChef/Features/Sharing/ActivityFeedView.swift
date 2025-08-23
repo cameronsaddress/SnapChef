@@ -895,9 +895,17 @@ class ActivityFeedManager: ObservableObject {
                 }
                 
                 var results: [ActivityItem] = []
+                var seenIds = Set<String>()
                 for await result in group {
                     if let activity = result {
-                        results.append(activity)
+                        // Filter out duplicate activity IDs
+                        if !seenIds.contains(activity.id) {
+                            seenIds.insert(activity.id)
+                            results.append(activity)
+                            print("✅ Added activity \(activity.id) by \(activity.userName)")
+                        } else {
+                            print("⚠️ Skipping duplicate activity ID: \(activity.id)")
+                        }
                     }
                 }
                 return results
@@ -1060,6 +1068,9 @@ class ActivityFeedManager: ObservableObject {
                         // CloudKitUser init already strips the prefix
                         if let userID = user.recordID {
                             userCache[userID] = user
+                            print("✅ Cached user \(userID): username=\(user.username ?? "nil"), displayName=\(user.displayName)")
+                        } else {
+                            print("⚠️ User record has no recordID")
                         }
                     } catch {
                         print("⚠️ Failed to parse user record \(recordID.recordName): \(error)")
@@ -1107,23 +1118,37 @@ class ActivityFeedManager: ObservableObject {
 
     /// Fetches user display name by userID, using cache when available
     private func fetchUserDisplayName(userID: String) async -> String {
+        print("🔍 DEBUG: fetchUserDisplayName for userID: \(userID)")
+        
         // Check cache first to avoid redundant fetches
         if let cachedUser = userCache[userID] {
-            return cachedUser.username ?? cachedUser.displayName
+            let displayName = cachedUser.username ?? cachedUser.displayName
+            print("✅ Found cached user: \(displayName) (username: \(cachedUser.username ?? "nil"))")
+            return displayName
         }
+        
+        print("⚠️ User not in cache, fetching from CloudKit...")
         
         // This should rarely happen now with batch fetching, but fallback just in case
         do {
             // User records in CloudKit have "user_" prefix
             let userRecordID = CKRecord.ID(recordName: "user_\(userID)")
+            print("🔍 Fetching user record with ID: \(userRecordID.recordName)")
+            
             let userRecord = try await publicDatabase.record(for: userRecordID)
             let user = CloudKitUser(from: userRecord)
+            
+            print("✅ Fetched user from CloudKit:")
+            print("   - recordID: \(user.recordID ?? "nil")")
+            print("   - username: \(user.username ?? "nil")")
+            print("   - displayName: \(user.displayName)")
             
             // Update cache with fresh data
             userCache[userID] = user
             
-            print("⚠️ Individual fetch for \(userID): \(user.username ?? user.displayName)")
-            return user.username ?? user.displayName
+            let result = user.username ?? user.displayName
+            print("⚠️ Individual fetch for \(userID): \(result)")
+            return result
         } catch {
             print("❌ Failed to fetch user details for \(userID): \(error)")
             return "Unknown Chef"
@@ -1160,6 +1185,7 @@ class ActivityFeedManager: ObservableObject {
 
         // Fetch actor (user) details dynamically
         let actorName = await fetchUserDisplayName(userID: actorID)
+        print("🔍 DEBUG: Creating ActivityItem for \(actorID) with name '\(actorName)'")
         
         // Extract optional fields
         let targetUserID = record[CKField.Activity.targetUserID] as? String
@@ -1253,6 +1279,13 @@ class ActivityFeedManager: ObservableObject {
     
     private func loadCachedActivities() async {
         print("🔍 DEBUG: loadCachedActivities - checking for cache")
+        
+        // Temporarily clear cache to force fresh fetch with correct usernames
+        // Remove this after fixing the username issue
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+        UserDefaults.standard.removeObject(forKey: cacheTimestampKey)
+        print("⚠️ DEBUG: Cache cleared to force fresh fetch")
+        return
         
         guard let data = UserDefaults.standard.data(forKey: cacheKey) else {
             print("🔍 DEBUG: No cached data found")

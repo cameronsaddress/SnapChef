@@ -299,25 +299,47 @@ final class UnifiedAuthManager: ObservableObject {
     func setUsername(_ username: String) async throws {
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID else {
+            print("❌ setUsername failed: No current user or recordID")
             throw UnifiedAuthError.notAuthenticated
         }
         
         // Check availability
         let isAvailable = try await checkUsernameAvailability(username)
         guard isAvailable else {
+            print("❌ Username '\(username)' is not available")
             throw UnifiedAuthError.usernameUnavailable
         }
         
-        // Update record
-        let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: recordID))
-        record[CKField.User.username] = username.lowercased()
-        try await cloudKitDatabase.save(record)
-        
-        // Update local state
-        self.currentUser?.username = username
-        self.showUsernameSetup = false
-        
-        completeAuthentication()
+        do {
+            // Update record - need to use the full "user_" prefixed ID for CloudKit
+            let fullRecordID = "user_\(recordID)"
+            print("🔍 DEBUG: Setting username '\(username)' for record: \(fullRecordID)")
+            
+            let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: fullRecordID))
+            record[CKField.User.username] = username.lowercased()
+            
+            let savedRecord = try await cloudKitDatabase.save(record)
+            print("✅ Successfully saved username '\(username)' to CloudKit record")
+            
+            // Update local state
+            self.currentUser?.username = username
+            self.showUsernameSetup = false
+            
+            completeAuthentication()
+        } catch let error as CKError {
+            print("❌ CloudKit error setting username: \(error)")
+            print("   Error code: \(error.code)")
+            print("   Error description: \(error.localizedDescription)")
+            
+            if error.code == .unknownItem {
+                print("❌ User record doesn't exist. May need to create it first.")
+                throw UnifiedAuthError.userRecordNotFound
+            }
+            throw error
+        } catch {
+            print("❌ Unexpected error setting username: \(error)")
+            throw error
+        }
     }
     
     func checkUsernameAvailability(_ username: String) async throws -> Bool {
@@ -1040,6 +1062,7 @@ enum UnifiedAuthError: LocalizedError {
     case invalidCredential
     case notAuthenticated
     case usernameUnavailable
+    case userRecordNotFound
     case tikTokAuthFailed(String)
     case networkError
     case cloudKitNotAvailable
@@ -1055,6 +1078,8 @@ enum UnifiedAuthError: LocalizedError {
             return "Please sign in to iCloud to sync your data"
         case .usernameUnavailable:
             return "This username is already taken"
+        case .userRecordNotFound:
+            return "User profile not found. Please try signing in again."
         case .tikTokAuthFailed(let details):
             return "TikTok sign in failed: \(details)"
         case .networkError:
