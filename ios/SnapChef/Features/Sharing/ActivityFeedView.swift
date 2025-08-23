@@ -899,7 +899,14 @@ class ActivityFeedManager: ObservableObject {
     
     /// Fetch a batch of users by their IDs
     private func fetchUserBatch(userIDs: [String]) async {
-        let recordIDs = userIDs.map { CKRecord.ID(recordName: $0) }
+        // Filter out nil or empty user IDs
+        let validUserIDs = userIDs.filter { !$0.isEmpty }
+        guard !validUserIDs.isEmpty else {
+            print("⚠️ No valid user IDs to fetch")
+            return
+        }
+        
+        let recordIDs = validUserIDs.map { CKRecord.ID(recordName: $0) }
         
         do {
             let recordResults = try await publicDatabase.records(for: recordIDs)
@@ -907,32 +914,47 @@ class ActivityFeedManager: ObservableObject {
             for (recordID, result) in recordResults {
                 switch result {
                 case .success(let record):
-                    let user = CloudKitUser(from: record)
-                    userCache[recordID.recordName] = user
+                    // Safely create user from record
+                    do {
+                        let user = CloudKitUser(from: record)
+                        userCache[recordID.recordName] = user
+                    } catch {
+                        print("⚠️ Failed to parse user record \(recordID.recordName): \(error)")
+                        // Create placeholder user
+                        createPlaceholderUser(for: recordID)
+                    }
                 case .failure(let error):
                     print("❌ Failed to fetch user \(recordID.recordName): \(error)")
-                    // Create placeholder user using a CKRecord - avoid repeated failed fetches
-                    let placeholderRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: recordID)
-                    placeholderRecord[CKField.User.displayName] = "Unknown Chef"
-                    placeholderRecord[CKField.User.username] = "unknown_chef"
-                    placeholderRecord[CKField.User.totalPoints] = Int64(0)
-                    placeholderRecord[CKField.User.recipesCreated] = Int64(0)
-                    placeholderRecord[CKField.User.isVerified] = Int64(0)
-                    placeholderRecord[CKField.User.createdAt] = Date()
-                    placeholderRecord[CKField.User.lastLoginAt] = Date()
-                    placeholderRecord[CKField.User.currentStreak] = Int64(0)
-                    placeholderRecord[CKField.User.challengesCompleted] = Int64(0)
-                    placeholderRecord[CKField.User.recipesShared] = Int64(0)
-                    placeholderRecord[CKField.User.followerCount] = Int64(0)
-                    placeholderRecord[CKField.User.followingCount] = Int64(0)
-                    userCache[recordID.recordName] = CloudKitUser(from: placeholderRecord)
+                    // Create placeholder user to avoid repeated failed fetches
+                    createPlaceholderUser(for: recordID)
                 }
             }
             
-            print("✅ Batch fetched \(userIDs.count) users")
+            print("✅ Batch fetched \(validUserIDs.count) users")
         } catch {
             print("❌ Failed to batch fetch users: \(error)")
+            // Create placeholder users for all IDs to prevent repeated failures
+            for recordID in recordIDs {
+                createPlaceholderUser(for: recordID)
+            }
         }
+    }
+    
+    private func createPlaceholderUser(for recordID: CKRecord.ID) {
+        let placeholderRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: recordID)
+        placeholderRecord[CKField.User.displayName] = "Unknown Chef"
+        placeholderRecord[CKField.User.username] = "unknown_chef"
+        placeholderRecord[CKField.User.totalPoints] = Int64(0)
+        placeholderRecord[CKField.User.recipesCreated] = Int64(0)
+        placeholderRecord[CKField.User.isVerified] = Int64(0)
+        placeholderRecord[CKField.User.createdAt] = Date()
+        placeholderRecord[CKField.User.lastLoginAt] = Date()
+        placeholderRecord[CKField.User.currentStreak] = Int64(0)
+        placeholderRecord[CKField.User.challengesCompleted] = Int64(0)
+        placeholderRecord[CKField.User.recipesShared] = Int64(0)
+        placeholderRecord[CKField.User.followerCount] = Int64(0)
+        placeholderRecord[CKField.User.followingCount] = Int64(0)
+        userCache[recordID.recordName] = CloudKitUser(from: placeholderRecord)
     }
 
     /// Fetches user display name by userID, using cache when available
