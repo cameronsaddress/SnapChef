@@ -1043,37 +1043,50 @@ final class UnifiedAuthManager: ObservableObject {
         }
         
         do {
-            // Count followers
-            let followerPredicate = NSPredicate(format: "followingID == %@", recordID)
+            // Count followers - people who follow this user
+            // followingID is the user being followed
+            let followerPredicate = NSPredicate(format: "followingID == %@ AND isActive == 1", recordID)
             let followerQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
             
-            let (followerResults, _) = try await cloudKitDatabase.records(
-                matching: followerQuery,
-                desiredKeys: nil,
-                resultsLimit: 1000
-            )
+            let followerResults = try await cloudKitDatabase.records(matching: followerQuery)
+            let activeFollowers = followerResults.matchResults.compactMap { (_, result) -> String? in
+                if case .success(let record) = result,
+                   let isActive = record["isActive"] as? Int64,
+                   isActive == 1 {
+                    return record["followerID"] as? String
+                }
+                return nil
+            }
+            let followerCount = activeFollowers.count
             
-            let followerCount = followerResults.count
-            
-            // Count following
-            let followingPredicate = NSPredicate(format: "followerID == %@", currentUser.recordID ?? "")
+            // Count following - people this user follows
+            // followerID is the user doing the following
+            let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == 1", recordID)
             let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
             
-            let (followingResults, _) = try await cloudKitDatabase.records(
-                matching: followingQuery,
-                desiredKeys: nil,
-                resultsLimit: 1000
-            )
+            let followingResults = try await cloudKitDatabase.records(matching: followingQuery)
+            let activeFollowing = followingResults.matchResults.compactMap { (_, result) -> String? in
+                if case .success(let record) = result,
+                   let isActive = record["isActive"] as? Int64,
+                   isActive == 1 {
+                    return record["followingID"] as? String
+                }
+                return nil
+            }
+            let followingCount = activeFollowing.count
             
-            let followingCount = followingResults.count
+            print("📊 Updated social counts - Followers: \(followerCount), Following: \(followingCount)")
             
-            // Update user record
+            // Update user record with the counts
             let updates = UserStatUpdates(
                 followerCount: followerCount,
                 followingCount: followingCount
             )
             
             try await updateUserStats(updates)
+            
+            // Refresh the entire user object from CloudKit to get all updates
+            await refreshCurrentUser()
             
         } catch {
             print("❌ Failed to update social counts: \(error)")

@@ -155,16 +155,14 @@ struct DiscoverUsersView: View {
             }
             .navigationTitle("Discover Chefs")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        // Invite friends
-                    }) {
-                        Image(systemName: "person.badge.plus")
-                            .foregroundColor(.white)
-                    }
+            .navigationBarItems(trailing: 
+                Button(action: {
+                    // Invite friends
+                }) {
+                    Image(systemName: "person.badge.plus")
+                        .foregroundColor(.white)
                 }
-            }
+            )
         }
         .task {
             await viewModel.loadUsers(for: selectedCategory)
@@ -177,7 +175,7 @@ struct DiscoverUsersView: View {
         .sheet(item: $viewModel.selectedUser) { user in
             UserProfileView(
                 userID: user.id,
-                userName: user.username ?? user.displayName
+                userName: user.displayName
             )
             .environmentObject(appState)
         }
@@ -316,7 +314,7 @@ struct UserDiscoveryCard: View {
                             )
                             .frame(width: 60, height: 60)
                             .overlay(
-                                Text((user.username ?? user.displayName).prefix(1).uppercased())
+                                Text(user.displayName.prefix(1).uppercased())
                                     .font(.system(size: 24, weight: .bold))
                                     .foregroundColor(.white)
                             )
@@ -334,7 +332,7 @@ struct UserDiscoveryCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     // Name and Username
                     HStack {
-                        Text(user.username ?? user.displayName)
+                        Text(user.displayName)
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.white)
                             .lineLimit(1)
@@ -346,7 +344,7 @@ struct UserDiscoveryCard: View {
                         }
                     }
 
-                    Text("@\(user.username)")
+                    Text("@\(user.displayName)")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.7))
                         .lineLimit(1)
@@ -578,7 +576,7 @@ class DiscoverUsersViewModel: ObservableObject {
             profileImage: nil,
             followerCount: cloudKitUser.followerCount,
             followingCount: cloudKitUser.followingCount,
-            recipesCreated: cloudKitUser.recipesShared,
+            recipesCreated: cloudKitUser.recipesCreated,
             isVerified: cloudKitUser.isVerified,
             isFollowing: false, // Updated after creation based on actual follow status
             bio: nil,
@@ -652,7 +650,7 @@ class DiscoverUsersViewModel: ObservableObject {
                 searchResults[index].followerCount += searchResults[index].isFollowing ? 1 : -1
             }
 
-            print("✅ Toggle follow completed for user: \(user.username ?? user.displayName)")
+            print("✅ Toggle follow completed for user: \(user.displayName)")
         } catch {
             print("Failed to toggle follow: \(error)")
         }

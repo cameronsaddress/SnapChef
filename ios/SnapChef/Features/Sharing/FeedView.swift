@@ -170,7 +170,7 @@ struct FeedView: View {
                     )
 
                     socialStatItem(
-                        count: cloudKitAuth.currentUser?.recipesShared ?? 0,
+                        count: cloudKitAuth.currentUser?.recipesCreated ?? 0,
                         label: "Recipes"
                     )
                 }
