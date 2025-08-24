@@ -2224,11 +2224,8 @@ struct ActiveChallengesSection: View {
     @State private var isLoadingChallenges = false
 
     private var activeChallenges: [Challenge] {
-        // Filter to only show challenges the user has joined
-        // After syncChallengesFromCloudKit, the isJoined flag should be properly set
-        return gamificationManager.activeChallenges.filter { challenge in
-            challenge.isJoined
-        }
+        // Use exact same logic as ChallengeHubView - just return activeChallenges directly
+        return gamificationManager.activeChallenges
     }
 
     private func loadUserChallenges() {
@@ -2334,15 +2331,20 @@ struct ActiveChallengesSection: View {
         )
         .onAppear {
             loadUserChallenges()
-            // Also sync challenges from CloudKit to update isJoined status
-            Task {
-                await GamificationManager.shared.syncChallengesFromCloudKit()
-                // Force UI update after sync
-                await MainActor.run {
-                    // Trigger a refresh by updating state
-                    isLoadingChallenges = true
-                    isLoadingChallenges = false
+            
+            // Copy exact logic from ChallengeHubView
+            // Create mock challenges if needed
+            if gamificationManager.activeChallenges.isEmpty {
+                Task {
+                    await ChallengeService.shared.createMockChallenges()
                 }
+            }
+            
+            // Trigger challenge sync when section is displayed
+            Task {
+                await CloudKitSyncService.shared.triggerChallengeSync()
+                // Also sync challenge join status from CloudKit
+                await gamificationManager.syncChallengesFromCloudKit()
             }
         }
         .onChange(of: authManager.isAuthenticated) { _ in

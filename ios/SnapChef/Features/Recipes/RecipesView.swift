@@ -192,6 +192,9 @@ struct RecipesView: View {
         let uniqueRecipes = Dictionary(grouping: allRecipes, by: { $0.id })
             .compactMap { $0.value.first }
         allRecipes = uniqueRecipes
+        
+        // Sort by creation date (newest first) for consistent left-to-right, top-to-bottom ordering
+        allRecipes.sort { $0.createdAt > $1.createdAt }
 
         return allRecipes.filter { recipe in
             // Search filter
@@ -599,8 +602,17 @@ struct RecipeGridView: View {
                 .foregroundColor(.white)
 
             LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(recipes) { recipe in
+                ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                     RecipeGridCard(recipe: recipe)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.9).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
+                        ))
+                        .animation(
+                            .spring(response: 0.4, dampingFraction: 0.8)
+                            .delay(Double(index) * 0.05), // Stagger by 50ms per card
+                            value: recipes.count
+                        )
                 }
             }
         }
@@ -703,20 +715,22 @@ struct RecipeGridCard: View {
                                             .padding(8)
                                             .background(
                                                 Circle()
-                                                    .fill(Color.black.opacity(0.3))
+                                                    .fill(isLiked ? Color.pink.opacity(0.15) : Color.black.opacity(0.3))
                                             )
                                             .scaleEffect(isLikeAnimating ? 1.3 : 1.0)
-                                            .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isLikeAnimating)
                                         
-                                        // Like count badge (only show if > 0)
-                                        if likeCount > 0 {
-                                            Text("\(likeCount)")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundColor(.white)
-                                                .padding(4)
-                                                .background(Circle().fill(Color.pink))
-                                                .offset(x: 15, y: -15)
-                                        }
+                                        // Like count badge - always show to see immediate updates
+                                        Text("\(likeCount)")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(
+                                                Capsule()
+                                                    .fill(isLiked ? Color.pink : Color.gray)
+                                            )
+                                            .offset(x: 18, y: -15)
+                                            .opacity(likeCount > 0 ? 1 : 0.6)
                                     }
                                 }
 
@@ -853,18 +867,23 @@ struct RecipeGridCard: View {
             return
         }
         
-        // Animate the like button
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-            isLikeAnimating = true
-        }
-        
-        // Haptic feedback
+        // Haptic feedback immediately
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.impactOccurred()
         
-        // Toggle like state optimistically
-        isLiked.toggle()
-        likeCount += isLiked ? 1 : -1
+        // Toggle like state and animate immediately with optimistic update
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+            isLiked.toggle()
+            likeCount += isLiked ? 1 : -1
+            isLikeAnimating = true
+        }
+        
+        // Animate button scale
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isLikeAnimating = false
+            }
+        }
         
         // Save to CloudKit in background
         Task {
@@ -879,23 +898,25 @@ struct RecipeGridCard: View {
                     print("✅ Unliked recipe: \(recipe.name)")
                 }
                 
-                // Update like count from CloudKit
+                // Only update count if significantly different (to avoid flickering)
                 let actualLikeCount = await cloudKitRecipeManager.getLikeCount(for: recipe.id.uuidString)
                 await MainActor.run {
-                    likeCount = actualLikeCount
+                    // Only update if the difference is more than 1 (accounting for our own like/unlike)
+                    if abs(actualLikeCount - likeCount) > 1 {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            likeCount = actualLikeCount
+                        }
+                    }
                 }
             } catch {
-                // Revert on error
+                // Revert on error with animation
                 await MainActor.run {
-                    isLiked.toggle()
-                    likeCount += isLiked ? 1 : -1
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        isLiked.toggle()
+                        likeCount += isLiked ? 1 : -1
+                    }
                     print("❌ Failed to update like: \(error)")
                 }
-            }
-            
-            // Reset animation
-            await MainActor.run {
-                isLikeAnimating = false
             }
         }
         
