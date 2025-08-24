@@ -1,11 +1,21 @@
 -- SnapChef CloudKit Schema Definition
--- Version: 3.0
--- Last Updated: December 2024
--- Source: Production CloudKit Dashboard
+-- Version: 4.0
+-- Last Updated: August 24, 2025
+-- Source: Production CloudKit Dashboard with enhancements
 --
--- IMPORTANT: This is the authoritative schema from production
+-- IMPORTANT: This is the authoritative schema for production
 -- User is the primary record type for authentication
 -- Users and UserProfile are deprecated but kept for compatibility
+--
+-- Version 4.0 Changes:
+-- - Fixed followingCount to be QUERYABLE SORTABLE
+-- - Fixed recipesCreated to be SORTABLE
+-- - Fixed recipesShared to be QUERYABLE
+-- - Fixed challengesCompleted to be QUERYABLE SORTABLE
+-- - Added new fields: recipeSaveCount, recipeLikeCount, recipeViewCount
+-- - Added activity tracking: activityCount, lastActivityAt
+-- - Added challenge fields: joinedChallenges, completedChallenges
+-- - Added teamMemberships and achievementCount
 
 DEFINE SCHEMA
 
@@ -660,14 +670,14 @@ DEFINE SCHEMA
         appleUserId         STRING QUERYABLE,
         authProvider        STRING QUERYABLE,
         bio                 STRING,
-        challengesCompleted INT64,
+        challengesCompleted INT64 QUERYABLE SORTABLE,
         coinBalance         INT64,
         createdAt           TIMESTAMP SORTABLE,
         currentStreak       INT64,
         displayName         STRING QUERYABLE SEARCHABLE,
         email               STRING,
         followerCount       INT64 QUERYABLE SORTABLE,
-        followingCount      INT64,
+        followingCount      INT64 QUERYABLE SORTABLE,
         isProfilePublic     INT64 QUERYABLE,
         isVerified          INT64,
         lastActiveAt        TIMESTAMP SORTABLE,
@@ -675,14 +685,23 @@ DEFINE SCHEMA
         longestStreak       INT64,
         profileImageURL     STRING,
         profilePictureAsset ASSET,
-        recipesCreated      INT64 QUERYABLE,
-        recipesShared       INT64 SORTABLE,
+        recipesCreated      INT64 QUERYABLE SORTABLE,
+        recipesShared       INT64 QUERYABLE SORTABLE,
         showOnLeaderboard   INT64,
         subscriptionTier    STRING,
         tiktokUserId        STRING QUERYABLE,
         totalPoints         INT64 QUERYABLE SORTABLE,
         userID              STRING QUERYABLE,
         username            STRING QUERYABLE SORTABLE,
+        recipeSaveCount     INT64 QUERYABLE SORTABLE,
+        recipeLikeCount     INT64 QUERYABLE SORTABLE,
+        recipeViewCount     INT64 QUERYABLE SORTABLE,
+        activityCount       INT64 QUERYABLE SORTABLE,
+        lastActivityAt      TIMESTAMP QUERYABLE SORTABLE,
+        joinedChallenges    INT64 QUERYABLE SORTABLE,
+        completedChallenges INT64 QUERYABLE SORTABLE,
+        teamMemberships     INT64 QUERYABLE SORTABLE,
+        achievementCount    INT64 QUERYABLE SORTABLE,
         GRANT WRITE TO "_creator",
         GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"

@@ -268,7 +268,7 @@ struct CloudKitConfig {
 
 // MARK: - CloudKit Field Names
 struct CKField {
-    // User Fields - EXACT production field names from CloudKit
+    // User Fields - EXACT production field names from CloudKit (v4.0 Schema)
     struct User {
         // Authentication
         static let authProvider = "authProvider"
@@ -288,15 +288,36 @@ struct CKField {
         static let createdAt = "createdAt"
         static let lastActiveAt = "lastActiveAt"
         static let lastLoginAt = "lastLoginAt"
+        
+        // Gamification & Points
         static let totalPoints = "totalPoints"
         static let currentStreak = "currentStreak"
         static let longestStreak = "longestStreak"
-        static let challengesCompleted = "challengesCompleted"
-        static let recipesShared = "recipesShared"
-        static let recipesCreated = "recipesCreated"
+        static let challengesCompleted = "challengesCompleted"  // NOW QUERYABLE SORTABLE
         static let coinBalance = "coinBalance"
-        static let followerCount = "followerCount"
-        static let followingCount = "followingCount"
+        
+        // Recipe Stats
+        static let recipesShared = "recipesShared"  // NOW QUERYABLE SORTABLE
+        static let recipesCreated = "recipesCreated"  // NOW QUERYABLE SORTABLE
+        static let recipeSaveCount = "recipeSaveCount"  // NEW v4.0: Total saves of user's recipes
+        static let recipeLikeCount = "recipeLikeCount"  // NEW v4.0: Total likes on user's recipes
+        static let recipeViewCount = "recipeViewCount"  // NEW v4.0: Total views on user's recipes
+        
+        // Social Stats
+        static let followerCount = "followerCount"  // QUERYABLE SORTABLE
+        static let followingCount = "followingCount"  // NOW QUERYABLE SORTABLE (fixed in v4.0)
+        
+        // Activity Tracking (NEW v4.0)
+        static let activityCount = "activityCount"  // NEW v4.0: Total activities
+        static let lastActivityAt = "lastActivityAt"  // NEW v4.0: Last activity timestamp
+        
+        // Challenges & Teams (NEW v4.0)
+        static let joinedChallenges = "joinedChallenges"  // NEW v4.0: Number of challenges joined
+        static let completedChallenges = "completedChallenges"  // NEW v4.0: Number of challenges completed
+        static let teamMemberships = "teamMemberships"  // NEW v4.0: Number of teams joined
+        static let achievementCount = "achievementCount"  // NEW v4.0: Total achievements earned
+        
+        // Settings & Permissions
         static let isVerified = "isVerified"
         static let isProfilePublic = "isProfilePublic"
         static let showOnLeaderboard = "showOnLeaderboard"
