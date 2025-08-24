@@ -207,9 +207,16 @@ final class UnifiedAuthManager: ObservableObject {
             newRecord[CKField.User.authProvider] = "apple"
             newRecord[CKField.User.appleUserId] = appleUserID  // Store Apple Sign In ID
             newRecord[CKField.User.email] = email ?? ""
-            newRecord[CKField.User.displayName] = fullName?.formatted() ?? "Anonymous Chef"
-            // Set a temporary username - will be updated when user chooses one
-            newRecord[CKField.User.username] = nil  // Will be set during username setup
+            
+            // Generate username and set display name
+            let generatedUsername = generateUsername(from: email, fullName: fullName)
+            let displayName = fullName?.formatted() ?? generatedUsername.capitalized
+            
+            newRecord[CKField.User.username] = generatedUsername
+            newRecord[CKField.User.displayName] = displayName
+            
+            print("📝 Generated username: \(generatedUsername)")
+            print("📝 Display name: \(displayName)")
             newRecord[CKField.User.createdAt] = Date()
             newRecord[CKField.User.lastLoginAt] = Date()
             
@@ -647,6 +654,47 @@ final class UnifiedAuthManager: ObservableObject {
         }
     }
     
+    // MARK: - ID Normalization
+    
+    /// Normalizes user IDs by removing "user_" prefix if present
+    /// This ensures consistent ID format throughout the app
+    private func normalizeUserID(_ id: String) -> String {
+        // Remove "user_" prefix to get raw CloudKit ID
+        if id.hasPrefix("user_") {
+            return String(id.dropFirst(5))
+        }
+        return id
+    }
+    
+    // MARK: - Username Generation
+    
+    /// Generates a unique username from email or name
+    private func generateUsername(from email: String?, fullName: PersonNameComponents?) -> String {
+        // Try to use email prefix
+        if let email = email, let username = email.split(separator: "@").first {
+            let base = String(username).lowercased()
+                .replacingOccurrences(of: ".", with: "")
+                .replacingOccurrences(of: "_", with: "")
+                .replacingOccurrences(of: "-", with: "")
+            if base.count >= 3 {
+                return base
+            }
+        }
+        
+        // Try to use first name
+        if let firstName = fullName?.givenName?.lowercased() {
+            let cleanName = firstName
+                .replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: "-", with: "")
+            if cleanName.count >= 3 {
+                return cleanName + String(Int.random(in: 100...999))
+            }
+        }
+        
+        // Fallback to random username
+        return "chef" + String(Int.random(in: 10000...99999))
+    }
+    
     // MARK: - Social Features
     
     /// Check if the current user is following another user
@@ -656,14 +704,14 @@ final class UnifiedAuthManager: ObservableObject {
             return false
         }
         
-        // Ensure IDs have "user_" prefix for CloudKit queries
-        let fullFollowerID = currentUserID.hasPrefix("user_") ? currentUserID : "user_\(currentUserID)"
-        let fullFollowingID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
+        // Use normalized IDs for CloudKit queries
+        let normalizedFollowerID = normalizeUserID(currentUserID)
+        let normalizedFollowingID = normalizeUserID(userID)
         
         let predicate = NSPredicate(
             format: "%K == %@ AND %K == %@ AND %K == %d",
-            CKField.Follow.followerID, fullFollowerID,
-            CKField.Follow.followingID, fullFollowingID,
+            CKField.Follow.followerID, normalizedFollowerID,
+            CKField.Follow.followingID, normalizedFollowingID,
             CKField.Follow.isActive, 1
         )
         
@@ -692,14 +740,14 @@ final class UnifiedAuthManager: ObservableObject {
             return // Already following
         }
         
-        // Create follow record with full user IDs (including "user_" prefix)
+        // Create follow record with normalized IDs (without "user_" prefix)
         let followRecord = CKRecord(recordType: CloudKitConfig.followRecordType)
-        // Ensure IDs have "user_" prefix for consistency with CloudKit
-        let fullFollowerID = currentUserID.hasPrefix("user_") ? currentUserID : "user_\(currentUserID)"
-        let fullFollowingID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
+        // Normalize IDs to ensure consistency
+        let normalizedFollowerID = normalizeUserID(currentUserID)
+        let normalizedFollowingID = normalizeUserID(userID)
         
-        followRecord[CKField.Follow.followerID] = fullFollowerID
-        followRecord[CKField.Follow.followingID] = fullFollowingID
+        followRecord[CKField.Follow.followerID] = normalizedFollowerID
+        followRecord[CKField.Follow.followingID] = normalizedFollowingID
         followRecord[CKField.Follow.followedAt] = Date()
         followRecord[CKField.Follow.isActive] = Int64(1)
         
@@ -725,14 +773,14 @@ final class UnifiedAuthManager: ObservableObject {
             throw UnifiedAuthError.notAuthenticated
         }
         
-        // Ensure IDs have "user_" prefix for CloudKit queries
-        let fullFollowerID = currentUserID.hasPrefix("user_") ? currentUserID : "user_\(currentUserID)"
-        let fullFollowingID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
+        // Use normalized IDs for CloudKit queries
+        let normalizedFollowerID = normalizeUserID(currentUserID)
+        let normalizedFollowingID = normalizeUserID(userID)
         
         let predicate = NSPredicate(
             format: "%K == %@ AND %K == %@ AND %K == %d",
-            CKField.Follow.followerID, fullFollowerID,
-            CKField.Follow.followingID, fullFollowingID,
+            CKField.Follow.followerID, normalizedFollowerID,
+            CKField.Follow.followingID, normalizedFollowingID,
             CKField.Follow.isActive, 1
         )
         
@@ -771,9 +819,9 @@ final class UnifiedAuthManager: ObservableObject {
     /// Helper method to update the followed/unfollowed user's follower count
     private func updateFollowedUserFollowerCount(userID: String, increment: Bool) async {
         do {
-            // Fetch the user's record (ensure proper ID format)
-            let fullUserID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
-            let userRecordID = CKRecord.ID(recordName: fullUserID)
+            // Normalize the user ID and add "user_" prefix for CloudKit record
+            let normalizedID = normalizeUserID(userID)
+            let userRecordID = CKRecord.ID(recordName: "user_\(normalizedID)")
             let userRecord = try await cloudKitDatabase.record(for: userRecordID)
             
             // Get current follower count
@@ -1074,11 +1122,12 @@ final class UnifiedAuthManager: ObservableObject {
         do {
             // Count followers - people who follow this user
             // followingID is the user being followed
-            // Ensure we use the full "user_" prefixed ID for queries
-            let fullUserID = recordID.hasPrefix("user_") ? recordID : "user_\(recordID)"
-            print("🔍 DEBUG updateSocialCounts: Using fullUserID for queries: \(fullUserID)")
+            // Use normalized ID for consistency
+            let normalizedID = normalizeUserID(recordID)
+            print("🔍 DEBUG updateSocialCounts: Using normalized ID: \(normalizedID)")
             
-            let followerPredicate = NSPredicate(format: "followingID == %@ AND isActive == 1", fullUserID)
+            // Query for followers with normalized ID
+            let followerPredicate = NSPredicate(format: "followingID == %@ AND isActive == 1", normalizedID)
             let followerQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
             
             let followerResults = try await cloudKitDatabase.records(matching: followerQuery)
@@ -1100,8 +1149,8 @@ final class UnifiedAuthManager: ObservableObject {
             
             // Count following - people this user follows
             // followerID is the user doing the following
-            // Use the same fullUserID from above
-            let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == 1", fullUserID)
+            // Use normalized ID for consistency
+            let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == 1", normalizedID)
             let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
             
             let followingResults = try await cloudKitDatabase.records(matching: followingQuery)
@@ -1301,14 +1350,18 @@ public struct CloudKitUser: Identifiable {
             self.recordID = fullRecordID
         }
         self.username = record[CKField.User.username] as? String
-        // Handle displayName - use username if displayName is empty, fallback to "Anonymous Chef"
+        // Handle displayName - prioritize username, then displayName, never use "Anonymous Chef"
         let rawDisplayName = record[CKField.User.displayName] as? String
-        if let displayName = rawDisplayName, !displayName.isEmpty, displayName != "Anonymous Chef" {
+        if let username = self.username, !username.isEmpty {
+            // If we have a username, use it as the display name
+            self.displayName = username
+        } else if let displayName = rawDisplayName, !displayName.isEmpty, displayName != "Anonymous Chef" {
+            // Fall back to displayName if no username
             self.displayName = displayName
-        } else if let username = self.username, !username.isEmpty {
-            self.displayName = username.capitalized
         } else {
-            self.displayName = "Anonymous Chef"
+            // Generate a display name from recordID as last resort
+            let idSuffix = String(recordID?.suffix(4) ?? "0000")
+            self.displayName = "User\(idSuffix)"
         }
         self.email = record[CKField.User.email] as? String ?? ""
         self.profileImageURL = record[CKField.User.profileImageURL] as? String

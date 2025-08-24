@@ -133,10 +133,15 @@ struct UserProfileView: View {
             // User Info
             VStack(spacing: 8) {
                 Text({
-                    // Use fetchedDisplayName if available, otherwise fall back to user data
-                    let displayText = fetchedDisplayName ?? user.username ?? user.displayName ?? "Chef"
+                    // Use fetchedDisplayName if available, otherwise userName parameter, then fall back to user data
+                    let displayText = fetchedDisplayName ?? 
+                                    (userName != "Anonymous Chef" ? userName : nil) ?? 
+                                    user.username ?? 
+                                    user.displayName ?? 
+                                    "Chef"
                     print("🔍 DEBUG UserProfileView - Full name display:")
                     print("    └─ Fetched display name: \(fetchedDisplayName ?? "nil")")
+                    print("    └─ userName parameter: \(userName)")
                     print("    └─ Field: user.username = \(user.username ?? "nil")")
                     print("    └─ Field: user.displayName = \(user.displayName ?? "nil")")
                     print("    └─ CloudKit mapping: CKField.User.username, CKField.User.displayName")
@@ -417,6 +422,15 @@ struct UserProfileView: View {
     private func fetchUserDisplayName(for userID: String) async -> String? {
         print("🔍 DEBUG UserProfileView: Fetching display name for userID: \(userID)")
         
+        // If we already have the user data from viewModel, use that
+        if let user = viewModel.userProfile {
+            let result = user.username ?? user.displayName
+            if result != nil && result != "Anonymous Chef" {
+                print("✅ DEBUG UserProfileView: Using cached display name: \(result ?? "nil")")
+                return result
+            }
+        }
+        
         do {
             // Try to fetch user record from CloudKit
             let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
@@ -426,12 +440,26 @@ struct UserProfileView: View {
             // Get username or display name
             let username = userRecord[CKField.User.username] as? String
             let displayName = userRecord[CKField.User.displayName] as? String
-            let result = username ?? displayName
             
-            print("✅ DEBUG UserProfileView: Fetched display name: \(result ?? "nil") (username: \(username ?? "nil"), displayName: \(displayName ?? "nil"))")
+            // If both are nil or empty, try to use the userName passed from the parent view
+            var result = username ?? displayName
+            
+            // If still nil, check if we have a userName parameter that's not "Anonymous Chef"
+            if result == nil || result == "Anonymous Chef" {
+                // userName is passed from DiscoverUsersView and contains the actual name
+                if !userName.isEmpty && userName != "Anonymous Chef" {
+                    result = userName
+                }
+            }
+            
+            print("✅ DEBUG UserProfileView: Fetched display name: \(result ?? "nil") (username: \(username ?? "nil"), displayName: \(displayName ?? "nil"), userName param: \(userName))")
             return result
         } catch {
             print("❌ DEBUG UserProfileView: Failed to fetch display name: \(error)")
+            // Fallback to userName parameter if available
+            if !userName.isEmpty && userName != "Anonymous Chef" {
+                return userName
+            }
             return nil
         }
     }
