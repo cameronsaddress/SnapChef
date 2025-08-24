@@ -130,7 +130,12 @@ struct SnapChefApp: App {
             
             // MIGRATION: Run CloudKit data migration (Remove after successful run)
             // Uncomment the line below to run the migration ONCE
-            await CloudKitMigration.shared.runFullMigration()
+            // await CloudKitMigration.shared.runFullMigration()
+            
+            // MIGRATION NOTES: 
+            // - Follow record IDs were successfully normalized (removed user_ prefix)
+            // - Cannot update followerCount/followingCount - fields not in production schema
+            // - Username generation needs different approach for production
         }
     }
 
