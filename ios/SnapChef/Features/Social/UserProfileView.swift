@@ -133,18 +133,31 @@ struct UserProfileView: View {
             // User Info
             VStack(spacing: 8) {
                 Text({
-                    // Use fetchedDisplayName if available, otherwise userName parameter, then fall back to user data
-                    let displayText = fetchedDisplayName ?? 
-                                    (userName != "Anonymous Chef" ? userName : nil) ?? 
-                                    user.username ?? 
-                                    user.displayName ?? 
-                                    "Chef"
+                    // If CloudKit has a generated username like "userd31f", use the passed userName instead
+                    let cloudKitUsername = user.username ?? ""
+                    let isGeneratedUsername = cloudKitUsername.hasPrefix("user") && cloudKitUsername.count <= 10
+                    
+                    let displayText: String
+                    if isGeneratedUsername && !userName.isEmpty && userName != "Anonymous Chef" {
+                        // CloudKit has a generated username, use the passed one
+                        displayText = userName
+                        
+                        // Try to fix the CloudKit record
+                        Task {
+                            try? await UnifiedAuthManager.shared.fixUserUsername(userID: userID, username: userName)
+                        }
+                    } else if !cloudKitUsername.isEmpty {
+                        // Use CloudKit username if it's real
+                        displayText = cloudKitUsername
+                    } else {
+                        // Fallback
+                        displayText = userName.isEmpty ? "Chef" : userName
+                    }
+                    
                     print("🔍 DEBUG UserProfileView - Full name display:")
-                    print("    └─ Fetched display name: \(fetchedDisplayName ?? "nil")")
                     print("    └─ userName parameter: \(userName)")
-                    print("    └─ Field: user.username = \(user.username ?? "nil")")
-                    print("    └─ Field: user.displayName = \(user.displayName ?? "nil")")
-                    print("    └─ CloudKit mapping: CKField.User.username, CKField.User.displayName")
+                    print("    └─ CloudKit username: \(cloudKitUsername)")
+                    print("    └─ Is generated: \(isGeneratedUsername)")
                     print("    └─ Displayed value: \(displayText)")
                     return displayText
                 }())
@@ -153,10 +166,14 @@ struct UserProfileView: View {
 
                 if let username = user.username {
                     Text({
-                        let text = "@\(username)"
+                        // Same logic - if it's a generated username, use the passed userName
+                        let isGeneratedUsername = username.hasPrefix("user") && username.count <= 10
+                        let displayUsername = (isGeneratedUsername && !userName.isEmpty && userName != "Anonymous Chef") ? userName : username
+                        let text = "@\(displayUsername)"
                         print("🔍 DEBUG UserProfileView - Username below circle:")
-                        print("    └─ Field: user.username = \(username)")
-                        print("    └─ CloudKit mapping: CKField.User.username")
+                        print("    └─ CloudKit username: \(username)")
+                        print("    └─ userName parameter: \(userName)")
+                        print("    └─ Is generated: \(isGeneratedUsername)")
                         print("    └─ Displayed value: \(text)")
                         return text
                     }())

@@ -343,9 +343,9 @@ struct UsernameSetupView: View {
                 // Save username using CloudKitAuthManager
                 try await cloudKitAuth.setUsername(username)
 
-                // Save profile image to CloudKit if provided
+                // Save profile image locally and sync to CloudKit if provided
                 if let image = selectedImage {
-                    try await CloudKitUserManager.shared.updateProfileImage(image)
+                    await ProfilePhotoManager.shared.saveProfilePhoto(image)
                 }
 
                 await MainActor.run {

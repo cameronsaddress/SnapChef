@@ -227,9 +227,6 @@ struct SocialFeedView: View {
                     }
                 }
             }
-            .refreshable {
-                await refreshSocialData()
-            }
         }
         .sheet(isPresented: $showingDiscoverUsers) {
             DiscoverUsersView()
@@ -306,20 +303,12 @@ struct SocialFeedView: View {
             HStack(spacing: 16) {
                 // Profile Image
                 if let user = authManager.currentUser {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 60, height: 60)
-                        .overlay(
-                            Text((user.username ?? user.displayName).prefix(1).uppercased())
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.white)
-                        )
+                    UserAvatarView(
+                        userID: user.recordID,
+                        username: user.username,
+                        displayName: user.displayName,
+                        size: 60
+                    )
                 }
 
                 // Stats

@@ -2,6 +2,7 @@ import SwiftUI
 import os.log
 import CloudKit
 import UIKit
+import PhotosUI
 
 enum SubscriptionTier: String, CaseIterable {
     case free = "Free"
@@ -162,32 +163,25 @@ struct ProfileView: View {
         isLoadingStats = true
         
         Task {
-            do {
-                guard let userID = authManager.currentUser?.recordID else {
-                    await MainActor.run {
-                        self.isLoadingStats = false
-                    }
-                    return
-                }
-                
-                // For now, create stats from current user data
-                let currentUser = authManager.currentUser
-                let stats = UserStats(
-                    followerCount: currentUser?.followerCount ?? 0,
-                    followingCount: currentUser?.followingCount ?? 0,
-                    recipeCount: currentUser?.recipesCreated ?? 0,
-                    achievementCount: 0,
-                    currentStreak: currentUser?.currentStreak ?? 0
-                )
-                await MainActor.run {
-                    self.userStats = stats
-                    self.isLoadingStats = false
-                }
-            } catch {
-                print("Error loading user stats: \(error)")
+            guard authManager.currentUser?.recordID != nil else {
                 await MainActor.run {
                     self.isLoadingStats = false
                 }
+                return
+            }
+            
+            // For now, create stats from current user data
+            let currentUser = authManager.currentUser
+            let stats = UserStats(
+                followerCount: currentUser?.followerCount ?? 0,
+                followingCount: currentUser?.followingCount ?? 0,
+                recipeCount: currentUser?.recipesCreated ?? 0,
+                achievementCount: 0,
+                currentStreak: currentUser?.currentStreak ?? 0
+            )
+            await MainActor.run {
+                self.userStats = stats
+                self.isLoadingStats = false
             }
         }
     }
@@ -204,6 +198,9 @@ struct EnhancedProfileHeader: View {
     @State private var customName: String = UserDefaults.standard.string(forKey: "CustomChefName") ?? ""
     @State private var customPhotoData: Data? = ProfilePhotoHelper.loadCustomPhotoFromFile()
     @State private var refreshTrigger = 0
+    @StateObject private var profilePhotoManager = ProfilePhotoManager.shared
+    @State private var showingImagePicker = false
+    @State private var selectedItem: PhotosPickerItem?
     // Using UnifiedAuthManager from environment
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @EnvironmentObject var appState: AppState
@@ -365,15 +362,29 @@ struct EnhancedProfileHeader: View {
     
     private var profileButton: some View {
         Button(action: {
-            // If not authenticated, show auth view instead of edit profile
-            if !authManager.isAuthenticated {
-                authManager.showAuthSheet = true
+            // Show image picker for authenticated users
+            if authManager.isAuthenticated {
+                showingImagePicker = true
             } else {
-                // For authenticated users, show UsernameEditView for CloudKit username
-                showingUsernameEdit = true
+                authManager.showAuthSheet = true
             }
         }) {
-            profileButtonContent
+            ZStack {
+                profileButtonContent
+                
+                // Camera icon overlay for authenticated users
+                if authManager.isAuthenticated {
+                    Circle()
+                        .fill(Color.black.opacity(0.6))
+                        .frame(width: 35, height: 35)
+                        .overlay(
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white)
+                        )
+                        .offset(x: 40, y: 40)
+                }
+            }
         }
     }
     
@@ -398,7 +409,13 @@ struct EnhancedProfileHeader: View {
     
     @ViewBuilder
     private var profileImageOverlay: some View {
-        if let photoData = customPhotoData,
+        if let profilePhoto = profilePhotoManager.currentUserPhoto {
+            Image(uiImage: profilePhoto)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 120, height: 120)
+                .clipShape(Circle())
+        } else if let photoData = customPhotoData,
            let uiImage = UIImage(data: photoData) {
             Image(uiImage: uiImage)
                 .resizable()
@@ -422,12 +439,12 @@ struct EnhancedProfileHeader: View {
                 profileButton
                     .buttonStyle(PlainButtonStyle())
 
-                // Level badge
+                // Level badge (shows recipes created count)
                 VStack {
                     Spacer()
                     HStack {
                         Spacer()
-                        LevelBadge(level: 12)
+                        LevelBadge(level: authManager.currentUser?.recipesCreated ?? 0)
                             .offset(x: -10, y: -10)
                     }
                 }
@@ -558,6 +575,21 @@ struct EnhancedProfileHeader: View {
                         refreshTrigger += 1
                     }
                 }
+        }
+        .photosPicker(isPresented: $showingImagePicker, selection: $selectedItem, matching: .images)
+        .onChange(of: selectedItem) { newItem in
+            Task {
+                if let data = try? await newItem?.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    await profilePhotoManager.saveProfilePhoto(image)
+                    // Force UI refresh
+                    refreshTrigger += 1
+                }
+            }
+        }
+        .task {
+            // Load profile photo on appear
+            await profilePhotoManager.loadCurrentUserPhoto()
         }
         .sheet(isPresented: $authManager.showAuthSheet) {
             UnifiedAuthView()
@@ -1800,6 +1832,9 @@ struct CollectionProgressView: View {
                     return
                 }
                 
+                // Load recipe references (includes favorites) from CloudKit
+                await cloudKitRecipeManager.loadUserRecipeReferences()
+                
                 // Load comprehensive stats from CloudKit
                 let stats = try await cloudKitUserManager.getUserStats(for: userID)
                 
@@ -2189,9 +2224,10 @@ struct ActiveChallengesSection: View {
     @State private var isLoadingChallenges = false
 
     private var activeChallenges: [Challenge] {
-        // Get challenges from GamificationManager that the user has joined
-        return GamificationManager.shared.activeChallenges.filter { challenge in
-            challenge.isJoined && !challenge.isCompleted
+        // Filter to only show challenges the user has joined
+        // After syncChallengesFromCloudKit, the isJoined flag should be properly set
+        return gamificationManager.activeChallenges.filter { challenge in
+            challenge.isJoined
         }
     }
 
@@ -2298,12 +2334,29 @@ struct ActiveChallengesSection: View {
         )
         .onAppear {
             loadUserChallenges()
+            // Also sync challenges from CloudKit to update isJoined status
+            Task {
+                await GamificationManager.shared.syncChallengesFromCloudKit()
+                // Force UI update after sync
+                await MainActor.run {
+                    // Trigger a refresh by updating state
+                    isLoadingChallenges = true
+                    isLoadingChallenges = false
+                }
+            }
         }
         .onChange(of: authManager.isAuthenticated) { _ in
             loadUserChallenges()
         }
         .sheet(isPresented: $showingChallengeHub) {
+            // Refresh when returning from challenge hub
+            loadUserChallenges()
+        } content: {
             ChallengeHubView()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // Refresh when app comes to foreground
+            loadUserChallenges()
         }
     }
     

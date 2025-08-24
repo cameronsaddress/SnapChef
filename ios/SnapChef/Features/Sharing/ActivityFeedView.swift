@@ -231,6 +231,9 @@ struct ActivityFeedView: View {
                             .padding(.horizontal, 20)
                             .padding(.bottom, 20)
                         }
+                        .refreshable {
+                            await feedManager.refresh()
+                        }
                     }
                 }
             }
@@ -546,24 +549,14 @@ struct ActivityItemView: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            // User Photo or Activity Icon
+            // User Avatar with profile photo
             ZStack {
-                if let photo = activity.userPhoto {
-                    Image(uiImage: photo)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 50, height: 50)
-                        .clipShape(Circle())
-                } else {
-                    Circle()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 50, height: 50)
-                        .overlay(
-                            Text(activity.userName.prefix(1).uppercased())
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.white)
-                        )
-                }
+                UserAvatarView(
+                    userID: activity.userID,
+                    username: activity.userName,
+                    displayName: activity.userName,
+                    size: 50
+                )
 
                 // Activity Type Icon
                 Circle()

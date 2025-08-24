@@ -276,25 +276,18 @@ struct RecipesView: View {
                 isBackgroundSyncing = true
             }
             
-            do {
-                // Get recipes from cache (intelligent caching)
-                let recipes = await cloudKitRecipeCache.getRecipes(forceRefresh: false)
-                print("✅ RecipesView: Background sync got \(recipes.count) recipes")
+            // Get recipes from cache (intelligent caching)
+            let recipes = await cloudKitRecipeCache.getRecipes(forceRefresh: false)
+            print("✅ RecipesView: Background sync got \(recipes.count) recipes")
 
-                // Fetch photos in background without blocking UI
-                await fetchPhotosInBackground(for: recipes)
+            // Fetch photos in background without blocking UI
+            await fetchPhotosInBackground(for: recipes)
 
-                // Trigger manual sync for latest data
-                await CloudKitDataManager.shared.triggerManualSync()
+            // Trigger manual sync for latest data
+            await CloudKitDataManager.shared.triggerManualSync()
 
-                await MainActor.run {
-                    isBackgroundSyncing = false
-                }
-            } catch {
-                print("❌ RecipesView: Background sync failed: \(error)")
-                await MainActor.run {
-                    isBackgroundSyncing = false
-                }
+            await MainActor.run {
+                isBackgroundSyncing = false
             }
         }
     }
@@ -307,19 +300,15 @@ struct RecipesView: View {
             isBackgroundSyncing = true
         }
 
-        do {
-            // Force refresh for pull-to-refresh
-            let recipes = await cloudKitRecipeCache.getRecipes(forceRefresh: true)
-            print("✅ RecipesView: Foreground sync got \(recipes.count) recipes")
+        // Force refresh for pull-to-refresh
+        let recipes = await cloudKitRecipeCache.getRecipes(forceRefresh: true)
+        print("✅ RecipesView: Foreground sync got \(recipes.count) recipes")
 
-            // Fetch photos with higher priority
-            await fetchPhotosInBackground(for: recipes)
+        // Fetch photos with higher priority
+        await fetchPhotosInBackground(for: recipes)
 
-            // Trigger manual sync
-            await CloudKitDataManager.shared.triggerManualSync()
-        } catch {
-            print("❌ RecipesView: Foreground sync failed: \(error)")
-        }
+        // Trigger manual sync
+        await CloudKitDataManager.shared.triggerManualSync()
 
         await MainActor.run {
             isBackgroundSyncing = false
@@ -626,6 +615,9 @@ struct RecipeGridCard: View {
     @State private var showingUserProfile = false
     @State private var creatorUsername: String = "Anonymous"
     @State private var isLoadingUsername = false
+    @State private var isLiked = false
+    @State private var likeCount = 0
+    @State private var isLikeAnimating = false
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
@@ -697,28 +689,38 @@ struct RecipeGridCard: View {
                         .allowsHitTesting(false) // Allow scroll to pass through
 
 
-                        // Difficulty badge and favorite button overlay
+                        // Like button overlay with animation
                         VStack {
                             HStack {
-                                // Favorite button - as overlay button that captures its own taps
+                                // Like button - saves to CloudKit
                                 Button(action: {
-                                appState.toggleFavorite(recipe.id)
-                                let generator = UIImpactFeedbackGenerator(style: .light)
-                                generator.impactOccurred()
-                            }) {
-                                Image(systemName: appState.isFavorited(recipe.id) ? "heart.fill" : "heart")
-                                    .font(.system(size: 20, weight: .medium))
-                                    .foregroundColor(appState.isFavorited(recipe.id) ? Color(hex: "#ff6b6b") : .white)
-                                    .padding(8)
-                                    .background(
-                                        Circle()
-                                            .fill(Color.black.opacity(0.3))
-                                    )
-                            }
+                                    toggleLike()
+                                }) {
+                                    ZStack {
+                                        Image(systemName: isLiked ? "heart.fill" : "heart")
+                                            .font(.system(size: 20, weight: .medium))
+                                            .foregroundColor(isLiked ? .pink : .white)
+                                            .padding(8)
+                                            .background(
+                                                Circle()
+                                                    .fill(Color.black.opacity(0.3))
+                                            )
+                                            .scaleEffect(isLikeAnimating ? 1.3 : 1.0)
+                                            .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isLikeAnimating)
+                                        
+                                        // Like count badge (only show if > 0)
+                                        if likeCount > 0 {
+                                            Text("\(likeCount)")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .padding(4)
+                                                .background(Circle().fill(Color.pink))
+                                                .offset(x: 15, y: -15)
+                                        }
+                                    }
+                                }
 
                             Spacer()
-                            DifficultyBadge(difficulty: recipe.difficulty)
-                                .allowsHitTesting(false) // Let scroll pass through badge
                         }
                         .padding(8)
                         Spacer()
@@ -774,9 +776,15 @@ struct RecipeGridCard: View {
                                 .allowsHitTesting(false) // Allow scroll to pass through
                         }
 
-                        // Share button
+                        // Difficulty badge and Share button
                         HStack {
                             Spacer()
+                            
+                            // Difficulty badge
+                            DifficultyBadge(difficulty: recipe.difficulty)
+                                .allowsHitTesting(false)
+                            
+                            // Share button
                             Button(action: {
                                 showSharePopup = true
                             }) {
@@ -828,12 +836,91 @@ struct RecipeGridCard: View {
             if let currentUser = cloudKitAuth.currentUser {
                 UserProfileView(
                     userID: currentUser.recordID ?? "current-user",
-                    userName: currentUser.displayName ?? "Me"
+                    userName: currentUser.displayName
                 )
             }
         }
         .task {
             await fetchCreatorUsername()
+            await loadLikeStatus()
+        }
+    }
+    
+    private func toggleLike() {
+        // Check if user is authenticated
+        guard cloudKitAuth.isAuthenticated else {
+            cloudKitAuth.promptAuthForFeature(.socialSharing)
+            return
+        }
+        
+        // Animate the like button
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+            isLikeAnimating = true
+        }
+        
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        
+        // Toggle like state optimistically
+        isLiked.toggle()
+        likeCount += isLiked ? 1 : -1
+        
+        // Save to CloudKit in background
+        Task {
+            do {
+                if isLiked {
+                    // Like the recipe
+                    try await cloudKitRecipeManager.likeRecipe(recipeID: recipe.id.uuidString)
+                    print("✅ Liked recipe: \(recipe.name)")
+                } else {
+                    // Unlike the recipe
+                    try await cloudKitRecipeManager.unlikeRecipe(recipeID: recipe.id.uuidString)
+                    print("✅ Unliked recipe: \(recipe.name)")
+                }
+                
+                // Update like count from CloudKit
+                let actualLikeCount = await cloudKitRecipeManager.getLikeCount(for: recipe.id.uuidString)
+                await MainActor.run {
+                    likeCount = actualLikeCount
+                }
+            } catch {
+                // Revert on error
+                await MainActor.run {
+                    isLiked.toggle()
+                    likeCount += isLiked ? 1 : -1
+                    print("❌ Failed to update like: \(error)")
+                }
+            }
+            
+            // Reset animation
+            await MainActor.run {
+                isLikeAnimating = false
+            }
+        }
+        
+        // Also toggle favorite locally for consistency
+        appState.toggleFavorite(recipe.id)
+    }
+    
+    private func loadLikeStatus() async {
+        // Load initial like status from CloudKit
+        if cloudKitAuth.isAuthenticated {
+            // Check if current user has liked this recipe (no need for do-catch, these don't throw)
+            let hasLiked = await cloudKitRecipeManager.hasUserLikedRecipe(recipeID: recipe.id.uuidString)
+            let currentLikeCount = await cloudKitRecipeManager.getLikeCount(for: recipe.id.uuidString)
+            
+            await MainActor.run {
+                isLiked = hasLiked
+                likeCount = currentLikeCount
+            }
+        }
+        
+        // Also sync with local favorites
+        await MainActor.run {
+            if appState.isFavorited(recipe.id) && !isLiked {
+                isLiked = true
+            }
         }
     }
 

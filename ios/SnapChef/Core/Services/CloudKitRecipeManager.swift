@@ -1903,6 +1903,101 @@ class CloudKitRecipeManager: ObservableObject {
 
         return (beforePhoto, afterPhoto)
     }
+    
+    // MARK: - Recipe Likes
+    
+    /// Like a recipe
+    func likeRecipe(recipeID: String) async throws {
+        guard let userID = getCurrentUserID() else {
+            throw RecipeError.uploadFailed
+        }
+        
+        // Create a Like record
+        let likeID = "\(userID)_\(recipeID)"
+        let likeRecord = CKRecord(recordType: "RecipeLike", recordID: CKRecord.ID(recordName: likeID))
+        likeRecord["userID"] = userID
+        likeRecord["recipeID"] = recipeID
+        likeRecord["likedAt"] = Date()
+        
+        // Save to CloudKit
+        _ = try await publicDB.save(likeRecord)
+        
+        // Update the recipe's like count
+        await updateRecipeLikeCount(recipeID: recipeID, increment: true)
+        
+        print("✅ Liked recipe: \(recipeID)")
+    }
+    
+    /// Unlike a recipe
+    func unlikeRecipe(recipeID: String) async throws {
+        guard let userID = getCurrentUserID() else {
+            throw RecipeError.uploadFailed
+        }
+        
+        // Delete the Like record
+        let likeID = "\(userID)_\(recipeID)"
+        let recordID = CKRecord.ID(recordName: likeID)
+        
+        do {
+            _ = try await publicDB.deleteRecord(withID: recordID)
+            
+            // Update the recipe's like count
+            await updateRecipeLikeCount(recipeID: recipeID, increment: false)
+            
+            print("✅ Unliked recipe: \(recipeID)")
+        } catch {
+            print("⚠️ Failed to unlike recipe: \(error)")
+            throw error
+        }
+    }
+    
+    /// Check if user has liked a recipe
+    func hasUserLikedRecipe(recipeID: String) async -> Bool {
+        guard let userID = getCurrentUserID() else {
+            return false
+        }
+        
+        let likeID = "\(userID)_\(recipeID)"
+        let recordID = CKRecord.ID(recordName: likeID)
+        
+        do {
+            _ = try await publicDB.record(for: recordID)
+            return true
+        } catch {
+            return false
+        }
+    }
+    
+    /// Get like count for a recipe
+    func getLikeCount(for recipeID: String) async -> Int {
+        let predicate = NSPredicate(format: "recipeID == %@", recipeID)
+        let query = CKQuery(recordType: "RecipeLike", predicate: predicate)
+        
+        do {
+            let (matchResults, _) = try await publicDB.records(matching: query, resultsLimit: 1000)
+            return matchResults.count
+        } catch {
+            print("Failed to get like count: \(error)")
+            return 0
+        }
+    }
+    
+    /// Update recipe's like count
+    private func updateRecipeLikeCount(recipeID: String, increment: Bool) async {
+        let recordID = CKRecord.ID(recordName: recipeID)
+        
+        do {
+            // Try to fetch from public database
+            if let record = try? await publicDB.record(for: recordID) {
+                let currentCount = record["likeCount"] as? Int64 ?? 0
+                record["likeCount"] = increment ? currentCount + 1 : max(0, currentCount - 1)
+                _ = try await publicDB.save(record)
+                print("✅ Updated like count for recipe: \(recipeID)")
+            }
+        } catch {
+            print("⚠️ Could not update like count for recipe: \(error)")
+        }
+    }
 }
 
 // MARK: - Sync Data Structures

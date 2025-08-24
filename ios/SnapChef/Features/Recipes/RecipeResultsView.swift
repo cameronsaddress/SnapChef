@@ -667,7 +667,7 @@ struct DifficultyBadge: View {
         Text(difficulty.rawValue.capitalized)
             .font(.system(size: 12, weight: .bold))
             .foregroundColor(.white)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, difficulty == .medium ? 8 : 12)
             .padding(.vertical, 4)
             .background(
                 Capsule()

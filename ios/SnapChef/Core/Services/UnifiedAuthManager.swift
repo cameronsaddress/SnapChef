@@ -208,15 +208,13 @@ final class UnifiedAuthManager: ObservableObject {
             newRecord[CKField.User.appleUserId] = appleUserID  // Store Apple Sign In ID
             newRecord[CKField.User.email] = email ?? ""
             
-            // Generate username and set display name
+            // Generate username - this is the ONLY name we use
             let generatedUsername = generateUsername(from: email, fullName: fullName)
-            let displayName = fullName?.formatted() ?? generatedUsername.capitalized
             
             newRecord[CKField.User.username] = generatedUsername
-            newRecord[CKField.User.displayName] = displayName
+            newRecord[CKField.User.displayName] = generatedUsername  // Same as username
             
             print("📝 Generated username: \(generatedUsername)")
-            print("📝 Display name: \(displayName)")
             newRecord[CKField.User.createdAt] = Date()
             newRecord[CKField.User.lastLoginAt] = Date()
             
@@ -312,36 +310,65 @@ final class UnifiedAuthManager: ObservableObject {
             throw UnifiedAuthError.notAuthenticated
         }
         
-        // Check availability
-        let isAvailable = try await checkUsernameAvailability(username)
-        guard isAvailable else {
-            print("❌ Username '\(username)' is not available")
-            throw UnifiedAuthError.usernameUnavailable
+        // Check availability - but allow setting our own current username
+        if username.lowercased() != currentUser.username?.lowercased() {
+            let isAvailable = try await checkUsernameAvailability(username)
+            guard isAvailable else {
+                print("❌ Username '\(username)' is not available")
+                throw UnifiedAuthError.usernameUnavailable
+            }
         }
         
         do {
-            // Update record - need to use the full "user_" prefixed ID for CloudKit
-            let fullRecordID = "user_\(recordID)"
-            print("🔍 DEBUG: Setting username '\(username)' for record: \(fullRecordID)")
+            // Try BOTH possible record IDs - with and without prefix
+            let recordIDsToTry = [
+                "user_\(recordID)",  // Standard format
+                recordID             // Just the raw ID
+            ]
             
-            let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: fullRecordID))
+            var recordFound: CKRecord? = nil
+            var usedRecordID: String? = nil
+            
+            for tryID in recordIDsToTry {
+                do {
+                    print("🔍 DEBUG: Trying to fetch record with ID: \(tryID)")
+                    let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: tryID))
+                    recordFound = record
+                    usedRecordID = tryID
+                    print("✅ Found record with ID: \(tryID)")
+                    break
+                } catch {
+                    print("   Record not found with ID: \(tryID)")
+                    continue
+                }
+            }
+            
+            guard let record = recordFound, let finalRecordID = usedRecordID else {
+                print("❌ Could not find user record with any ID format")
+                throw UnifiedAuthError.userRecordNotFound
+            }
+            
+            // Debug what's currently in CloudKit before update
+            print("🔍 DEBUG setUsername - BEFORE update (record ID: \(finalRecordID)):")
+            print("   username field: '\(record[CKField.User.username] as? String ?? "nil")'")
+            print("   displayName field: '\(record[CKField.User.displayName] as? String ?? "nil")'")
+            
             record[CKField.User.username] = username.lowercased()
+            // ALWAYS update displayName to match username - we only use username!
+            record[CKField.User.displayName] = username
+            print("   Setting BOTH username and displayName to '\(username)'")
             
-            // If displayName is still "Anonymous Chef", update it to the username
-            let currentDisplayName = record[CKField.User.displayName] as? String
-            if currentDisplayName == nil || currentDisplayName == "Anonymous Chef" || currentDisplayName?.isEmpty == true {
-                record[CKField.User.displayName] = username
-            }
+            let savedRecord = try await cloudKitDatabase.save(record)
             
-            let _ = try await cloudKitDatabase.save(record)
+            // Debug what was actually saved
             print("✅ Successfully saved username '\(username)' to CloudKit record")
+            print("🔍 DEBUG setUsername - AFTER save:")
+            print("   username field: '\(savedRecord[CKField.User.username] as? String ?? "nil")'")
+            print("   displayName field: '\(savedRecord[CKField.User.displayName] as? String ?? "nil")'")
             
-            // Update local state
+            // Update local state - both username and displayName
             self.currentUser?.username = username.lowercased()
-            // Also update displayName if it was "Anonymous Chef"
-            if self.currentUser?.displayName == "Anonymous Chef" || self.currentUser?.displayName.isEmpty == true {
-                self.currentUser?.displayName = username
-            }
+            self.currentUser?.displayName = username  // Always keep them in sync
             self.showUsernameSetup = false
             
             completeAuthentication()
@@ -693,6 +720,121 @@ final class UnifiedAuthManager: ObservableObject {
         
         // Fallback to random username
         return "chef" + String(Int.random(in: 10000...99999))
+    }
+    
+    /// Fix CloudKit user record that has missing username
+    func fixUserUsername(userID: String, username: String) async throws {
+        print("🔧 Fixing username for user \(userID) to '\(username)'")
+        
+        // Try both record ID formats
+        let recordIDsToTry = [
+            userID,                    // Raw ID like "_d4b8018a9065711f8e9731b7c8c6d31f"
+            "user_\(userID)"          // With prefix
+        ]
+        
+        var recordFound: CKRecord? = nil
+        
+        for tryID in recordIDsToTry {
+            do {
+                let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: tryID))
+                recordFound = record
+                print("✅ Found record with ID: \(tryID)")
+                break
+            } catch {
+                continue
+            }
+        }
+        
+        guard let record = recordFound else {
+            print("❌ Could not find user record for ID: \(userID)")
+            throw UnifiedAuthError.userRecordNotFound
+        }
+        
+        // Update the username field
+        record[CKField.User.username] = username.lowercased()
+        record[CKField.User.displayName] = username
+        
+        let savedRecord = try await cloudKitDatabase.save(record)
+        print("✅ Fixed username for user \(userID): username='\(savedRecord[CKField.User.username] as? String ?? "nil")'")
+    }
+    
+    // MARK: - Profile Photo Management
+    
+    /// Update profile photo in CloudKit
+    func updateProfilePhoto(_ asset: CKAsset, for userID: String) async {
+        do {
+            let database = cloudKitDatabase
+            
+            // Fetch user record
+            let recordID = CKRecord.ID(recordName: "user_\(userID)")
+            let record = try await database.record(for: recordID)
+            
+            // Update profile photo asset
+            record["profilePictureAsset"] = asset
+            
+            // Save record
+            _ = try await database.save(record)
+            
+            print("✅ UnifiedAuthManager: Updated profile photo in CloudKit for user \(userID)")
+            
+            // Refresh current user if this is the current user
+            if userID == currentUser?.recordID {
+                await refreshCurrentUser()
+            }
+        } catch {
+            print("⚠️ UnifiedAuthManager: Failed to update profile photo in CloudKit: \(error)")
+        }
+    }
+    
+    /// Fetch profile photo from CloudKit
+    func fetchProfilePhoto(for userID: String) async -> UIImage? {
+        do {
+            let database = cloudKitDatabase
+            
+            // Fetch user record
+            let recordID = CKRecord.ID(recordName: "user_\(userID)")
+            let record = try await database.record(for: recordID)
+            
+            // Get profile photo asset
+            guard let asset = record["profilePictureAsset"] as? CKAsset,
+                  let fileURL = asset.fileURL,
+                  let imageData = try? Data(contentsOf: fileURL),
+                  let image = UIImage(data: imageData) else {
+                return nil
+            }
+            
+            print("✅ UnifiedAuthManager: Fetched profile photo from CloudKit for user \(userID)")
+            return image
+        } catch {
+            print("⚠️ UnifiedAuthManager: Failed to fetch profile photo from CloudKit: \(error)")
+            return nil
+        }
+    }
+    
+    /// Delete profile photo from CloudKit
+    func deleteProfilePhoto(for userID: String) async {
+        do {
+            let database = cloudKitDatabase
+            
+            // Fetch user record
+            let recordID = CKRecord.ID(recordName: "user_\(userID)")
+            let record = try await database.record(for: recordID)
+            
+            // Remove profile photo asset
+            record["profilePictureAsset"] = nil
+            
+            // Save record
+            _ = try await database.save(record)
+            
+            print("✅ UnifiedAuthManager: Deleted profile photo from CloudKit for user \(userID)")
+            
+            // Refresh current user if this is the current user
+            if userID == currentUser?.recordID {
+                await refreshCurrentUser()
+            }
+        } catch {
+            print("⚠️ UnifiedAuthManager: Failed to delete profile photo from CloudKit: \(error)")
+        }
     }
     
     // MARK: - Social Features
@@ -1057,6 +1199,11 @@ final class UnifiedAuthManager: ObservableObject {
             let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
             let record = try await cloudKitDatabase.record(for: userRecordID)
             
+            // Debug what's actually in CloudKit
+            print("🔍 DEBUG refreshCurrentUser - CloudKit record contents:")
+            print("   username field: '\(record[CKField.User.username] as? String ?? "nil")'")
+            print("   displayName field: '\(record[CKField.User.displayName] as? String ?? "nil")'")
+            
             await MainActor.run {
                 self.currentUser = CloudKitUser(from: record)
             }
@@ -1349,20 +1496,33 @@ public struct CloudKitUser: Identifiable {
         } else {
             self.recordID = fullRecordID
         }
-        self.username = record[CKField.User.username] as? String
-        // Handle displayName - prioritize username, then displayName, never use "Anonymous Chef"
+        
+        // CRITICAL FIX: Extract username and displayName properly
+        let rawUsername = record[CKField.User.username] as? String
         let rawDisplayName = record[CKField.User.displayName] as? String
-        if let username = self.username, !username.isEmpty {
-            // If we have a username, use it as the display name
-            self.displayName = username
-        } else if let displayName = rawDisplayName, !displayName.isEmpty, displayName != "Anonymous Chef" {
-            // Fall back to displayName if no username
-            self.displayName = displayName
+        
+        print("🔍 DEBUG CloudKitUser init: Processing user record \(fullRecordID)")
+        print("    └─ Raw username field: '\(rawUsername ?? "nil")'")
+        print("    └─ Raw displayName field: '\(rawDisplayName ?? "nil")'")
+        
+        // ONLY use username field - ignore displayName completely
+        if let username = rawUsername, !username.isEmpty {
+            // This is the user's actual chosen username - use it!
+            self.username = username.lowercased()
+            self.displayName = username  // Display name always matches username
+            print("    └─ ✅ Using CloudKit username field: '\(username)'")
         } else {
-            // Generate a display name from recordID as last resort
+            // No username in CloudKit - this is a problem that needs fixing
+            // Generate a temporary one but log it as an error
             let idSuffix = String(recordID?.suffix(4) ?? "0000")
+            self.username = "user\(idSuffix)".lowercased()
             self.displayName = "User\(idSuffix)"
+            print("    └─ ❌ ERROR: No username in CloudKit! Generated fallback: '\(self.username ?? "nil")'")
+            print("    └─ This user needs to set their username in ProfileView")
         }
+        
+        print("    └─ Final username: '\(self.username ?? "nil")'")
+        print("    └─ Final displayName: '\(self.displayName)'")
         self.email = record[CKField.User.email] as? String ?? ""
         self.profileImageURL = record[CKField.User.profileImageURL] as? String
         self.authProvider = record[CKField.User.authProvider] as? String ?? "unknown"

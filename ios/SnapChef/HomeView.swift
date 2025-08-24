@@ -91,25 +91,25 @@ struct HomeView: View {
                         InfluencerCarousel()
                             .padding(.top, 10)
 
+                        // Recipe Detective Tile (moved up)
+                        DetectiveFeatureTile()
+                            .padding(.horizontal, 30)
+                            .padding(.top, 20)
+
                         // Streak Summary
                         StreakSummaryCard()
                             .padding(.horizontal, 20)
                             .padding(.top, 20)
 
+                        // Viral Section (Today's Challenges) - moved up
+                        ViralChallengeSection()
+                            .padding(.top, 20)
+                            .padding(.bottom, 20)
+
                         // Food Preferences Card
                         FoodPreferencesCard()
                             .padding(.horizontal, 30)
                             .padding(.top, 20)
-
-                        // Recipe Detective Tile
-                        DetectiveFeatureTile()
-                            .padding(.horizontal, 30)
-                            .padding(.top, 20)
-
-                        // Viral Section (Today's Challenges)
-                        ViralChallengeSection()
-                            .padding(.top, 20)
-                            .padding(.bottom, 20)
 
                         // Mystery Meal Button
                         MysteryMealButton(

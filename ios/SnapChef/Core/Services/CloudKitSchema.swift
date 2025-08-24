@@ -71,6 +71,7 @@ import CloudKit
  - completedAt: Date/Time (Indexed, Sortable)
  - earnedPoints: Int64
  - earnedCoins: Int64
+ - proofImage: Asset
  - proofImageURL: String
  - notes: String
  - teamID: String (Indexed, Queryable)
@@ -358,6 +359,7 @@ struct CKField {
         static let completedAt = "completedAt"
         static let earnedPoints = "earnedPoints"
         static let earnedCoins = "earnedCoins"
+        static let proofImage = "proofImage"
         static let proofImageURL = "proofImageURL"
         static let notes = "notes"
         static let teamID = "teamID"

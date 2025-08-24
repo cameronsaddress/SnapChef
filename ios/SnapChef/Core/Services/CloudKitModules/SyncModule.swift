@@ -576,7 +576,7 @@ final class SyncModule: ObservableObject {
             let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).jpg")
             try imageData.write(to: tempURL)
             let imageAsset = CKAsset(fileURL: tempURL)
-            userChallengeRecord["proofImage"] = imageAsset
+            userChallengeRecord[CKField.UserChallenge.proofImage] = imageAsset
             
             // Also store URL for quick access
             userChallengeRecord[CKField.UserChallenge.proofImageURL] = tempURL.absoluteString

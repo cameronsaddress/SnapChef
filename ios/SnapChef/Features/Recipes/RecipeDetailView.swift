@@ -860,32 +860,41 @@ struct RecipeDetailView: View {
         let impactGenerator = UIImpactFeedbackGenerator(style: .medium)
         impactGenerator.impactOccurred()
 
+        // Immediately update UI for better responsiveness
+        let wasLiked = isLiked
+        let previousCount = likeCount
+        
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            isLiked.toggle()
+            likeCount = isLiked ? likeCount + 1 : max(0, likeCount - 1)
+        }
+
         Task {
             isLoadingLike = true
             defer { isLoadingLike = false }
 
             do {
-                if isLiked {
+                if wasLiked {
+                    // Was liked, now unliking
                     try await cloudKitSync.unlikeRecipe(recipe.id.uuidString)
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        isLiked = false
-                        likeCount = max(0, likeCount - 1)
-                    }
                 } else {
-                    // For demo purposes, use current user ID as owner ID
+                    // Was not liked, now liking
                     let ownerID = UnifiedAuthManager.shared.currentUser?.recordID ?? "anonymous"
                     try await cloudKitSync.likeRecipe(recipe.id.uuidString, recipeOwnerID: ownerID)
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        isLiked = true
-                        likeCount += 1
-                    }
-
+                    
                     // Success haptic for like
                     let successGenerator = UINotificationFeedbackGenerator()
                     successGenerator.notificationOccurred(.success)
                 }
             } catch {
                 print("Failed to toggle like: \(error)")
+                
+                // Revert the UI changes on error
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    isLiked = wasLiked
+                    likeCount = previousCount
+                }
+                
                 // Error haptic
                 let errorGenerator = UINotificationFeedbackGenerator()
                 errorGenerator.notificationOccurred(.error)

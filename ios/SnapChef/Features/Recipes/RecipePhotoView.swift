@@ -7,6 +7,8 @@
 
 import SwiftUI
 import CloudKit
+import AVFoundation
+import PhotosUI
 
 struct RecipePhotoView: View {
     let recipe: Recipe
@@ -170,9 +172,9 @@ struct RecipePhotoView: View {
             }
         }
         .fullScreenCover(isPresented: $showingAfterPhotoCapture) {
-            AfterPhotoCaptureView(
+            MealPhotoCameraView(
                 afterPhoto: $afterPhoto,
-                recipeID: recipe.id.uuidString
+                recipeID: recipe.id
             )
             .onDisappear {
                 if let photo = afterPhoto {
@@ -408,26 +410,19 @@ struct RecipePhotoView: View {
         // Check if migration is needed and start it
         if PhotoMigrationCoordinator.shared.startMigration(for: recipe.id) {
             Task(priority: .background) {
-                do {
-                    PhotoStorageManager.shared.storePhotos(
-                        fridgePhoto: savedRecipe.beforePhoto,
-                        mealPhoto: savedRecipe.afterPhoto,
-                        for: recipe.id
-                    )
-                    
-                    await MainActor.run {
-                        PhotoMigrationCoordinator.shared.completeMigration(for: recipe.id)
-                        print("📸 RecipePhotoView: Successfully migrated photos for recipe \(recipe.id)")
-                    }
-                    
-                    // Refresh cache after successful migration
-                    await refreshCache()
-                } catch {
-                    await MainActor.run {
-                        PhotoMigrationCoordinator.shared.failMigration(for: recipe.id)
-                        print("⚠️ RecipePhotoView: Failed to migrate photos for recipe \(recipe.id): \(error)")
-                    }
+                PhotoStorageManager.shared.storePhotos(
+                    fridgePhoto: savedRecipe.beforePhoto,
+                    mealPhoto: savedRecipe.afterPhoto,
+                    for: recipe.id
+                )
+                
+                await MainActor.run {
+                    PhotoMigrationCoordinator.shared.completeMigration(for: recipe.id)
+                    print("📸 RecipePhotoView: Successfully migrated photos for recipe \(recipe.id)")
                 }
+                
+                // Refresh cache after successful migration
+                await refreshCache()
             }
         }
     }

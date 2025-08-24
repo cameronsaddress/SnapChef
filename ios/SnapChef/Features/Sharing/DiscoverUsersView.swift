@@ -155,14 +155,6 @@ struct DiscoverUsersView: View {
             }
             .navigationTitle("Discover Chefs")
             .navigationBarTitleDisplayMode(.large)
-            .navigationBarItems(trailing: 
-                Button(action: {
-                    // Invite friends
-                }) {
-                    Image(systemName: "person.badge.plus")
-                        .foregroundColor(.white)
-                }
-            )
         }
         .task {
             await viewModel.loadUsers(for: selectedCategory)
@@ -175,13 +167,7 @@ struct DiscoverUsersView: View {
         .sheet(item: $viewModel.selectedUser) { user in
             UserProfileView(
                 userID: user.id,
-                userName: {
-                    print("🔍 DEBUG DiscoverUsersView -> UserProfileView navigation:")
-                    print("    └─ Passing userName parameter: user.displayName = \(user.displayName)")
-                    print("    └─ Should pass user.username instead for consistency?")
-                    print("    └─ user.username = \(user.username ?? "nil")")
-                    return user.displayName
-                }()
+                userName: user.username  // Always use username, not displayName
             )
             .environmentObject(appState)
         }
@@ -320,7 +306,7 @@ struct UserDiscoveryCard: View {
                             )
                             .frame(width: 60, height: 60)
                             .overlay(
-                                Text(user.displayName.prefix(1).uppercased())
+                                Text(user.username.prefix(1).uppercased())
                                     .font(.system(size: 24, weight: .bold))
                                     .foregroundColor(.white)
                             )
@@ -338,7 +324,7 @@ struct UserDiscoveryCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     // Name and Username
                     HStack {
-                        Text(user.displayName)
+                        Text(user.username)
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.white)
                             .lineLimit(1)
@@ -350,7 +336,7 @@ struct UserDiscoveryCard: View {
                         }
                     }
 
-                    Text("@\(user.username ?? user.displayName)")
+                    Text("@\(user.username)")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.7))
                         .lineLimit(1)
@@ -359,7 +345,7 @@ struct UserDiscoveryCard: View {
                     HStack(spacing: 12) {
                         Text({
                             let text = user.followerText
-                            print("🔍 DEBUG DiscoverUsersView Card - User: \(user.username ?? user.displayName)")
+                            print("🔍 DEBUG DiscoverUsersView Card - User: \(user.username)")
                             print("    └─ Followers field: user.followerCount = \(user.followerCount)")
                             print("    └─ UserProfile struct field mapping from CloudKit: CKField.User.followerCount")
                             return text
@@ -541,7 +527,25 @@ class DiscoverUsersViewModel: ObservableObject {
             // Convert to UserProfile and check follow status for each user
             var convertedUsers: [UserProfile] = []
             for cloudKitUser in fetchedUsers {
-                var userProfile = convertToUserProfile(cloudKitUser)
+                // CRITICAL FIX: Refresh social counts from Follow records before conversion
+                // This ensures we show the most up-to-date follower/following counts
+                var updatedCloudKitUser = cloudKitUser
+                if let userID = updatedCloudKitUser.recordID {
+                    let actualFollowerCount = await getActualFollowerCount(userID: userID)
+                    let actualFollowingCount = await getActualFollowingCount(userID: userID)
+                    
+                    print("🔍 DEBUG DiscoverUsers: Social counts for user \(userID):")
+                    print("    └─ Stored followerCount: \(updatedCloudKitUser.followerCount)")
+                    print("    └─ Actual followerCount: \(actualFollowerCount)")
+                    print("    └─ Stored followingCount: \(updatedCloudKitUser.followingCount)")
+                    print("    └─ Actual followingCount: \(actualFollowingCount)")
+                    
+                    // Update the CloudKitUser with actual counts
+                    updatedCloudKitUser.followerCount = actualFollowerCount
+                    updatedCloudKitUser.followingCount = actualFollowingCount
+                }
+                
+                var userProfile = convertToUserProfile(updatedCloudKitUser)
                 
                 // Check actual follow status if authenticated
                 if UnifiedAuthManager.shared.isAuthenticated {
@@ -581,13 +585,25 @@ class DiscoverUsersViewModel: ObservableObject {
 
 
     private func convertToUserProfile(_ cloudKitUser: CloudKitUser) -> UserProfile {
-        // Ensure we use the most current username from CloudKit
-        let currentUsername = cloudKitUser.username ?? cloudKitUser.displayName.lowercased().replacingOccurrences(of: " ", with: "")
+        print("🔍 DEBUG DiscoverUsers: Converting CloudKitUser to UserProfile")
+        print("    └─ CloudKitUser username: '\(cloudKitUser.username ?? "nil")'")
+        print("    └─ CloudKitUser displayName: '\(cloudKitUser.displayName)'")
+        print("    └─ CloudKitUser followerCount: \(cloudKitUser.followerCount)")
+        print("    └─ CloudKitUser followingCount: \(cloudKitUser.followingCount)")
+        print("    └─ CloudKitUser recipesCreated: \(cloudKitUser.recipesCreated)")
+        
+        // CRITICAL FIX: Use the corrected username from CloudKitUser
+        // The CloudKitUser init has been fixed to properly extract usernames
+        let finalUsername = cloudKitUser.username ?? cloudKitUser.displayName.lowercased().replacingOccurrences(of: " ", with: "")
+        let finalDisplayName = cloudKitUser.displayName
+        
+        print("    └─ Final username for UserProfile: '\(finalUsername)'")
+        print("    └─ Final displayName for UserProfile: '\(finalDisplayName)'")
         
         return UserProfile(
             id: cloudKitUser.recordID ?? "",
-            username: currentUsername,
-            displayName: cloudKitUser.displayName,
+            username: finalUsername,
+            displayName: finalDisplayName,
             profileImageURL: cloudKitUser.profileImageURL,
             profileImage: nil,
             followerCount: cloudKitUser.followerCount,
@@ -684,6 +700,40 @@ class DiscoverUsersViewModel: ObservableObject {
         // Refresh follow status for search results
         for i in 0..<searchResults.count {
             searchResults[i].isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: searchResults[i].id)
+        }
+    }
+    
+    /// Get actual follower count from Follow records
+    private func getActualFollowerCount(userID: String) async -> Int {
+        do {
+            let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+            let predicate = NSPredicate(format: "followingID == %@ AND isActive == 1", userID)
+            let query = CKQuery(recordType: "Follow", predicate: predicate)
+            
+            let results = try await database.records(matching: query)
+            let count = results.matchResults.count
+            print("🔍 DEBUG getActualFollowerCount: User \(userID) has \(count) followers")
+            return count
+        } catch {
+            print("❌ DEBUG getActualFollowerCount: Error for user \(userID): \(error)")
+            return 0
+        }
+    }
+    
+    /// Get actual following count from Follow records
+    private func getActualFollowingCount(userID: String) async -> Int {
+        do {
+            let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+            let predicate = NSPredicate(format: "followerID == %@ AND isActive == 1", userID)
+            let query = CKQuery(recordType: "Follow", predicate: predicate)
+            
+            let results = try await database.records(matching: query)
+            let count = results.matchResults.count
+            print("🔍 DEBUG getActualFollowingCount: User \(userID) has \(count) following")
+            return count
+        } catch {
+            print("❌ DEBUG getActualFollowingCount: Error for user \(userID): \(error)")
+            return 0
         }
     }
     
