@@ -3,7 +3,6 @@ import CloudKit
 
 struct FeedView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @StateObject private var gamificationManager = GamificationManager.shared
     @State private var showingDiscoverUsers = false
     @State private var showingChallengePopup = false
@@ -120,18 +119,18 @@ struct FeedView: View {
 
     private func refreshUserStats() async {
         // Only refresh if authenticated
-        guard cloudKitAuth.isAuthenticated else {
+        guard UnifiedAuthManager.shared.isAuthenticated else {
             print("⚠️ FeedView: Skipping refresh - user not authenticated")
             return
         }
         
         isRefreshing = true
         // Update social counts (followers/following)
-        await cloudKitAuth.updateSocialCounts()
+        await UnifiedAuthManager.shared.updateSocialCounts()
         // Update recipe counts
-        await cloudKitAuth.updateRecipeCounts()
+        await UnifiedAuthManager.shared.updateRecipeCounts()
         // Reload user data
-        await cloudKitAuth.refreshCurrentUser()
+        await UnifiedAuthManager.shared.refreshCurrentUser()
         isRefreshing = false
     }
 
@@ -140,7 +139,7 @@ struct FeedView: View {
             // User Info Row
             HStack(spacing: 16) {
                 // Profile Image
-                if let user = cloudKitAuth.currentUser {
+                if let user = UnifiedAuthManager.shared.currentUser {
                     Circle()
                         .fill(
                             LinearGradient(
@@ -160,17 +159,17 @@ struct FeedView: View {
                 // Stats
                 HStack(spacing: 24) {
                     socialStatItem(
-                        count: cloudKitAuth.currentUser?.followerCount ?? 0,
+                        count: UnifiedAuthManager.shared.currentUser?.followerCount ?? 0,
                         label: "Followers"
                     )
 
                     socialStatItem(
-                        count: cloudKitAuth.currentUser?.followingCount ?? 0,
+                        count: UnifiedAuthManager.shared.currentUser?.followingCount ?? 0,
                         label: "Following"
                     )
 
                     socialStatItem(
-                        count: cloudKitAuth.currentUser?.recipesCreated ?? 0,
+                        count: UnifiedAuthManager.shared.currentUser?.recipesCreated ?? 0,
                         label: "Recipes"
                     )
                 }

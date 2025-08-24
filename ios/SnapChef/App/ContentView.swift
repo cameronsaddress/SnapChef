@@ -241,6 +241,7 @@ struct SocialFeedView: View {
                 print("🔍 DEBUG: SocialFeedView initial data load")
                 do {
                     try await authManager.refreshCurrentUserData()
+                    await authManager.updateSocialCounts()
                     await authManager.updateRecipeCounts()
                     hasLoadedInitialData = true
                     print("✅ DEBUG: User data loaded - Followers: \(authManager.currentUser?.followerCount ?? 0), Following: \(authManager.currentUser?.followingCount ?? 0), Recipes Created: \(authManager.currentUser?.recipesCreated ?? 0)")
@@ -284,6 +285,9 @@ struct SocialFeedView: View {
                 // First refresh user data
                 try await authManager.refreshCurrentUserData()
                 
+                // Update social counts (followers/following)
+                await authManager.updateSocialCounts()
+                
                 // Then update recipe counts from CloudKit
                 await authManager.updateRecipeCounts()
                 
@@ -321,17 +325,32 @@ struct SocialFeedView: View {
                 // Stats
                 HStack(spacing: 24) {
                     socialStatItem(
-                        count: authManager.currentUser?.followerCount ?? 0,
+                        count: {
+                            let count = authManager.currentUser?.followerCount ?? 0
+                            print("🔍 DEBUG SocialFeedView - Followers field: authManager.currentUser?.followerCount = \(count)")
+                            print("    └─ CloudKit field: CKField.User.followerCount")
+                            return count
+                        }(),
                         label: "Followers"
                     )
 
                     socialStatItem(
-                        count: authManager.currentUser?.followingCount ?? 0,
+                        count: {
+                            let count = authManager.currentUser?.followingCount ?? 0
+                            print("🔍 DEBUG SocialFeedView - Following field: authManager.currentUser?.followingCount = \(count)")
+                            print("    └─ CloudKit field: CKField.User.followingCount")
+                            return count
+                        }(),
                         label: "Following"
                     )
 
                     socialStatItem(
-                        count: authManager.currentUser?.recipesCreated ?? 0,
+                        count: {
+                            let count = authManager.currentUser?.recipesCreated ?? 0
+                            print("🔍 DEBUG SocialFeedView - Recipes field: authManager.currentUser?.recipesCreated = \(count)")
+                            print("    └─ CloudKit field: CKField.User.recipesCreated")
+                            return count
+                        }(),
                         label: "Recipes"
                     )
                 }

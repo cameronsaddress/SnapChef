@@ -18,7 +18,7 @@ class StreakManager: ObservableObject {
 
     // MARK: - Private Properties
     private let userDefaults = UserDefaults.standard
-    private lazy var notificationCenter = UNUserNotificationCenter.current()
+    private lazy var notificationManager = NotificationManager.shared
     private var updateTimer: Timer?
     private var midnightTimer: Timer?
 
@@ -32,8 +32,8 @@ class StreakManager: ObservableObject {
     private init() {
         loadStreaksFromCache()
         setupTimers()
-        // Don't setup notifications in init to avoid dispatch queue issues
-        // setupNotifications() - removed, will be called lazily
+        // CRITICAL FIX: Removed notification setup to prevent duplicate notifications
+        // All notifications now handled by NotificationManager.shared
         checkAllStreaks()
     }
 
@@ -152,10 +152,17 @@ class StreakManager: ObservableObject {
         saveStreaksToCache()
 
         // Schedule notification for freeze expiry
-        scheduleNotification(
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: max(freeze.expiresAt.addingTimeInterval(-3_600).timeIntervalSinceNow, 1.0),
+            repeats: false
+        )
+        
+        _ = notificationManager.scheduleNotification(
+            identifier: "freeze_expiry_\(type.rawValue)",
             title: "❄️ Freeze Expiring Soon",
             body: "Your \(type.displayName) streak freeze expires in 1 hour!",
-            date: freeze.expiresAt.addingTimeInterval(-3_600)
+            category: .streakReminder,
+            trigger: trigger
         )
 
         print("❄️ Streak frozen until \(freeze.expiresAt)")
@@ -288,20 +295,40 @@ class StreakManager: ObservableObject {
 
     private func checkAllStreaks() {
         let calendar = Calendar.current
-        let now = Date()
 
         for (type, streak) in currentStreaks {
-            // Check for streak at risk
+            // Check for streak at risk - only send once per hour to avoid spam
             if streak.isActive && !streak.isFrozen && !calendar.isDateInToday(streak.lastActivityDate) {
                 let hoursRemaining = streak.hoursUntilBreak
 
                 if hoursRemaining <= 2 && hoursRemaining > 0 {
-                    // Send notification
-                    scheduleNotification(
-                        title: "🔥 Streak at Risk!",
-                        body: "Your \(streak.currentStreak)-day \(type.displayName) streak ends in \(hoursRemaining) hours!",
-                        date: Date().addingTimeInterval(60) // 1 minute from now
-                    )
+                    // Check if we already sent a notification recently for this streak
+                    let lastNotificationKey = "last_streak_notification_\(type.rawValue)"
+                    let lastNotification = userDefaults.object(forKey: lastNotificationKey) as? Date ?? Date.distantPast
+                    let hoursSinceLastNotification = Date().timeIntervalSince(lastNotification) / 3600
+                    
+                    // Only send notification if we haven't sent one in the last hour
+                    if hoursSinceLastNotification >= 1.0 {
+                        let trigger = UNTimeIntervalNotificationTrigger(
+                            timeInterval: 300, // 5 minutes from now
+                            repeats: false
+                        )
+                        
+                        let success = notificationManager.scheduleNotification(
+                            identifier: "streak_risk_\(type.rawValue)",
+                            title: "🔥 Streak at Risk!",
+                            body: "Your \(streak.currentStreak)-day \(type.displayName) streak ends in \(hoursRemaining) hours!",
+                            category: .streakReminder,
+                            trigger: trigger
+                        )
+                        
+                        if success {
+                            userDefaults.set(Date(), forKey: lastNotificationKey)
+                            print("📱 Scheduled streak risk notification for \(type.displayName)")
+                        }
+                    } else {
+                        print("⏭️ Skipping streak notification for \(type.displayName) - sent \(String(format: "%.1f", hoursSinceLastNotification)) hours ago")
+                    }
                 }
             }
 
@@ -347,7 +374,7 @@ class StreakManager: ObservableObject {
     }
 
     private func restoreStreak(type: StreakType) async {
-        guard var streak = currentStreaks[type] else { return }
+        guard currentStreaks[type] != nil else { return }
 
         // Use insurance if available
         if let insurance = activeInsurance[type], insurance.isActive {
@@ -363,7 +390,7 @@ class StreakManager: ObservableObject {
         // Mark history as restored
         if let lastBreak = streakHistory.last(where: { $0.type == type && !$0.wasRestored }) {
             if let index = streakHistory.firstIndex(where: { $0.id == lastBreak.id }) {
-                var restoredHistory = lastBreak
+                let restoredHistory = lastBreak
                 streakHistory[index] = StreakHistory(
                     type: restoredHistory.type,
                     streakLength: restoredHistory.streakLength,
@@ -390,10 +417,12 @@ class StreakManager: ObservableObject {
         )
 
         // Send push notification
-        scheduleNotification(
+        _ = notificationManager.scheduleImmediateNotification(
+            identifier: "milestone_\(type.rawValue)_\(milestone.days)",
             title: "🎉 Milestone Achieved!",
             body: "\(milestone.days)-day streak! You earned \(milestone.coins) Chef Coins!",
-            date: Date().addingTimeInterval(1)
+            category: .streakReminder,
+            userInfo: ["milestone": milestone.days, "type": type.rawValue]
         )
 
         // Sync with CloudKit
@@ -510,70 +539,17 @@ class StreakManager: ObservableObject {
         }
     }
 
-    // MARK: - Notifications
-
+    // MARK: - Notifications (REMOVED - Delegated to NotificationManager)
+    
+    // CRITICAL FIX: Removed duplicate daily streak notifications
+    // All notifications now go through NotificationManager.shared for centralized control
+    
     private func setupNotifications() {
-        Task.detached {
-            // Request permission on background queue
-            let center = UNUserNotificationCenter.current()
-            do {
-                let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
-                if granted {
-                    print("✅ Notification permission granted")
-                }
-            } catch {
-                print("Notification permission error: \(error)")
-            }
-
-            // Schedule daily reminder
-            await self.scheduleDailyReminder()
-        }
+        // DEPRECATED: Notifications now handled by NotificationManager
+        // This prevents duplicate daily streak reminders
+        print("⚠️ StreakManager notifications delegated to NotificationManager")
     }
 
-    private func scheduleDailyReminder() async {
-        let content = UNMutableNotificationContent()
-        content.title = "🔥 Keep Your Streak Alive!"
-        content.body = "Don't forget to complete today's activities"
-        content.sound = .default
-
-        // Schedule for 8 PM daily
-        var dateComponents = DateComponents()
-        dateComponents.hour = 20
-        dateComponents.minute = 0
-
-        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-        let request = UNNotificationRequest(
-            identifier: "daily_streak_reminder",
-            content: content,
-            trigger: trigger
-        )
-
-        let center = UNUserNotificationCenter.current()
-        try? await center.add(request)
-    }
-
-    private func scheduleNotification(title: String, body: String, date: Date) {
-        Task.detached {
-            let content = UNMutableNotificationContent()
-            content.title = title
-            content.body = body
-            content.sound = .default
-
-            let trigger = UNTimeIntervalNotificationTrigger(
-                timeInterval: date.timeIntervalSinceNow,
-                repeats: false
-            )
-
-            let request = UNNotificationRequest(
-                identifier: UUID().uuidString,
-                content: content,
-                trigger: trigger
-            )
-
-            let center = UNUserNotificationCenter.current()
-            try? await center.add(request)
-        }
-    }
 
     // MARK: - Analytics
 

@@ -13,6 +13,7 @@ struct UserProfileView: View {
     @State private var selectedTab = 0
     @State private var showingFollowers = false
     @State private var showingFollowing = false
+    @State private var fetchedDisplayName: String?
 
     var body: some View {
         NavigationStack {
@@ -55,7 +56,12 @@ struct UserProfileView: View {
                     }
                 }
             }
-            .navigationTitle(userName)
+            .navigationTitle({
+                print("🔍 DEBUG UserProfileView - Navigation bar title:")
+                print("    └─ Value passed as userName parameter: \(userName)")
+                print("    └─ This comes from the calling view (DiscoverUsersView or other)")
+                return userName
+            }())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -71,6 +77,10 @@ struct UserProfileView: View {
         }
         .task {
             await viewModel.loadUserProfile(userID: userID)
+            // Update social counts when profile view appears
+            await UnifiedAuthManager.shared.updateSocialCounts()
+            // Fetch the actual display name from CloudKit
+            fetchedDisplayName = await fetchUserDisplayName(for: userID)
         }
         .sheet(isPresented: $showingFollowers) {
             FollowListView(userID: userID, mode: .followers)
@@ -122,12 +132,29 @@ struct UserProfileView: View {
 
             // User Info
             VStack(spacing: 8) {
-                Text(user.username ?? user.displayName ?? "Chef")
+                Text({
+                    // Use fetchedDisplayName if available, otherwise fall back to user data
+                    let displayText = fetchedDisplayName ?? user.username ?? user.displayName ?? "Chef"
+                    print("🔍 DEBUG UserProfileView - Full name display:")
+                    print("    └─ Fetched display name: \(fetchedDisplayName ?? "nil")")
+                    print("    └─ Field: user.username = \(user.username ?? "nil")")
+                    print("    └─ Field: user.displayName = \(user.displayName ?? "nil")")
+                    print("    └─ CloudKit mapping: CKField.User.username, CKField.User.displayName")
+                    print("    └─ Displayed value: \(displayText)")
+                    return displayText
+                }())
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
                 if let username = user.username {
-                    Text("@\(username)")
+                    Text({
+                        let text = "@\(username)"
+                        print("🔍 DEBUG UserProfileView - Username below circle:")
+                        print("    └─ Field: user.username = \(username)")
+                        print("    └─ CloudKit mapping: CKField.User.username")
+                        print("    └─ Displayed value: \(text)")
+                        return text
+                    }())
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
@@ -147,7 +174,13 @@ struct UserProfileView: View {
             // Followers
             Button(action: { showingFollowers = true }) {
                 VStack(spacing: 4) {
-                    Text("\(user.followerCount)")
+                    Text({
+                        let count = "\(user.followerCount)"
+                        print("🔍 DEBUG UserProfileView - Followers count:")
+                        print("    └─ Field: user.followerCount = \(user.followerCount)")
+                        print("    └─ CloudKit mapping: CKField.User.followerCount")
+                        return count
+                    }())
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     Text("Followers")
@@ -161,7 +194,13 @@ struct UserProfileView: View {
             // Following
             Button(action: { showingFollowing = true }) {
                 VStack(spacing: 4) {
-                    Text("\(user.followingCount)")
+                    Text({
+                        let count = "\(user.followingCount)"
+                        print("🔍 DEBUG UserProfileView - Following count:")
+                        print("    └─ Field: user.followingCount = \(user.followingCount)")
+                        print("    └─ CloudKit mapping: CKField.User.followingCount")
+                        return count
+                    }())
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     Text("Following")
@@ -174,7 +213,13 @@ struct UserProfileView: View {
 
             // Recipes
             VStack(spacing: 4) {
-                Text("\(user.recipesShared)")
+                Text({
+                    let count = "\(user.recipesCreated)"
+                    print("🔍 DEBUG UserProfileView - Recipes count:")
+                    print("    └─ Field: user.recipesCreated = \(user.recipesCreated)")
+                    print("    └─ CloudKit mapping: CKField.User.recipesCreated")
+                    return count
+                }())
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                 Text("Recipes")
@@ -368,6 +413,29 @@ struct UserProfileView: View {
         }
     }
 
+    // MARK: - Helper Methods
+    private func fetchUserDisplayName(for userID: String) async -> String? {
+        print("🔍 DEBUG UserProfileView: Fetching display name for userID: \(userID)")
+        
+        do {
+            // Try to fetch user record from CloudKit
+            let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+            let recordID = CKRecord.ID(recordName: userID)
+            let userRecord = try await database.record(for: recordID)
+            
+            // Get username or display name
+            let username = userRecord[CKField.User.username] as? String
+            let displayName = userRecord[CKField.User.displayName] as? String
+            let result = username ?? displayName
+            
+            print("✅ DEBUG UserProfileView: Fetched display name: \(result ?? "nil") (username: \(username ?? "nil"), displayName: \(displayName ?? "nil"))")
+            return result
+        } catch {
+            print("❌ DEBUG UserProfileView: Failed to fetch display name: \(error)")
+            return nil
+        }
+    }
+    
     // MARK: - Stats Tab
     private func statsTab(user: CloudKitUser) -> some View {
         VStack(spacing: 16) {
@@ -587,7 +655,7 @@ struct UserListRow: View {
 
                 // Stats
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(user.recipesShared)")
+                    Text("\(user.recipesCreated)")
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     Text("recipes")

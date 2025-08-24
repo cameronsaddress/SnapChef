@@ -219,23 +219,37 @@ struct EnhancedProfileHeader: View {
         
         // Priority: CloudKit username > CloudKit display name > Auth username > Custom name > User name > Guest
         if let cloudKitUser = authManager.currentUser {
-            // Prefer username if set, otherwise use display name
+            // Prefer username if set, otherwise use display name (but avoid "Anonymous Chef")
             if let username = cloudKitUser.username, !username.isEmpty {
                 return username
-            } else if !cloudKitUser.displayName.isEmpty {
+            } else if !cloudKitUser.displayName.isEmpty && cloudKitUser.displayName != "Anonymous Chef" {
                 return cloudKitUser.displayName
             }
         }
         
         if let authUser = authManager.currentUser {
-            return authUser.username ?? authUser.displayName
-        } else if !customName.isEmpty {
-            return customName
-        } else if let userName = user?.name {
-            return userName
-        } else {
-            return "Anonymous Chef"
+            // Use username first, then displayName if it's not "Anonymous Chef"
+            if let username = authUser.username, !username.isEmpty {
+                return username
+            } else if !authUser.displayName.isEmpty && authUser.displayName != "Anonymous Chef" {
+                return authUser.displayName
+            }
         }
+        
+        if !customName.isEmpty {
+            return customName
+        }
+        
+        if let userName = user?.name, !userName.isEmpty {
+            return userName
+        }
+        
+        // Last resort - show a more helpful identifier if possible
+        if let authUser = authManager.currentUser, let recordID = authUser.recordID {
+            return "Chef \(recordID.suffix(4))" // Show last 4 chars of record ID
+        }
+        
+        return "Anonymous Chef"
     }
 
     private var profileInitial: String {
@@ -1687,7 +1701,7 @@ struct CollectionProgressView: View {
     var sharedRecipes: Int {
         // Use real CloudKit data when authenticated
         if authManager.isAuthenticated {
-            return authManager.currentUser?.recipesShared ?? 0
+            return authManager.currentUser?.recipesCreated ?? 0  // Fixed: Using recipesCreated instead of recipesShared
         } else {
             return appState.totalShares
         }
@@ -1940,7 +1954,7 @@ struct ProfileAchievementGalleryView: View {
         
         if authManager.isAuthenticated {
             recipeCount = authManager.currentUser?.recipesCreated ?? 0
-            sharedCount = authManager.currentUser?.recipesShared ?? 0
+            sharedCount = authManager.currentUser?.recipesCreated ?? 0  // Fixed: Using recipesCreated for shared count
             streak = authManager.currentUser?.currentStreak ?? 0
         } else {
             recipeCount = appState.allRecipes.count

@@ -75,6 +75,8 @@
 		588722A57F6F8FB4733B9E2D /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13C669CCD49BD9E3C3961EBE /* SubscriptionManager.swift */; };
 		5D1F87E18E1721FB4368BA1E /* ChallengeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3087E3BC28593B910150BF /* ChallengeService.swift */; };
 		5D2101B614D2956937BA48DB /* CloudKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D1E5B498461918FE635EE77 /* CloudKitManager.swift */; };
+		9C9320B79BD849759CA51AFE /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F1DA4F546442BFA11AE443 /* NotificationManager.swift */; };
+		4F8FB4EE7EC440E2958B775726 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8910282E06244028866A222D /* NotificationSettingsView.swift */; };
 		623D1A9D6546A2BE6A95DD62 /* SimpleMediaBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54C3A058766E816CC5E046EE /* SimpleMediaBundle.swift */; };
 		648361B13FB672E010BE17C6 /* PremiumChallengeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C18EBEBBC731F955270272E7 /* PremiumChallengeManager.swift */; };
 		662332BB4AE9CDA132E60483 /* StreakModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FA990D10A449119F5630D4 /* StreakModels.swift */; };
@@ -325,6 +327,8 @@
 		9A8A82594C8D57196A136177 /* SimplePhotoCaptureView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SimplePhotoCaptureView.swift; path = SnapChef/Features/Camera/SimplePhotoCaptureView.swift; sourceTree = "<group>"; };
 		9A8B0F1E88F55951D118BE2F /* CloudKitSchema.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitSchema.swift; path = SnapChef/Core/Services/CloudKitSchema.swift; sourceTree = "<group>"; };
 		9D1E5B498461918FE635EE77 /* CloudKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitManager.swift; path = SnapChef/Core/Services/CloudKitManager.swift; sourceTree = "<group>"; };
+		A6F1DA4F546442BFA11AE443 /* NotificationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotificationManager.swift; path = SnapChef/Core/Services/NotificationManager.swift; sourceTree = "<group>"; };
+		8910282E06244028866A222D /* NotificationSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotificationSettingsView.swift; path = SnapChef/Features/Profile/NotificationSettingsView.swift; sourceTree = "<group>"; };
 		9D502E726703734D99E68D2E /* AnalyticsManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AnalyticsManager.swift; path = SnapChef/Core/Services/AnalyticsManager.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6789012345679 /* ComboEffects.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ComboEffects.swift; path = SnapChef/Design/ComboEffects.swift; sourceTree = "<group>"; };
 		A222D311FA8E5A63B5427FCE /* AIPersonalityManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AIPersonalityManager.swift; path = SnapChef/Features/AIPersonality/AIPersonalityManager.swift; sourceTree = "<group>"; };
@@ -592,6 +596,7 @@
 			children = (
 				12BAEE733C681CFD14DD29A3 /* ProfileView.swift */,
 				C07A7B624E9CEDDD6FAD0A36 /* ProfileView.swift */,
+				8910282E06244028866A222D /* NotificationSettingsView.swift */,
 			);
 			name = Profile;
 			sourceTree = "<group>";
@@ -805,6 +810,7 @@
 				13C669CCD49BD9E3C3961EBE /* SubscriptionManager.swift */,
 				9D502E726703734D99E68D2E /* AnalyticsManager.swift */,
 				9D1E5B498461918FE635EE77 /* CloudKitManager.swift */,
+				A6F1DA4F546442BFA11AE443 /* NotificationManager.swift */,
 				4AC9B83A23805AF72F7FA1CC /* PersistenceController.swift */,
 				E4F9C285D07CBD89E2776441 /* ChallengeAnalytics.swift */,
 				9A8B0F1E88F55951D118BE2F /* CloudKitSchema.swift */,
@@ -1271,6 +1277,8 @@
 				57A353FC46B94AC45DD9FD34 /* PremiumUpgradePrompt.swift in Sources */,
 				FFAF7C1CEA1855B0235BE6EC /* SnapchefLogo.swift in Sources */,
 				5D2101B614D2956937BA48DB /* CloudKitManager.swift in Sources */,
+				9C9320B79BD849759CA51AFE /* NotificationManager.swift in Sources */,
+				4F8FB4EE7EC440E2958B775726 /* NotificationSettingsView.swift in Sources */,
 				3834916075B6D09838E4B70F /* ChallengeGenerator.swift in Sources */,
 				52A987EF28B4559ACDA698F8 /* ChallengeProgressTracker.swift in Sources */,
 				5D1F87E18E1721FB4368BA1E /* ChallengeService.swift in Sources */,

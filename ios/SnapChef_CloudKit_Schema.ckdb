@@ -1,18 +1,10 @@
 -- SnapChef CloudKit Schema Definition
--- Version: 2.7
--- Last Updated: August 22, 2025
--- Changes: Updated to match production schema exactly, then added cloudKitUserID field
---          All deprecated record types (Users, UserProfile) preserved to avoid deletion errors
+-- Version: 3.0
+-- Last Updated: December 2024
+-- Source: Production CloudKit Dashboard
 --
--- DEPLOYMENT INSTRUCTIONS:
--- 1. Open CloudKit Dashboard: https://icloud.developer.apple.com/dashboard
--- 2. Select container: iCloud.com.snapchefapp.app
--- 3. Go to Schema > Record Types
--- 4. Import this schema to Development environment
--- 5. Test thoroughly
--- 6. Deploy to Production environment
---
--- IMPORTANT: User is the primary record type for authentication
+-- IMPORTANT: This is the authoritative schema from production
+-- User is the primary record type for authentication
 -- Users and UserProfile are deprecated but kept for compatibility
 
 DEFINE SCHEMA
@@ -35,6 +27,7 @@ DEFINE SCHEMA
         type                  STRING QUERYABLE,
         userID                STRING QUERYABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -78,7 +71,8 @@ DEFINE SCHEMA
         sessionID       STRING QUERYABLE,
         timestamp       TIMESTAMP QUERYABLE SORTABLE,
         userID          STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE AppSession (
@@ -99,7 +93,8 @@ DEFINE SCHEMA
         sessionID        STRING QUERYABLE,
         startTime        TIMESTAMP QUERYABLE SORTABLE,
         userID           STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE CameraSession (
@@ -118,7 +113,8 @@ DEFINE SCHEMA
         sessionID           STRING QUERYABLE,
         timestamp           TIMESTAMP QUERYABLE SORTABLE,
         userID              STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE Challenge (
@@ -168,7 +164,8 @@ DEFINE SCHEMA
         timestamp       TIMESTAMP QUERYABLE SORTABLE,
         type            STRING QUERYABLE,
         userID          STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE DeviceSync (
@@ -186,7 +183,8 @@ DEFINE SCHEMA
         osVersion       STRING,
         syncData        STRING,
         userID          STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE ErrorLog (
@@ -204,7 +202,8 @@ DEFINE SCHEMA
         stackTrace      STRING,
         timestamp       TIMESTAMP QUERYABLE SORTABLE,
         userID          STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE FeatureUsage (
@@ -256,7 +255,8 @@ DEFINE SCHEMA
         mealPlanningGoals   STRING,
         preferredCookTime   INT64,
         userID              STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE Leaderboard (
@@ -299,7 +299,8 @@ DEFINE SCHEMA
         socialUpdates         INT64,
         teamNotifications     INT64,
         userID                STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE PhotoModeration (
@@ -365,6 +366,7 @@ DEFINE SCHEMA
         viewCount         INT64 SORTABLE,
         visualClues       LIST<STRING>,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -411,7 +413,8 @@ DEFINE SCHEMA
         sessionID       STRING QUERYABLE,
         timestamp       TIMESTAMP QUERYABLE SORTABLE,
         userID          STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE RecipeLike (
@@ -443,6 +446,7 @@ DEFINE SCHEMA
         recipeID        STRING QUERYABLE,
         userID          STRING QUERYABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -457,6 +461,7 @@ DEFINE SCHEMA
         userID          STRING QUERYABLE,
         viewedAt        TIMESTAMP SORTABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -473,7 +478,8 @@ DEFINE SCHEMA
         searchType      STRING,
         timestamp       TIMESTAMP QUERYABLE SORTABLE,
         userID          STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE SocialShare (
@@ -489,7 +495,8 @@ DEFINE SCHEMA
         shareURL        STRING,
         sharedAt        TIMESTAMP QUERYABLE SORTABLE,
         userID          STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE StreakAchievement (
@@ -509,6 +516,7 @@ DEFINE SCHEMA
         userID          STRING QUERYABLE,
         xpEarned        INT64,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -543,7 +551,8 @@ DEFINE SCHEMA
         streakLength    INT64 QUERYABLE SORTABLE,
         streakType      STRING QUERYABLE,
         userID          STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
     RECORD TYPE StreakLeaderboard (
@@ -619,6 +628,7 @@ DEFINE SCHEMA
         timestamp       TIMESTAMP QUERYABLE SORTABLE,
         type            STRING QUERYABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -636,11 +646,10 @@ DEFINE SCHEMA
         streakType          STRING QUERYABLE,
         teamID              STRING QUERYABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
-    -- This is the main User record type we use for authentication
-    -- Added cloudKitUserID field to store the actual CloudKit user record ID
     RECORD TYPE User (
         "___createTime"     TIMESTAMP,
         "___createdBy"      REFERENCE,
@@ -657,9 +666,9 @@ DEFINE SCHEMA
         currentStreak       INT64,
         displayName         STRING QUERYABLE SEARCHABLE,
         email               STRING,
-        followerCount       INT64 QUERYABLE,
+        followerCount       INT64 QUERYABLE SORTABLE,
         followingCount      INT64,
-        isProfilePublic     INT64,
+        isProfilePublic     INT64 QUERYABLE,
         isVerified          INT64,
         lastActiveAt        TIMESTAMP SORTABLE,
         lastLoginAt         TIMESTAMP SORTABLE,
@@ -667,7 +676,7 @@ DEFINE SCHEMA
         profileImageURL     STRING,
         profilePictureAsset ASSET,
         recipesCreated      INT64 QUERYABLE,
-        recipesShared       INT64,
+        recipesShared       INT64 SORTABLE,
         showOnLeaderboard   INT64,
         subscriptionTier    STRING,
         tiktokUserId        STRING QUERYABLE,
@@ -698,6 +707,7 @@ DEFINE SCHEMA
         teamID          STRING QUERYABLE,
         userID          STRING QUERYABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
@@ -718,11 +728,10 @@ DEFINE SCHEMA
         privacySettings       STRING,
         themePreference       STRING,
         userID                STRING QUERYABLE,
-        GRANT READ, WRITE TO "_creator"
+        GRANT READ, WRITE TO "_creator",
+        GRANT CREATE TO "_icloud"
     );
 
-    -- DEPRECATED: UserProfile exists in production but should not be used
-    -- Use User record type instead for all new functionality
     RECORD TYPE UserProfile (
         "___createTime"   TIMESTAMP,
         "___createdBy"    REFERENCE,
@@ -768,11 +777,10 @@ DEFINE SCHEMA
         totalDaysActive  INT64,
         userID           STRING QUERYABLE,
         GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
         GRANT READ TO "_world"
     );
 
-    -- DEPRECATED: Users exists in production but should not be used
-    -- This was created by mistake with wrong configuration
     RECORD TYPE Users (
         "___createTime" TIMESTAMP,
         "___createdBy"  REFERENCE,

@@ -4,8 +4,9 @@ import Social
 import UserNotifications
 import Photos
 
-// MARK: - Notification Category
-enum NotificationCategory: String {
+// MARK: - Legacy Notification Category (DEPRECATED)
+// Use NotificationManager.NotificationCategory instead
+private enum LegacySharingNotificationCategory: String {
     case newChallenge = "NEW_CHALLENGE"
     case challengeReminder = "CHALLENGE_REMINDER"
     case challengeCompleted = "CHALLENGE_COMPLETED"

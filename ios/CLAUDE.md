@@ -16,6 +16,13 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 - **Progressive Authentication**: Anonymous users tracked via Keychain
 - **User Lifecycle**: Honeymoon (7 days unlimited) → Trial (14 days, 10/day) → Standard (5/day)
 
+#### 🔴 CRITICAL: CloudKit ID Structure
+- **CloudKit Internal IDs**: Start with underscore (e.g., "_abc123")
+- **User Record IDs**: Use "user_" prefix → "user__abc123" (double underscore is CORRECT)
+- **Follow Record IDs**: Must match User format → followerID/followingID = "user__abc123"
+- **Internal Storage**: CloudKitUser strips "user_" prefix for simplicity
+- **Queries**: ALWAYS add "user_" prefix when querying Follow records with user IDs
+
 ### Core Services
 - **UnifiedAuthManager** - All authentication and user management ✅
 - **SnapChefAPIManager** - API communication (Gemini/Grok)
@@ -130,19 +137,25 @@ All authentication goes through UnifiedAuthManager:
 
 ### Social Follow Implementation
 ```swift
-// Follow a user
-try await UnifiedAuthManager.shared.followUser(userID: "user_id")
+// Follow a user (ID can be with or without "user_" prefix)
+try await UnifiedAuthManager.shared.followUser(userID: "_abc123") // or "user__abc123"
 
 // Unfollow a user
-try await UnifiedAuthManager.shared.unfollowUser(userID: "user_id")
+try await UnifiedAuthManager.shared.unfollowUser(userID: "_abc123")
 
 // Check if following
-let isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: "user_id")
+let isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: "_abc123")
 
-// Refresh current user data (updates counts)
-try await UnifiedAuthManager.shared.refreshCurrentUserData()
+// Update social counts (follower/following)
+await UnifiedAuthManager.shared.updateSocialCounts()
+
+// Refresh current user data
+await UnifiedAuthManager.shared.refreshCurrentUser()
 ```
-**Important**: Always refresh user data when views appear to show accurate follower/following counts
+**Important**: 
+- User IDs internally stored without "user_" prefix (e.g., "_abc123")
+- Functions automatically add "user_" prefix for CloudKit queries
+- Always call updateSocialCounts() when views appear for accurate counts
 
 ## 🚫 Anti-Patterns to Avoid
 
@@ -164,13 +177,15 @@ try await UnifiedAuthManager.shared.refreshCurrentUserData()
 ✅ Progressive premium features
 ✅ Gamification system
 
-### Recent Changes (Aug 23, 2025)
+### Recent Changes (December 2024)
 - **Migration Complete**: CloudKitAuthManager removed, using UnifiedAuthManager exclusively
 - **CloudKit Schema Updated**: Added appleUserId, tiktokUserId, profilePictureAsset fields
 - **Build Verified**: All compilation errors fixed, app builds successfully
 - **Social Feed Fixed**: Username display and duplicate activities resolved
 - **New User Experience**: Fixed username setup errors for first-time users
 - **Share Consistency**: All share buttons use BrandedSharePopup with auto-feed sharing
+- **CloudKit ID Fix**: Fixed Follow record ID format to match User records ("user__xxx")
+- **Social Counts Fixed**: Follower/following counts now query with correct ID format
 
 ## 📝 API Integration
 
@@ -240,7 +255,15 @@ try await UnifiedAuthManager.shared.refreshCurrentUserData()
 - **COMPLETE_CODE_TRACE.md** - App flow analysis
 - **FILE_USAGE_ANALYSIS.md** - File usage status
 
-## 🔄 Latest Updates (Aug 23, 2025)
+## 🔄 Latest Updates (Aug 24, 2025)
+
+### UserProfileView CloudKit Field Fixes (Aug 24)
+- ✅ **Fixed display name**: UserProfileView now fetches actual username from CloudKit instead of showing "Anonymous Chef"
+- ✅ **Added `fetchUserDisplayName` method**: Properly queries CloudKit for user's actual display name
+- ✅ **Recipe count consistency**: All views now use `recipesCreated` field instead of mixed `recipesShared`
+- ✅ **ProfileView fixes**: Updated Collection Progress and Achievement views to use `recipesCreated`
+- ✅ **UserProfileViewModel fix**: Changed stats update to use `recipesCreated` instead of `recipesShared`
+- ✅ **Build verified**: All changes compile successfully with no errors
 
 ### SocialFeedView Recipe Count Fixed (Aug 23)
 - ✅ Fixed recipe count showing 0 in SocialFeedView header

@@ -43,6 +43,10 @@ class UserProfileViewModel: ObservableObject {
                 print("🔍 DEBUG UserProfile: About to load recipes for userID: '\(userID)'")
                 await loadUserRecipes(userID: userID)
 
+                // Update social counts for accurate display
+                print("🔍 DEBUG UserProfile: Updating social counts for accurate display")
+                await cloudKitAuth.updateSocialCounts()
+
                 // Load and apply dynamic stats first
                 print("🔍 DEBUG UserProfile: About to load user stats for userID: '\(userID)'")
                 await loadUserStats(userID: userID)
@@ -305,7 +309,7 @@ class UserProfileViewModel: ObservableObject {
                 print("🔍 DEBUG UserProfile: Updating profile with dynamic stats...")
                 profile.followerCount = stats.followerCount
                 profile.followingCount = stats.followingCount
-                profile.recipesShared = stats.recipeCount
+                profile.recipesCreated = stats.recipeCount  // Fixed: Using recipesCreated instead of recipesShared
                 profile.currentStreak = stats.currentStreak
                 profile.challengesCompleted = challengesCompleted
                 profile.totalPoints = totalPoints

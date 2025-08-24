@@ -208,6 +208,8 @@ final class UnifiedAuthManager: ObservableObject {
             newRecord[CKField.User.appleUserId] = appleUserID  // Store Apple Sign In ID
             newRecord[CKField.User.email] = email ?? ""
             newRecord[CKField.User.displayName] = fullName?.formatted() ?? "Anonymous Chef"
+            // Set a temporary username - will be updated when user chooses one
+            newRecord[CKField.User.username] = nil  // Will be set during username setup
             newRecord[CKField.User.createdAt] = Date()
             newRecord[CKField.User.lastLoginAt] = Date()
             
@@ -318,11 +320,21 @@ final class UnifiedAuthManager: ObservableObject {
             let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: fullRecordID))
             record[CKField.User.username] = username.lowercased()
             
+            // If displayName is still "Anonymous Chef", update it to the username
+            let currentDisplayName = record[CKField.User.displayName] as? String
+            if currentDisplayName == nil || currentDisplayName == "Anonymous Chef" || currentDisplayName?.isEmpty == true {
+                record[CKField.User.displayName] = username
+            }
+            
             let _ = try await cloudKitDatabase.save(record)
             print("✅ Successfully saved username '\(username)' to CloudKit record")
             
             // Update local state
-            self.currentUser?.username = username
+            self.currentUser?.username = username.lowercased()
+            // Also update displayName if it was "Anonymous Chef"
+            if self.currentUser?.displayName == "Anonymous Chef" || self.currentUser?.displayName.isEmpty == true {
+                self.currentUser?.displayName = username
+            }
             self.showUsernameSetup = false
             
             completeAuthentication()
@@ -644,10 +656,14 @@ final class UnifiedAuthManager: ObservableObject {
             return false
         }
         
+        // Ensure IDs have "user_" prefix for CloudKit queries
+        let fullFollowerID = currentUserID.hasPrefix("user_") ? currentUserID : "user_\(currentUserID)"
+        let fullFollowingID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
+        
         let predicate = NSPredicate(
             format: "%K == %@ AND %K == %@ AND %K == %d",
-            CKField.Follow.followerID, currentUserID,
-            CKField.Follow.followingID, userID,
+            CKField.Follow.followerID, fullFollowerID,
+            CKField.Follow.followingID, fullFollowingID,
             CKField.Follow.isActive, 1
         )
         
@@ -676,10 +692,14 @@ final class UnifiedAuthManager: ObservableObject {
             return // Already following
         }
         
-        // Create follow record
+        // Create follow record with full user IDs (including "user_" prefix)
         let followRecord = CKRecord(recordType: CloudKitConfig.followRecordType)
-        followRecord[CKField.Follow.followerID] = currentUserID
-        followRecord[CKField.Follow.followingID] = userID
+        // Ensure IDs have "user_" prefix for consistency with CloudKit
+        let fullFollowerID = currentUserID.hasPrefix("user_") ? currentUserID : "user_\(currentUserID)"
+        let fullFollowingID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
+        
+        followRecord[CKField.Follow.followerID] = fullFollowerID
+        followRecord[CKField.Follow.followingID] = fullFollowingID
         followRecord[CKField.Follow.followedAt] = Date()
         followRecord[CKField.Follow.isActive] = Int64(1)
         
@@ -705,10 +725,14 @@ final class UnifiedAuthManager: ObservableObject {
             throw UnifiedAuthError.notAuthenticated
         }
         
+        // Ensure IDs have "user_" prefix for CloudKit queries
+        let fullFollowerID = currentUserID.hasPrefix("user_") ? currentUserID : "user_\(currentUserID)"
+        let fullFollowingID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
+        
         let predicate = NSPredicate(
             format: "%K == %@ AND %K == %@ AND %K == %d",
-            CKField.Follow.followerID, currentUserID,
-            CKField.Follow.followingID, userID,
+            CKField.Follow.followerID, fullFollowerID,
+            CKField.Follow.followingID, fullFollowingID,
             CKField.Follow.isActive, 1
         )
         
@@ -747,8 +771,9 @@ final class UnifiedAuthManager: ObservableObject {
     /// Helper method to update the followed/unfollowed user's follower count
     private func updateFollowedUserFollowerCount(userID: String, increment: Bool) async {
         do {
-            // Fetch the user's record
-            let userRecordID = CKRecord.ID(recordName: "user_\(userID)")
+            // Fetch the user's record (ensure proper ID format)
+            let fullUserID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
+            let userRecordID = CKRecord.ID(recordName: fullUserID)
             let userRecord = try await cloudKitDatabase.record(for: userRecordID)
             
             // Get current follower count
@@ -923,11 +948,12 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Update user statistics in CloudKit
     func updateUserStats(_ updates: UserStatUpdates) async throws {
-        guard let currentUser = currentUser else {
+        guard let currentUser = currentUser,
+              let recordID = currentUser.recordID else {
             throw UnifiedAuthError.notAuthenticated
         }
         
-        let userRecordID = CKRecord.ID(recordName: "user_\(String(describing: currentUser.recordID))")
+        let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
         let record = try await cloudKitDatabase.record(for: userRecordID)
         
         // Apply updates - only for fields that exist in production
@@ -979,7 +1005,8 @@ final class UnifiedAuthManager: ObservableObject {
         guard let currentUser = currentUser else { return }
         
         do {
-            let userRecordID = CKRecord.ID(recordName: "user_\(String(describing: currentUser.recordID))")
+            guard let recordID = currentUser.recordID else { return }
+            let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
             let record = try await cloudKitDatabase.record(for: userRecordID)
             
             await MainActor.run {
@@ -1042,38 +1069,57 @@ final class UnifiedAuthManager: ObservableObject {
             return 
         }
         
+        print("🔍 DEBUG updateSocialCounts: Starting for user recordID: \(recordID)")
+        
         do {
             // Count followers - people who follow this user
             // followingID is the user being followed
-            let followerPredicate = NSPredicate(format: "followingID == %@ AND isActive == 1", recordID)
+            // Ensure we use the full "user_" prefixed ID for queries
+            let fullUserID = recordID.hasPrefix("user_") ? recordID : "user_\(recordID)"
+            print("🔍 DEBUG updateSocialCounts: Using fullUserID for queries: \(fullUserID)")
+            
+            let followerPredicate = NSPredicate(format: "followingID == %@ AND isActive == 1", fullUserID)
             let followerQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
             
             let followerResults = try await cloudKitDatabase.records(matching: followerQuery)
+            print("🔍 DEBUG updateSocialCounts: Follower query returned \(followerResults.matchResults.count) results")
+            
             let activeFollowers = followerResults.matchResults.compactMap { (_, result) -> String? in
-                if case .success(let record) = result,
-                   let isActive = record["isActive"] as? Int64,
-                   isActive == 1 {
-                    return record["followerID"] as? String
+                if case .success(let record) = result {
+                    let isActive = record["isActive"] as? Int64
+                    let followerID = record["followerID"] as? String
+                    print("🔍 DEBUG updateSocialCounts: Follow record - followerID: \(followerID ?? "nil"), isActive: \(isActive ?? -1)")
+                    if isActive == 1 {
+                        return followerID
+                    }
                 }
                 return nil
             }
             let followerCount = activeFollowers.count
+            print("🔍 DEBUG updateSocialCounts: Final follower count: \(followerCount)")
             
             // Count following - people this user follows
             // followerID is the user doing the following
-            let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == 1", recordID)
+            // Use the same fullUserID from above
+            let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == 1", fullUserID)
             let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
             
             let followingResults = try await cloudKitDatabase.records(matching: followingQuery)
+            print("🔍 DEBUG updateSocialCounts: Following query returned \(followingResults.matchResults.count) results")
+            
             let activeFollowing = followingResults.matchResults.compactMap { (_, result) -> String? in
-                if case .success(let record) = result,
-                   let isActive = record["isActive"] as? Int64,
-                   isActive == 1 {
-                    return record["followingID"] as? String
+                if case .success(let record) = result {
+                    let isActive = record["isActive"] as? Int64
+                    let followingID = record["followingID"] as? String
+                    print("🔍 DEBUG updateSocialCounts: Follow record - followingID: \(followingID ?? "nil"), isActive: \(isActive ?? -1)")
+                    if isActive == 1 {
+                        return followingID
+                    }
                 }
                 return nil
             }
             let followingCount = activeFollowing.count
+            print("🔍 DEBUG updateSocialCounts: Final following count: \(followingCount)")
             
             print("📊 Updated social counts - Followers: \(followerCount), Following: \(followingCount)")
             
@@ -1096,7 +1142,9 @@ final class UnifiedAuthManager: ObservableObject {
     /// Get list of users followed by a specific user
     func getUsersFollowedBy(userID: String) async -> [CloudKitUser] {
         do {
-            let predicate = NSPredicate(format: "followerID == %@", userID)
+            // Ensure userID has "user_" prefix for CloudKit query
+            let fullUserID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
+            let predicate = NSPredicate(format: "followerID == %@", fullUserID)
             let query = CKQuery(recordType: "Follow", predicate: predicate)
             
             let (results, _) = try await cloudKitDatabase.records(
@@ -1112,7 +1160,8 @@ final class UnifiedAuthManager: ObservableObject {
                    let followingID = record["followingID"] as? String {
                     // Fetch the user record
                     do {
-                        let userRecordID = CKRecord.ID(recordName: "user_\(followingID)")
+                        // followingID already has "user_" prefix from Follow record, use it directly
+                        let userRecordID = CKRecord.ID(recordName: followingID)
                         let userRecord = try await cloudKitDatabase.record(for: userRecordID)
                         users.append(CloudKitUser(from: userRecord))
                     } catch {
@@ -1252,7 +1301,15 @@ public struct CloudKitUser: Identifiable {
             self.recordID = fullRecordID
         }
         self.username = record[CKField.User.username] as? String
-        self.displayName = record[CKField.User.displayName] as? String ?? "Anonymous Chef"
+        // Handle displayName - use username if displayName is empty, fallback to "Anonymous Chef"
+        let rawDisplayName = record[CKField.User.displayName] as? String
+        if let displayName = rawDisplayName, !displayName.isEmpty, displayName != "Anonymous Chef" {
+            self.displayName = displayName
+        } else if let username = self.username, !username.isEmpty {
+            self.displayName = username.capitalized
+        } else {
+            self.displayName = "Anonymous Chef"
+        }
         self.email = record[CKField.User.email] as? String ?? ""
         self.profileImageURL = record[CKField.User.profileImageURL] as? String
         self.authProvider = record[CKField.User.authProvider] as? String ?? "unknown"

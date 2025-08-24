@@ -37,10 +37,10 @@ struct UserProfile: Identifiable {
 // MARK: - Discover Users View
 struct DiscoverUsersView: View {
     @StateObject private var viewModel = DiscoverUsersViewModel()
-    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @EnvironmentObject var appState: AppState
     @State private var searchText = ""
     @State private var selectedCategory: DiscoverCategory = .suggested
+    @State private var showAuthSheet = false
 
     enum DiscoverCategory: String, CaseIterable {
         case suggested = "Suggested"
@@ -118,12 +118,12 @@ struct DiscoverUsersView: View {
                                     UserDiscoveryCard(
                                         user: user,
                                         onFollow: {
-                                            if cloudKitAuth.isAuthenticated {
+                                            if UnifiedAuthManager.shared.isAuthenticated {
                                                 Task {
                                                     await viewModel.toggleFollow(user)
                                                 }
                                             } else {
-                                                cloudKitAuth.promptAuthForFeature(.socialSharing)
+                                                UnifiedAuthManager.shared.promptAuthForFeature(.socialSharing)
                                             }
                                         },
                                         onTap: {
@@ -175,11 +175,17 @@ struct DiscoverUsersView: View {
         .sheet(item: $viewModel.selectedUser) { user in
             UserProfileView(
                 userID: user.id,
-                userName: user.displayName
+                userName: {
+                    print("🔍 DEBUG DiscoverUsersView -> UserProfileView navigation:")
+                    print("    └─ Passing userName parameter: user.displayName = \(user.displayName)")
+                    print("    └─ Should pass user.username instead for consistency?")
+                    print("    └─ user.username = \(user.username ?? "nil")")
+                    return user.displayName
+                }()
             )
             .environmentObject(appState)
         }
-        .sheet(isPresented: $cloudKitAuth.showAuthSheet) {
+        .sheet(isPresented: $showAuthSheet) {
             UnifiedAuthView()
         }
     }
@@ -344,20 +350,31 @@ struct UserDiscoveryCard: View {
                         }
                     }
 
-                    Text("@\(user.displayName)")
+                    Text("@\(user.username ?? user.displayName)")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.7))
                         .lineLimit(1)
 
                     // Stats
                     HStack(spacing: 12) {
-                        Text(user.followerText)
+                        Text({
+                            let text = user.followerText
+                            print("🔍 DEBUG DiscoverUsersView Card - User: \(user.username ?? user.displayName)")
+                            print("    └─ Followers field: user.followerCount = \(user.followerCount)")
+                            print("    └─ UserProfile struct field mapping from CloudKit: CKField.User.followerCount")
+                            return text
+                        }())
                             .font(.system(size: 13))
                             .foregroundColor(.white.opacity(0.8))
                             .lineLimit(1)
                             .fixedSize(horizontal: false, vertical: true)
 
-                        Text("\(user.recipesCreated) recipes")
+                        Text({
+                            let text = "\(user.recipesCreated) recipes"
+                            print("    └─ Recipes field: user.recipesCreated = \(user.recipesCreated)")
+                            print("    └─ UserProfile struct field mapping from CloudKit: CKField.User.recipesCreated")
+                            return text
+                        }())
                             .font(.system(size: 13))
                             .foregroundColor(.white.opacity(0.8))
                             .lineLimit(1)
@@ -486,7 +503,6 @@ class DiscoverUsersViewModel: ObservableObject {
     @Published var searchResults: [UserProfile] = []
     @Published var isSearching = false
 
-    private let cloudKitAuth = UnifiedAuthManager.shared
     private let cloudKitSync = CloudKitSyncService.shared
     private var lastFetchedRecord: CKRecord?
     private var cloudKitUsers: [UserProfile] = []
@@ -512,14 +528,14 @@ class DiscoverUsersViewModel: ObservableObject {
             
             switch category {
             case .suggested:
-                fetchedUsers = try await cloudKitAuth.getSuggestedUsers(limit: 20)
+                fetchedUsers = try await UnifiedAuthManager.shared.getSuggestedUsers(limit: 20)
             case .trending:
-                fetchedUsers = try await cloudKitAuth.getTrendingUsers(limit: 20)
+                fetchedUsers = try await UnifiedAuthManager.shared.getTrendingUsers(limit: 20)
             case .newChefs:
                 // Get the newest 100 users based on recent activity
-                fetchedUsers = try await cloudKitAuth.getNewUsers(limit: 100)
+                fetchedUsers = try await UnifiedAuthManager.shared.getNewUsers(limit: 100)
             case .verified:
-                fetchedUsers = try await cloudKitAuth.getVerifiedUsers(limit: 20)
+                fetchedUsers = try await UnifiedAuthManager.shared.getVerifiedUsers(limit: 20)
             }
             
             // Convert to UserProfile and check follow status for each user
@@ -528,8 +544,8 @@ class DiscoverUsersViewModel: ObservableObject {
                 var userProfile = convertToUserProfile(cloudKitUser)
                 
                 // Check actual follow status if authenticated
-                if cloudKitAuth.isAuthenticated {
-                    userProfile.isFollowing = await cloudKitAuth.isFollowing(userID: userProfile.id)
+                if UnifiedAuthManager.shared.isAuthenticated {
+                    userProfile.isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: userProfile.id)
                 }
                 
                 convertedUsers.append(userProfile)
@@ -597,7 +613,7 @@ class DiscoverUsersViewModel: ObservableObject {
 
         // Search CloudKit users only
         do {
-            let cloudKitResults = try await cloudKitAuth.searchUsers(query: query)
+            let cloudKitResults = try await UnifiedAuthManager.shared.searchUsers(query: query)
             
             // Convert to UserProfile and check follow status for each user
             var convertedResults: [UserProfile] = []
@@ -605,8 +621,8 @@ class DiscoverUsersViewModel: ObservableObject {
                 var userProfile = convertToUserProfile(cloudKitUser)
                 
                 // Check actual follow status if authenticated
-                if cloudKitAuth.isAuthenticated {
-                    userProfile.isFollowing = await cloudKitAuth.isFollowing(userID: userProfile.id)
+                if UnifiedAuthManager.shared.isAuthenticated {
+                    userProfile.isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: userProfile.id)
                 }
                 
                 convertedResults.append(userProfile)
@@ -635,9 +651,9 @@ class DiscoverUsersViewModel: ObservableObject {
         // Perform follow/unfollow for CloudKit users
         do {
             if user.isFollowing {
-                try await cloudKitAuth.unfollowUser(userID: user.id)
+                try await UnifiedAuthManager.shared.unfollowUser(userID: user.id)
             } else {
-                try await cloudKitAuth.followUser(userID: user.id)
+                try await UnifiedAuthManager.shared.followUser(userID: user.id)
             }
 
             // Update local state
@@ -658,16 +674,16 @@ class DiscoverUsersViewModel: ObservableObject {
     
     /// Refresh follow status for all users when returning to the view
     func refreshFollowStatus() async {
-        guard cloudKitAuth.isAuthenticated else { return }
+        guard UnifiedAuthManager.shared.isAuthenticated else { return }
         
         // Refresh follow status for main users list
         for i in 0..<users.count {
-            users[i].isFollowing = await cloudKitAuth.isFollowing(userID: users[i].id)
+            users[i].isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: users[i].id)
         }
         
         // Refresh follow status for search results
         for i in 0..<searchResults.count {
-            searchResults[i].isFollowing = await cloudKitAuth.isFollowing(userID: searchResults[i].id)
+            searchResults[i].isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: searchResults[i].id)
         }
     }
     

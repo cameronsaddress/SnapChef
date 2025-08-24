@@ -25,6 +25,7 @@ struct SnapChefApp: App {
     @StateObject private var socialShareManager = SocialShareManager.shared
     @StateObject private var cloudKitSyncService = CloudKitSyncService.shared
     @StateObject private var cloudKitDataManager = CloudKitDataManager.shared
+    @StateObject private var notificationManager = NotificationManager.shared
 
     var body: some Scene {
         WindowGroup {
@@ -37,6 +38,7 @@ struct SnapChefApp: App {
                 .environmentObject(socialShareManager)
                 .environmentObject(cloudKitSyncService)
                 .environmentObject(cloudKitDataManager)
+                .environmentObject(notificationManager)
 
                 .preferredColorScheme(.dark)
 
@@ -99,8 +101,17 @@ struct SnapChefApp: App {
         NetworkManager.shared.configure()
         deviceManager.checkDeviceStatus()
 
+        // Initialize notification system with comprehensive spam prevention
         Task {
-            _ = await ChallengeNotificationManager.shared.requestNotificationPermission()
+            let granted = await notificationManager.requestNotificationPermission()
+            print("📱 Notification permission granted: \(granted)")
+            
+            if granted {
+                // Setup default notifications (with limits and controls)
+                notificationManager.scheduleDailyStreakReminder()
+                notificationManager.scheduleJoinedChallengeReminders()
+                print("✅ Notification system initialized with spam prevention")
+            }
         }
 
         Task {
