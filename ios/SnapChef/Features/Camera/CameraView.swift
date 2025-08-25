@@ -11,7 +11,6 @@ struct CameraView: View {
     @EnvironmentObject var deviceManager: DeviceManager
     @EnvironmentObject var cloudKitDataManager: CloudKitDataManager
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
-    @Environment(\.dismiss) var dismiss
     @Binding var selectedTab: Int
     
     // Performance optimization: Lazy loading of heavy views
@@ -102,13 +101,8 @@ struct CameraView: View {
                     // Top controls (CameraTopControls temporarily commented out)
                     // TODO: Implement CameraTopControls
                     CameraTopBar(onClose: {
-                        // If we have a selectedTab binding, go back to home tab
-                        if $selectedTab.wrappedValue != 0 {
-                            $selectedTab.wrappedValue = 0
-                        } else {
-                            // Otherwise, dismiss the view
-                            dismiss()
-                        }
+                        // Go back to home tab
+                        selectedTab = 0
                     })
                     
                     Spacer()
@@ -164,12 +158,8 @@ struct CameraView: View {
                             captureMode = .fridge
                             showPantryStep = false
                             
-                            // Navigate back to home if from tab
-                            if $selectedTab.wrappedValue != 0 {
-                                $selectedTab.wrappedValue = 0
-                            } else {
-                                dismiss()
-                            }
+                            // Navigate back to home tab
+                            selectedTab = 0
                         })
                     )
             }
@@ -276,8 +266,10 @@ struct CameraView: View {
                 capturedImage: capturedImage
             )
             .onDisappear {
-                // When recipe results are dismissed, also dismiss the camera
-                dismiss()
+                // When recipe results are dismissed, go back to home tab
+                selectedTab = 0 // Switch to home tab
+                // Reset the capture flow for next time
+                resetCaptureFlow()
             }
         }
         .fullScreenCover(isPresented: $showingUpgrade, onDismiss: {

@@ -88,6 +88,12 @@ struct EmojiFlickGame: View {
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { value in
+                                    // Hide tutorial immediately on user interaction
+                                    if showTutorial {
+                                        showTutorial = false
+                                        tutorialOpacity = 0
+                                    }
+                                    
                                     createTouchSpark(at: value.location)
 
                                     // Track drag path
@@ -671,16 +677,36 @@ struct EmojiFlickGame: View {
 
         // Start finger visible on screen immediately
         tutorialFingerPosition = CGPoint(x: 200, y: 400)
+        
+        // GUARANTEED to hide tutorial after 3 seconds no matter what
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            if self.showTutorial {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    self.tutorialOpacity = 0
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.showTutorial = false
+                }
+            }
+        }
 
         // Wait for emojis to reach middle of screen
         let screenHeight = UIScreen.main.bounds.height
         let targetMinY = screenHeight * 0.4
         let targetMaxY = screenHeight * 0.6
+        
+        var animationCompleted = false
 
         // Check every 0.1 seconds for emojis at target position
         var tutorialTimer: Timer?
         tutorialTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             Task { @MainActor in
+                // Stop if animation already completed or tutorial hidden
+                guard !animationCompleted && self.showTutorial else {
+                    tutorialTimer?.invalidate()
+                    return
+                }
+                
                 // Find emojis in the middle zone
                 let readyEmojis = self.emojis.filter { emoji in
                     emoji.position.y >= targetMinY && emoji.position.y <= targetMaxY && !emoji.isFlicked
@@ -689,91 +715,46 @@ struct EmojiFlickGame: View {
                 guard !readyEmojis.isEmpty else { return }
 
                 tutorialTimer?.invalidate()
+                animationCompleted = true
 
-                // Flick first emoji
+                // Animate finger to first emoji and swipe
                 if let firstEmoji = readyEmojis.first {
+                    // Move to emoji
                     withAnimation(.easeInOut(duration: 0.3)) {
                         self.tutorialFingerPosition = CGPoint(
-                            x: firstEmoji.position.x - 50,
+                            x: firstEmoji.position.x - 30,
                             y: firstEmoji.position.y
                         )
                     }
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        self.tutorialFingerPosition = CGPoint(
-                            x: firstEmoji.position.x + 100,
-                            y: firstEmoji.position.y - 50
-                        )
-                    }
-
-                    let velocity = CGVector(dx: 300, dy: -150)
-                    self.handleEmojiFlick(emoji: firstEmoji, velocity: velocity, position: firstEmoji.position)
-                }
-            }
-
-            // Flick second emoji
-            if readyEmojis.count >= 2 {
-                let secondEmoji = readyEmojis[1]
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        self.tutorialFingerPosition = CGPoint(
-                            x: secondEmoji.position.x - 50,
-                            y: secondEmoji.position.y
-                        )
-                    }
-
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                    // Perform swipe animation
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        guard self.showTutorial else { return }
+                        
+                        withAnimation(.easeOut(duration: 0.3)) {
                             self.tutorialFingerPosition = CGPoint(
-                                x: secondEmoji.position.x + 100,
-                                y: secondEmoji.position.y - 50
+                                x: firstEmoji.position.x + 100,
+                                y: firstEmoji.position.y - 60
                             )
                         }
 
-                        let velocity = CGVector(dx: 300, dy: -150)
-                        self.handleEmojiFlick(emoji: secondEmoji, velocity: velocity, position: secondEmoji.position)
-                    }
-                }
-            }
-
-            // Flick third emoji
-            if readyEmojis.count >= 3 {
-                let thirdEmoji = readyEmojis[2]
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        self.tutorialFingerPosition = CGPoint(
-                            x: thirdEmoji.position.x - 50,
-                            y: thirdEmoji.position.y
-                        )
-                    }
-
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            self.tutorialFingerPosition = CGPoint(
-                                x: thirdEmoji.position.x + 100,
-                                y: thirdEmoji.position.y - 50
-                            )
+                        // Flick the emoji
+                        let velocity = CGVector(dx: 300, dy: -200)
+                        self.handleEmojiFlick(emoji: firstEmoji, velocity: velocity, position: firstEmoji.position)
+                        
+                        // Fade out tutorial after successful demonstration
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            if self.showTutorial {
+                                withAnimation(.easeOut(duration: 0.3)) {
+                                    self.tutorialOpacity = 0
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    self.showTutorial = false
+                                }
+                            }
                         }
-
-                        let velocity = CGVector(dx: 300, dy: -150)
-                        self.handleEmojiFlick(emoji: thirdEmoji, velocity: velocity, position: thirdEmoji.position)
                     }
                 }
-            }
-
-            // Fade out tutorial
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.3) {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    self.tutorialOpacity = 0
-                }
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    self.showTutorial = false
-                }
-            }
             } // End Task
         }
     }
