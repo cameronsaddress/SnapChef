@@ -69,27 +69,17 @@ struct RecipeDetectiveView: View {
                             
                             Spacer()
                             
-                            // Premium badge
+                            // Premium icon
                             if !deviceManager.hasUnlimitedAccess {
-                                HStack(spacing: 6) {
+                                VStack(spacing: 4) {
                                     Image(systemName: "crown.fill")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(Color(hex: "#ffd700"))
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundColor(Color(hex: "#9b59b6"))
                                     
-                                    Text("PREMIUM")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(.white)
+                                    Text("Premium")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(Color(hex: "#9b59b6"))
                                 }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(
-                                    Capsule()
-                                        .fill(Color(hex: "#2d1b69"))
-                                        .overlay(
-                                            Capsule()
-                                                .stroke(Color(hex: "#ffd700"), lineWidth: 1)
-                                        )
-                                )
                             }
                         }
                         .padding(.horizontal, 20)
@@ -163,10 +153,6 @@ struct RecipeDetectiveView: View {
                             }
                         }
                         
-                        // Usage Counter
-                        if !deviceManager.hasUnlimitedAccess {
-                            UsageCounterCard(remaining: usagesRemaining, total: 10)
-                        }
                         
                         // Camera Preview or Captured Image
                         VStack(spacing: 20) {

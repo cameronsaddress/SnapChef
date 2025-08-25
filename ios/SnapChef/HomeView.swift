@@ -1391,10 +1391,14 @@ struct DetectiveFeatureTile: View {
                                 endPoint: .trailing
                             )
                         )
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     
                     Text("Reverse-engineer any dish")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
                 
                 Spacer()
@@ -1416,7 +1420,7 @@ struct DetectiveFeatureTile: View {
                         .offset(x: isAnimating ? 5 : 0)
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 16)
             .padding(.vertical, 20)
             .background(
                 RoundedRectangle(cornerRadius: 20)

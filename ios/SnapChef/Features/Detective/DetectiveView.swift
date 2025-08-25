@@ -180,14 +180,9 @@ struct DetectiveView: View {
                 
                 Spacer()
                 
-                // Show usage remaining for non-premium users
+                // Show premium badge for non-premium users
                 if !SubscriptionManager.shared.isPremium {
-                    let remaining = UsageTracker.shared.getDetectiveUsesRemaining()
-                    if remaining > 0 {
-                        detectiveUsageCounter(remaining: remaining)
-                    } else {
-                        premiumBadge
-                    }
+                    premiumBadge
                 }
             }
         }
@@ -204,20 +199,14 @@ struct DetectiveView: View {
     
     // MARK: - Premium Badge
     private var premiumBadge: some View {
-        HStack(spacing: 6) {
+        VStack(spacing: 2) {
             Image(systemName: "crown.fill")
-                .font(.system(size: 12))
+                .font(.system(size: 16))
+                .foregroundColor(Color(hex: "#9b59b6"))
             Text("Premium")
-                .font(.caption)
-                .fontWeight(.semibold)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(Color(hex: "#9b59b6"))
         }
-        .foregroundColor(.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(
-            Capsule()
-                .fill(Color(hex: "#9b59b6").opacity(0.8))
-        )
     }
     
     // MARK: - Detective Usage Counter

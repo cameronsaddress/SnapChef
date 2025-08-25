@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import CloudKit
 
 // MARK: - Emoji Flick Game
 struct EmojiFlickGame: View {
@@ -191,6 +192,19 @@ struct EmojiFlickGame: View {
                 } else {
                     showTutorial = false
                 }
+                
+                // Fetch global high score
+                if !gameState.hasLoadedGlobalScore {
+                    gameState.isLoadingGlobalScore = true
+                    Task {
+                        let globalScore = await GameState.fetchGlobalHighScore()
+                        await MainActor.run {
+                            gameState.globalHighScore = globalScore
+                            gameState.isLoadingGlobalScore = false
+                            gameState.hasLoadedGlobalScore = true
+                        }
+                    }
+                }
             }
         }
     }
@@ -325,9 +339,7 @@ struct EmojiFlickGame: View {
         let score = Int(Double(baseScore) * speedBonus * Double(gameState.multiplier))
 
         gameState.score += score
-        if gameState.score > gameState.highScore {
-            gameState.highScore = gameState.score
-        }
+        gameState.saveHighScore()
 
         // Update combo
         gameState.combo += 1
@@ -772,14 +784,87 @@ struct EmojiFlickGame: View {
 struct GameState {
     var score: Int = 0
     var highScore: Int = UserDefaults.standard.integer(forKey: "emojiFlickHighScore")
+    var globalHighScore: Int = UserDefaults.standard.integer(forKey: "emojiFlickGlobalHighScore")
     var combo: Int = 0
     var multiplier: Int = 1
     var lastComboTime = Date()
+    var isLoadingGlobalScore = false
+    var hasLoadedGlobalScore = false
 
     mutating func saveHighScore() {
         if score > highScore {
             highScore = score
             UserDefaults.standard.set(highScore, forKey: "emojiFlickHighScore")
+            
+            // Also check if it's a new global high score
+            if score > globalHighScore {
+                updateGlobalHighScore(score: score)
+            }
+        }
+    }
+    
+    mutating func updateGlobalHighScore(score: Int) {
+        globalHighScore = score
+        UserDefaults.standard.set(globalHighScore, forKey: "emojiFlickGlobalHighScore")
+        
+        // Save to CloudKit
+        Task {
+            await GameState.saveGlobalHighScoreToCloudKit(score: score)
+        }
+    }
+    
+    static func saveGlobalHighScoreToCloudKit(score: Int) async {
+        let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+        let publicDB = container.publicCloudDatabase
+        
+        // Create or update the high score record
+        let recordID = CKRecord.ID(recordName: "EmojiGameGlobalHighScore")
+        
+        do {
+            // Try to fetch existing record
+            let record: CKRecord
+            do {
+                record = try await publicDB.record(for: recordID)
+            } catch {
+                // Record doesn't exist, create new one
+                record = CKRecord(recordType: "GameHighScore", recordID: recordID)
+            }
+            
+            // Only update if the new score is higher
+            let currentHighScore = record["score"] as? Int ?? 0
+            if score > currentHighScore {
+                record["score"] = score
+                record["lastUpdated"] = Date()
+                let deviceID = await MainActor.run {
+                    UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
+                }
+                record["deviceID"] = deviceID
+                
+                _ = try await publicDB.save(record)
+                print("✅ Global high score updated to \(score)")
+            }
+        } catch {
+            print("❌ Failed to save global high score: \(error)")
+        }
+    }
+    
+    static func fetchGlobalHighScore() async -> Int {
+        let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+        let publicDB = container.publicCloudDatabase
+        let recordID = CKRecord.ID(recordName: "EmojiGameGlobalHighScore")
+        
+        do {
+            let record = try await publicDB.record(for: recordID)
+            let score = record["score"] as? Int ?? 0
+            
+            // Cache it locally
+            UserDefaults.standard.set(score, forKey: "emojiFlickGlobalHighScore")
+            
+            return score
+        } catch {
+            print("❌ Failed to fetch global high score: \(error)")
+            // Return cached value
+            return UserDefaults.standard.integer(forKey: "emojiFlickGlobalHighScore")
         }
     }
 }
@@ -1021,32 +1106,102 @@ struct AnimatedScoreboard: View {
     @State private var glowOpacity: Double = 0.6
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Score
-            HStack(spacing: 4) {
-                Image(systemName: "star.fill")
-                    .foregroundColor(.yellow)
-                    .font(.system(size: 20))
-
+        VStack(alignment: .leading, spacing: 4) {
+            // Current Score
+            HStack(spacing: 6) {
+                Text("Score:")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.8)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(color: .white.opacity(0.5), radius: 4)
+                    .shadow(color: .cyan.opacity(0.3), radius: 8)
+                
                 Text("\(gameState.score)")
-                    .font(.system(size: 42, weight: .black, design: .rounded))
+                    .font(.system(size: 32, weight: .black, design: .rounded))
                     .foregroundColor(.white)
                     .scaleEffect(scoreScale)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: gameState.score)
             }
 
-            // High score
-            HStack(spacing: 4) {
-                Image(systemName: "crown.fill")
-                    .foregroundColor(.orange)
-                    .font(.system(size: 14))
+            // Your best score
+            HStack(spacing: 6) {
+                Text("Your Best:")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.8)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(color: .white.opacity(0.5), radius: 4)
+                    .shadow(color: .orange.opacity(0.3), radius: 8)
 
-                Text("BEST: \(gameState.highScore)")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.8))
+                Text("\(gameState.highScore)")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(gameState.score > gameState.highScore ? .yellow : .white.opacity(0.9))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+            }
+            
+            // World Record
+            HStack(spacing: 4) {
+                Image(systemName: "globe")
+                    .font(.system(size: 11))
+                    .foregroundColor(.cyan)
+                    .shadow(color: .cyan.opacity(0.6), radius: 3)
+                
+                Text("World Record:")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.8)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(color: .white.opacity(0.5), radius: 4)
+                    .shadow(color: .green.opacity(0.3), radius: 8)
+
+                if gameState.isLoadingGlobalScore {
+                    ProgressView()
+                        .scaleEffect(0.5)
+                        .frame(width: 18, height: 18)
+                } else {
+                    Text("\(gameState.globalHighScore)")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(gameState.score > gameState.globalHighScore ? .green : .cyan.opacity(0.9))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                }
+            }
+            
+            // New record indicators
+            if gameState.score > gameState.globalHighScore && gameState.globalHighScore > 0 {
+                Text("🌟 NEW WORLD RECORD! 🌟")
+                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .foregroundColor(.yellow)
+                    .scaleEffect(scoreScale)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            } else if gameState.score > gameState.highScore && gameState.highScore > 0 {
+                Text("✨ Personal Best! ✨")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundColor(.orange)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
-        .padding(20)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(minWidth: 180, maxWidth: 240)
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(.ultraThinMaterial)
@@ -1054,14 +1209,17 @@ struct AnimatedScoreboard: View {
                     RoundedRectangle(cornerRadius: 20)
                         .stroke(
                             LinearGradient(
-                                colors: [.purple, .pink, .orange],
+                                colors: gameState.score > gameState.globalHighScore ? [.yellow, .green] : 
+                                        gameState.score > gameState.highScore ? [.orange, .yellow] : 
+                                        [.purple, .pink],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
                             lineWidth: 2
                         )
                 )
-                .shadow(color: .purple.opacity(glowOpacity), radius: 20)
+                .shadow(color: gameState.score > gameState.globalHighScore ? .yellow.opacity(glowOpacity) : 
+                               .purple.opacity(glowOpacity), radius: 20)
         )
         .onChange(of: gameState.score) { _ in
             scoreScale = 1.2
