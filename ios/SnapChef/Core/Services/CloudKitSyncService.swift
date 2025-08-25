@@ -671,7 +671,7 @@ final class CloudKitSyncService: ObservableObject {
         var recipeOwnerID: String?
         
         if let recipeRecord = try? await publicDatabase.record(for: CKRecord.ID(recordName: recipeID)) {
-            recipeName = recipeRecord[CKField.Recipe.name] as? String
+            recipeName = recipeRecord[CKField.Recipe.title] as? String
             recipeOwnerID = recipeRecord[CKField.Recipe.ownerID] as? String
         }
 
