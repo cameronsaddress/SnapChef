@@ -1354,6 +1354,7 @@ extension RecipeDetailView {
             }
         }
         .padding(.horizontal, 20)
+        .id("commentsSection")
     }
 }
 
