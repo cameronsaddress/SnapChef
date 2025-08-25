@@ -255,10 +255,21 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 - **COMPLETE_CODE_TRACE.md** - App flow analysis
 - **FILE_USAGE_ANALYSIS.md** - File usage status
 
-## 🔄 Latest Updates (Aug 24, 2025)
+## 🔄 Latest Updates (Aug 25, 2025)
 
+### Challenge System Improvements (Aug 25) ✅
+- ✅ **Fixed Challenge Requirements Display**: Challenge cards now show proper progress indicators (e.g., "0/3 recipes") instead of description text or UUIDs
+- ✅ **Added Leave Challenge Feature**: Users can now leave joined challenges with confirmation dialog
+- ✅ **ChallengeDatabase Enhanced**: Added proper progress strings for all challenge types (daily, weekly, special, viral, seasonal)
+- ✅ **Leave Challenge Implementation**: 
+  - Added red-tinted "Leave Challenge" button in ProgressCard
+  - Confirmation alert warns users about losing progress and rewards
+  - Updates CloudKit UserChallenge records with "left" status
+  - Tracks analytics for challenge abandonment
+  - Provides haptic feedback for better UX
+- ✅ **Build Verified**: All changes compile successfully
 
-### UI/UX and Social Feed Improvements (Aug 24 - Latest) ✅
+### UI/UX and Social Feed Improvements (Aug 24) ✅
 - ✅ **SocialFeedView Avatar Fix**: Activity items now display user profile pictures instead of initials
 - ✅ **HomeView Tile Reordering**: Recipe Detective moved below Celebrity Kitchens, Today's Challenge moved below Streak Summary for better user flow
 - ✅ **ProfileView Active Challenges**: Fixed CloudKit sync to show accurate challenge count with proper data fetching

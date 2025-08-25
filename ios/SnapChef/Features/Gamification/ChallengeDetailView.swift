@@ -351,6 +351,8 @@ struct MiniLeaderboardCard: View {
 struct ProgressCard: View {
     let challenge: Challenge
     @State private var showProofSubmission = false
+    @State private var showLeaveConfirmation = false
+    @State private var isLeavingChallenge = false
 
     private var progressPercentage: Int {
         Int(challenge.currentProgress * 100)
@@ -469,11 +471,61 @@ struct ProgressCard: View {
                 }
                 .disabled(challenge.currentProgress >= 1.0)
                 .opacity(challenge.currentProgress >= 1.0 ? 0.5 : 1.0)
+                
+                // Leave Challenge Button
+                Button(action: {
+                    showLeaveConfirmation = true
+                }) {
+                    HStack {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18))
+                        Text("Leave Challenge")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundColor(.white.opacity(0.9))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.red.opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.red.opacity(0.5), lineWidth: 1)
+                            )
+                    )
+                }
+                .disabled(isLeavingChallenge)
             }
             .padding(20)
         }
         .sheet(isPresented: $showProofSubmission) {
             ChallengeProofSubmissionView(challenge: challenge)
+        }
+        .alert("Leave Challenge?", isPresented: $showLeaveConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Leave", role: .destructive) {
+                leaveChallenge()
+            }
+        } message: {
+            Text("Are you sure you want to leave this challenge? Your progress will be lost and you won't receive any rewards.")
+        }
+    }
+    
+    private func leaveChallenge() {
+        isLeavingChallenge = true
+        
+        // Haptic feedback
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.warning)
+        
+        // Leave the challenge
+        Task {
+            await GamificationManager.shared.leaveChallenge(challenge.id)
+            
+            // Dismiss after a short delay
+            await MainActor.run {
+                isLeavingChallenge = false
+            }
         }
     }
 }

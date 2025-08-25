@@ -573,6 +573,74 @@ final class GamificationManager: ObservableObject {
     }
 
     // MARK: - Challenge Management
+    
+    /// Smart notification scheduling with weekly limit
+    private func scheduleSmartChallengeNotifications(for challenge: Challenge) {
+        // Only schedule for joined challenges
+        guard challenge.isJoined else { return }
+        
+        // With 1 notification per week limit, we only schedule the most important reminder
+        // Priority: Time-sensitive challenges ending soon > Regular reminders
+        
+        let now = Date()
+        let timeUntilEnd = challenge.endDate.timeIntervalSince(now)
+        
+        // Don't schedule if challenge is already expired
+        guard timeUntilEnd > 0 else { return }
+        
+        // Determine priority based on time remaining and challenge importance
+        let priority: NotificationPriority
+        if timeUntilEnd < 24 * 3600 { // Less than 24 hours
+            priority = .high // Time-sensitive
+        } else if timeUntilEnd < 72 * 3600 { // Less than 3 days
+            priority = .medium
+        } else {
+            priority = .low // Can wait
+        }
+        
+        // Only schedule ONE notification at the optimal time
+        let optimalReminderTime: Date
+        if timeUntilEnd < 24 * 3600 {
+            // For challenges ending soon, remind 2 hours before
+            optimalReminderTime = challenge.endDate.addingTimeInterval(-2 * 3600)
+        } else {
+            // For longer challenges, remind at midpoint
+            optimalReminderTime = now.addingTimeInterval(timeUntilEnd / 2)
+        }
+        
+        // Ensure it's during reasonable hours (10 AM - 6 PM for best engagement)
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.year, .month, .day, .hour], from: optimalReminderTime)
+        
+        if let hour = components.hour {
+            if hour < 10 {
+                components.hour = 10 // Move to 10 AM
+            } else if hour > 18 {
+                // Move to next day 10 AM
+                if let nextDay = calendar.date(byAdding: .day, value: 1, to: optimalReminderTime) {
+                    components = calendar.dateComponents([.year, .month, .day], from: nextDay)
+                    components.hour = 10
+                    components.minute = 0
+                }
+            }
+        }
+        
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        
+        // Use the new NotificationManager with priority
+        let notificationManager = NotificationManager.shared
+        _ = notificationManager.scheduleNotification(
+            identifier: "challenge_\(challenge.id)",
+            title: "🏆 Challenge Reminder",
+            body: "\(challenge.title) ends soon! Complete it to earn \(challenge.points) points.",
+            category: .challengeReminder,
+            userInfo: ["challengeId": challenge.id],
+            trigger: trigger,
+            priority: priority
+        )
+        
+        print("📅 Queued challenge notification for \(challenge.title) with \(priority) priority")
+    }
 
     func saveChallenge(_ challenge: Challenge) {
         // Add challenge to active challenges
@@ -623,6 +691,9 @@ final class GamificationManager: ObservableObject {
             activeChallenges.append(joinedChallenge)
         }
 
+        // Schedule notifications for joined challenge (best practices)
+        scheduleSmartChallengeNotifications(for: challenge)
+        
         // Save to CloudKit UserChallenge record
         Task {
             do {
@@ -671,6 +742,65 @@ final class GamificationManager: ObservableObject {
         }
         // Completed challenges are considered joined
         return completedChallenges.contains(where: { $0.id == challengeId })
+    }
+    
+    @MainActor
+    func leaveChallenge(_ challengeId: String) async {
+        // Find the challenge and update its joined status
+        if let index = activeChallenges.firstIndex(where: { $0.id == challengeId }) {
+            activeChallenges[index].isJoined = false
+            activeChallenges[index].currentProgress = 0
+            
+            print("📤 Left challenge: \(activeChallenges[index].title)")
+            
+            // Update CloudKit UserChallenge record
+            let authManager = UnifiedAuthManager.shared
+            guard let userID = authManager.currentUser?.recordID else {
+                print("❌ Cannot leave challenge: User not authenticated")
+                return
+            }
+            
+            do {
+                let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+                let privateDB = container.privateCloudDatabase
+                
+                // Query for the UserChallenge record
+                let predicate = NSPredicate(format: "userID == %@ AND challengeID == %@", 
+                                           userID, 
+                                           CKRecord.Reference(recordID: CKRecord.ID(recordName: challengeId), action: .none))
+                let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
+                
+                let (results, _) = try await privateDB.records(matching: query)
+                
+                // Delete or update the UserChallenge record
+                for (recordId, result) in results {
+                    if let record = try? result.get() {
+                        // Update status to "left" instead of deleting
+                        record["status"] = "left"
+                        record["leftAt"] = Date()
+                        record["progress"] = 0.0
+                        
+                        _ = try await privateDB.save(record)
+                        print("✅ Updated challenge leave status in CloudKit")
+                    }
+                }
+                
+                // Track analytics
+                ChallengeAnalyticsService.shared.trackChallengeInteraction(
+                    challengeId: challengeId,
+                    action: "left",
+                    metadata: [
+                        "challengeType": activeChallenges[index].type.rawValue,
+                        "difficulty": activeChallenges[index].difficulty.rawValue,
+                        "category": activeChallenges[index].category,
+                        "progressWhenLeft": "\(activeChallenges[index].currentProgress)"
+                    ]
+                )
+                
+            } catch {
+                print("❌ Failed to update challenge leave status in CloudKit: \(error)")
+            }
+        }
     }
 
     func isChallengeJoinedByTitle(_ title: String) -> Bool {

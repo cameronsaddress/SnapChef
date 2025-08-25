@@ -293,8 +293,8 @@ struct ViralChallengeSection: View {
     ]
 
     var displayChallenges: [DisplayChallenge] {
-        // Get first 5 active challenges from ChallengeDatabase
-        let activeChallenges = Array(challengeDatabase.activeChallenges.prefix(5))
+        // Get ALL active challenges from ChallengeDatabase (should be 3-4 per day now)
+        let activeChallenges = challengeDatabase.activeChallenges
 
         // If we have active challenges, use them
         if !activeChallenges.isEmpty {
@@ -489,6 +489,9 @@ struct ViralChallengeSection: View {
             .frame(height: 540)
         }
         .onAppear {
+            // Update challenges when view appears
+            challengeDatabase.updateActiveChallenges()
+            
             DispatchQueue.main.async {
                 withAnimation(.easeOut(duration: 1.5).repeatForever(autoreverses: false)) {
                     sparkleAnimation = true

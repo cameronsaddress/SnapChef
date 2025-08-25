@@ -14,27 +14,27 @@ final class NotificationManager: ObservableObject {
     @Published var pendingNotifications: [UNNotificationRequest] = []
     
     // MARK: - Constants
-    private let maxDailyNotifications = 5
+    private let maxWeeklyNotifications = 1  // Only 1 notification per week
     private let quietHoursStart = 22 // 10 PM
     private let quietHoursEnd = 8    // 8 AM
-    private let maxChallengeNotifications = 3
     
     // MARK: - Private Properties
     private let notificationCenter = UNUserNotificationCenter.current()
     private let userDefaults = UserDefaults.standard
+    private var weeklyResetTimer: Timer?
     private var midnightTimer: Timer?
     
     // UserDefaults Keys
-    private let dailyCountKey = "notification_daily_count"
-    private let lastResetDateKey = "notification_last_reset_date"
+    private let weeklyNotificationDateKey = "last_weekly_notification_date"
+    private let weeklyNotificationCountKey = "weekly_notification_count"
     private let preferencesKey = "notification_preferences"
-    private let challengeNotificationCountKey = "challenge_notification_count"
+    private let pendingNotificationsKey = "pending_notifications_queue"
     
     private init() {
         loadPreferences()
         checkNotificationAuthorization()
-        setupMidnightTimer()
-        resetDailyCountIfNeeded()
+        setupWeeklyResetTimer()
+        resetWeeklyCountIfNeeded()
     }
     
     // MARK: - Authorization
@@ -65,7 +65,7 @@ final class NotificationManager: ObservableObject {
     
     // MARK: - Core Notification Scheduling
     
-    /// Schedule a notification with global limits and quiet hours enforcement
+    /// Schedule a notification with weekly limit and smart selection
     func scheduleNotification(
         identifier: String,
         title: String,
@@ -74,7 +74,7 @@ final class NotificationManager: ObservableObject {
         category: NotificationCategory,
         userInfo: [String: Any] = [:],
         trigger: UNNotificationTrigger?,
-        bypassQuietHours: Bool = false
+        priority: NotificationPriority = .medium
     ) -> Bool {
         guard isEnabled else {
             print("🔕 Notifications disabled - skipping: \(title)")
@@ -87,30 +87,42 @@ final class NotificationManager: ObservableObject {
             return false
         }
         
-        // Check daily limit
-        guard dailyNotificationCount < maxDailyNotifications else {
-            print("📈 Daily notification limit reached (\(maxDailyNotifications)) - skipping: \(title)")
+        // Check weekly limit - ONLY 1 notification per week
+        if !canSendWeeklyNotification() {
+            print("📅 Weekly notification already sent this week - queuing: \(title)")
+            // Queue this notification for smart selection later
+            queueNotificationForSmartSelection(
+                identifier: identifier,
+                title: title,
+                body: body,
+                category: category,
+                priority: priority,
+                trigger: trigger
+            )
             return false
         }
         
         // Check quiet hours for scheduled notifications
         if let calendarTrigger = trigger as? UNCalendarNotificationTrigger,
-           !bypassQuietHours && isInQuietHours(dateComponents: calendarTrigger.dateComponents) {
-            print("🌙 Notification scheduled during quiet hours - skipping: \(title)")
+           isInQuietHours(dateComponents: calendarTrigger.dateComponents) {
+            print("🌙 Notification scheduled during quiet hours - rescheduling to optimal time")
+            // Reschedule to next optimal time (tomorrow at 10 AM)
+            if let rescheduledTrigger = rescheduleToOptimalTime(originalTrigger: calendarTrigger) {
+                return scheduleNotification(
+                    identifier: identifier,
+                    title: title,
+                    body: body,
+                    subtitle: subtitle,
+                    category: category,
+                    userInfo: userInfo,
+                    trigger: rescheduledTrigger,
+                    priority: priority
+                )
+            }
             return false
         }
         
-        // Check challenge notification limits
-        if case .challengeReminder = category {
-            let challengeCount = userDefaults.integer(forKey: challengeNotificationCountKey)
-            guard challengeCount < maxChallengeNotifications else {
-                print("🏆 Challenge notification limit reached (\(maxChallengeNotifications)) - skipping: \(title)")
-                return false
-            }
-            userDefaults.set(challengeCount + 1, forKey: challengeNotificationCountKey)
-        }
-        
-        // Create and schedule notification
+        // This is our ONE weekly notification - make it count!
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -128,9 +140,9 @@ final class NotificationManager: ObservableObject {
         Task { @MainActor in
             do {
                 try await notificationCenter.add(request)
-                incrementDailyCount()
+                markWeeklyNotificationSent()
                 await updatePendingNotifications()
-                print("✅ Scheduled notification: \(title)")
+                print("✅ Sent weekly notification: \(title)")
             } catch {
                 print("❌ Failed to schedule notification: \(error)")
             }
@@ -156,7 +168,7 @@ final class NotificationManager: ObservableObject {
             category: category,
             userInfo: userInfo,
             trigger: nil,
-            bypassQuietHours: true
+            priority: .high
         )
     }
     
@@ -167,7 +179,7 @@ final class NotificationManager: ObservableObject {
         
         let joinedChallenges = GamificationManager.shared.activeChallenges
             .filter { $0.isJoined }
-            .prefix(maxChallengeNotifications) // Limit to 3 max
+            .prefix(3) // Limit to 3 max
         
         // Clear existing challenge notifications first
         cancelChallengeNotifications()
@@ -192,7 +204,7 @@ final class NotificationManager: ObservableObject {
             )
         }
         
-        print("📱 Scheduled reminders for \(joinedChallenges.count) joined challenges (max \(maxChallengeNotifications))")
+        print("📱 Scheduled reminders for \(joinedChallenges.count) joined challenges (max 3)")
     }
     
     // MARK: - Streak Notifications
@@ -272,7 +284,7 @@ final class NotificationManager: ObservableObject {
             notificationCenter.removePendingNotificationRequests(withIdentifiers: challengeIdentifiers)
             
             // Reset challenge notification count
-            userDefaults.set(0, forKey: challengeNotificationCountKey)
+            userDefaults.set(0, forKey: "challenge_notification_count")
             
             await updatePendingNotifications()
         }
@@ -281,8 +293,8 @@ final class NotificationManager: ObservableObject {
     func cancelAllNotifications() {
         notificationCenter.removeAllPendingNotificationRequests()
         dailyNotificationCount = 0
-        userDefaults.set(0, forKey: dailyCountKey)
-        userDefaults.set(0, forKey: challengeNotificationCountKey)
+        userDefaults.set(0, forKey: "daily_notification_count")
+        userDefaults.set(0, forKey: "challenge_notification_count")
         
         Task { @MainActor in
             await updatePendingNotifications()
@@ -318,30 +330,30 @@ final class NotificationManager: ObservableObject {
     
     private func incrementDailyCount() {
         dailyNotificationCount += 1
-        userDefaults.set(dailyNotificationCount, forKey: dailyCountKey)
+        userDefaults.set(dailyNotificationCount, forKey: "daily_notification_count")
     }
     
     private func resetDailyCountIfNeeded() {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         
-        if let lastResetDate = userDefaults.object(forKey: lastResetDateKey) as? Date {
+        if let lastResetDate = userDefaults.object(forKey: "last_notification_reset_date") as? Date {
             let lastReset = calendar.startOfDay(for: lastResetDate)
             
             if today > lastReset {
                 // New day, reset counts
                 dailyNotificationCount = 0
-                userDefaults.set(0, forKey: dailyCountKey)
-                userDefaults.set(0, forKey: challengeNotificationCountKey)
-                userDefaults.set(today, forKey: lastResetDateKey)
+                userDefaults.set(0, forKey: "daily_notification_count")
+                userDefaults.set(0, forKey: "challenge_notification_count")
+                userDefaults.set(today, forKey: "last_notification_reset_date")
                 print("🔄 Reset daily notification count for new day")
             }
         } else {
             // First time, set reset date
-            userDefaults.set(today, forKey: lastResetDateKey)
+            userDefaults.set(today, forKey: "last_notification_reset_date")
         }
         
-        dailyNotificationCount = userDefaults.integer(forKey: dailyCountKey)
+        dailyNotificationCount = userDefaults.integer(forKey: "daily_notification_count")
     }
     
     private func setupMidnightTimer() {
@@ -350,7 +362,7 @@ final class NotificationManager: ObservableObject {
         let midnight = calendar.startOfDay(for: tomorrow)
         let timeInterval = midnight.timeIntervalSince(Date())
         
-        midnightTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: false) { _ in
+        self.midnightTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: false) { _ in
             Task { @MainActor in
                 self.resetDailyCountIfNeeded()
                 self.setupMidnightTimer() // Setup for next midnight
@@ -417,6 +429,193 @@ final class NotificationManager: ObservableObject {
     }
 }
 
+// MARK: - Weekly Notification Management
+
+extension NotificationManager {
+    
+    /// Check if we can send a notification this week
+    private func canSendWeeklyNotification() -> Bool {
+        if let lastNotificationDate = userDefaults.object(forKey: weeklyNotificationDateKey) as? Date {
+            let calendar = Calendar.current
+            let weeksSince = calendar.dateComponents([.weekOfYear], from: lastNotificationDate, to: Date()).weekOfYear ?? 0
+            return weeksSince >= 1
+        }
+        return true // No notification sent yet
+    }
+    
+    /// Mark that we've sent our weekly notification
+    private func markWeeklyNotificationSent() {
+        userDefaults.set(Date(), forKey: weeklyNotificationDateKey)
+        userDefaults.set(1, forKey: weeklyNotificationCountKey)
+    }
+    
+    /// Reset weekly count if a week has passed
+    private func resetWeeklyCountIfNeeded() {
+        if let lastNotificationDate = userDefaults.object(forKey: weeklyNotificationDateKey) as? Date {
+            let calendar = Calendar.current
+            let weeksSince = calendar.dateComponents([.weekOfYear], from: lastNotificationDate, to: Date()).weekOfYear ?? 0
+            if weeksSince >= 1 {
+                userDefaults.set(0, forKey: weeklyNotificationCountKey)
+                print("📅 Weekly notification count reset")
+            }
+        }
+    }
+    
+    /// Setup timer to reset weekly count
+    private func setupWeeklyResetTimer() {
+        let calendar = Calendar.current
+        let nextMonday = calendar.nextDate(after: Date(), matching: DateComponents(hour: 0, minute: 0, weekday: 2), matchingPolicy: .nextTime) ?? Date()
+        let timeInterval = nextMonday.timeIntervalSince(Date())
+        
+        weeklyResetTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: false) { _ in
+            Task { @MainActor in
+                self.resetWeeklyCountIfNeeded()
+                self.setupWeeklyResetTimer() // Reschedule for next week
+            }
+        }
+    }
+    
+    /// Queue notification for smart selection
+    private func queueNotificationForSmartSelection(
+        identifier: String,
+        title: String,
+        body: String,
+        category: NotificationCategory,
+        priority: NotificationPriority,
+        trigger: UNNotificationTrigger?
+    ) {
+        var queue = getNotificationQueue()
+        let queueItem = NotificationQueueItem(
+            identifier: identifier,
+            title: title,
+            body: body,
+            category: category,
+            priority: priority,
+            trigger: trigger,
+            queuedAt: Date()
+        )
+        queue.append(queueItem)
+        saveNotificationQueue(queue)
+        
+        // Run smart selection at the start of next week
+        scheduleSmartSelection()
+    }
+    
+    /// Get queued notifications
+    private func getNotificationQueue() -> [NotificationQueueItem] {
+        if let data = userDefaults.data(forKey: pendingNotificationsKey),
+           let queue = try? JSONDecoder().decode([NotificationQueueItem].self, from: data) {
+            return queue
+        }
+        return []
+    }
+    
+    /// Save notification queue
+    private func saveNotificationQueue(_ queue: [NotificationQueueItem]) {
+        if let encoded = try? JSONEncoder().encode(queue) {
+            userDefaults.set(encoded, forKey: pendingNotificationsKey)
+        }
+    }
+    
+    /// Smart selection of best notification for the week
+    private func scheduleSmartSelection() {
+        // Run smart selection on Monday morning
+        let calendar = Calendar.current
+        let nextMonday = calendar.nextDate(after: Date(), matching: DateComponents(hour: 10, minute: 0, weekday: 2), matchingPolicy: .nextTime) ?? Date()
+        
+        Task {
+            try? await Task.sleep(until: .now + .seconds(nextMonday.timeIntervalSinceNow))
+            await selectAndSendBestNotification()
+        }
+    }
+    
+    /// Select the best notification from the queue
+    @MainActor
+    private func selectAndSendBestNotification() async {
+        var queue = getNotificationQueue()
+        guard !queue.isEmpty else { return }
+        
+        // Sort by priority and relevance
+        queue.sort(by: { item1, item2 in
+            // Priority first
+            if item1.priority != item2.priority {
+                return item1.priority.rawValue > item2.priority.rawValue
+            }
+            
+            // Then by category importance
+            let categoryOrder: [NotificationCategory] = [
+                .challengeReminder,  // Most important - time-sensitive
+                .streakReminder,     // Keep engagement
+                .teamChallenge,      // Social engagement
+                .leaderboardUpdate   // Least urgent
+            ]
+            
+            let index1 = categoryOrder.firstIndex(of: item1.category) ?? 999
+            let index2 = categoryOrder.firstIndex(of: item2.category) ?? 999
+            return index1 < index2
+        })
+        
+        // Send the best notification
+        if let best = queue.first {
+            _ = scheduleNotification(
+                identifier: best.identifier,
+                title: best.title,
+                body: best.body,
+                category: best.category,
+                userInfo: [:],
+                trigger: nil, // Send immediately
+                priority: best.priority
+            )
+            
+            // Clear the queue after sending
+            saveNotificationQueue([])
+        }
+    }
+    
+    /// Reschedule to optimal time (next day at 10 AM)
+    private func rescheduleToOptimalTime(originalTrigger: UNCalendarNotificationTrigger) -> UNCalendarNotificationTrigger? {
+        let calendar = Calendar.current
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        
+        var components = calendar.dateComponents([.year, .month, .day], from: tomorrow)
+        components.hour = 10
+        components.minute = 0
+        
+        return UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+    }
+}
+
+// MARK: - Notification Priority
+
+enum NotificationPriority: Int, Codable {
+    case low = 1
+    case medium = 2
+    case high = 3
+    case critical = 4
+}
+
+// MARK: - Notification Queue Item
+
+struct NotificationQueueItem: Codable {
+    let identifier: String
+    let title: String
+    let body: String
+    let category: NotificationCategory
+    let priority: NotificationPriority
+    let trigger: Data? // Encoded trigger
+    let queuedAt: Date
+    
+    init(identifier: String, title: String, body: String, category: NotificationCategory, priority: NotificationPriority, trigger: UNNotificationTrigger?, queuedAt: Date) {
+        self.identifier = identifier
+        self.title = title
+        self.body = body
+        self.category = category
+        self.priority = priority
+        self.trigger = nil // Simplified for now
+        self.queuedAt = queuedAt
+    }
+}
+
 // MARK: - Notification Preferences
 
 struct NotificationPreferences: Codable {
@@ -449,7 +648,7 @@ struct NotificationPreferences: Codable {
 
 // MARK: - Notification Categories
 
-enum NotificationCategory: String, CaseIterable {
+enum NotificationCategory: String, CaseIterable, Codable {
     case challengeReminder = "CHALLENGE_REMINDER"
     case challengeComplete = "CHALLENGE_COMPLETE"
     case streakReminder = "STREAK_REMINDER"
