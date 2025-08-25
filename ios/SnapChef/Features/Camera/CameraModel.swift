@@ -218,11 +218,18 @@ class CameraModel: NSObject, ObservableObject {
     }
 
     func stopSession() {
+        print("🎥 Stopping camera session...")
+        isSessionReady = false
         let captureSession = session
+        
         if captureSession.isRunning {
+            // Stop the session asynchronously to avoid blocking
             DispatchQueue.global(qos: .userInitiated).async {
                 captureSession.stopRunning()
+                print("🎥 Camera session stopped")
             }
+        } else {
+            print("🎥 Camera session was not running")
         }
     }
 }

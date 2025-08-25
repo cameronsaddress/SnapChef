@@ -101,8 +101,15 @@ struct CameraView: View {
                     // Top controls (CameraTopControls temporarily commented out)
                     // TODO: Implement CameraTopControls
                     CameraTopBar(onClose: {
-                        // Go back to home tab
-                        selectedTab = 0
+                        // Properly clean up camera before switching tabs
+                        cameraModel.stopSession()
+                        resetCaptureFlow()
+                        
+                        // Add a small delay to ensure camera cleanup completes
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            // Go back to home tab
+                            selectedTab = 0
+                        }
                     })
                     
                     Spacer()
@@ -158,8 +165,14 @@ struct CameraView: View {
                             captureMode = .fridge
                             showPantryStep = false
                             
-                            // Navigate back to home tab
-                            selectedTab = 0
+                            // Ensure camera is stopped before navigating
+                            cameraModel.stopSession()
+                            
+                            // Add a small delay to ensure cleanup completes
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                // Navigate back to home tab
+                                selectedTab = 0
+                            }
                         })
                     )
             }
@@ -256,7 +269,10 @@ struct CameraView: View {
             enabled: deviceManager.shouldShowParticles
         ))
         .onDisappear {
-            cameraModel.stopSession()
+            // Only stop session if it hasn't been stopped already
+            if cameraModel.isSessionReady {
+                cameraModel.stopSession()
+            }
             resetCaptureFlow()
         }
         .fullScreenCover(isPresented: $showingResults) {
