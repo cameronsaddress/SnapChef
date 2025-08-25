@@ -67,11 +67,16 @@ struct ActivityItem: Identifiable {
         }
     }
 
+    @MainActor
     var activityText: AttributedString {
         var text = AttributedString()
+        
+        // Check if this is the current user's own activity
+        let currentUserID = UnifiedAuthManager.shared.currentUser?.recordID
+        let isOwnActivity = userID == currentUserID
 
-        // User name (bold)
-        var userName = AttributedString(self.userName)
+        // User name (bold) - show "You" for own activities
+        var userName = AttributedString(isOwnActivity ? "You" : self.userName)
         userName.font = .system(size: 16, weight: .semibold)
         text += userName
 
@@ -87,7 +92,11 @@ struct ActivityItem: Identifiable {
                 text += recipe
             }
         case .recipeLiked:
-            text += AttributedString(" liked your recipe: ")
+            if isOwnActivity {
+                text += AttributedString(" liked a recipe: ")
+            } else {
+                text += AttributedString(" liked your recipe: ")
+            }
             if let recipeName = recipeName {
                 var recipe = AttributedString(recipeName)
                 recipe.font = .system(size: 16, weight: .medium)
@@ -95,8 +104,22 @@ struct ActivityItem: Identifiable {
             }
         case .recipeComment:
             if targetUserID != nil {
-                text += AttributedString(" commented on your recipe")
+                // This is a notification for the recipe owner
+                if isOwnActivity {
+                    // You commented on someone else's recipe
+                    text += AttributedString(" commented on ")
+                    if let targetName = targetUserName {
+                        var target = AttributedString(targetName + "'s")
+                        target.font = .system(size: 16, weight: .medium)
+                        text += target
+                    }
+                    text += AttributedString(" recipe")
+                } else {
+                    // Someone else commented on your recipe
+                    text += AttributedString(" commented on your recipe")
+                }
             } else {
+                // This is a public activity (recipeCommented type)
                 text += AttributedString(" commented on a recipe")
                 if let recipeName = recipeName {
                     text += AttributedString(": ")
