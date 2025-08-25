@@ -666,17 +666,37 @@ final class CloudKitSyncService: ObservableObject {
         // Update recipe comment count
         await updateRecipeCommentCount(recipeID, increment: true)
 
-        // Create activity for recipe owner
-        if let recipeRecord = try? await publicDatabase.record(for: CKRecord.ID(recordName: recipeID)),
-           let recipeOwnerID = recipeRecord[CKField.Recipe.ownerID] as? String,
-           recipeOwnerID != userID {
+        // Get recipe details for activity
+        var recipeName: String?
+        var recipeOwnerID: String?
+        
+        if let recipeRecord = try? await publicDatabase.record(for: CKRecord.ID(recordName: recipeID)) {
+            recipeName = recipeRecord[CKField.Recipe.name] as? String
+            recipeOwnerID = recipeRecord[CKField.Recipe.ownerID] as? String
+        }
+
+        // Create activity for recipe owner (if it's not their own recipe)
+        if let ownerID = recipeOwnerID, ownerID != userID {
             try await createActivity(
                 type: "recipeComment",
                 actorID: userID,
-                targetUserID: recipeOwnerID,
-                recipeID: recipeID
+                targetUserID: ownerID,
+                recipeID: recipeID,
+                recipeName: recipeName
             )
         }
+        
+        // Create activity for user's followers' feeds (public activity)
+        // This will appear in all followers' feeds
+        try await createActivity(
+            type: "recipeCommented",  // Different type to distinguish from notification to owner
+            actorID: userID,
+            targetUserID: nil,  // No specific target - this is a public activity
+            recipeID: recipeID,
+            recipeName: recipeName
+        )
+        
+        print("✅ Created comment activities for followers' feeds")
     }
 
     func fetchComments(for recipeID: String, limit: Int = 50) async throws -> [CKRecord] {

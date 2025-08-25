@@ -94,7 +94,17 @@ struct ActivityItem: Identifiable {
                 text += recipe
             }
         case .recipeComment:
-            text += AttributedString(" commented on your recipe")
+            if targetUserID != nil {
+                text += AttributedString(" commented on your recipe")
+            } else {
+                text += AttributedString(" commented on a recipe")
+                if let recipeName = recipeName {
+                    text += AttributedString(": ")
+                    var recipe = AttributedString(recipeName)
+                    recipe.font = .system(size: 16, weight: .medium)
+                    text += recipe
+                }
+            }
         case .challengeCompleted:
             text += AttributedString(" completed the challenge: ")
             if let recipeName = recipeName { // Using recipeName for challenge name
@@ -1172,7 +1182,7 @@ class ActivityFeedManager: ObservableObject {
             activityType = .recipeShared
         case "recipeliked":
             activityType = .recipeLiked
-        case "recipecomment":
+        case "recipecomment", "recipecommented":  // Support both types
             activityType = .recipeComment
         case "challengecompleted":
             activityType = .challengeCompleted
