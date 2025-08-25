@@ -2223,9 +2223,14 @@ struct ActiveChallengesSection: View {
     @State private var userChallenges: [CloudKitUserChallenge] = []
     @State private var isLoadingChallenges = false
 
-    private var activeChallenges: [Challenge] {
-        // Use exact same logic as ChallengeHubView - just return activeChallenges directly
-        return gamificationManager.activeChallenges
+    private var joinedChallenges: [Challenge] {
+        // Only show challenges that are joined, same as ChallengeHubView
+        return gamificationManager.activeChallenges.filter { $0.isJoined }
+    }
+    
+    private var availableChallenges: [Challenge] {
+        // Show challenges that are not joined yet
+        return gamificationManager.activeChallenges.filter { !$0.isJoined && !$0.isCompleted }
     }
 
     private func loadUserChallenges() {
@@ -2257,11 +2262,13 @@ struct ActiveChallengesSection: View {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Active Challenges")
+                    Text(joinedChallenges.isEmpty ? "Join Challenges" : "Active Challenges")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
 
-                    Text("\(activeChallenges.count) challenges active")
+                    Text(joinedChallenges.isEmpty ? 
+                         "\(availableChallenges.count) challenges available" : 
+                         "\(joinedChallenges.count) challenges active")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
@@ -2275,22 +2282,8 @@ struct ActiveChallengesSection: View {
                 }
             }
 
-            // Active Challenges List
-            if activeChallenges.isEmpty && !isLoadingChallenges {
-                HStack {
-                    Spacer()
-                    VStack(spacing: 12) {
-                        Image(systemName: "trophy.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(.white.opacity(0.3))
-                        Text("No active challenges")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                    .padding(.vertical, 30)
-                    Spacer()
-                }
-            } else if isLoadingChallenges {
+            // Challenges List
+            if isLoadingChallenges {
                 HStack {
                     Spacer()
                     ProgressView()
@@ -2298,15 +2291,47 @@ struct ActiveChallengesSection: View {
                         .padding(.vertical, 30)
                     Spacer()
                 }
-            } else {
+            } else if !joinedChallenges.isEmpty {
+                // Show joined challenges
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
-                        ForEach(Array(activeChallenges.prefix(3))) { challenge in
+                        ForEach(Array(joinedChallenges.prefix(3))) { challenge in
                             CompactChallengeCard(challenge: challenge, userChallenge: getUserChallenge(for: challenge.id)) {
                                 showingChallengeHub = true
                             }
                         }
                     }
+                }
+            } else if !availableChallenges.isEmpty {
+                // Show available challenges when none are joined
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(Array(availableChallenges.prefix(3))) { challenge in
+                            CompactChallengeCard(challenge: challenge, userChallenge: nil) {
+                                showingChallengeHub = true
+                            }
+                            .opacity(0.85) // Slightly dimmed to show they're not joined
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+            } else {
+                // No challenges at all
+                HStack {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "trophy.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.white.opacity(0.3))
+                        Text("No challenges available")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .padding(.vertical, 30)
+                    Spacer()
                 }
             }
         }

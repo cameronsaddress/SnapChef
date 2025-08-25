@@ -350,6 +350,7 @@ struct MiniLeaderboardCard: View {
 // MARK: - Progress Card
 struct ProgressCard: View {
     let challenge: Challenge
+    @Environment(\.dismiss) var dismiss
     @State private var showProofSubmission = false
     @State private var showLeaveConfirmation = false
     @State private var isLeavingChallenge = false
@@ -522,9 +523,10 @@ struct ProgressCard: View {
         Task {
             await GamificationManager.shared.leaveChallenge(challenge.id)
             
-            // Dismiss after a short delay
+            // Dismiss the view after leaving
             await MainActor.run {
                 isLeavingChallenge = false
+                dismiss()
             }
         }
     }

@@ -257,16 +257,30 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 
 ## 🔄 Latest Updates (Aug 25, 2025)
 
-### Challenge System Improvements (Aug 25) ✅
-- ✅ **Fixed Challenge Requirements Display**: Challenge cards now show proper progress indicators (e.g., "0/3 recipes") instead of description text or UUIDs
-- ✅ **Added Leave Challenge Feature**: Users can now leave joined challenges with confirmation dialog
-- ✅ **ChallengeDatabase Enhanced**: Added proper progress strings for all challenge types (daily, weekly, special, viral, seasonal)
-- ✅ **Leave Challenge Implementation**: 
-  - Added red-tinted "Leave Challenge" button in ProgressCard
-  - Confirmation alert warns users about losing progress and rewards
-  - Updates CloudKit UserChallenge records with "left" status
-  - Tracks analytics for challenge abandonment
-  - Provides haptic feedback for better UX
+### Challenge System Complete Overhaul (Aug 25) ✅
+- ✅ **Challenge Membership Management**:
+  - Challenge Hub now only displays joined challenges by default
+  - Available challenges shown in separate "Available to Join" section
+  - Left challenges no longer reappear after CloudKit sync
+  - CloudKit query updated to only fetch challenges with status="active"
+  
+- ✅ **ProfileView Active Challenges Fixed**:
+  - Only shows challenges where isJoined=true
+  - Dynamically changes to "Join Challenges" when no challenges joined
+  - Shows available challenges when user hasn't joined any
+  - Visual distinction with opacity and border for unjoinable challenges
+
+- ✅ **Leave Challenge Feature**:
+  - Red-tinted "Leave Challenge" button with confirmation
+  - Properly removes challenge from all views
+  - Updates CloudKit status to "left" without errors
+  - Auto-dismisses detail view and refreshes lists
+  - Fixed CloudKit field error (removed non-existent leftAt field)
+
+- ✅ **Requirements Display**: 
+  - Shows readable progress (e.g., "0/3 recipes") 
+  - Properly formatted for all challenge types
+
 - ✅ **Build Verified**: All changes compile successfully
 
 ### UI/UX and Social Feed Improvements (Aug 24) ✅

@@ -254,7 +254,8 @@ final class GamificationManager: ObservableObject {
             }
 
             // Sync user's challenge progress and joined status
-            let predicate = NSPredicate(format: "userID == %@ AND status != %@", userID, "completed")
+            // Only fetch active challenges (not completed or left)
+            let predicate = NSPredicate(format: "userID == %@ AND status == %@", userID, "active")
             let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
             let privateDB = container.privateCloudDatabase
 
@@ -266,6 +267,14 @@ final class GamificationManager: ObservableObject {
             
             for (_, result) in results {
                 if let record = try? result.get() {
+                    // Check the status to ensure we only process active challenges
+                    let status = record["status"] as? String ?? "active"
+                    
+                    // Skip if status is "left" or "completed"
+                    if status == "left" || status == "completed" {
+                        continue
+                    }
+                    
                     // Update local challenge progress and joined status
                     if let challengeIDRef = record["challengeID"] as? CKRecord.Reference,
                        let progress = record["progress"] as? Double {
@@ -748,10 +757,9 @@ final class GamificationManager: ObservableObject {
     func leaveChallenge(_ challengeId: String) async {
         // Find the challenge and update its joined status
         if let index = activeChallenges.firstIndex(where: { $0.id == challengeId }) {
-            activeChallenges[index].isJoined = false
-            activeChallenges[index].currentProgress = 0
-            
-            print("📤 Left challenge: \(activeChallenges[index].title)")
+            // Remove the challenge from active challenges completely
+            let leftChallenge = activeChallenges.remove(at: index)
+            print("📤 Left challenge: \(leftChallenge.title)")
             
             // Update CloudKit UserChallenge record
             let authManager = UnifiedAuthManager.shared
@@ -777,7 +785,7 @@ final class GamificationManager: ObservableObject {
                     if let record = try? result.get() {
                         // Update status to "left" instead of deleting
                         record["status"] = "left"
-                        record["leftAt"] = Date()
+                        // Don't set leftAt as it doesn't exist in the CloudKit schema
                         record["progress"] = 0.0
                         
                         _ = try await privateDB.save(record)
@@ -785,15 +793,15 @@ final class GamificationManager: ObservableObject {
                     }
                 }
                 
-                // Track analytics
+                // Track analytics (using leftChallenge which was removed earlier)
                 ChallengeAnalyticsService.shared.trackChallengeInteraction(
                     challengeId: challengeId,
                     action: "left",
                     metadata: [
-                        "challengeType": activeChallenges[index].type.rawValue,
-                        "difficulty": activeChallenges[index].difficulty.rawValue,
-                        "category": activeChallenges[index].category,
-                        "progressWhenLeft": "\(activeChallenges[index].currentProgress)"
+                        "challengeType": leftChallenge.type.rawValue,
+                        "difficulty": leftChallenge.difficulty.rawValue,
+                        "category": leftChallenge.category,
+                        "progressWhenLeft": "\(leftChallenge.currentProgress)"
                     ]
                 )
                 

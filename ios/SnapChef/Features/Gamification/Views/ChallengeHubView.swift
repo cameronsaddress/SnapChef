@@ -34,10 +34,13 @@ struct ChallengeHubView: View {
         let challenges: [Challenge]
         switch selectedFilter {
         case .all:
-            let allChallenges = gamificationManager.activeChallenges + gamificationManager.completedChallenges
+            // Only show joined challenges
+            let joinedActive = gamificationManager.activeChallenges.filter { $0.isJoined }
+            let allChallenges = joinedActive + gamificationManager.completedChallenges
             challenges = premiumManager.isPremiumUser ? allChallenges + premiumManager.premiumChallenges : allChallenges
         case .active:
-            challenges = gamificationManager.activeChallenges
+            // Only show joined active challenges
+            challenges = gamificationManager.activeChallenges.filter { $0.isJoined }
         case .completed:
             challenges = gamificationManager.completedChallenges
         case .premium:
@@ -113,6 +116,10 @@ struct ChallengeHubView: View {
             }
             .sheet(item: $selectedChallenge) { challenge in
                 ChallengeDetailView(challenge: challenge)
+                    .onDisappear {
+                        // Refresh the challenge list when returning from detail view
+                        refreshID = UUID()
+                    }
             }
             .sheet(isPresented: $showingPremiumView) {
                 PremiumFeaturesView()
@@ -307,9 +314,16 @@ struct ChallengeHubView: View {
                 premiumBanner
             }
 
-            if filteredChallenges.isEmpty {
-                emptyStateView
-            } else {
+            // Show joined challenges
+            if !filteredChallenges.isEmpty {
+                // Section header for joined challenges
+                HStack {
+                    Text("Your Challenges")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                }
+                
                 ForEach(filteredChallenges) { challenge in
                     if challenge.isPremium {
                         PremiumChallengeCard(
@@ -336,6 +350,37 @@ struct ChallengeHubView: View {
                         ))
                     }
                 }
+            }
+            
+            // Show available challenges to join
+            if selectedFilter == .active || selectedFilter == .all {
+                let availableChallenges = gamificationManager.activeChallenges.filter { !$0.isJoined && !$0.isCompleted }
+                if !availableChallenges.isEmpty {
+                    // Section header for available challenges
+                    HStack {
+                        Text("Available to Join")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    .padding(.top, filteredChallenges.isEmpty ? 0 : 20)
+                    
+                    ForEach(availableChallenges) { challenge in
+                        ChallengeCardView(challenge: challenge) {
+                            handleChallengeInteraction(challenge: challenge)
+                        }
+                        .opacity(0.7) // Slightly dimmed to show they're not joined yet
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                }
+            }
+            
+            // Show empty state only if no joined and no available challenges
+            if filteredChallenges.isEmpty && gamificationManager.activeChallenges.filter({ !$0.isJoined && !$0.isCompleted }).isEmpty {
+                emptyStateView
             }
         }
     }
@@ -391,25 +436,48 @@ struct ChallengeHubView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.gray)
 
-            Text("No challenges found")
+            Text("No joined challenges")
                 .font(.headline)
                 .foregroundColor(.secondary)
 
-            Text("Check back soon for new challenges!")
+            Text("Browse available challenges below to join!")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+            
+            // Show available challenges to join
+            if selectedFilter == .active || selectedFilter == .all {
+                availableChallengesSection
+            }
         }
         .padding(.vertical, 40)
+    }
+    
+    // MARK: - Available Challenges Section
+    private var availableChallengesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Available Challenges")
+                .font(.headline)
+                .foregroundColor(.primary)
+                .padding(.top, 20)
+            
+            ForEach(gamificationManager.activeChallenges.filter { !$0.isJoined && !$0.isCompleted }) { challenge in
+                ChallengeCardView(challenge: challenge) {
+                    handleChallengeInteraction(challenge: challenge)
+                }
+                .opacity(0.8) // Slightly dimmed to show they're not joined yet
+            }
+        }
     }
 
     // MARK: - Helper Methods
     private func getCountForFilter(_ filter: ChallengeFilter) -> Int {
         switch filter {
         case .all:
-            return gamificationManager.activeChallenges.count + gamificationManager.completedChallenges.count
+            let joinedActive = gamificationManager.activeChallenges.filter { $0.isJoined }.count
+            return joinedActive + gamificationManager.completedChallenges.count
         case .active:
-            return gamificationManager.activeChallenges.count
+            return gamificationManager.activeChallenges.filter { $0.isJoined }.count
         case .completed:
             return gamificationManager.completedChallenges.count
         case .premium:
