@@ -107,7 +107,7 @@ struct ProfileView: View {
                     try await authManager.refreshCurrentUserData()
                     // Load user recipe references for favorites count
                     if let userID = authManager.currentUser?.recordID {
-                        try await cloudKitRecipeManager.fetchCurrentUserReferences(userID: userID)
+                        try await CloudKitRecipeManager.shared.fetchCurrentUserReferences(userID: userID)
                     }
                 } catch {
                     print("Failed to refresh user data: \(error)")
@@ -652,32 +652,25 @@ struct EnhancedProfileHeader: View {
         isLoadingStats = true
         
         Task {
-            do {
-                guard let userID = authManager.currentUser?.recordID else {
-                    await MainActor.run {
-                        self.isLoadingStats = false
-                    }
-                    return
-                }
-                
-                // For now, create stats from current user data
-                let currentUser = authManager.currentUser
-                let stats = UserStats(
-                    followerCount: currentUser?.followerCount ?? 0,
-                    followingCount: currentUser?.followingCount ?? 0,
-                    recipeCount: currentUser?.recipesCreated ?? 0,
-                    achievementCount: 0,
-                    currentStreak: currentUser?.currentStreak ?? 0
-                )
-                await MainActor.run {
-                    self.userStats = stats
-                    self.isLoadingStats = false
-                }
-            } catch {
-                print("Error loading user stats in EnhancedProfileHeader: \(error)")
+            guard authManager.currentUser?.recordID != nil else {
                 await MainActor.run {
                     self.isLoadingStats = false
                 }
+                return
+            }
+            
+            // For now, create stats from current user data
+            let currentUser = authManager.currentUser
+            let stats = UserStats(
+                followerCount: currentUser?.followerCount ?? 0,
+                followingCount: currentUser?.followingCount ?? 0,
+                recipeCount: currentUser?.recipesCreated ?? 0,
+                achievementCount: 0,
+                currentStreak: currentUser?.currentStreak ?? 0
+            )
+            await MainActor.run {
+                self.userStats = stats
+                self.isLoadingStats = false
             }
         }
     }
@@ -1808,7 +1801,9 @@ struct CollectionProgressView: View {
                 Task {
                     do {
                         try await cloudKitRecipeManager.fetchCurrentUserReferences(userID: userID)
-                        print("✅ Loaded user recipe references - Favorites: \(cloudKitRecipeManager.userFavoritedRecipeIDs.count)")
+                        await MainActor.run {
+                            print("✅ Loaded user recipe references - Favorites: \(cloudKitRecipeManager.userFavoritedRecipeIDs.count)")
+                        }
                     } catch {
                         print("❌ Failed to load user recipe references: \(error)")
                     }
