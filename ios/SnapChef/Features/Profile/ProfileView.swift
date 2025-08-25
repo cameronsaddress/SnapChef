@@ -106,9 +106,7 @@ struct ProfileView: View {
                 do {
                     try await authManager.refreshCurrentUserData()
                     // Load user recipe references for favorites count
-                    if let userID = authManager.currentUser?.recordID {
-                        try await CloudKitRecipeManager.shared.fetchCurrentUserReferences(userID: userID)
-                    }
+                    await CloudKitRecipeManager.shared.loadUserRecipeReferences()
                 } catch {
                     print("Failed to refresh user data: \(error)")
                 }
@@ -1797,15 +1795,11 @@ struct CollectionProgressView: View {
             }
             
             // Load user recipe references for accurate counts
-            if authManager.isAuthenticated, let userID = authManager.currentUser?.recordID {
+            if authManager.isAuthenticated {
                 Task {
-                    do {
-                        try await cloudKitRecipeManager.fetchCurrentUserReferences(userID: userID)
-                        await MainActor.run {
-                            print("✅ Loaded user recipe references - Favorites: \(cloudKitRecipeManager.userFavoritedRecipeIDs.count)")
-                        }
-                    } catch {
-                        print("❌ Failed to load user recipe references: \(error)")
+                    await cloudKitRecipeManager.loadUserRecipeReferences()
+                    await MainActor.run {
+                        print("✅ Loaded user recipe references - Favorites: \(cloudKitRecipeManager.userFavoritedRecipeIDs.count)")
                     }
                 }
             }
