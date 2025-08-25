@@ -20,6 +20,7 @@ struct RecipeDetailView: View {
     @State private var selectedUserID = ""
     @State private var selectedUserName = ""
     @State private var showingDeleteAlert = false
+    @FocusState private var isCommentFieldFocused: Bool
     @StateObject private var cloudKitSync = CloudKitSyncService.shared
     @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
@@ -642,8 +643,9 @@ struct RecipeDetailView: View {
             )
             .ignoresSafeArea()
             
-            ScrollView {
-                VStack(spacing: 30) {
+            ScrollViewReader { scrollProxy in
+                ScrollView {
+                    VStack(spacing: 30) {
                     // Header with close button
                     HStack {
                         Button(action: { showingPrintView = true }) {
@@ -687,6 +689,9 @@ struct RecipeDetailView: View {
                     // Nutrition
                     nutritionSection
 
+                    // Comments Section (moved above delete button)
+                    commentsSection
+
                     // Delete Recipe Button
                     Button(action: {
                         showingDeleteAlert = true
@@ -705,11 +710,25 @@ struct RecipeDetailView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-
-                    // Comments Section
-                    commentsSection
                     
-                    Spacer(minLength: 50)
+                        Spacer(minLength: 50)
+                    }
+                    .id("scrollContent")
+                }
+                .onTapGesture {
+                    // Dismiss keyboard when tapping outside
+                    isCommentFieldFocused = false
+                }
+                .onChange(of: isCommentFieldFocused) { isFocused in
+                    if isFocused {
+                        // Scroll to comments section when keyboard appears with more offset
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                // Use .top anchor with offset to provide more space above keyboard
+                                scrollProxy.scrollTo("commentsSection", anchor: .top)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -951,6 +970,8 @@ struct RecipeDetailView: View {
 
             await MainActor.run {
                 newCommentText = ""
+                // Dismiss keyboard after successful submission
+                isCommentFieldFocused = false
             }
         }
     }
@@ -1274,11 +1295,16 @@ extension RecipeDetailView {
                     }
                 }
 
-                // Comment Input
+                // Comment Input with keyboard handling
                 if cloudKitAuth.isAuthenticated {
                     HStack(spacing: 12) {
                         TextField("Add a comment...", text: $newCommentText)
                             .textFieldStyle(DetectiveTextFieldStyle())
+                            .focused($isCommentFieldFocused)
+                            .submitLabel(.send)
+                            .onSubmit {
+                                submitComment()
+                            }
 
                         Button(action: submitComment) {
                             if isSubmittingComment {
