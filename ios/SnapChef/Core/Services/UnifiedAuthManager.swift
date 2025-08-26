@@ -31,6 +31,7 @@ final class UnifiedAuthManager: ObservableObject {
     
     // Serial queue to prevent concurrent updates
     private var isUpdatingSocialData = false
+    private var isSavingUserRecord = false
     private let updateQueue = DispatchQueue(label: "com.snapchef.socialupdate", qos: .userInitiated)
     @Published var showUsernameSetup = false
     @Published var showUsernameSelection = false  // Added for CloudKitAuthView compatibility
@@ -1147,6 +1148,15 @@ final class UnifiedAuthManager: ObservableObject {
             throw UnifiedAuthError.notAuthenticated
         }
         
+        // Prevent concurrent saves
+        guard !isSavingUserRecord else {
+            print("⚠️ User record save already in progress, skipping")
+            return
+        }
+        
+        isSavingUserRecord = true
+        defer { isSavingUserRecord = false }
+        
         print("🔍 DEBUG updateUserStats: Starting ")
         
         let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
@@ -1188,12 +1198,55 @@ final class UnifiedAuthManager: ObservableObject {
         record[CKField.User.lastActiveAt] = Date()
         
         print("💾 Saving updated user record to CloudKit... ")
-        _ = try await cloudKitDatabase.save(record)
-        print("✅ User record saved successfully ")
         
-        // Don't update local user object here - it will be updated in refreshCurrentUser
-        // This prevents race conditions and duplicate updates
-        print("🔍 DEBUG updateUserStats: Completed without updating local user ")
+        do {
+            // Save the record - use a fresh save operation to avoid conflicts
+            let savedRecord = try await cloudKitDatabase.save(record)
+            print("✅ User record saved successfully ")
+            
+            // Update local counts immediately to reflect the changes
+            await MainActor.run {
+                if let followerCount = updates.followerCount {
+                    self.currentUser?.followerCount = followerCount
+                }
+                if let followingCount = updates.followingCount {
+                    self.currentUser?.followingCount = followingCount
+                }
+                if let recipesCreated = updates.recipesCreated {
+                    self.currentUser?.recipesCreated = recipesCreated
+                }
+            }
+        } catch let error as CKError {
+            print("❌ CloudKit error saving user record: \(error)")
+            print("   Error code: \(error.code)")
+            print("   Error description: \(error.localizedDescription)")
+            
+            // If it's a conflict error, retry with the server record
+            if error.code == .serverRecordChanged {
+                print("⚠️ Server record changed, retrying with latest version...")
+                if let serverRecord = error.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord {
+                    // Apply updates to the server record
+                    if let followerCount = updates.followerCount {
+                        serverRecord[CKField.User.followerCount] = Int64(followerCount)
+                    }
+                    if let followingCount = updates.followingCount {
+                        serverRecord[CKField.User.followingCount] = Int64(followingCount)
+                    }
+                    serverRecord[CKField.User.lastActiveAt] = Date()
+                    
+                    // Try saving again with the server record
+                    _ = try await cloudKitDatabase.save(serverRecord)
+                    print("✅ Retry successful - user record saved")
+                    return
+                }
+            }
+            throw error
+        } catch {
+            print("❌ Unexpected error saving user record: \(error)")
+            throw error
+        }
+        
+        print("🔍 DEBUG updateUserStats: Completed ")
     }
     
     /// Refresh current user data from CloudKit
@@ -1438,11 +1491,24 @@ final class UnifiedAuthManager: ObservableObject {
                 followingCount: followingCount
             )
             
-            try await updateUserStats(updates)
+            do {
+                try await updateUserStats(updates)
+            } catch {
+                // Log error but don't throw - this is a background update
+                print("⚠️ Failed to update user stats in CloudKit: \(error)")
+                print("   Will use cached counts for now")
+                
+                // Still update local state even if CloudKit save fails
+                await MainActor.run {
+                    self.currentUser?.followerCount = followerCount
+                    self.currentUser?.followingCount = followingCount
+                }
+            }
             
             // Don't call refreshCurrentUser here - it's already called in refreshAllSocialData
         } catch {
-            print("❌ Failed to update social counts (internal): \(error)")
+            print("❌ Failed to query social counts: \(error)")
+            // Don't crash the app - just use cached counts
         }
     }
     
