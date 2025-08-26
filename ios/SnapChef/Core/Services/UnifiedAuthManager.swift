@@ -28,6 +28,10 @@ final class UnifiedAuthManager: ObservableObject {
     @Published var tikTokUser: TikTokUser?
     @Published var isLoading = false
     @Published var showAuthSheet = false
+    
+    // Serial queue to prevent concurrent updates
+    private var isUpdatingSocialData = false
+    private let updateQueue = DispatchQueue(label: "com.snapchef.socialupdate", qos: .userInitiated)
     @Published var showUsernameSetup = false
     @Published var showUsernameSelection = false  // Added for CloudKitAuthView compatibility
     @Published var showError = false
@@ -1143,8 +1147,12 @@ final class UnifiedAuthManager: ObservableObject {
             throw UnifiedAuthError.notAuthenticated
         }
         
+        print("🔍 DEBUG updateUserStats: Starting ")
+        
         let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
         let record = try await cloudKitDatabase.record(for: userRecordID)
+        
+        print("🔍 DEBUG updateUserStats: Fetched record from CloudKit ")
         
         // Apply updates - only for fields that exist in production
         if let totalPoints = updates.totalPoints {
@@ -1179,23 +1187,20 @@ final class UnifiedAuthManager: ObservableObject {
         // Update last active time
         record[CKField.User.lastActiveAt] = Date()
         
-        print("💾 Saving updated user record to CloudKit...")
+        print("💾 Saving updated user record to CloudKit... ")
         _ = try await cloudKitDatabase.save(record)
-        print("✅ User record saved successfully")
+        print("✅ User record saved successfully ")
         
-        // Update local user object
-        await MainActor.run {
-            if let updatedUser = self.currentUser {
-                // Update local properties based on what's in UserStatUpdates
-                // Note: CloudKitUser might need to be extended to include these properties
-                self.currentUser = updatedUser
-            }
-        }
+        // Don't update local user object here - it will be updated in refreshCurrentUser
+        // This prevents race conditions and duplicate updates
+        print("🔍 DEBUG updateUserStats: Completed without updating local user ")
     }
     
     /// Refresh current user data from CloudKit
     func refreshCurrentUser() async {
         guard let currentUser = currentUser else { return }
+        
+        print("🔍 DEBUG refreshCurrentUser: Starting ")
         
         do {
             guard let recordID = currentUser.recordID else { return }
@@ -1203,19 +1208,28 @@ final class UnifiedAuthManager: ObservableObject {
             let record = try await cloudKitDatabase.record(for: userRecordID)
             
             // Debug what's actually in CloudKit
-            print("🔍 DEBUG refreshCurrentUser - CloudKit record contents:")
+            print("🔍 DEBUG refreshCurrentUser - CloudKit record contents :")
             print("   username field: '\(record[CKField.User.username] as? String ?? "nil")'")
             print("   displayName field: '\(record[CKField.User.displayName] as? String ?? "nil")'")
             print("   currentStreak field: '\(record[CKField.User.currentStreak] as? Int64 ?? -1)'")
             print("   longestStreak field: '\(record[CKField.User.longestStreak] as? Int64 ?? -1)'")
             print("   totalPoints field: '\(record[CKField.User.totalPoints] as? Int64 ?? -1)'")
             print("   recipesCreated field: '\(record[CKField.User.recipesCreated] as? Int64 ?? -1)'")
+            print("   followerCount field: '\(record[CKField.User.followerCount] as? Int64 ?? -1)'")
+            print("   followingCount field: '\(record[CKField.User.followingCount] as? Int64 ?? -1)'")
+            
+            let newUser = CloudKitUser(from: record)
+            print("🔍 DEBUG refreshCurrentUser: About to update currentUser on MainActor ")
             
             await MainActor.run {
-                self.currentUser = CloudKitUser(from: record)
+                print("🔍 DEBUG refreshCurrentUser: Updating currentUser on MainActor ")
+                self.currentUser = newUser
+                print("🔍 DEBUG refreshCurrentUser: currentUser updated successfully ")
             }
+            
+            print("🔍 DEBUG refreshCurrentUser: Completed successfully ")
         } catch {
-            print("❌ Failed to refresh current user: \(error)")
+            print("❌ Failed to refresh current user: \(error) ")
         }
     }
     
@@ -1251,14 +1265,45 @@ final class UnifiedAuthManager: ObservableObject {
             let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
             let userRecord = try await cloudKitDatabase.record(for: userRecordID)
             
-            // Update the current user with fresh data
+            // Update the current user with fresh data on MainActor
             let refreshedUser = CloudKitUser(from: userRecord)
-            self.currentUser = refreshedUser
+            await MainActor.run {
+                self.currentUser = refreshedUser
+            }
             
             print("✅ Refreshed current user data - Followers: \(refreshedUser.followerCount), Following: \(refreshedUser.followingCount)")
         } catch {
             print("❌ Failed to refresh user data: \(error)")
             throw error
+        }
+    }
+    
+    /// Synchronized method to refresh all social data without race conditions
+    func refreshAllSocialData() async {
+        // Prevent concurrent updates
+        guard !isUpdatingSocialData else {
+            print("⚠️ Social data update already in progress, skipping")
+            return
+        }
+        
+        isUpdatingSocialData = true
+        defer { isUpdatingSocialData = false }
+        
+        print("🔍 DEBUG refreshAllSocialData: Starting synchronized update ")
+        
+        do {
+            // First refresh the user record to get latest data
+            try await refreshCurrentUserData()
+            
+            // Then update counts (without calling refresh again)
+            await updateSocialCountsWithoutRefresh()
+            
+            // Finally update recipe counts
+            await updateRecipeCounts()
+            
+            print("✅ DEBUG refreshAllSocialData: Completed successfully")
+        } catch {
+            print("❌ Failed to refresh social data: \(error)")
         }
     }
     
@@ -1271,7 +1316,7 @@ final class UnifiedAuthManager: ObservableObject {
             return 
         }
         
-        print("🔍 DEBUG updateSocialCounts: Starting for user recordID: \(recordID)")
+        print("🔍 DEBUG updateSocialCounts: Starting for user recordID: \(recordID) ")
         
         do {
             // Count followers - people who follow this user
@@ -1324,7 +1369,7 @@ final class UnifiedAuthManager: ObservableObject {
             let followingCount = activeFollowing.count
             print("🔍 DEBUG updateSocialCounts: Final following count: \(followingCount)")
             
-            print("📊 Updated social counts - Followers: \(followerCount), Following: \(followingCount)")
+            print("📊 Updated social counts - Followers: \(followerCount), Following: \(followingCount) ")
             
             // Update user record with the counts
             let updates = UserStatUpdates(
@@ -1332,13 +1377,72 @@ final class UnifiedAuthManager: ObservableObject {
                 followingCount: followingCount
             )
             
+            print("🔍 DEBUG: About to call updateUserStats ")
             try await updateUserStats(updates)
+            print("🔍 DEBUG: updateUserStats completed successfully ")
             
             // Refresh the entire user object from CloudKit to get all updates
+            print("🔍 DEBUG: About to call refreshCurrentUser ")
             await refreshCurrentUser()
+            print("🔍 DEBUG: refreshCurrentUser completed successfully ")
             
         } catch {
             print("❌ Failed to update social counts: \(error)")
+        }
+    }
+    
+    /// Internal method to update social counts without refreshing user (prevents circular calls)
+    private func updateSocialCountsWithoutRefresh() async {
+        guard let currentUser = currentUser,
+              let recordID = currentUser.recordID,
+              !recordID.isEmpty else { 
+            print("⚠️ updateSocialCountsWithoutRefresh: No valid user record ID")
+            return 
+        }
+        
+        print("🔍 DEBUG updateSocialCountsWithoutRefresh: Starting ")
+        
+        do {
+            // Use normalized ID for consistency
+            let normalizedID = normalizeUserID(recordID)
+            
+            // Query for followers
+            let followerPredicate = NSPredicate(format: "followingID == %@ AND isActive == 1", normalizedID)
+            let followerQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
+            let followerResults = try await cloudKitDatabase.records(matching: followerQuery)
+            
+            let followerCount = followerResults.matchResults.compactMap { (_, result) -> String? in
+                if case .success(let record) = result, record["isActive"] as? Int64 == 1 {
+                    return record["followerID"] as? String
+                }
+                return nil
+            }.count
+            
+            // Query for following
+            let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == 1", normalizedID)
+            let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
+            let followingResults = try await cloudKitDatabase.records(matching: followingQuery)
+            
+            let followingCount = followingResults.matchResults.compactMap { (_, result) -> String? in
+                if case .success(let record) = result, record["isActive"] as? Int64 == 1 {
+                    return record["followingID"] as? String
+                }
+                return nil
+            }.count
+            
+            print("📊 updateSocialCountsWithoutRefresh: Followers: \(followerCount), Following: \(followingCount)")
+            
+            // Update user record with counts (without refreshing)
+            let updates = UserStatUpdates(
+                followerCount: followerCount,
+                followingCount: followingCount
+            )
+            
+            try await updateUserStats(updates)
+            
+            // Don't call refreshCurrentUser here - it's already called in refreshAllSocialData
+        } catch {
+            print("❌ Failed to update social counts (internal): \(error)")
         }
     }
     

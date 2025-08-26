@@ -233,18 +233,12 @@ struct SocialFeedView: View {
                 .environmentObject(appState)
         }
         .task {
-            // Initial data load
+            // Initial data load - use synchronized method to prevent race conditions
             if !hasLoadedInitialData && authManager.isAuthenticated {
                 print("🔍 DEBUG: SocialFeedView initial data load")
-                do {
-                    try await authManager.refreshCurrentUserData()
-                    await authManager.updateSocialCounts()
-                    await authManager.updateRecipeCounts()
-                    hasLoadedInitialData = true
-                    print("✅ DEBUG: User data loaded - Followers: \(authManager.currentUser?.followerCount ?? 0), Following: \(authManager.currentUser?.followingCount ?? 0), Recipes Created: \(authManager.currentUser?.recipesCreated ?? 0)")
-                } catch {
-                    print("❌ Failed to refresh user data: \(error)")
-                }
+                await authManager.refreshAllSocialData()
+                hasLoadedInitialData = true
+                print("✅ DEBUG: User data loaded - Followers: \(authManager.currentUser?.followerCount ?? 0), Following: \(authManager.currentUser?.followingCount ?? 0), Recipes Created: \(authManager.currentUser?.recipesCreated ?? 0)")
             }
         }
         .onAppear {
@@ -271,30 +265,20 @@ struct SocialFeedView: View {
     }
 
     private func refreshSocialData() async {
-        guard !isRefreshing else { return }
+        guard !isRefreshing else { 
+            print("⚠️ Refresh already in progress, skipping")
+            return 
+        }
         isRefreshing = true
+        defer { isRefreshing = false }
         
         print("🔍 DEBUG: Refreshing social data...")
         
-        // Refresh user data to get latest counts
+        // Use synchronized method to prevent race conditions
         if authManager.isAuthenticated {
-            do {
-                // First refresh user data
-                try await authManager.refreshCurrentUserData()
-                
-                // Update social counts (followers/following)
-                await authManager.updateSocialCounts()
-                
-                // Then update recipe counts from CloudKit
-                await authManager.updateRecipeCounts()
-                
-                print("✅ DEBUG: Social data refreshed - Followers: \(authManager.currentUser?.followerCount ?? 0), Following: \(authManager.currentUser?.followingCount ?? 0), Recipes Created: \(authManager.currentUser?.recipesCreated ?? 0)")
-            } catch {
-                print("❌ Failed to refresh user data: \(error)")
-            }
+            await authManager.refreshAllSocialData()
+            print("✅ DEBUG: Social data refreshed - Followers: \(authManager.currentUser?.followerCount ?? 0), Following: \(authManager.currentUser?.followingCount ?? 0), Recipes Created: \(authManager.currentUser?.recipesCreated ?? 0)")
         }
-        
-        isRefreshing = false
     }
 
     private var socialStatsHeader: some View {
