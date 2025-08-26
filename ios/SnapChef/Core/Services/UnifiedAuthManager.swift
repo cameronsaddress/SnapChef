@@ -1169,34 +1169,73 @@ final class UnifiedAuthManager: ObservableObject {
         print("   Record type: \(record.recordType)")
         print("   Record ID: \(record.recordID.recordName)")
         
+        // Check if any updates are actually needed
+        var hasChanges = false
+        
         // Apply updates - only for fields that exist in production
         if let totalPoints = updates.totalPoints {
             record[CKField.User.totalPoints] = Int64(totalPoints)
+            hasChanges = true
         }
         if let currentStreak = updates.currentStreak {
             print("📝 Setting currentStreak field to: \(currentStreak)")
             record[CKField.User.currentStreak] = Int64(currentStreak)
+            hasChanges = true
         }
         if let longestStreak = updates.longestStreak {
             record[CKField.User.longestStreak] = Int64(longestStreak)
+            hasChanges = true
         }
         if let challengesCompleted = updates.challengesCompleted {
             record[CKField.User.challengesCompleted] = Int64(challengesCompleted)
+            hasChanges = true
         }
         if let recipesShared = updates.recipesShared {
             record[CKField.User.recipesShared] = Int64(recipesShared)
+            hasChanges = true
         }
         if let recipesCreated = updates.recipesCreated {
-            record[CKField.User.recipesCreated] = Int64(recipesCreated)
+            let currentValue = record[CKField.User.recipesCreated] as? Int64 ?? 0
+            if currentValue != Int64(recipesCreated) {
+                record[CKField.User.recipesCreated] = Int64(recipesCreated)
+                hasChanges = true
+            }
         }
         if let coinBalance = updates.coinBalance {
             record[CKField.User.coinBalance] = Int64(coinBalance)
+            hasChanges = true
         }
         if let followerCount = updates.followerCount {
-            record[CKField.User.followerCount] = Int64(followerCount)
+            let currentValue = record[CKField.User.followerCount] as? Int64 ?? 0
+            if currentValue != Int64(followerCount) {
+                record[CKField.User.followerCount] = Int64(followerCount)
+                hasChanges = true
+            }
         }
         if let followingCount = updates.followingCount {
-            record[CKField.User.followingCount] = Int64(followingCount)
+            let currentValue = record[CKField.User.followingCount] as? Int64 ?? 0
+            if currentValue != Int64(followingCount) {
+                record[CKField.User.followingCount] = Int64(followingCount)
+                hasChanges = true
+            }
+        }
+        
+        // Skip save if no changes
+        guard hasChanges else {
+            print("ℹ️ No changes detected, skipping CloudKit save")
+            // Still update local state
+            await MainActor.run {
+                if let followerCount = updates.followerCount {
+                    self.currentUser?.followerCount = followerCount
+                }
+                if let followingCount = updates.followingCount {
+                    self.currentUser?.followingCount = followingCount
+                }
+                if let recipesCreated = updates.recipesCreated {
+                    self.currentUser?.recipesCreated = recipesCreated
+                }
+            }
+            return
         }
         
         // Update last active time
@@ -1208,12 +1247,20 @@ final class UnifiedAuthManager: ObservableObject {
         print("   Current queue before save: \(OperationQueue.current?.name ?? "unknown")")
         
         do {
-            // Save the record - ensure we're not on a dispatch assertion queue
+            // Save the record - ensure we're not on the main queue for CloudKit operations
             print("   About to call cloudKitDatabase.save()...")
             
-            // For iOS 16 compatibility, we'll save directly without Task.detached
-            // The async/await context should handle queue transitions properly
-            let savedRecord = try await cloudKitDatabase.save(record)
+            // Create a new task to ensure we're not on the main queue
+            let savedRecord = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CKRecord, Error>) in
+                Task {
+                    do {
+                        let result = try await cloudKitDatabase.save(record)
+                        continuation.resume(returning: result)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
             
             print("   cloudKitDatabase.save() returned successfully")
             print("✅ User record saved successfully ")
