@@ -351,13 +351,14 @@ final class SyncModule: ObservableObject {
         try await publicDatabase.add(operation)
         
         // Sort by timestamp in code since it may not be sortable in CloudKit
-        activities.sort { record1, record2 in
+        // Use sorted to create a new array instead of mutating in-place
+        let sortedActivities = activities.sorted { record1, record2 in
             let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
             let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
             return date1 > date2 // Descending order (newest first)
         }
         
-        return activities
+        return sortedActivities
     }
     
     func markActivityAsRead(_ activityID: String) async throws {

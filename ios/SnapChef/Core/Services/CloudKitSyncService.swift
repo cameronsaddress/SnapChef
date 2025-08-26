@@ -589,13 +589,14 @@ final class CloudKitSyncService: ObservableObject {
                     logger.logQuerySuccess(query: query, resultCount: activities.count, database: self.publicDatabase.debugName, duration: duration)
                     
                     // Sort by timestamp in code since it may not be sortable in CloudKit
-                    activities.sort { record1, record2 in
+                    // Use a sorted copy to avoid mutating the array on a background thread
+                    let sortedActivities = activities.sorted { record1, record2 in
                         let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
                         let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
                         return date1 > date2 // Descending order (newest first)
                     }
                     
-                    continuation.resume(returning: activities)
+                    continuation.resume(returning: sortedActivities)
                 case .failure(let error):
                     logger.logQueryFailure(query: query, database: self.publicDatabase.debugName, error: error, duration: duration)
                     continuation.resume(throwing: error)
