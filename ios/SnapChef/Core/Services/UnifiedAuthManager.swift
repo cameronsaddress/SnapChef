@@ -1159,7 +1159,6 @@ final class UnifiedAuthManager: ObservableObject {
         
         print("🔍 DEBUG updateUserStats: Starting ")
         print("   Current queue: \(OperationQueue.current?.name ?? "unknown")")
-        print("   Is main thread: \(Thread.isMainThread)")
         
         let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
         print("   Fetching record with ID: \(userRecordID.recordName)")
@@ -1207,16 +1206,14 @@ final class UnifiedAuthManager: ObservableObject {
         print("   Updates applied - Followers: \(updates.followerCount ?? -1), Following: \(updates.followingCount ?? -1)")
         print("   Record values - Followers: \(record[CKField.User.followerCount] as? Int64 ?? -1), Following: \(record[CKField.User.followingCount] as? Int64 ?? -1)")
         print("   Current queue before save: \(OperationQueue.current?.name ?? "unknown")")
-        print("   Is main thread before save: \(Thread.isMainThread)")
         
         do {
             // Save the record - ensure we're not on a dispatch assertion queue
             print("   About to call cloudKitDatabase.save()...")
             
-            // Wrap the save in a Task to ensure proper queue handling
-            let savedRecord = try await Task.detached(priority: .userInitiated) {
-                try await self.cloudKitDatabase.save(record)
-            }.value
+            // For iOS 16 compatibility, we'll save directly without Task.detached
+            // The async/await context should handle queue transitions properly
+            let savedRecord = try await cloudKitDatabase.save(record)
             
             print("   cloudKitDatabase.save() returned successfully")
             print("✅ User record saved successfully ")
@@ -1241,7 +1238,6 @@ final class UnifiedAuthManager: ObservableObject {
             print("   Error code: \(error.code)")
             print("   Error description: \(error.localizedDescription)")
             print("   Current queue on error: \(OperationQueue.current?.name ?? "unknown")")
-            print("   Is main thread on error: \(Thread.isMainThread)")
             
             // If it's a conflict error, retry with the server record
             if error.code == .serverRecordChanged {
@@ -1256,10 +1252,8 @@ final class UnifiedAuthManager: ObservableObject {
                     }
                     serverRecord[CKField.User.lastActiveAt] = Date()
                     
-                    // Try saving again with the server record (also detached)
-                    _ = try await Task.detached(priority: .userInitiated) {
-                        try await self.cloudKitDatabase.save(serverRecord)
-                    }.value
+                    // Try saving again with the server record
+                    _ = try await cloudKitDatabase.save(serverRecord)
                     print("✅ Retry successful - user record saved")
                     return
                 }
