@@ -1307,20 +1307,31 @@ final class UnifiedAuthManager: ObservableObject {
     /// Update recipe counts for the current user
     func updateRecipeCounts() async {
         guard let currentUser = currentUser,
-              let userID = currentUser.recordID else { return }
+              let userID = currentUser.recordID else { 
+            print("⚠️ updateRecipeCounts: No user ID available")
+            return 
+        }
+        
+        print("🔍 DEBUG updateRecipeCounts: Starting for user \(userID)")
         
         do {
             // Count recipes created by this user
+            print("   Creating recipe query...")
             let recipePredicate = NSPredicate(format: "%K == %@", CKField.Recipe.ownerID, userID)
             let recipeQuery = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: recipePredicate)
             
+            print("   Executing recipe query...")
             let recipeResults = try await cloudKitDatabase.records(matching: recipeQuery)
             let recipeCount = recipeResults.matchResults.count
+            print("   Found \(recipeCount) recipes")
             
             // Update the user's recipe count
+            print("   Updating user stats with recipe count...")
             try await updateUserStats(UserStatUpdates(recipesCreated: recipeCount, experiencePoints: nil))
+            print("   Recipe count update completed")
         } catch {
-            print("Error updating recipe counts: \(error)")
+            print("❌ Error updating recipe counts: \(error)")
+            // Don't propagate error - this is a best-effort update
         }
     }
     
@@ -1358,23 +1369,35 @@ final class UnifiedAuthManager: ObservableObject {
         }
         
         isUpdatingSocialData = true
-        defer { isUpdatingSocialData = false }
+        defer { 
+            isUpdatingSocialData = false
+            print("🔍 DEBUG refreshAllSocialData: Cleanup - isUpdatingSocialData set to false")
+        }
         
         print("🔍 DEBUG refreshAllSocialData: Starting synchronized update ")
         
         do {
             // First refresh the user record to get latest data
+            print("   Step 1: Refreshing user data...")
             try await refreshCurrentUserData()
+            print("   Step 1: ✅ User data refreshed")
             
             // Then update counts (without calling refresh again)
+            print("   Step 2: Updating social counts...")
             await updateSocialCountsWithoutRefresh()
+            print("   Step 2: ✅ Social counts updated")
             
             // Finally update recipe counts
+            print("   Step 3: Updating recipe counts...")
             await updateRecipeCounts()
+            print("   Step 3: ✅ Recipe counts updated")
             
             print("✅ DEBUG refreshAllSocialData: Completed successfully")
         } catch {
             print("❌ Failed to refresh social data: \(error)")
+            print("   Error type: \(type(of: error))")
+            print("   Error description: \(error.localizedDescription)")
+            // Don't propagate error - app should continue working with cached data
         }
     }
     
@@ -1472,15 +1495,20 @@ final class UnifiedAuthManager: ObservableObject {
         }
         
         print("🔍 DEBUG updateSocialCountsWithoutRefresh: Starting ")
+        print("   User ID: \(recordID)")
         
         do {
             // Use normalized ID for consistency
             let normalizedID = normalizeUserID(recordID)
+            print("   Normalized ID: \(normalizedID)")
             
             // Query for followers
+            print("   Creating follower query...")
             let followerPredicate = NSPredicate(format: "followingID == %@ AND isActive == 1", normalizedID)
             let followerQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
+            print("   Executing follower query...")
             let followerResults = try await cloudKitDatabase.records(matching: followerQuery)
+            print("   Follower query completed, got \(followerResults.matchResults.count) results")
             
             let followerCount = followerResults.matchResults.compactMap { (_, result) -> String? in
                 if case .success(let record) = result, record["isActive"] as? Int64 == 1 {
@@ -1490,9 +1518,12 @@ final class UnifiedAuthManager: ObservableObject {
             }.count
             
             // Query for following
+            print("   Creating following query...")
             let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == 1", normalizedID)
             let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
+            print("   Executing following query...")
             let followingResults = try await cloudKitDatabase.records(matching: followingQuery)
+            print("   Following query completed, got \(followingResults.matchResults.count) results")
             
             let followingCount = followingResults.matchResults.compactMap { (_, result) -> String? in
                 if case .success(let record) = result, record["isActive"] as? Int64 == 1 {
@@ -1509,18 +1540,23 @@ final class UnifiedAuthManager: ObservableObject {
                 followingCount: followingCount
             )
             
+            print("   About to call updateUserStats...")
             do {
                 try await updateUserStats(updates)
+                print("   updateUserStats completed successfully")
             } catch {
                 // Log error but don't throw - this is a background update
                 print("⚠️ Failed to update user stats in CloudKit: \(error)")
+                print("   Error type: \(type(of: error))")
                 print("   Will use cached counts for now")
                 
                 // Still update local state even if CloudKit save fails
+                print("   Updating local state on MainActor...")
                 await MainActor.run {
                     self.currentUser?.followerCount = followerCount
                     self.currentUser?.followingCount = followingCount
                 }
+                print("   Local state updated")
             }
             
             // Don't call refreshCurrentUser here - it's already called in refreshAllSocialData
