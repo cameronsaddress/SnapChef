@@ -1158,11 +1158,17 @@ final class UnifiedAuthManager: ObservableObject {
         defer { isSavingUserRecord = false }
         
         print("🔍 DEBUG updateUserStats: Starting ")
+        print("   Current queue: \(OperationQueue.current?.name ?? "unknown")")
+        print("   Is main thread: \(Thread.isMainThread)")
         
         let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
+        print("   Fetching record with ID: \(userRecordID.recordName)")
+        
         let record = try await cloudKitDatabase.record(for: userRecordID)
         
         print("🔍 DEBUG updateUserStats: Fetched record from CloudKit ")
+        print("   Record type: \(record.recordType)")
+        print("   Record ID: \(record.recordID.recordName)")
         
         // Apply updates - only for fields that exist in production
         if let totalPoints = updates.totalPoints {
@@ -1198,11 +1204,25 @@ final class UnifiedAuthManager: ObservableObject {
         record[CKField.User.lastActiveAt] = Date()
         
         print("💾 Saving updated user record to CloudKit... ")
+        print("   Updates applied - Followers: \(updates.followerCount ?? -1), Following: \(updates.followingCount ?? -1)")
+        print("   Record values - Followers: \(record[CKField.User.followerCount] as? Int64 ?? -1), Following: \(record[CKField.User.followingCount] as? Int64 ?? -1)")
+        print("   Current queue before save: \(OperationQueue.current?.name ?? "unknown")")
+        print("   Is main thread before save: \(Thread.isMainThread)")
         
         do {
-            // Save the record - use a fresh save operation to avoid conflicts
-            let savedRecord = try await cloudKitDatabase.save(record)
+            // Save the record - ensure we're not on a dispatch assertion queue
+            print("   About to call cloudKitDatabase.save()...")
+            
+            // Wrap the save in a Task to ensure proper queue handling
+            let savedRecord = try await Task.detached(priority: .userInitiated) {
+                try await self.cloudKitDatabase.save(record)
+            }.value
+            
+            print("   cloudKitDatabase.save() returned successfully")
             print("✅ User record saved successfully ")
+            print("   Saved record ID: \(savedRecord.recordID.recordName)")
+            print("   Saved follower count: \(savedRecord[CKField.User.followerCount] as? Int64 ?? -1)")
+            print("   Saved following count: \(savedRecord[CKField.User.followingCount] as? Int64 ?? -1)")
             
             // Update local counts immediately to reflect the changes
             await MainActor.run {
@@ -1220,6 +1240,8 @@ final class UnifiedAuthManager: ObservableObject {
             print("❌ CloudKit error saving user record: \(error)")
             print("   Error code: \(error.code)")
             print("   Error description: \(error.localizedDescription)")
+            print("   Current queue on error: \(OperationQueue.current?.name ?? "unknown")")
+            print("   Is main thread on error: \(Thread.isMainThread)")
             
             // If it's a conflict error, retry with the server record
             if error.code == .serverRecordChanged {
@@ -1234,8 +1256,10 @@ final class UnifiedAuthManager: ObservableObject {
                     }
                     serverRecord[CKField.User.lastActiveAt] = Date()
                     
-                    // Try saving again with the server record
-                    _ = try await cloudKitDatabase.save(serverRecord)
+                    // Try saving again with the server record (also detached)
+                    _ = try await Task.detached(priority: .userInitiated) {
+                        try await self.cloudKitDatabase.save(serverRecord)
+                    }.value
                     print("✅ Retry successful - user record saved")
                     return
                 }
