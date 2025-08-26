@@ -494,6 +494,12 @@ struct EnhancedProfileHeader: View {
                 // Status pills
                 HStack(spacing: 12) {
                     StatusPill(text: "🔥 \(currentStreak) day streak", color: Color(hex: "#f093fb"))
+                        .onTapGesture {
+                            // Manual streak update for testing
+                            Task {
+                                await updateStreakManually()
+                            }
+                        }
                     StatusPill(text: calculateUserStatus(), color: Color(hex: "#4facfe"))
                 }
 
@@ -640,6 +646,40 @@ struct EnhancedProfileHeader: View {
     }
     
     // MARK: - Data Loading Methods
+    
+    private func updateStreakManually() async {
+        print("🔄 Manually updating streak...")
+        
+        // Get or calculate the streak
+        let streakManager = StreakManager.shared
+        var newStreak = 1
+        
+        // Check if we have a daily snap streak
+        if let dailyStreak = streakManager.currentStreaks[.dailySnap] {
+            newStreak = max(1, dailyStreak.currentStreak)
+        }
+        
+        // Update CloudKit
+        let updates = UserStatUpdates(
+            currentStreak: newStreak,
+            longestStreak: max(newStreak, authManager.currentUser?.longestStreak ?? 0)
+        )
+        
+        do {
+            try await authManager.updateUserStats(updates)
+            print("✅ Manually updated streak to \(newStreak) in CloudKit")
+            
+            // Refresh the current user data
+            await authManager.refreshCurrentUser()
+            
+            // Force UI refresh
+            await MainActor.run {
+                refreshTrigger += 1
+            }
+        } catch {
+            print("❌ Failed to manually update streak: \(error)")
+        }
+    }
     
     private func loadUserStats() {
         guard authManager.isAuthenticated else {
@@ -1702,6 +1742,7 @@ struct CollectionProgressView: View {
     @EnvironmentObject var authManager: UnifiedAuthManager
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @StateObject private var cloudKitUserManager = CloudKitUserManager.shared
+    @StateObject private var likeManager = RecipeLikeManager.shared
     @State private var animateProgress = false
     @State private var userStats: UserStats?
     @State private var isLoadingStats = false
@@ -1717,12 +1758,8 @@ struct CollectionProgressView: View {
     }
 
     var favoriteRecipes: Int {
-        // Use CloudKit favorites when available
-        if authManager.isAuthenticated {
-            return cloudKitRecipeManager.userFavoritedRecipeIDs.count
-        } else {
-            return appState.favoritedRecipeIds.count
-        }
+        // Use RecipeLikeManager for centralized like state
+        return likeManager.likedRecipeIDs.count
     }
 
     var sharedRecipes: Int {
@@ -1757,7 +1794,7 @@ struct CollectionProgressView: View {
 
                 CollectionProgressRow(
                     icon: "heart.fill",
-                    title: "Favorites",
+                    title: "Likes",
                     value: favoriteRecipes,
                     maxValue: 50,
                     color: Color(hex: "#f093fb"),
@@ -1792,6 +1829,12 @@ struct CollectionProgressView: View {
                 }
                 loadUserStats()
                 print("🔍 DEBUG: CollectionProgressView - Async block completed")
+            }
+            
+            // Load user's liked recipes for accurate count
+            Task {
+                await likeManager.loadUserLikes()
+                print("✅ Loaded \(likeManager.likedRecipeIDs.count) liked recipes")
             }
             
             // Load user recipe references for accurate counts
@@ -2225,6 +2268,7 @@ struct ActiveChallengesSection: View {
     @StateObject private var cloudKitChallengeManager = CloudKitChallengeManager.shared
     @EnvironmentObject var authManager: UnifiedAuthManager
     @State private var showingChallengeHub = false
+    @State private var selectedChallenge: Challenge?
     @State private var userChallenges: [CloudKitUserChallenge] = []
     @State private var isLoadingChallenges = false
 
@@ -2302,7 +2346,7 @@ struct ActiveChallengesSection: View {
                     HStack(spacing: 16) {
                         ForEach(Array(joinedChallenges.prefix(3))) { challenge in
                             CompactChallengeCard(challenge: challenge, userChallenge: getUserChallenge(for: challenge.id)) {
-                                showingChallengeHub = true
+                                selectedChallenge = challenge
                             }
                         }
                     }
@@ -2313,6 +2357,7 @@ struct ActiveChallengesSection: View {
                     HStack(spacing: 16) {
                         ForEach(Array(availableChallenges.prefix(3))) { challenge in
                             CompactChallengeCard(challenge: challenge, userChallenge: nil) {
+                                // For available challenges, show the challenge hub to join first
                                 showingChallengeHub = true
                             }
                             .opacity(0.85) // Slightly dimmed to show they're not joined
@@ -2385,6 +2430,13 @@ struct ActiveChallengesSection: View {
             loadUserChallenges()
         } content: {
             ChallengeHubView()
+        }
+        .sheet(item: $selectedChallenge) { challenge in
+            ChallengeDetailView(challenge: challenge)
+                .onDisappear {
+                    // Refresh challenges when returning
+                    loadUserChallenges()
+                }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Refresh when app comes to foreground

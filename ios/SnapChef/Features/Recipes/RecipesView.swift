@@ -627,14 +627,22 @@ struct RecipeGridCard: View {
     @State private var showingUserProfile = false
     @State private var creatorUsername: String = "Anonymous"
     @State private var isLoadingUsername = false
-    @State private var isLiked = false
-    @State private var likeCount = 0
     @State private var isLikeAnimating = false
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @StateObject private var cloudKitUserManager = CloudKitUserManager.shared
     @StateObject private var cloudKitRecipeCache = CloudKitRecipeCache.shared
+    @StateObject private var likeManager = RecipeLikeManager.shared
+    
+    // Computed properties for like state from manager
+    private var isLiked: Bool {
+        likeManager.isRecipeLiked(recipe.id.uuidString)
+    }
+    
+    private var likeCount: Int {
+        likeManager.getLikeCount(for: recipe.id.uuidString)
+    }
 
     var body: some View {
         // Base card with tap gesture for viewing details
@@ -856,92 +864,29 @@ struct RecipeGridCard: View {
         }
         .task {
             await fetchCreatorUsername()
-            await loadLikeStatus()
         }
     }
     
     private func toggleLike() {
-        // Check if user is authenticated
-        guard cloudKitAuth.isAuthenticated else {
-            cloudKitAuth.promptAuthForFeature(.socialSharing)
-            return
-        }
-        
         // Haptic feedback immediately
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.impactOccurred()
         
-        // Toggle like state and animate immediately with optimistic update
+        // Animate button
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-            isLiked.toggle()
-            likeCount += isLiked ? 1 : -1
             isLikeAnimating = true
         }
         
-        // Animate button scale
+        // Animate button scale back
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 isLikeAnimating = false
             }
         }
         
-        // Save to CloudKit in background
+        // Update via manager (handles auth check and optimistic updates)
         Task {
-            do {
-                if isLiked {
-                    // Like the recipe
-                    try await cloudKitRecipeManager.likeRecipe(recipeID: recipe.id.uuidString)
-                    print("✅ Liked recipe: \(recipe.name)")
-                } else {
-                    // Unlike the recipe
-                    try await cloudKitRecipeManager.unlikeRecipe(recipeID: recipe.id.uuidString)
-                    print("✅ Unliked recipe: \(recipe.name)")
-                }
-                
-                // Only update count if significantly different (to avoid flickering)
-                let actualLikeCount = await cloudKitRecipeManager.getLikeCount(for: recipe.id.uuidString)
-                await MainActor.run {
-                    // Only update if the difference is more than 1 (accounting for our own like/unlike)
-                    if abs(actualLikeCount - likeCount) > 1 {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            likeCount = actualLikeCount
-                        }
-                    }
-                }
-            } catch {
-                // Revert on error with animation
-                await MainActor.run {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        isLiked.toggle()
-                        likeCount += isLiked ? 1 : -1
-                    }
-                    print("❌ Failed to update like: \(error)")
-                }
-            }
-        }
-        
-        // Also toggle favorite locally for consistency
-        appState.toggleFavorite(recipe.id)
-    }
-    
-    private func loadLikeStatus() async {
-        // Load initial like status from CloudKit
-        if cloudKitAuth.isAuthenticated {
-            // Check if current user has liked this recipe (no need for do-catch, these don't throw)
-            let hasLiked = await cloudKitRecipeManager.hasUserLikedRecipe(recipeID: recipe.id.uuidString)
-            let currentLikeCount = await cloudKitRecipeManager.getLikeCount(for: recipe.id.uuidString)
-            
-            await MainActor.run {
-                isLiked = hasLiked
-                likeCount = currentLikeCount
-            }
-        }
-        
-        // Also sync with local favorites
-        await MainActor.run {
-            if appState.isFavorited(recipe.id) && !isLiked {
-                isLiked = true
-            }
+            await likeManager.toggleLike(for: recipe.id.uuidString)
         }
     }
 

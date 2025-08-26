@@ -58,7 +58,7 @@ public enum DifficultyLevel: Int, CaseIterable {
 }
 
 // MARK: - Challenge Model
-public struct Challenge: Identifiable {
+public struct Challenge: Identifiable, Hashable {
     public let id: String
     let type: ChallengeType
     let title: String
@@ -936,6 +936,27 @@ final class GamificationManager: ObservableObject {
     }
 
     // MARK: - Points & Rewards
+    
+    func markChallengeCompleted(_ challengeID: String) {
+        // Find challenge in active challenges
+        if let index = activeChallenges.firstIndex(where: { $0.id == challengeID }) {
+            // Update local state immediately
+            activeChallenges[index].currentProgress = 1.0
+            activeChallenges[index].isCompleted = true
+            
+            // Move to completed challenges
+            let completedChallenge = activeChallenges[index]
+            completedChallenges.append(completedChallenge)
+            activeChallenges.remove(at: index)
+            
+            // Trigger celebration
+            NotificationCenter.default.post(
+                name: Notification.Name("ChallengeCompleted"),
+                object: nil,
+                userInfo: ["challengeID": challengeID]
+            )
+        }
+    }
 
     func awardPoints(_ points: Int, reason: String = "") {
         userStats.totalPoints += points

@@ -1912,8 +1912,9 @@ class CloudKitRecipeManager: ObservableObject {
             throw RecipeError.uploadFailed
         }
         
-        // Create a Like record
-        let likeID = "\(userID)_\(recipeID)"
+        // Create a Like record - ensure ID doesn't start with underscore
+        let cleanUserID = userID.hasPrefix("_") ? String(userID.dropFirst()) : userID
+        let likeID = "like_\(cleanUserID)_\(recipeID)"
         let likeRecord = CKRecord(recordType: "RecipeLike", recordID: CKRecord.ID(recordName: likeID))
         likeRecord["userID"] = userID
         likeRecord["recipeID"] = recipeID
@@ -1934,8 +1935,9 @@ class CloudKitRecipeManager: ObservableObject {
             throw RecipeError.uploadFailed
         }
         
-        // Delete the Like record
-        let likeID = "\(userID)_\(recipeID)"
+        // Delete the Like record - ensure ID doesn't start with underscore
+        let cleanUserID = userID.hasPrefix("_") ? String(userID.dropFirst()) : userID
+        let likeID = "like_\(cleanUserID)_\(recipeID)"
         let recordID = CKRecord.ID(recordName: likeID)
         
         do {
@@ -1957,7 +1959,9 @@ class CloudKitRecipeManager: ObservableObject {
             return false
         }
         
-        let likeID = "\(userID)_\(recipeID)"
+        // Ensure ID doesn't start with underscore
+        let cleanUserID = userID.hasPrefix("_") ? String(userID.dropFirst()) : userID
+        let likeID = "like_\(cleanUserID)_\(recipeID)"
         let recordID = CKRecord.ID(recordName: likeID)
         
         do {
@@ -1979,6 +1983,30 @@ class CloudKitRecipeManager: ObservableObject {
         } catch {
             print("Failed to get like count: \(error)")
             return 0
+        }
+    }
+    
+    /// Fetch all recipes liked by the current user
+    func fetchUserLikedRecipes() async -> [String] {
+        guard let userID = getCurrentUserID() else {
+            print("⚠️ No user ID available for fetching likes")
+            return []
+        }
+        
+        let predicate = NSPredicate(format: "userID == %@", userID)
+        let query = CKQuery(recordType: "RecipeLike", predicate: predicate)
+        
+        do {
+            let (matchResults, _) = try await publicDB.records(matching: query, resultsLimit: 1000)
+            let recipeIDs = matchResults.compactMap { result -> String? in
+                guard case .success(let record) = result.1 else { return nil }
+                return record["recipeID"] as? String
+            }
+            print("✅ Fetched \(recipeIDs.count) liked recipes for user")
+            return recipeIDs
+        } catch {
+            print("❌ Failed to fetch user likes: \(error)")
+            return []
         }
     }
     

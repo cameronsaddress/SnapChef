@@ -9,9 +9,7 @@ struct RecipeDetailView: View {
     @EnvironmentObject var appState: AppState
     @State private var showingPrintView = false
     @State private var showingComments = false
-    @State private var isLiked = false
-    @State private var likeCount = 0
-    @State private var isLoadingLike = false
+    @StateObject private var likeManager = RecipeLikeManager.shared
     @State private var showingUserProfile = false
     @State private var authorName = ""
     @State private var newCommentText = ""
@@ -151,6 +149,9 @@ struct RecipeDetailView: View {
     
     @ViewBuilder
     private var likeButton: some View {
+        let isLiked = likeManager.isRecipeLiked(recipe.id.uuidString)
+        let likeCount = likeManager.getLikeCount(for: recipe.id.uuidString)
+        
         Button(action: toggleLike) {
             VStack(spacing: 4) {
                 ZStack {
@@ -176,8 +177,6 @@ struct RecipeDetailView: View {
                 }
             }
         }
-        .disabled(isLoadingLike)
-        .opacity(isLoadingLike ? 0.6 : 1.0)
     }
     
     @ViewBuilder
@@ -826,7 +825,6 @@ struct RecipeDetailView: View {
                 }
             }
             .task {
-                await loadLikeStatus()
                 await loadAuthorInfo()
                 
                 print("🔍 RecipeDetailView: Loading comments for recipe: \(recipe.name) (ID: \(recipe.id.uuidString))")
@@ -873,62 +871,16 @@ struct RecipeDetailView: View {
     }
 
     private func toggleLike() {
-        guard !isLoadingLike else { return }
-
         // Haptic feedback
         let impactGenerator = UIImpactFeedbackGenerator(style: .medium)
         impactGenerator.impactOccurred()
-
-        // Immediately update UI for better responsiveness
-        let wasLiked = isLiked
-        let previousCount = likeCount
         
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-            isLiked.toggle()
-            likeCount = isLiked ? likeCount + 1 : max(0, likeCount - 1)
-        }
-
+        // Use like manager for centralized state management
         Task {
-            isLoadingLike = true
-            defer { isLoadingLike = false }
-
-            do {
-                if wasLiked {
-                    // Was liked, now unliking
-                    try await cloudKitSync.unlikeRecipe(recipe.id.uuidString)
-                } else {
-                    // Was not liked, now liking
-                    let ownerID = UnifiedAuthManager.shared.currentUser?.recordID ?? "anonymous"
-                    try await cloudKitSync.likeRecipe(recipe.id.uuidString, recipeOwnerID: ownerID)
-                    
-                    // Success haptic for like
-                    let successGenerator = UINotificationFeedbackGenerator()
-                    successGenerator.notificationOccurred(.success)
-                }
-            } catch {
-                print("Failed to toggle like: \(error)")
-                
-                // Revert the UI changes on error
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    isLiked = wasLiked
-                    likeCount = previousCount
-                }
-                
-                // Error haptic
-                let errorGenerator = UINotificationFeedbackGenerator()
-                errorGenerator.notificationOccurred(.error)
-            }
+            await likeManager.toggleLike(for: recipe.id.uuidString)
         }
     }
 
-    private func loadLikeStatus() async {
-        do {
-            isLiked = try await cloudKitSync.isRecipeLiked(recipe.id.uuidString)
-            likeCount = try await cloudKitSync.getRecipeLikeCount(recipe.id.uuidString)
-        } catch {
-            print("Failed to load like status: \(error)")
-        }
-    }
 
     private func loadAuthorInfo() async {
         guard let cloudKitRecipe = cloudKitRecipe, !cloudKitRecipe.ownerID.isEmpty else { return }

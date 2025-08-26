@@ -1152,28 +1152,25 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     func updateLeaderboardEntry(for userID: String, points: Int, challengesCompleted: Int) async throws {
-        let recordID = CKRecord.ID(recordName: userID)
+        // Update the Users record, not create a Leaderboard record
+        let recordID = CKRecord.ID(recordName: "user_\(userID)")
 
         do {
-            // Try to fetch existing record
-            let record = try await publicDatabase.record(for: recordID)
-            record[CKField.Leaderboard.totalPoints] = (record[CKField.Leaderboard.totalPoints] as? Int ?? 0) + points
-            record[CKField.Leaderboard.challengesCompleted] = challengesCompleted
-            record[CKField.Leaderboard.lastUpdated] = Date()
+            // Fetch the Users record
+            let userRecord = try await publicDatabase.record(for: recordID)
+            
+            // Update user stats in the Users table
+            let currentPoints = userRecord["totalPoints"] as? Int64 ?? 0
+            userRecord["totalPoints"] = currentPoints + Int64(points)
+            userRecord["challengesCompleted"] = Int64(challengesCompleted)
+            userRecord["lastActiveAt"] = Date()
 
-            _ = try await publicDatabase.save(record)
+            _ = try await publicDatabase.save(userRecord)
+            print("✅ Updated user stats in CloudKit")
         } catch {
-            // Create new record if doesn't exist
-            let newRecord = CKRecord(recordType: CloudKitConfig.leaderboardRecordType, recordID: recordID)
-            newRecord[CKField.Leaderboard.userID] = userID
-            newRecord[CKField.Leaderboard.totalPoints] = points
-            newRecord[CKField.Leaderboard.challengesCompleted] = challengesCompleted
-            newRecord[CKField.Leaderboard.lastUpdated] = Date()
-
-            _ = try await publicDatabase.save(newRecord)
+            print("❌ Failed to update user stats: \(error)")
+            throw error
         }
-
-        print("✅ Updated leaderboard entry")
     }
     
     // MARK: - Social Recipe Feed Methods

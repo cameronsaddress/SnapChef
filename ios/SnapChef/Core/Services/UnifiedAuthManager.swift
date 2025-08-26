@@ -1151,6 +1151,7 @@ final class UnifiedAuthManager: ObservableObject {
             record[CKField.User.totalPoints] = Int64(totalPoints)
         }
         if let currentStreak = updates.currentStreak {
+            print("📝 Setting currentStreak field to: \(currentStreak)")
             record[CKField.User.currentStreak] = Int64(currentStreak)
         }
         if let longestStreak = updates.longestStreak {
@@ -1178,7 +1179,9 @@ final class UnifiedAuthManager: ObservableObject {
         // Update last active time
         record[CKField.User.lastActiveAt] = Date()
         
+        print("💾 Saving updated user record to CloudKit...")
         _ = try await cloudKitDatabase.save(record)
+        print("✅ User record saved successfully")
         
         // Update local user object
         await MainActor.run {
@@ -1203,6 +1206,10 @@ final class UnifiedAuthManager: ObservableObject {
             print("🔍 DEBUG refreshCurrentUser - CloudKit record contents:")
             print("   username field: '\(record[CKField.User.username] as? String ?? "nil")'")
             print("   displayName field: '\(record[CKField.User.displayName] as? String ?? "nil")'")
+            print("   currentStreak field: '\(record[CKField.User.currentStreak] as? Int64 ?? -1)'")
+            print("   longestStreak field: '\(record[CKField.User.longestStreak] as? Int64 ?? -1)'")
+            print("   totalPoints field: '\(record[CKField.User.totalPoints] as? Int64 ?? -1)'")
+            print("   recipesCreated field: '\(record[CKField.User.recipesCreated] as? Int64 ?? -1)'")
             
             await MainActor.run {
                 self.currentUser = CloudKitUser(from: record)
@@ -1527,7 +1534,9 @@ public struct CloudKitUser: Identifiable {
         self.profileImageURL = record[CKField.User.profileImageURL] as? String
         self.authProvider = record[CKField.User.authProvider] as? String ?? "unknown"
         self.totalPoints = Int(record[CKField.User.totalPoints] as? Int64 ?? 0)
-        self.currentStreak = Int(record[CKField.User.currentStreak] as? Int64 ?? 0)
+        let streakValue = record[CKField.User.currentStreak] as? Int64 ?? 0
+        print("    └─ currentStreak from CloudKit: '\(streakValue)'")
+        self.currentStreak = Int(streakValue)
         self.longestStreak = Int(record[CKField.User.longestStreak] as? Int64 ?? 0)
         self.challengesCompleted = Int(record[CKField.User.challengesCompleted] as? Int64 ?? 0)
         self.recipesShared = Int(record[CKField.User.recipesShared] as? Int64 ?? 0)

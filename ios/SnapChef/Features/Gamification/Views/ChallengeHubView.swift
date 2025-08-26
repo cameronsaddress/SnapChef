@@ -354,7 +354,10 @@ struct ChallengeHubView: View {
             
             // Show available challenges to join
             if selectedFilter == .active || selectedFilter == .all {
-                let availableChallenges = gamificationManager.activeChallenges.filter { !$0.isJoined && !$0.isCompleted }
+                // Filter out challenges that are already shown in filteredChallenges
+                let shownChallengeIDs = Set(filteredChallenges.map { $0.id })
+                let availableChallenges = gamificationManager.activeChallenges
+                    .filter { !$0.isJoined && !$0.isCompleted && !shownChallengeIDs.contains($0.id) }
                 if !availableChallenges.isEmpty {
                     // Section header for available challenges
                     HStack {
@@ -461,7 +464,9 @@ struct ChallengeHubView: View {
                 .foregroundColor(.primary)
                 .padding(.top, 20)
             
-            ForEach(gamificationManager.activeChallenges.filter { !$0.isJoined && !$0.isCompleted }) { challenge in
+            // Get unique challenges that haven't been joined or completed
+            let uniqueAvailableChallenges = Array(Set(gamificationManager.activeChallenges.filter { !$0.isJoined && !$0.isCompleted }))
+            ForEach(uniqueAvailableChallenges) { challenge in
                 ChallengeCardView(challenge: challenge) {
                     handleChallengeInteraction(challenge: challenge)
                 }

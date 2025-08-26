@@ -124,6 +124,13 @@ struct SnapChefApp: App {
             
             // Initialize CloudKit authentication managers
             await initializeAuthentication()
+            
+            // Initialize RecipeLikeManager to load user's liked recipes
+            await RecipeLikeManager.shared.loadUserLikes()
+            print("✅ RecipeLikeManager initialized with user's liked recipes")
+            
+            // Track daily app usage and update streak
+            await trackDailyAppUsage()
 
             // Sync CloudKit photos to PhotoStorageManager
             await syncCloudKitPhotosToStorage()
@@ -184,6 +191,106 @@ struct SnapChefApp: App {
         // and will restore authentication state if the user was previously signed in
         
         print("🔐 Authentication initialization completed")
+    }
+    
+    @MainActor
+    private func trackDailyAppUsage() async {
+        print("📅 Tracking daily app usage for streak...")
+        
+        // Check if authenticated
+        guard authManager.isAuthenticated, let currentUser = authManager.currentUser else {
+            print("⚠️ User not authenticated, skipping streak update")
+            return
+        }
+        
+        // Check last app open date
+        let lastOpenKey = "lastAppOpenDate"
+        let lastOpenDate = UserDefaults.standard.object(forKey: lastOpenKey) as? Date
+        let today = Calendar.current.startOfDay(for: Date())
+        
+        // If we haven't opened the app today, update the streak
+        if lastOpenDate == nil || !Calendar.current.isDate(lastOpenDate!, inSameDayAs: today) {
+            print("🔥 New day detected, updating streak...")
+            
+            // Calculate new streak
+            var newStreak = currentUser.currentStreak
+            
+            if let lastOpen = lastOpenDate {
+                let daysSinceLastOpen = Calendar.current.dateComponents([.day], from: lastOpen, to: today).day ?? 0
+                
+                if daysSinceLastOpen == 1 {
+                    // Consecutive day - increment streak
+                    newStreak += 1
+                    print("✅ Consecutive day! Streak increased to \(newStreak)")
+                } else if daysSinceLastOpen > 1 {
+                    // Streak broken - reset to 1
+                    newStreak = 1
+                    print("❌ Streak broken. Reset to 1 day")
+                }
+            } else {
+                // First time tracking - start at 1
+                newStreak = 1
+                print("🎉 Starting streak tracking at 1 day")
+            }
+            
+            // Update UserDefaults
+            UserDefaults.standard.set(today, forKey: lastOpenKey)
+            
+            // Update CloudKit User record
+            let updates = UserStatUpdates(
+                currentStreak: newStreak,
+                longestStreak: max(newStreak, currentUser.longestStreak)
+            )
+            
+            do {
+                try await authManager.updateUserStats(updates)
+                print("✅ Streak updated in CloudKit to \(newStreak) days")
+                
+                // Refresh current user data to reflect the update
+                await authManager.refreshCurrentUser()
+            } catch {
+                print("❌ Failed to update streak in CloudKit: \(error)")
+            }
+            
+            // Also update StreakManager for gamification
+            await StreakManager.shared.recordActivity(for: .dailySnap)
+        } else {
+            print("✅ Already opened app today, streak maintained at \(currentUser.currentStreak) days")
+            
+            // Sync existing streak from StreakManager if CloudKit shows 0
+            if currentUser.currentStreak == 0 {
+                await syncStreakFromManager()
+            }
+        }
+    }
+    
+    @MainActor
+    private func syncStreakFromManager() async {
+        print("🔄 Syncing streak from StreakManager to CloudKit...")
+        
+        // Get the daily snap streak from StreakManager
+        let streakManager = StreakManager.shared
+        if let dailyStreak = streakManager.currentStreaks[.dailySnap] {
+            let currentStreak = dailyStreak.currentStreak
+            let longestStreak = dailyStreak.longestStreak
+            
+            if currentStreak > 0 {
+                print("📊 Found existing streak in StreakManager: \(currentStreak) days")
+                
+                let updates = UserStatUpdates(
+                    currentStreak: currentStreak,
+                    longestStreak: longestStreak
+                )
+                
+                do {
+                    try await authManager.updateUserStats(updates)
+                    print("✅ Synced streak to CloudKit: \(currentStreak) days")
+                    await authManager.refreshCurrentUser()
+                } catch {
+                    print("❌ Failed to sync streak to CloudKit: \(error)")
+                }
+            }
+        }
     }
     
     @MainActor

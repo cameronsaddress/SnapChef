@@ -48,10 +48,17 @@ class ConfettiScene: SKScene {
     override func didMove(to view: SKView) {
         backgroundColor = .clear
 
+        // Ensure size is valid
+        if size.width <= 0 || size.height <= 0 {
+            size = view.bounds.size
+        }
+
         // Create emitter based on animation type
         emitterNode = createEmitter(for: animationType)
         if let emitterNode = emitterNode {
-            emitterNode.position = CGPoint(x: size.width / 2, y: size.height)
+            let xPos = size.width > 0 ? size.width / 2 : view.bounds.width / 2
+            let yPos = size.height > 0 ? size.height : view.bounds.height
+            emitterNode.position = CGPoint(x: xPos, y: yPos)
             addChild(emitterNode)
         }
     }
@@ -83,7 +90,8 @@ class ConfettiScene: SKScene {
         emitter.numParticlesToEmit = 0
         emitter.particleLifetime = 3
         emitter.particleLifetimeRange = 1
-        emitter.particlePositionRange = CGVector(dx: frame.width, dy: 0)
+        let width = size.width > 0 ? size.width : UIScreen.main.bounds.width
+        emitter.particlePositionRange = CGVector(dx: width, dy: 0)
         emitter.emissionAngle = .pi
         emitter.emissionAngleRange = .pi / 4
         emitter.particleSpeed = 200
@@ -131,7 +139,8 @@ class ConfettiScene: SKScene {
         emitter.numParticlesToEmit = 0
         emitter.particleLifetime = 2.5
         emitter.particleLifetimeRange = 1
-        emitter.particlePositionRange = CGVector(dx: frame.width, dy: 0)
+        let width = size.width > 0 ? size.width : UIScreen.main.bounds.width
+        emitter.particlePositionRange = CGVector(dx: width, dy: 0)
         emitter.emissionAngle = .pi
         emitter.emissionAngleRange = .pi / 3
         emitter.particleSpeed = 150
@@ -399,6 +408,7 @@ final class ChallengeRewardAnimator: ObservableObject {
         tier: RewardTier? = nil,
         duration: Double = 2.0
     ) {
+        print("🎉 Playing reward animation: \(type), message: \(message ?? "none")")
         currentAnimation = type
         rewardMessage = message
         rewardValue = value
@@ -407,6 +417,7 @@ final class ChallengeRewardAnimator: ObservableObject {
 
         // Auto-hide after duration
         DispatchQueue.main.asyncAfter(deadline: .now() + duration + 2) {
+            print("🎉 Hiding reward animation")
             self.isAnimating = false
             self.currentAnimation = nil
             self.rewardMessage = nil

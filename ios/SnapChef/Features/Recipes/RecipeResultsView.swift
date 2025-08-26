@@ -687,9 +687,7 @@ struct MagicalRecipeCard: View {
     
     @State private var isHovered = false
     @State private var shimmerPhase: CGFloat = -1
-    @State private var isLiked = false
-    @State private var likeCount = 0
-    @State private var isLoadingLike = false
+    @StateObject private var likeManager = RecipeLikeManager.shared
     @StateObject private var cloudKitSync = CloudKitSyncService.shared
     @EnvironmentObject var appState: AppState
     
@@ -749,9 +747,9 @@ struct MagicalRecipeCard: View {
                 HStack(spacing: 12) {
                     // Like button with count
                     LikeButton(
-                        isLiked: isLiked,
-                        likeCount: likeCount,
-                        isLoading: isLoadingLike,
+                        isLiked: likeManager.isRecipeLiked(recipe.id.uuidString),
+                        likeCount: likeManager.getLikeCount(for: recipe.id.uuidString),
+                        isLoading: false,
                         action: toggleLike
                     )
                     
@@ -778,86 +776,16 @@ struct MagicalRecipeCard: View {
         .onHover { hovering in
             isHovered = hovering
         }
-        .task {
-            // Load like status when view appears
-            await loadLikeStatus()
-        }
     }
     
     private func toggleLike() {
-        guard !isLoadingLike else { return }
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
         
-        // Apply changes locally first for immediate feedback
-        let previousLiked = isLiked
-        let previousCount = likeCount
-        
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-            isLiked.toggle()
-            likeCount = isLiked ? likeCount + 1 : max(0, likeCount - 1)
-        }
-        
-        // Store local like state
-        UserDefaults.standard.set(isLiked, forKey: "like_\(recipe.id.uuidString)")
-        UserDefaults.standard.set(likeCount, forKey: "likeCount_\(recipe.id.uuidString)")
-        
-        // Sync with CloudKit if authenticated
+        // Use like manager for centralized state management
         Task {
-            isLoadingLike = true
-            defer { isLoadingLike = false }
-            
-            do {
-                if UnifiedAuthManager.shared.isAuthenticated {
-                    if previousLiked {
-                        try await cloudKitSync.unlikeRecipe(recipe.id.uuidString)
-                    } else {
-                        let ownerID = UnifiedAuthManager.shared.currentUser?.recordID ?? "anonymous"
-                        try await cloudKitSync.likeRecipe(recipe.id.uuidString, recipeOwnerID: ownerID)
-                    }
-                }
-            } catch {
-                print("Failed to sync like with CloudKit: \(error)")
-                // Revert local changes on failure if authenticated
-                if UnifiedAuthManager.shared.isAuthenticated {
-                    await MainActor.run {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                            isLiked = previousLiked
-                            likeCount = previousCount
-                        }
-                        UserDefaults.standard.set(isLiked, forKey: "like_\(recipe.id.uuidString)")
-                        UserDefaults.standard.set(likeCount, forKey: "likeCount_\(recipe.id.uuidString)")
-                    }
-                }
-            }
-        }
-    }
-    
-    private func loadLikeStatus() async {
-        // Load local like state first
-        let localLiked = UserDefaults.standard.bool(forKey: "like_\(recipe.id.uuidString)")
-        let localCount = UserDefaults.standard.integer(forKey: "likeCount_\(recipe.id.uuidString)")
-        
-        await MainActor.run {
-            self.isLiked = localLiked
-            self.likeCount = localCount
-        }
-        
-        // Try to sync with CloudKit if authenticated
-        if UnifiedAuthManager.shared.isAuthenticated {
-            do {
-                let cloudLiked = try await cloudKitSync.isRecipeLiked(recipe.id.uuidString)
-                let cloudCount = try await cloudKitSync.getRecipeLikeCount(recipe.id.uuidString)
-                
-                await MainActor.run {
-                    self.isLiked = cloudLiked
-                    self.likeCount = cloudCount
-                    // Update local storage with CloudKit data
-                    UserDefaults.standard.set(cloudLiked, forKey: "like_\(recipe.id.uuidString)")
-                    UserDefaults.standard.set(cloudCount, forKey: "likeCount_\(recipe.id.uuidString)")
-                }
-            } catch {
-                print("Failed to load like status from CloudKit: \(error)")
-                // Keep local state if CloudKit fails
-            }
+            await likeManager.toggleLike(for: recipe.id.uuidString)
         }
     }
 }
