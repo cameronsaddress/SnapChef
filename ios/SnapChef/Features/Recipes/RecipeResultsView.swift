@@ -6,6 +6,7 @@ struct RecipeResultsView: View {
     let capturedImage: UIImage?
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var appState: AppState
+    @StateObject private var authManager = UnifiedAuthManager.shared
     @State private var selectedRecipe: Recipe?
     @State private var showShareSheet = false
     @State private var showShareGenerator = false
@@ -16,6 +17,29 @@ struct RecipeResultsView: View {
     @State private var activeSheet: ActiveSheet?
     @State private var savedRecipeIds: Set<UUID> = []
     @State private var showingExitConfirmation = false
+    
+    // Authentication states
+    @State private var showAuthPrompt = false
+    @State private var pendingAction: PendingAction?
+    
+    enum PendingAction {
+        case save(Recipe)
+        case like(Recipe)
+        
+        var actionName: String {
+            switch self {
+            case .save: return "save"
+            case .like: return "like"
+            }
+        }
+        
+        var recipeName: String {
+            switch self {
+            case .save(let recipe), .like(let recipe):
+                return recipe.name
+            }
+        }
+    }
     
     // New states for branded share
     @State private var showBrandedShare = false
@@ -66,7 +90,14 @@ struct RecipeResultsView: View {
                 VStack(spacing: 30) {
                     // Header with close button
                     HStack {
-                        Button(action: { dismiss() }) {
+                        Button(action: { 
+                            // Check if any recipes are saved
+                            if savedRecipeIds.isEmpty && !recipes.isEmpty {
+                                showingExitConfirmation = true
+                            } else {
+                                dismiss()
+                            }
+                        }) {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 28))
                                 .foregroundStyle(
@@ -174,9 +205,45 @@ struct RecipeResultsView: View {
         } message: {
             Text("You haven't saved any recipes yet. They will be lost if you exit now.")
         }
+        // Authentication prompt sheet
+        .sheet(isPresented: $showAuthPrompt) {
+            RecipeAuthPromptSheet(
+                action: pendingAction?.actionName ?? "save",
+                recipeName: pendingAction?.recipeName ?? "this recipe",
+                isPresented: $showAuthPrompt,
+                onAuthenticated: {
+                    // Complete the pending action after authentication
+                    if let pending = pendingAction {
+                        switch pending {
+                        case .save(let recipe):
+                            // Re-attempt save after authentication
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                saveRecipe(recipe)
+                            }
+                        case .like(let recipe):
+                            // Handle like action (future implementation)
+                            print("Like action for: \(recipe.name)")
+                        }
+                    }
+                    pendingAction = nil
+                }
+            )
+        }
     }
     
     private func saveRecipe(_ recipe: Recipe) {
+        // Check authentication first
+        guard authManager.isAuthenticated else {
+            // Store pending action and show auth prompt
+            pendingAction = .save(recipe)
+            showAuthPrompt = true
+            
+            // Haptic feedback for auth prompt
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.warning)
+            return
+        }
+        
         print("🔍 DEBUG: Fridge recipe save started for '\(recipe.name)'")
         print("🔍   - savedRecipes count before: \(appState.savedRecipes.count)")
         
@@ -261,6 +328,8 @@ struct DetectiveRecipeCard: View {
     let onSelect: () -> Void
     let onShare: () -> Void
     let onSave: () -> Void
+    
+    @StateObject private var authManager = UnifiedAuthManager.shared
     
     var body: some View {
         mainCardView
@@ -462,18 +531,40 @@ struct DetectiveRecipeCard: View {
         HStack(spacing: 12) {
             Button(action: onSave) {
                 HStack(spacing: 8) {
-                    Image(systemName: isSaved ? "heart.fill" : "heart")
-                    Text(isSaved ? "Saved" : "Save")
+                    Image(systemName: authManager.isAuthenticated ? 
+                          (isSaved ? "heart.fill" : "heart") : 
+                          "lock.fill")
+                    Text(authManager.isAuthenticated ? 
+                         (isSaved ? "Saved" : "Save") : 
+                         "Sign In to Save")
                 }
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(isSaved ? Color(hex: "#4CAF50").opacity(0.3) : Color.white.opacity(0.2))
+                .background {
+                    if !authManager.isAuthenticated {
+                        LinearGradient(
+                            colors: [Color(hex: "#667eea").opacity(0.3), Color(hex: "#764ba2").opacity(0.3)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    } else if isSaved {
+                        Color(hex: "#4CAF50").opacity(0.3)
+                    } else {
+                        Color.white.opacity(0.2)
+                    }
+                }
                 .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(!authManager.isAuthenticated ? 
+                               Color(hex: "#667eea").opacity(0.5) : 
+                               Color.clear, lineWidth: 1)
+                )
             }
-            .disabled(isSaved)
+            .disabled(isSaved && authManager.isAuthenticated)
             
             Button(action: onShare) {
                 HStack(spacing: 8) {
@@ -585,6 +676,186 @@ struct DetectiveRecipeCard: View {
 }
 
 
+
+// MARK: - Recipe Auth Prompt Sheet
+struct RecipeAuthPromptSheet: View {
+    let action: String
+    let recipeName: String
+    @Binding var isPresented: Bool
+    let onAuthenticated: () -> Void
+    
+    @State private var isAuthenticating = false
+    @State private var lockRotation = false
+    @State private var showingAuthSheet = false
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                // Beautiful gradient background
+                LinearGradient(
+                    colors: [
+                        Color(hex: "#667eea"),
+                        Color(hex: "#764ba2"),
+                        Color(hex: "#8e44ad")
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                VStack(spacing: 30) {
+                    // Animated lock icon
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.15))
+                            .frame(width: 100, height: 100)
+                        
+                        Image(systemName: lockRotation ? "lock.open.fill" : "lock.fill")
+                            .font(.system(size: 45))
+                            .foregroundColor(.white)
+                            .rotation3DEffect(
+                                .degrees(lockRotation ? 360 : 0),
+                                axis: (x: 0, y: 1, z: 0)
+                            )
+                            .animation(.spring(response: 0.6, dampingFraction: 0.7), value: lockRotation)
+                    }
+                    .padding(.top, 30)
+                    
+                    // Title and message
+                    VStack(spacing: 12) {
+                        Text("Sign In to \(action.capitalized) Recipes")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
+                        
+                        Text("Create your account to \(action) **\(recipeName)** and build your personal recipe collection")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.9))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
+                    }
+                    
+                    // Benefits list
+                    VStack(alignment: .leading, spacing: 16) {
+                        benefitRow(icon: "heart.fill", text: "Save unlimited recipes", color: .red)
+                        benefitRow(icon: "icloud.fill", text: "Sync across all devices", color: .blue)
+                        benefitRow(icon: "star.fill", text: "Track your favorites", color: .yellow)
+                        benefitRow(icon: "person.3.fill", text: "Join the community", color: .green)
+                        benefitRow(icon: "trophy.fill", text: "Unlock challenges & rewards", color: .orange)
+                    }
+                    .padding(.horizontal, 40)
+                    .padding(.vertical, 20)
+                    
+                    Spacer()
+                    
+                    // Action buttons
+                    VStack(spacing: 16) {
+                        if isAuthenticating {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+                        } else {
+                            // Sign in with Apple button
+                            Button(action: {
+                                // Show the UnifiedAuthManager's auth sheet
+                                UnifiedAuthManager.shared.showAuthSheet = true
+                                lockRotation = true
+                                
+                                // Monitor authentication state
+                                Task {
+                                    // Wait a moment for auth to potentially complete
+                                    try? await Task.sleep(nanoseconds: 500_000_000)
+                                    
+                                    // Start checking for auth success
+                                    for _ in 0..<20 { // Check for up to 10 seconds
+                                        if UnifiedAuthManager.shared.isAuthenticated {
+                                            // Haptic success
+                                            let generator = UINotificationFeedbackGenerator()
+                                            generator.notificationOccurred(.success)
+                                            
+                                            // Call the completion handler
+                                            await MainActor.run {
+                                                onAuthenticated()
+                                                
+                                                // Dismiss the sheet
+                                                isPresented = false
+                                            }
+                                            break
+                                        }
+                                        try? await Task.sleep(nanoseconds: 500_000_000)
+                                    }
+                                    
+                                    // Reset state if auth wasn't successful
+                                    if !UnifiedAuthManager.shared.isAuthenticated {
+                                        await MainActor.run {
+                                            lockRotation = false
+                                        }
+                                    }
+                                }
+                            }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "applelogo")
+                                        .font(.system(size: 20))
+                                    Text("Sign in with Apple")
+                                        .font(.system(size: 18, weight: .semibold))
+                                }
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 56)
+                                .background(Color.white)
+                                .cornerRadius(16)
+                            }
+                            .padding(.horizontal, 40)
+                            
+                            // Maybe later button
+                            Button(action: {
+                                isPresented = false
+                            }) {
+                                Text("Maybe Later")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                        }
+                    }
+                    .padding(.bottom, 40)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        isPresented = false
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                }
+            }
+        }
+        .onAppear {
+            // Haptic feedback on appear
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+        }
+    }
+    
+    private func benefitRow(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundColor(color)
+                .frame(width: 28)
+            
+            Text(text)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.white)
+            
+            Spacer()
+        }
+    }
+}
 
 // MARK: - Success Header (Legacy - now using Detective style)
 struct SuccessHeaderView: View {
