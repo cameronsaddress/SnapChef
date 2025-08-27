@@ -1926,6 +1926,30 @@ class CloudKitRecipeManager: ObservableObject {
         // Update the recipe's like count
         await updateRecipeLikeCount(recipeID: recipeID, increment: true)
         
+        // Create activity for recipe owner (if it's not their own recipe)
+        do {
+            // Fetch the recipe to get owner info and recipe name
+            let recipeRecord = try await publicDB.record(for: CKRecord.ID(recordName: recipeID))
+            let recipeOwnerID = recipeRecord["ownerID"] as? String
+            let recipeName = recipeRecord["title"] as? String ?? recipeRecord["name"] as? String
+            
+            // Only create activity if it's not the user's own recipe
+            if let recipeOwnerID = recipeOwnerID, recipeOwnerID != userID {
+                // Use CloudKitSyncService to create the activity
+                try await CloudKitSyncService.shared.createActivity(
+                    type: "recipeLiked",
+                    actorID: userID,
+                    targetUserID: recipeOwnerID,
+                    recipeID: recipeID,
+                    recipeName: recipeName
+                )
+                print("📢 Created like activity for recipe owner: \(recipeOwnerID)")
+            }
+        } catch {
+            // Don't fail the like operation if activity creation fails
+            print("⚠️ Failed to create like activity: \(error)")
+        }
+        
         print("✅ Liked recipe: \(recipeID)")
     }
     
