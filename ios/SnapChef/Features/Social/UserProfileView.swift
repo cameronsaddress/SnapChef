@@ -499,7 +499,18 @@ struct RecipeGridItem: View {
     @State private var showingDetail = false
     @State private var fullRecipe: Recipe?
     @State private var isLoadingRecipe = false
+    @State private var isLikeAnimating = false
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var likeManager = RecipeLikeManager.shared
+    
+    // Computed properties for like state from manager
+    private var isLiked: Bool {
+        likeManager.isRecipeLiked(recipe.id)
+    }
+    
+    private var likeCount: Int {
+        likeManager.getLikeCount(for: recipe.id)
+    }
 
     var body: some View {
         Button(action: {
@@ -539,26 +550,43 @@ struct RecipeGridItem: View {
                             )
                     }
                     
-                    // Like count overlay
+                    // Like button overlay
                     VStack {
-                        Spacer()
                         HStack {
                             Spacer()
-                            HStack(spacing: 4) {
-                                Image(systemName: "heart.fill")
-                                    .font(.system(size: 12))
-                                Text("\(recipe.likeCount)")
-                                    .font(.system(size: 12, weight: .medium))
+                            // Interactive like button
+                            Button(action: {
+                                toggleLike()
+                            }) {
+                                ZStack {
+                                    Image(systemName: isLiked ? "heart.fill" : "heart")
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundColor(isLiked ? .pink : .white)
+                                        .padding(8)
+                                        .background(
+                                            Circle()
+                                                .fill(isLiked ? Color.pink.opacity(0.15) : Color.black.opacity(0.3))
+                                        )
+                                        .scaleEffect(isLikeAnimating ? 1.3 : 1.0)
+                                    
+                                    // Like count badge - always show to see immediate updates
+                                    if likeCount > 0 {
+                                        Text("\(likeCount)")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(
+                                                Capsule()
+                                                    .fill(isLiked ? Color.pink : Color.gray)
+                                            )
+                                            .offset(x: 18, y: -15)
+                                    }
+                                }
                             }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(Color.black.opacity(0.5))
-                            )
                             .padding(8)
                         }
+                        Spacer()
                     }
                 }
 
@@ -641,6 +669,29 @@ struct RecipeGridItem: View {
             await MainActor.run {
                 self.isLoadingRecipe = false
             }
+        }
+    }
+    
+    private func toggleLike() {
+        // Haptic feedback immediately
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        
+        // Animate button
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+            isLikeAnimating = true
+        }
+        
+        // Animate button scale back
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isLikeAnimating = false
+            }
+        }
+        
+        // Update via manager (handles auth check and optimistic updates)
+        Task {
+            await likeManager.toggleLike(for: recipe.id)
         }
     }
     
