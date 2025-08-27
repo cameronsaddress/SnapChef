@@ -600,9 +600,9 @@ final class SocialRecipeFeedManager: ObservableObject {
     private func generateMockRecipes() -> [SocialRecipeCard] {
         // Create a mock CloudKit record for the creator
         let mockUserRecord = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: CKRecord.ID(recordName: "mock-user-1"))
-        mockUserRecord[CKField.User.username] = "chef_gordon"
-        mockUserRecord[CKField.User.displayName] = "Gordon Ramsay"
-        mockUserRecord[CKField.User.email] = "gordon@example.com"
+        mockUserRecord[CKField.User.username] = "alex_baker"
+        mockUserRecord[CKField.User.displayName] = "Alex Baker"
+        mockUserRecord[CKField.User.email] = "alex@example.com"
         mockUserRecord[CKField.User.authProvider] = "apple"
         mockUserRecord[CKField.User.totalPoints] = Int64(5000)
         mockUserRecord[CKField.User.currentStreak] = Int64(30)
@@ -637,7 +637,7 @@ final class SocialRecipeFeedManager: ObservableObject {
                 cookingTime: 120,
                 isLiked: false,
                 creatorID: "mock-user-1",
-                creatorName: "Gordon Ramsay",
+                creatorName: "Alex Baker",
                 creatorImageURL: nil,
                 creatorIsVerified: true
             ),
@@ -654,7 +654,7 @@ final class SocialRecipeFeedManager: ObservableObject {
                 cookingTime: 20,
                 isLiked: true,
                 creatorID: "mock-user-1",
-                creatorName: "Gordon Ramsay",
+                creatorName: "Alex Baker",
                 creatorImageURL: nil,
                 creatorIsVerified: true
             )
