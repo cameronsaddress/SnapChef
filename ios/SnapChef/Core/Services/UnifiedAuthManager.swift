@@ -1213,16 +1213,21 @@ final class UnifiedAuthManager: ObservableObject {
         
         // Skip save if no changes
         guard hasChanges else {
-            print("ℹ️ No changes detected, skipping CloudKit save")
-            // Still update local state
-            if let followerCount = updates.followerCount {
-                self.currentUser?.followerCount = followerCount
-            }
-            if let followingCount = updates.followingCount {
-                self.currentUser?.followingCount = followingCount
-            }
-            if let recipesCreated = updates.recipesCreated {
-                self.currentUser?.recipesCreated = recipesCreated
+            print("ℹ️ No changes detected in CloudKit record, skipping save but updating local state")
+            // Still update local state - CRITICAL for social counts
+            await MainActor.run {
+                if let followerCount = updates.followerCount {
+                    self.currentUser?.followerCount = followerCount
+                    print("   Updated local followerCount to \(followerCount)")
+                }
+                if let followingCount = updates.followingCount {
+                    self.currentUser?.followingCount = followingCount
+                    print("   Updated local followingCount to \(followingCount)")
+                }
+                if let recipesCreated = updates.recipesCreated {
+                    self.currentUser?.recipesCreated = recipesCreated
+                    print("   Updated local recipesCreated to \(recipesCreated)")
+                }
             }
             return
         }
@@ -1265,15 +1270,20 @@ final class UnifiedAuthManager: ObservableObject {
             return
         }
         
-        // Update local counts immediately
-        if let followerCount = updates.followerCount {
-            self.currentUser?.followerCount = followerCount
-        }
-        if let followingCount = updates.followingCount {
-            self.currentUser?.followingCount = followingCount
-        }
-        if let recipesCreated = updates.recipesCreated {
-            self.currentUser?.recipesCreated = recipesCreated
+        // Update local counts immediately on MainActor
+        await MainActor.run {
+            if let followerCount = updates.followerCount {
+                self.currentUser?.followerCount = followerCount
+                print("   Updated local followerCount to \(followerCount) after save")
+            }
+            if let followingCount = updates.followingCount {
+                self.currentUser?.followingCount = followingCount
+                print("   Updated local followingCount to \(followingCount) after save")
+            }
+            if let recipesCreated = updates.recipesCreated {
+                self.currentUser?.recipesCreated = recipesCreated
+                print("   Updated local recipesCreated to \(recipesCreated) after save")
+            }
         }
         
         print("🔍 DEBUG updateUserStats: Completed successfully")
