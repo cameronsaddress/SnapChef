@@ -31,10 +31,25 @@ struct LaunchAnimationView: View {
             MagicalBackground()
                 .ignoresSafeArea()
 
-            // SNAPCHEF logo
-            SnapchefLogo()
-                .opacity(animationComplete ? 0 : 1)
-                .animation(.easeOut(duration: 0.3), value: animationComplete)
+            // SNAPCHEF logo with app icon
+            VStack(spacing: 0) {
+                Spacer()
+                
+                SnapchefLogo()
+                
+                // App icon below the logo
+                Image("AppIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 120, height: 120)
+                    .cornerRadius(26)
+                    .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
+                    .padding(.top, 30)
+                
+                Spacer()
+            }
+            .opacity(animationComplete ? 0 : 1)
+            .animation(.easeOut(duration: 0.3), value: animationComplete)
 
             // Conditional falling food emojis
             if deviceManager.shouldShowParticles {

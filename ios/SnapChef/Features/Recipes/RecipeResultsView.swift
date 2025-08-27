@@ -762,13 +762,10 @@ struct RecipeAuthPromptSheet: View {
                                 UnifiedAuthManager.shared.showAuthSheet = true
                                 lockRotation = true
                                 
-                                // Monitor authentication state
+                                // Monitor authentication state immediately
                                 Task {
-                                    // Wait a moment for auth to potentially complete
-                                    try? await Task.sleep(nanoseconds: 500_000_000)
-                                    
-                                    // Start checking for auth success
-                                    for _ in 0..<20 { // Check for up to 10 seconds
+                                    // Start checking for auth success immediately
+                                    for _ in 0..<40 { // Check for up to 10 seconds (40 * 0.25s)
                                         if UnifiedAuthManager.shared.isAuthenticated {
                                             // Haptic success
                                             let generator = UINotificationFeedbackGenerator()
@@ -783,7 +780,7 @@ struct RecipeAuthPromptSheet: View {
                                             }
                                             break
                                         }
-                                        try? await Task.sleep(nanoseconds: 500_000_000)
+                                        try? await Task.sleep(nanoseconds: 250_000_000) // Check every 0.25s
                                     }
                                     
                                     // Reset state if auth wasn't successful

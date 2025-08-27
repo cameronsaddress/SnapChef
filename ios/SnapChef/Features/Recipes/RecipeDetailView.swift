@@ -28,6 +28,15 @@ struct RecipeDetailView: View {
     @State private var showBrandedShare = false
     @State private var shareContent: ShareContent?
     
+    // Authentication states
+    @State private var showAuthPrompt = false
+    @State private var pendingAuthAction: AuthAction?
+    
+    enum AuthAction {
+        case like
+        case save
+    }
+    
     // MARK: - ViewBuilder Helper Functions
     
     @ViewBuilder
@@ -151,25 +160,33 @@ struct RecipeDetailView: View {
     private var likeButton: some View {
         let isLiked = likeManager.isRecipeLiked(recipe.id.uuidString)
         let likeCount = likeManager.getLikeCount(for: recipe.id.uuidString)
+        let isAuthenticated = cloudKitAuth.isAuthenticated
         
         Button(action: toggleLike) {
             VStack(spacing: 4) {
                 ZStack {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(Color(hex: "#9b59b6"))
-                        .scaleEffect(isLiked ? 1.1 : 0)
-                        .opacity(isLiked ? 1 : 0)
-                    
-                    Image(systemName: "heart")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(.white.opacity(0.6))
-                        .scaleEffect(isLiked ? 0 : 1.0)
-                        .opacity(isLiked ? 0 : 1)
+                    if !isAuthenticated {
+                        // Show lock icon for unauthenticated users
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                    } else {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 24, weight: .medium))
+                            .foregroundColor(Color(hex: "#9b59b6"))
+                            .scaleEffect(isLiked ? 1.1 : 0)
+                            .opacity(isLiked ? 1 : 0)
+                        
+                        Image(systemName: "heart")
+                            .font(.system(size: 24, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                            .scaleEffect(isLiked ? 0 : 1.0)
+                            .opacity(isLiked ? 0 : 1)
+                    }
                 }
                 .animation(.spring(response: 0.3, dampingFraction: 0.6, blendDuration: 0), value: isLiked)
                 
-                if likeCount > 0 {
+                if likeCount > 0 && isAuthenticated {
                     Text("\(likeCount)")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(isLiked ? Color(hex: "#9b59b6") : .white.opacity(0.6))
@@ -755,6 +772,27 @@ struct RecipeDetailView: View {
                     BrandedSharePopup(content: content)
                 }
             }
+            // Authentication prompt sheet
+            .sheet(isPresented: $showAuthPrompt) {
+                RecipeAuthPromptSheet(
+                    action: pendingAuthAction == .like ? "like" : "save",
+                    recipeName: recipe.name,
+                    isPresented: $showAuthPrompt,
+                    onAuthenticated: {
+                        // Complete the pending action after authentication
+                        if let action = pendingAuthAction {
+                            switch action {
+                            case .like:
+                                toggleLike()
+                            case .save:
+                                // Handle save action if needed
+                                break
+                            }
+                        }
+                        pendingAuthAction = nil
+                    }
+                )
+            }
             .alert("Delete Recipe?", isPresented: $showingDeleteAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Delete", role: .destructive) {
@@ -871,6 +909,18 @@ struct RecipeDetailView: View {
     }
 
     private func toggleLike() {
+        // Check authentication first
+        guard cloudKitAuth.isAuthenticated else {
+            // Show auth prompt
+            pendingAuthAction = .like
+            showAuthPrompt = true
+            
+            // Warning haptic for auth required
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.warning)
+            return
+        }
+        
         // Haptic feedback
         let impactGenerator = UIImpactFeedbackGenerator(style: .medium)
         impactGenerator.impactOccurred()
