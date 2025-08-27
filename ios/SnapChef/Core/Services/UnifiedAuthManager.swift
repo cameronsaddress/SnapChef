@@ -33,6 +33,7 @@ final class UnifiedAuthManager: ObservableObject {
     private var isUpdatingSocialData = false
     private var isSavingUserRecord = false
     private let updateQueue = DispatchQueue(label: "com.snapchef.socialupdate", qos: .userInitiated)
+    private var refreshTask: Task<Void, Never>? // Track refresh task to prevent concurrent calls
     @Published var showUsernameSetup = false
     @Published var showUsernameSelection = false  // Added for CloudKitAuthView compatibility
     @Published var showError = false
@@ -46,6 +47,7 @@ final class UnifiedAuthManager: ObservableObject {
     
     private let cloudKitContainer = CKContainer(identifier: CloudKitConfig.containerIdentifier)
     private let cloudKitDatabase = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+    private let cloudKitActor = CloudKitActor()  // Swift 6 compliant CloudKit operations
     internal let profileManager = KeychainProfileManager.shared
     private let tikTokAuthManager = TikTokAuthManager.shared
     
@@ -1155,56 +1157,38 @@ final class UnifiedAuthManager: ObservableObject {
         }
         
         isSavingUserRecord = true
-        defer { isSavingUserRecord = false }
+        defer { 
+            isSavingUserRecord = false
+            print("🔍 DEBUG updateUserStats: Cleanup - isSavingUserRecord set to false")
+        }
         
         print("🔍 DEBUG updateUserStats: Starting ")
-        print("   Current queue: \(OperationQueue.current?.name ?? "unknown")")
+        print("   Record ID: \(recordID)")
+        print("   Updates: follower=\(updates.followerCount ?? -1), following=\(updates.followingCount ?? -1)")
         
-        let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
-        print("   Fetching record with ID: \(userRecordID.recordName)")
-        
-        let record = try await cloudKitDatabase.record(for: userRecordID)
-        
-        print("🔍 DEBUG updateUserStats: Fetched record from CloudKit ")
-        print("   Record type: \(record.recordType)")
-        print("   Record ID: \(record.recordID.recordName)")
+        // Use CloudKitActor for thread-safe operations with error boundary
+        let record: CKRecord
+        do {
+            record = try await cloudKitActor.fetchUserRecord(userID: recordID)
+        } catch {
+            print("❌ Failed to fetch user record for updates: \(error)")
+            print("   Error type: \(type(of: error))")
+            print("   Attempting recovery...")
+            
+            // Try to create a fresh fetch without the "user_" prefix if it was double-prefixed
+            let cleanID = recordID.replacingOccurrences(of: "user_user_", with: "user_")
+            if cleanID != recordID {
+                print("   Detected double-prefix, trying with: \(cleanID)")
+                record = try await cloudKitActor.fetchUserRecord(userID: cleanID)
+            } else {
+                throw error
+            }
+        }
         
         // Check if any updates are actually needed
         var hasChanges = false
         
-        // Apply updates - only for fields that exist in production
-        if let totalPoints = updates.totalPoints {
-            record[CKField.User.totalPoints] = Int64(totalPoints)
-            hasChanges = true
-        }
-        if let currentStreak = updates.currentStreak {
-            print("📝 Setting currentStreak field to: \(currentStreak)")
-            record[CKField.User.currentStreak] = Int64(currentStreak)
-            hasChanges = true
-        }
-        if let longestStreak = updates.longestStreak {
-            record[CKField.User.longestStreak] = Int64(longestStreak)
-            hasChanges = true
-        }
-        if let challengesCompleted = updates.challengesCompleted {
-            record[CKField.User.challengesCompleted] = Int64(challengesCompleted)
-            hasChanges = true
-        }
-        if let recipesShared = updates.recipesShared {
-            record[CKField.User.recipesShared] = Int64(recipesShared)
-            hasChanges = true
-        }
-        if let recipesCreated = updates.recipesCreated {
-            let currentValue = record[CKField.User.recipesCreated] as? Int64 ?? 0
-            if currentValue != Int64(recipesCreated) {
-                record[CKField.User.recipesCreated] = Int64(recipesCreated)
-                hasChanges = true
-            }
-        }
-        if let coinBalance = updates.coinBalance {
-            record[CKField.User.coinBalance] = Int64(coinBalance)
-            hasChanges = true
-        }
+        // Apply updates
         if let followerCount = updates.followerCount {
             let currentValue = record[CKField.User.followerCount] as? Int64 ?? 0
             if currentValue != Int64(followerCount) {
@@ -1219,21 +1203,26 @@ final class UnifiedAuthManager: ObservableObject {
                 hasChanges = true
             }
         }
+        if let recipesCreated = updates.recipesCreated {
+            let currentValue = record[CKField.User.recipesCreated] as? Int64 ?? 0
+            if currentValue != Int64(recipesCreated) {
+                record[CKField.User.recipesCreated] = Int64(recipesCreated)
+                hasChanges = true
+            }
+        }
         
         // Skip save if no changes
         guard hasChanges else {
             print("ℹ️ No changes detected, skipping CloudKit save")
             // Still update local state
-            await MainActor.run {
-                if let followerCount = updates.followerCount {
-                    self.currentUser?.followerCount = followerCount
-                }
-                if let followingCount = updates.followingCount {
-                    self.currentUser?.followingCount = followingCount
-                }
-                if let recipesCreated = updates.recipesCreated {
-                    self.currentUser?.recipesCreated = recipesCreated
-                }
+            if let followerCount = updates.followerCount {
+                self.currentUser?.followerCount = followerCount
+            }
+            if let followingCount = updates.followingCount {
+                self.currentUser?.followingCount = followingCount
+            }
+            if let recipesCreated = updates.recipesCreated {
+                self.currentUser?.recipesCreated = recipesCreated
             }
             return
         }
@@ -1241,80 +1230,59 @@ final class UnifiedAuthManager: ObservableObject {
         // Update last active time
         record[CKField.User.lastActiveAt] = Date()
         
-        print("💾 Saving updated user record to CloudKit... ")
-        print("   Updates applied - Followers: \(updates.followerCount ?? -1), Following: \(updates.followingCount ?? -1)")
-        print("   Record values - Followers: \(record[CKField.User.followerCount] as? Int64 ?? -1), Following: \(record[CKField.User.followingCount] as? Int64 ?? -1)")
-        print("   Current queue before save: \(OperationQueue.current?.name ?? "unknown")")
+        // Save using CloudKitActor with error boundary
+        print("💾 Saving updated user record to CloudKit...")
         
+        let savedRecord: CKRecord
         do {
-            // Save the record - ensure we're not on the main queue for CloudKit operations
-            print("   About to call cloudKitDatabase.save()...")
-            
-            // Create a new task to ensure we're not on the main queue
-            let savedRecord = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CKRecord, Error>) in
-                Task {
-                    do {
-                        let result = try await cloudKitDatabase.save(record)
-                        continuation.resume(returning: result)
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
-            
-            print("   cloudKitDatabase.save() returned successfully")
-            print("✅ User record saved successfully ")
-            print("   Saved record ID: \(savedRecord.recordID.recordName)")
-            print("   Saved follower count: \(savedRecord[CKField.User.followerCount] as? Int64 ?? -1)")
-            print("   Saved following count: \(savedRecord[CKField.User.followingCount] as? Int64 ?? -1)")
-            
-            // Update local counts immediately to reflect the changes
-            await MainActor.run {
-                if let followerCount = updates.followerCount {
-                    self.currentUser?.followerCount = followerCount
-                }
-                if let followingCount = updates.followingCount {
-                    self.currentUser?.followingCount = followingCount
-                }
-                if let recipesCreated = updates.recipesCreated {
-                    self.currentUser?.recipesCreated = recipesCreated
-                }
-            }
-        } catch let error as CKError {
-            print("❌ CloudKit error saving user record: \(error)")
-            print("   Error code: \(error.code)")
-            print("   Error description: \(error.localizedDescription)")
-            print("   Current queue on error: \(OperationQueue.current?.name ?? "unknown")")
-            
-            // If it's a conflict error, retry with the server record
-            if error.code == .serverRecordChanged {
-                print("⚠️ Server record changed, retrying with latest version...")
-                if let serverRecord = error.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord {
-                    // Apply updates to the server record
-                    if let followerCount = updates.followerCount {
-                        serverRecord[CKField.User.followerCount] = Int64(followerCount)
-                    }
-                    if let followingCount = updates.followingCount {
-                        serverRecord[CKField.User.followingCount] = Int64(followingCount)
-                    }
-                    serverRecord[CKField.User.lastActiveAt] = Date()
-                    
-                    // Try saving again with the server record
-                    _ = try await cloudKitDatabase.save(serverRecord)
-                    print("✅ Retry successful - user record saved")
-                    return
-                }
-            }
-            throw error
+            savedRecord = try await cloudKitActor.saveRecord(record)
+            print("✅ User record saved successfully")
         } catch {
-            print("❌ Unexpected error saving user record: \(error)")
-            throw error
+            print("❌ Failed to save user record: \(error)")
+            print("   Error type: \(type(of: error))")
+            print("   Error description: \(error.localizedDescription)")
+            
+            // Check for specific CloudKit errors
+            if let ckError = error as? CKError {
+                print("   CKError code: \(ckError.code)")
+                print("   CKError domain: \(ckError.errorCode)")
+                
+                // Handle specific error cases
+                switch ckError.code {
+                case .serverRecordChanged:
+                    print("   Record was modified on server, need to retry with latest version")
+                case .networkFailure, .networkUnavailable:
+                    print("   Network issue, updates will sync when connection restored")
+                case .quotaExceeded:
+                    print("   CloudKit quota exceeded")
+                default:
+                    print("   Other CloudKit error: \(ckError.code.rawValue)")
+                }
+            }
+            
+            // Don't crash the app - just skip the update this time
+            print("⚠️ Skipping user stats update due to CloudKit error")
+            return
         }
         
-        print("🔍 DEBUG updateUserStats: Completed ")
+        // Update local counts immediately
+        if let followerCount = updates.followerCount {
+            self.currentUser?.followerCount = followerCount
+        }
+        if let followingCount = updates.followingCount {
+            self.currentUser?.followingCount = followingCount
+        }
+        if let recipesCreated = updates.recipesCreated {
+            self.currentUser?.recipesCreated = recipesCreated
+        }
+        
+        print("🔍 DEBUG updateUserStats: Completed successfully")
     }
     
-    /// Refresh current user data from CloudKit
+    // REMOVED: Old methods that were causing too much async wrapping
+    // Now using CloudKitActor for all operations
+    
+    /// Refresh current user data from CloudKit - Swift 6 compliant
     func refreshCurrentUser() async {
         guard let currentUser = currentUser else { return }
         
@@ -1322,8 +1290,9 @@ final class UnifiedAuthManager: ObservableObject {
         
         do {
             guard let recordID = currentUser.recordID else { return }
-            let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
-            let record = try await cloudKitDatabase.record(for: userRecordID)
+            
+            // Use CloudKitActor for thread-safe fetch
+            let record = try await cloudKitActor.fetchUserRecord(userID: recordID)
             
             // Debug what's actually in CloudKit
             print("🔍 DEBUG refreshCurrentUser - CloudKit record contents :")
@@ -1351,7 +1320,7 @@ final class UnifiedAuthManager: ObservableObject {
         }
     }
     
-    /// Update recipe counts for the current user
+    /// Update recipe counts for the current user - Swift 6 compliant
     func updateRecipeCounts() async {
         guard let currentUser = currentUser,
               let userID = currentUser.recordID else { 
@@ -1362,14 +1331,9 @@ final class UnifiedAuthManager: ObservableObject {
         print("🔍 DEBUG updateRecipeCounts: Starting for user \(userID)")
         
         do {
-            // Count recipes created by this user
-            print("   Creating recipe query...")
-            let recipePredicate = NSPredicate(format: "%K == %@", CKField.Recipe.ownerID, userID)
-            let recipeQuery = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: recipePredicate)
-            
+            // Use CloudKitActor for thread-safe query
             print("   Executing recipe query...")
-            let recipeResults = try await cloudKitDatabase.records(matching: recipeQuery)
-            let recipeCount = recipeResults.matchResults.count
+            let recipeCount = try await cloudKitActor.fetchRecipeCount(for: userID)
             print("   Found \(recipeCount) recipes")
             
             // Update the user's recipe count
@@ -1382,7 +1346,7 @@ final class UnifiedAuthManager: ObservableObject {
         }
     }
     
-    /// Refresh current user data from CloudKit
+    /// Refresh current user data from CloudKit - Swift 6 compliant
     func refreshCurrentUserData() async throws {
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID else {
@@ -1390,9 +1354,8 @@ final class UnifiedAuthManager: ObservableObject {
         }
         
         do {
-            // Fetch the latest user record from CloudKit
-            let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
-            let userRecord = try await cloudKitDatabase.record(for: userRecordID)
+            // Use CloudKitActor for thread-safe fetch
+            let userRecord = try await cloudKitActor.fetchUserRecord(userID: recordID)
             
             // Update the current user with fresh data on MainActor
             let refreshedUser = CloudKitUser(from: userRecord)
@@ -1409,46 +1372,73 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Synchronized method to refresh all social data without race conditions
     func refreshAllSocialData() async {
-        // Prevent concurrent updates
-        guard !isUpdatingSocialData else {
-            print("⚠️ Social data update already in progress, skipping")
-            return
+        // Cancel any existing refresh task
+        refreshTask?.cancel()
+        
+        // Create new refresh task  
+        refreshTask = Task { @MainActor in
+            // Prevent concurrent updates using both flag and Task
+            guard !isUpdatingSocialData else {
+                print("⚠️ Social data update already in progress, skipping")
+                return
+            }
+            
+            // Check for task cancellation
+            guard !Task.isCancelled else {
+                print("⚠️ Refresh task cancelled before starting")
+                return
+            }
+            
+            isUpdatingSocialData = true
+            defer { 
+                isUpdatingSocialData = false
+                refreshTask = nil // Clear task reference
+                print("🔍 DEBUG refreshAllSocialData: Cleanup - isUpdatingSocialData set to false")
+            }
+            
+            print("🔍 DEBUG refreshAllSocialData: Starting synchronized update ")
+            
+            do {
+                // First refresh the user record to get latest data
+                print("   Step 1: Refreshing user data...")
+                try await refreshCurrentUserData()
+                
+                // Check cancellation between steps
+                guard !Task.isCancelled else {
+                    print("⚠️ Refresh cancelled after user data refresh")
+                    return
+                }
+                print("   Step 1: ✅ User data refreshed")
+                
+                // Then update counts (without calling refresh again)
+                print("   Step 2: Updating social counts...")
+                await updateSocialCountsWithoutRefresh()
+                
+                guard !Task.isCancelled else {
+                    print("⚠️ Refresh cancelled after social counts")
+                    return
+                }
+                print("   Step 2: ✅ Social counts updated")
+                
+                // Finally update recipe counts
+                print("   Step 3: Updating recipe counts...")
+                await updateRecipeCounts()
+                print("   Step 3: ✅ Recipe counts updated")
+                
+                print("✅ DEBUG refreshAllSocialData: Completed successfully")
+            } catch {
+                print("❌ Failed to refresh social data: \(error)")
+                print("   Error type: \(type(of: error))")
+                print("   Error description: \(error.localizedDescription)")
+                // Don't propagate error - app should continue working with cached data
+            }
         }
         
-        isUpdatingSocialData = true
-        defer { 
-            isUpdatingSocialData = false
-            print("🔍 DEBUG refreshAllSocialData: Cleanup - isUpdatingSocialData set to false")
-        }
-        
-        print("🔍 DEBUG refreshAllSocialData: Starting synchronized update ")
-        
-        do {
-            // First refresh the user record to get latest data
-            print("   Step 1: Refreshing user data...")
-            try await refreshCurrentUserData()
-            print("   Step 1: ✅ User data refreshed")
-            
-            // Then update counts (without calling refresh again)
-            print("   Step 2: Updating social counts...")
-            await updateSocialCountsWithoutRefresh()
-            print("   Step 2: ✅ Social counts updated")
-            
-            // Finally update recipe counts
-            print("   Step 3: Updating recipe counts...")
-            await updateRecipeCounts()
-            print("   Step 3: ✅ Recipe counts updated")
-            
-            print("✅ DEBUG refreshAllSocialData: Completed successfully")
-        } catch {
-            print("❌ Failed to refresh social data: \(error)")
-            print("   Error type: \(type(of: error))")
-            print("   Error description: \(error.localizedDescription)")
-            // Don't propagate error - app should continue working with cached data
-        }
+        // Wait for the task to complete
+        await refreshTask?.value
     }
     
-    /// Update social counts (followers/following)
+    /// Update social counts (followers/following) - Swift 6 compliant
     func updateSocialCounts() async {
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID,
@@ -1460,55 +1450,8 @@ final class UnifiedAuthManager: ObservableObject {
         print("🔍 DEBUG updateSocialCounts: Starting for user recordID: \(recordID) ")
         
         do {
-            // Count followers - people who follow this user
-            // followingID is the user being followed
-            // Use normalized ID for consistency
-            let normalizedID = normalizeUserID(recordID)
-            print("🔍 DEBUG updateSocialCounts: Using normalized ID: \(normalizedID)")
-            
-            // Query for followers with normalized ID
-            let followerPredicate = NSPredicate(format: "followingID == %@ AND isActive == 1", normalizedID)
-            let followerQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
-            
-            let followerResults = try await cloudKitDatabase.records(matching: followerQuery)
-            print("🔍 DEBUG updateSocialCounts: Follower query returned \(followerResults.matchResults.count) results")
-            
-            let activeFollowers = followerResults.matchResults.compactMap { (_, result) -> String? in
-                if case .success(let record) = result {
-                    let isActive = record["isActive"] as? Int64
-                    let followerID = record["followerID"] as? String
-                    print("🔍 DEBUG updateSocialCounts: Follow record - followerID: \(followerID ?? "nil"), isActive: \(isActive ?? -1)")
-                    if isActive == 1 {
-                        return followerID
-                    }
-                }
-                return nil
-            }
-            let followerCount = activeFollowers.count
-            print("🔍 DEBUG updateSocialCounts: Final follower count: \(followerCount)")
-            
-            // Count following - people this user follows
-            // followerID is the user doing the following
-            // Use normalized ID for consistency
-            let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == 1", normalizedID)
-            let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
-            
-            let followingResults = try await cloudKitDatabase.records(matching: followingQuery)
-            print("🔍 DEBUG updateSocialCounts: Following query returned \(followingResults.matchResults.count) results")
-            
-            let activeFollowing = followingResults.matchResults.compactMap { (_, result) -> String? in
-                if case .success(let record) = result {
-                    let isActive = record["isActive"] as? Int64
-                    let followingID = record["followingID"] as? String
-                    print("🔍 DEBUG updateSocialCounts: Follow record - followingID: \(followingID ?? "nil"), isActive: \(isActive ?? -1)")
-                    if isActive == 1 {
-                        return followingID
-                    }
-                }
-                return nil
-            }
-            let followingCount = activeFollowing.count
-            print("🔍 DEBUG updateSocialCounts: Final following count: \(followingCount)")
+            // Use CloudKitActor for thread-safe operations
+            let (followerCount, followingCount) = try await cloudKitActor.fetchFollowCounts(for: recordID)
             
             print("📊 Updated social counts - Followers: \(followerCount), Following: \(followingCount) ")
             
@@ -1532,7 +1475,7 @@ final class UnifiedAuthManager: ObservableObject {
         }
     }
     
-    /// Internal method to update social counts without refreshing user (prevents circular calls)
+    /// Internal method to update social counts without refreshing user (prevents circular calls) - Swift 6 compliant
     private func updateSocialCountsWithoutRefresh() async {
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID,
@@ -1545,39 +1488,11 @@ final class UnifiedAuthManager: ObservableObject {
         print("   User ID: \(recordID)")
         
         do {
-            // Use normalized ID for consistency
-            let normalizedID = normalizeUserID(recordID)
-            print("   Normalized ID: \(normalizedID)")
-            
-            // Query for followers
-            print("   Creating follower query...")
-            let followerPredicate = NSPredicate(format: "followingID == %@ AND isActive == 1", normalizedID)
-            let followerQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
-            print("   Executing follower query...")
-            let followerResults = try await cloudKitDatabase.records(matching: followerQuery)
-            print("   Follower query completed, got \(followerResults.matchResults.count) results")
-            
-            let followerCount = followerResults.matchResults.compactMap { (_, result) -> String? in
-                if case .success(let record) = result, record["isActive"] as? Int64 == 1 {
-                    return record["followerID"] as? String
-                }
-                return nil
-            }.count
-            
-            // Query for following
-            print("   Creating following query...")
-            let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == 1", normalizedID)
-            let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
-            print("   Executing following query...")
-            let followingResults = try await cloudKitDatabase.records(matching: followingQuery)
-            print("   Following query completed, got \(followingResults.matchResults.count) results")
-            
-            let followingCount = followingResults.matchResults.compactMap { (_, result) -> String? in
-                if case .success(let record) = result, record["isActive"] as? Int64 == 1 {
-                    return record["followingID"] as? String
-                }
-                return nil
-            }.count
+            // Use CloudKitActor for thread-safe operations
+            print("   Executing follow queries...")
+            let (followerCount, followingCount) = try await cloudKitActor.fetchFollowCounts(for: recordID)
+            print("   Follower query completed: \(followerCount) followers")
+            print("   Following query completed: \(followingCount) following")
             
             print("📊 updateSocialCountsWithoutRefresh: Followers: \(followerCount), Following: \(followingCount)")
             
@@ -1899,7 +1814,7 @@ public struct CloudKitUser: Identifiable {
 
 // MARK: - UserStatUpdates
 
-public struct UserStatUpdates {
+public struct UserStatUpdates: Sendable {
     public var totalPoints: Int?
     public var currentStreak: Int?
     public var longestStreak: Int?

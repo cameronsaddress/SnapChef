@@ -979,12 +979,12 @@ class ActivityFeedManager: ObservableObject {
         var followedUserIDs: [String] = []
         
         do {
-            let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
-            let followRecords = try await database.records(matching: followingQuery)
+            // Use CloudKitSyncService's actor instead of direct database access
+            let cloudKitSync = CloudKitSyncService.shared
+            let followRecords = try await cloudKitSync.cloudKitActor.executeQuery(followingQuery)
             
-            for (_, result) in followRecords.matchResults {
-                if case .success(let record) = result,
-                   let followingID = record["followingID"] as? String {
+            for record in followRecords {
+                if let followingID = record["followingID"] as? String {
                     followedUserIDs.append(followingID)
                 }
             }
@@ -1007,29 +1007,17 @@ class ActivityFeedManager: ObservableObject {
             let activityPredicate = NSPredicate(format: "actorID IN %@", limitedFollowedUsers)
             let activityQuery = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: activityPredicate)
             
-            // Use the modern async API instead of operation-based API
-            var activities: [CKRecord] = []
+            // Use CloudKitActor for safe query execution
+            let activities = try await cloudKitSync.cloudKitActor.executeQuery(activityQuery, desiredKeys: nil, resultsLimit: limit)
             
-            let queryOperation = CKQueryOperation(query: activityQuery)
-            queryOperation.resultsLimit = limit
-            
-            // Use record results directly instead of continuations
-            let results = try await database.records(matching: activityQuery, resultsLimit: limit)
-            
-            for (_, result) in results.matchResults {
-                if case .success(let record) = result {
-                    activities.append(record)
-                }
-            }
-            
-            // Sort by timestamp
-            activities.sort { record1, record2 in
+            // Sort by timestamp (use sorted() instead of sort() to avoid mutation)
+            let sortedActivities = activities.sorted { record1, record2 in
                 let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
                 let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
                 return date1 > date2
             }
             
-            return activities
+            return sortedActivities
             
         } catch {
             print("⚠️ Failed to fetch followed user activities: \(error)")

@@ -67,11 +67,30 @@ xcodebuild -scheme SnapChef -destination 'platform=iOS Simulator,name=iPhone 16 
 - **ALWAYS modify existing files** when possible
 - **NEVER create new files** without explicit permission
 
-### 3. Swift 6 Compliance
+### 3. Swift 6 Compliance & CloudKit Safety
 - Strict concurrency checking required
 - Proper actor isolation and Sendable conformance
 - Use @MainActor appropriately
 - Modern async/await patterns
+
+#### 🚨 CRITICAL: CloudKit Operation Safety
+**NEVER use CloudKit's async/await APIs directly** - they have internal dispatch queue bugs that cause crashes.
+
+**ALWAYS use CloudKitActor for ALL CloudKit operations:**
+```swift
+// ❌ WRONG - Will crash with EXC_BREAKPOINT
+let record = try await database.record(for: recordID)
+let records = try await database.records(matching: query)
+
+// ✅ CORRECT - Safe with double-resume protection
+let record = try await cloudKitActor.fetchRecord(with: recordID)
+let records = try await cloudKitActor.executeQuery(query)
+```
+
+**CloudKitActor Location:** `SnapChef/Core/Services/CloudKitActor.swift`
+- All methods have NSLock protection against double-resume
+- Use for: fetch, save, delete, query operations
+- Access via: `CloudKitSyncService.shared.cloudKitActor` or create instance
 
 ### 4. Local-First Architecture
 ```
@@ -165,6 +184,21 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 ❌ Creating new files for existing functionality
 ❌ Using privateDB for public content
 ❌ Ignoring Swift 6 concurrency warnings
+❌ Using CloudKit's async/await APIs directly (causes EXC_BREAKPOINT crashes)
+❌ Creating continuations without double-resume protection
+❌ Making concurrent CloudKit operations without synchronization
+
+## 🚨 Common Crashes & Solutions
+
+### CloudKit EXC_BREAKPOINT Crash
+**Symptom:** `Thread X: EXC_BREAKPOINT` on `com.apple.cloudkit.operation.callback`
+**Cause:** CloudKit's internal callbacks firing multiple times, causing continuation double-resume
+**Solution:** Always use CloudKitActor for ALL CloudKit operations
+
+### Concurrent Refresh Crashes
+**Symptom:** Multiple simultaneous CloudKit operations causing conflicts
+**Cause:** .task and .onAppear both triggering refreshes
+**Solution:** Use flags and Task cancellation to prevent concurrent operations
 
 ## 🎯 Current State
 
@@ -255,7 +289,30 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 - **COMPLETE_CODE_TRACE.md** - App flow analysis
 - **FILE_USAGE_ANALYSIS.md** - File usage status
 
-## 🔄 Latest Updates (Aug 25, 2025)
+## 🔄 Latest Updates (Aug 27, 2025)
+
+### CloudKit Crash Fix Complete (Aug 27) ✅
+- ✅ **Fixed EXC_BREAKPOINT crashes in Feed view**:
+  - Created CloudKitActor with NSLock protection against double-resume
+  - Updated ALL CloudKit operations to use CloudKitActor
+  - Removed all direct database.records() and database.save() calls
+  - Added comprehensive error boundaries
+  
+- ✅ **Fixed concurrent operation issues**:
+  - Added Task cancellation to refreshAllSocialData
+  - Prevented .task and .onAppear from both triggering refreshes
+  - Added synchronization flags to prevent race conditions
+
+- ✅ **Files Updated**:
+  - CloudKitActor.swift - Added double-resume protection
+  - UnifiedAuthManager.swift - Added Task synchronization
+  - CloudKitSyncService.swift - Converted all operations to use CloudKitActor
+  - ActivityFeedView.swift - Removed direct CloudKit calls
+  - ContentView.swift (SocialFeedView) - Fixed concurrent refresh
+
+- ✅ **Build verified**: All changes compile successfully, crashes resolved
+
+## 🔄 Previous Updates (Aug 25, 2025)
 
 ### Challenge System Complete Overhaul (Aug 25) ✅
 - ✅ **Challenge Membership Management**:

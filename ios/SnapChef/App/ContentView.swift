@@ -234,12 +234,17 @@ struct SocialFeedView: View {
         }
         .task {
             // Initial data load - use synchronized method to prevent race conditions
-            if !hasLoadedInitialData && authManager.isAuthenticated {
-                print("🔍 DEBUG: SocialFeedView initial data load")
-                await authManager.refreshAllSocialData()
-                hasLoadedInitialData = true
-                print("✅ DEBUG: User data loaded - Followers: \(authManager.currentUser?.followerCount ?? 0), Following: \(authManager.currentUser?.followingCount ?? 0), Recipes Created: \(authManager.currentUser?.recipesCreated ?? 0)")
+            guard !hasLoadedInitialData else { return }
+            guard authManager.isAuthenticated else { return }
+            guard !isRefreshing else { 
+                print("⚠️ SocialFeedView: Refresh already in progress in .task")
+                return 
             }
+            
+            print("🔍 DEBUG: SocialFeedView initial data load")
+            hasLoadedInitialData = true // Set immediately to prevent double-load
+            await authManager.refreshAllSocialData()
+            print("✅ DEBUG: User data loaded - Followers: \(authManager.currentUser?.followerCount ?? 0), Following: \(authManager.currentUser?.followingCount ?? 0), Recipes Created: \(authManager.currentUser?.recipesCreated ?? 0)")
         }
         .onAppear {
             print("🔍 DEBUG: SocialFeedView appeared")
@@ -247,6 +252,12 @@ struct SocialFeedView: View {
             print("🔍 DEBUG: Followers: \(authManager.currentUser?.followerCount ?? 0)")
             print("🔍 DEBUG: Following: \(authManager.currentUser?.followingCount ?? 0)")
             print("🔍 DEBUG: Recipes Created: \(authManager.currentUser?.recipesCreated ?? 0)")
+            
+            // Only refresh if .task hasn't handled it
+            guard hasLoadedInitialData else { 
+                print("🔍 DEBUG: Initial load will be handled by .task")
+                return 
+            }
             
             // Force refresh if data looks stale
             if authManager.isAuthenticated && authManager.currentUser != nil {

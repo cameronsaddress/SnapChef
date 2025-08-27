@@ -14,7 +14,7 @@ final class CloudKitSyncService: ObservableObject {
     private let container: CKContainer
     private let publicDatabase: CKDatabase
     private let privateDatabase: CKDatabase
-    let cloudKitActor = CloudKitActor() // Made internal for ActivityFeedView access
+    private let cloudKitActor = CloudKitActor()
 
     @Published var isSyncing = false
     @Published var syncError: Error?
@@ -192,7 +192,7 @@ final class CloudKitSyncService: ObservableObject {
         logger.logFetchStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
         
         do {
-            let record = try await cloudKitActor.fetchRecord(with: CKRecord.ID(recordName: recipeID))
+            let record = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
             let fetchDuration = Date().timeIntervalSince(startTime)
             logger.logFetchSuccess(recordType: CloudKitConfig.recipeRecordType, recordCount: 1, database: publicDatabase.debugName, duration: fetchDuration)
             
@@ -203,7 +203,7 @@ final class CloudKitSyncService: ObservableObject {
             logger.logSaveStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
             
             do {
-                _ = try await cloudKitActor.saveRecord(record)
+                try await publicDatabase.save(record)
                 let saveDuration = Date().timeIntervalSince(saveStartTime)
                 logger.logSaveSuccess(recordType: CloudKitConfig.recipeRecordType, recordID: recipeID, database: publicDatabase.debugName, duration: saveDuration)
             } catch {
@@ -225,7 +225,7 @@ final class CloudKitSyncService: ObservableObject {
         logger.logFetchStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
         
         do {
-            let record = try await cloudKitActor.fetchRecord(with: CKRecord.ID(recordName: recipeID))
+            let record = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
             let fetchDuration = Date().timeIntervalSince(startTime)
             logger.logFetchSuccess(recordType: CloudKitConfig.recipeRecordType, recordCount: 1, database: publicDatabase.debugName, duration: fetchDuration)
             
@@ -236,7 +236,7 @@ final class CloudKitSyncService: ObservableObject {
             logger.logSaveStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
             
             do {
-                _ = try await cloudKitActor.saveRecord(record)
+                try await publicDatabase.save(record)
                 let saveDuration = Date().timeIntervalSince(saveStartTime)
                 logger.logSaveSuccess(recordType: CloudKitConfig.recipeRecordType, recordID: recipeID, database: publicDatabase.debugName, duration: saveDuration)
             } catch {
@@ -276,7 +276,7 @@ final class CloudKitSyncService: ObservableObject {
         like[CKField.RecipeLike.likedAt] = Date()
 
         do {
-            _ = try await cloudKitActor.saveRecord(like)
+            try await publicDatabase.save(like)
             let duration = Date().timeIntervalSince(startTime)
             logger.logSaveSuccess(recordType: CloudKitConfig.recipeLikeRecordType, recordID: like.recordID.recordName, database: publicDatabase.debugName, duration: duration)
             
@@ -288,7 +288,7 @@ final class CloudKitSyncService: ObservableObject {
                 // Get recipe name for the activity
                 var recipeName: String?
                 do {
-                    let recipeRecord = try await cloudKitActor.fetchRecord(with: CKRecord.ID(recordName: recipeID))
+                    let recipeRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
                     recipeName = recipeRecord[CKField.Recipe.title] as? String
                 } catch {
                     print("⚠️ Could not fetch recipe name for activity: \(error)")
@@ -326,7 +326,7 @@ final class CloudKitSyncService: ObservableObject {
         logger.logQueryStart(query: query, database: publicDatabase.debugName)
 
         do {
-            let results = try await cloudKitActor.executeQueryWithResults(query)
+            let results = try await publicDatabase.records(matching: query)
             let duration = Date().timeIntervalSince(startTime)
             logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: publicDatabase.debugName, duration: duration)
 
@@ -337,7 +337,7 @@ final class CloudKitSyncService: ObservableObject {
                     logger.logDeleteStart(recordType: CloudKitConfig.recipeLikeRecordType, recordID: recordID.recordName, database: publicDatabase.debugName)
                     
                     do {
-                        try await cloudKitActor.deleteRecord(with: recordID)
+                        try await publicDatabase.deleteRecord(withID: recordID)
                         let deleteDuration = Date().timeIntervalSince(deleteStartTime)
                         logger.logDeleteSuccess(recordType: CloudKitConfig.recipeLikeRecordType, recordID: recordID.recordName, database: publicDatabase.debugName, duration: deleteDuration)
                     } catch {
@@ -373,7 +373,7 @@ final class CloudKitSyncService: ObservableObject {
         logger.logQueryStart(query: query, database: publicDatabase.debugName)
 
         do {
-            let results = try await cloudKitActor.executeQueryWithResults(query)
+            let results = try await publicDatabase.records(matching: query)
             let duration = Date().timeIntervalSince(startTime)
             logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: publicDatabase.debugName, duration: duration)
             return !results.matchResults.isEmpty
@@ -393,7 +393,7 @@ final class CloudKitSyncService: ObservableObject {
         
         do {
             let recordID = CKRecord.ID(recordName: recipeID)
-            let record = try await cloudKitActor.fetchRecord(with: recordID)
+            let record = try await publicDatabase.record(for: recordID)
             let duration = Date().timeIntervalSince(startTime)
             logger.logFetchSuccess(recordType: CloudKitConfig.recipeRecordType, recordCount: 1, database: publicDatabase.debugName, duration: duration)
             return Int(record[CKField.Recipe.likeCount] as? Int64 ?? 0)
@@ -409,7 +409,7 @@ final class CloudKitSyncService: ObservableObject {
             logger.logQueryStart(query: query, database: publicDatabase.debugName)
             
             do {
-                let results = try await cloudKitActor.executeQueryWithResults(query)
+                let results = try await publicDatabase.records(matching: query)
                 let fallbackDuration = Date().timeIntervalSince(fallbackStartTime)
                 logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: publicDatabase.debugName, duration: fallbackDuration)
                 return results.matchResults.count
@@ -430,7 +430,7 @@ final class CloudKitSyncService: ObservableObject {
         do {
             // Fetch the recipe record from CloudKit
             let recordID = CKRecord.ID(recordName: recipeID)
-            let record = try await cloudKitActor.fetchRecord(with: recordID)
+            let record = try await publicDatabase.record(for: recordID)
             let fetchDuration = Date().timeIntervalSince(startTime)
             logger.logFetchSuccess(recordType: CloudKitConfig.recipeRecordType, recordCount: 1, database: publicDatabase.debugName, duration: fetchDuration)
             
@@ -444,7 +444,7 @@ final class CloudKitSyncService: ObservableObject {
             logger.logSaveStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
             
             do {
-                _ = try await cloudKitActor.saveRecord(record)
+                try await publicDatabase.save(record)
                 let saveDuration = Date().timeIntervalSince(saveStartTime)
                 logger.logSaveSuccess(recordType: CloudKitConfig.recipeRecordType, recordID: recipeID, database: publicDatabase.debugName, duration: saveDuration)
                 print("✅ Recipe \(recipeID) like count \(increment ? "incremented" : "decremented") to \(newCount)")
@@ -477,7 +477,7 @@ final class CloudKitSyncService: ObservableObject {
         logger.logQueryStart(query: query, database: publicDatabase.debugName)
         
         do {
-            let results = try await cloudKitActor.executeQueryWithResults(query)
+            let results = try await publicDatabase.records(matching: query)
             let queryDuration = Date().timeIntervalSince(startTime)
             logger.logQuerySuccess(query: query, resultCount: results.matchResults.count, database: publicDatabase.debugName, duration: queryDuration)
             
@@ -489,7 +489,7 @@ final class CloudKitSyncService: ObservableObject {
             
             do {
                 let recordID = CKRecord.ID(recordName: recipeID)
-                let record = try await cloudKitActor.fetchRecord(with: recordID)
+                let record = try await publicDatabase.record(for: recordID)
                 let fetchDuration = Date().timeIntervalSince(fetchStartTime)
                 logger.logFetchSuccess(recordType: CloudKitConfig.recipeRecordType, recordCount: 1, database: publicDatabase.debugName, duration: fetchDuration)
                 
@@ -499,7 +499,7 @@ final class CloudKitSyncService: ObservableObject {
                 logger.logSaveStart(recordType: CloudKitConfig.recipeRecordType, database: publicDatabase.debugName)
                 
                 do {
-                    _ = try await cloudKitActor.saveRecord(record)
+                    try await publicDatabase.save(record)
                     let saveDuration = Date().timeIntervalSince(saveStartTime)
                     logger.logSaveSuccess(recordType: CloudKitConfig.recipeRecordType, recordID: recipeID, database: publicDatabase.debugName, duration: saveDuration)
                     print("♾️ Synced recipe \(recipeID) like count to \(actualLikeCount) from RecipeLike records")
@@ -549,7 +549,7 @@ final class CloudKitSyncService: ObservableObject {
         activity[CKField.Activity.isRead] = Int64(0)
 
         do {
-            _ = try await cloudKitActor.saveRecord(activity)
+            try await publicDatabase.save(activity)
             let duration = Date().timeIntervalSince(startTime)
             logger.logSaveSuccess(recordType: CloudKitConfig.activityRecordType, recordID: activity.recordID.recordName, database: publicDatabase.debugName, duration: duration)
         } catch {
@@ -566,36 +566,54 @@ final class CloudKitSyncService: ObservableObject {
         // Fetch activities where user is the target or activities from users they follow
         let predicate = NSPredicate(format: "%K == %@", CKField.Activity.targetUserID, userID)
         let query = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: predicate)
+        // Remove timestamp sort descriptor since it may not be sortable in CloudKit
+        // query.sortDescriptors = [NSSortDescriptor(key: CKField.Activity.timestamp, ascending: false)]
         
         logger.logQueryStart(query: query, database: publicDatabase.debugName)
-        
-        // Use CloudKitActor for safe query execution
-        do {
-            let records = try await cloudKitActor.executeQuery(query, desiredKeys: nil, resultsLimit: limit)
-            let duration = Date().timeIntervalSince(startTime)
-            logger.logQuerySuccess(query: query, resultCount: records.count, database: publicDatabase.debugName, duration: duration)
-            
-            // Sort by timestamp
-            let sortedActivities = records.sorted { record1, record2 in
-                let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
-                let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
-                return date1 > date2 // Descending order (newest first)
+
+        let operation = CKQueryOperation(query: query)
+        operation.resultsLimit = limit
+
+        var activities: [CKRecord] = []
+
+        return try await withCheckedThrowingContinuation { continuation in
+            operation.recordMatchedBlock = { _, result in
+                if case .success(let record) = result {
+                    activities.append(record)
+                }
             }
             
-            return sortedActivities
-        } catch {
-            let duration = Date().timeIntervalSince(startTime)
-            logger.logQueryFailure(query: query, database: publicDatabase.debugName, error: error, duration: duration)
-            throw error
+            operation.queryResultBlock = { result in
+                let duration = Date().timeIntervalSince(startTime)
+                switch result {
+                case .success:
+                    logger.logQuerySuccess(query: query, resultCount: activities.count, database: self.publicDatabase.debugName, duration: duration)
+                    
+                    // Sort by timestamp in code since it may not be sortable in CloudKit
+                    // Use a sorted copy to avoid mutating the array on a background thread
+                    let sortedActivities = activities.sorted { record1, record2 in
+                        let date1 = record1[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+                        let date2 = record2[CKField.Activity.timestamp] as? Date ?? Date.distantPast
+                        return date1 > date2 // Descending order (newest first)
+                    }
+                    
+                    continuation.resume(returning: sortedActivities)
+                case .failure(let error):
+                    logger.logQueryFailure(query: query, database: self.publicDatabase.debugName, error: error, duration: duration)
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            publicDatabase.add(operation)
         }
     }
 
     func markActivityAsRead(_ activityID: String) async throws {
         do {
             let recordID = CKRecord.ID(recordName: activityID)
-            let record = try await cloudKitActor.fetchRecord(with: recordID)
+            let record = try await publicDatabase.record(for: recordID)
             record[CKField.Activity.isRead] = Int64(1)
-            _ = try await cloudKitActor.saveRecord(record)
+            try await publicDatabase.save(record)
             print("✅ Marked activity \(activityID) as read")
         } catch {
             if let ckError = error as? CKError, ckError.code == .unknownItem {
@@ -644,7 +662,7 @@ final class CloudKitSyncService: ObservableObject {
         print("   - parentCommentID: \(parentCommentID ?? "nil")")
 
         print("💾 Saving comment to CloudKit...")
-        _ = try await cloudKitActor.saveRecord(comment)
+        _ = try await publicDatabase.save(comment)
         print("✅ Comment saved to CloudKit with ID: \(commentID)")
 
         // Update recipe comment count
@@ -654,7 +672,7 @@ final class CloudKitSyncService: ObservableObject {
         var recipeName: String?
         var recipeOwnerID: String?
         
-        if let recipeRecord = try? await cloudKitActor.fetchRecord(with: CKRecord.ID(recordName: recipeID)) {
+        if let recipeRecord = try? await publicDatabase.record(for: CKRecord.ID(recordName: recipeID)) {
             recipeName = recipeRecord[CKField.Recipe.title] as? String
             recipeOwnerID = recipeRecord[CKField.Recipe.ownerID] as? String
         }
@@ -730,11 +748,11 @@ final class CloudKitSyncService: ObservableObject {
 
     func deleteComment(_ commentID: String) async throws {
         let recordID = CKRecord.ID(recordName: commentID)
-        let record = try await cloudKitActor.fetchRecord(with: recordID)
+        let record = try await publicDatabase.record(for: recordID)
 
         // Soft delete
         record[CKField.RecipeComment.isDeleted] = Int64(1)
-        _ = try await cloudKitActor.saveRecord(record)
+        _ = try await publicDatabase.save(record)
         print("✅ Comment soft deleted in CloudKit with ID: \(commentID)")
 
         // Update recipe comment count
@@ -745,11 +763,11 @@ final class CloudKitSyncService: ObservableObject {
 
     private func updateRecipeCommentCount(_ recipeID: String, increment: Bool) async {
         do {
-            let record = try await cloudKitActor.fetchRecord(with: CKRecord.ID(recordName: recipeID))
+            let record = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
             let currentCount = record[CKField.Recipe.commentCount] as? Int64 ?? 0
             let newCount = increment ? currentCount + 1 : max(0, currentCount - 1)
             record[CKField.Recipe.commentCount] = newCount
-            _ = try await cloudKitActor.saveRecord(record)
+            try await publicDatabase.save(record)
         } catch {
             print("Failed to update comment count for recipe \(recipeID): \(error)")
         }
@@ -791,13 +809,13 @@ final class CloudKitSyncService: ObservableObject {
     private func updateCommentLikeCount(_ commentID: String, increment: Bool) async {
         do {
             let recordID = CKRecord.ID(recordName: commentID)
-            let record = try await cloudKitActor.fetchRecord(with: recordID)
+            let record = try await publicDatabase.record(for: recordID)
             
             let currentCount = record[CKField.RecipeComment.likeCount] as? Int64 ?? 0
             let newCount = increment ? currentCount + 1 : max(0, currentCount - 1)
             record[CKField.RecipeComment.likeCount] = newCount
             
-            _ = try await cloudKitActor.saveRecord(record)
+            try await publicDatabase.save(record)
             print("✅ Comment \(commentID) like count \(increment ? "incremented" : "decremented") to \(newCount)")
         } catch {
             print("❌ Failed to update comment like count for \(commentID): \(error)")
@@ -870,7 +888,7 @@ final class CloudKitSyncService: ObservableObject {
             let query = CKQuery(recordType: CloudKitConfig.challengeRecordType, predicate: predicate)
             query.sortDescriptors = [NSSortDescriptor(key: CKField.Challenge.startDate, ascending: true)]
 
-            let results = try await cloudKitActor.executeQueryWithResults(query)
+            let results = try await publicDatabase.records(matching: query)
 
             var challenges: [Challenge] = []
             for (_, result) in results.matchResults {
@@ -887,7 +905,7 @@ final class CloudKitSyncService: ObservableObject {
             let upcomingQuery = CKQuery(recordType: CloudKitConfig.challengeRecordType, predicate: upcomingPredicate)
             upcomingQuery.sortDescriptors = [NSSortDescriptor(key: CKField.Challenge.startDate, ascending: true)]
 
-            let upcomingResults = try await cloudKitActor.executeQueryWithResults( upcomingQuery)
+            let upcomingResults = try await publicDatabase.records(matching: upcomingQuery)
 
             for (_, result) in upcomingResults.matchResults {
                 if case .success(let record) = result {
@@ -1000,7 +1018,7 @@ final class CloudKitSyncService: ObservableObject {
         let predicate = NSPredicate(value: true)
         let query = CKQuery(recordType: CloudKitConfig.userChallengeRecordType, predicate: predicate)
 
-        let results = try await cloudKitActor.executeQueryWithResults( query)
+        let results = try await publicDatabase.records(matching: query)
         
         // Filter for this user's challenge locally
         let filteredResults = results.matchResults.filter { _, result in
@@ -1049,7 +1067,7 @@ final class CloudKitSyncService: ObservableObject {
         }
 
         // Save to CloudKit
-        _ = try await cloudKitActor.saveRecord(userChallengeRecord)
+        _ = try await publicDatabase.save(userChallengeRecord)
 
         // Update challenge participant/completion counts
         await updateChallengeStats(challengeID: challengeID, completed: true)
@@ -1068,7 +1086,7 @@ final class CloudKitSyncService: ObservableObject {
     private func updateChallengeStats(challengeID: String, completed: Bool) async {
         do {
             let recordID = CKRecord.ID(recordName: challengeID)
-            let record = try await cloudKitActor.fetchRecord(with: recordID)
+            let record = try await publicDatabase.record(for: recordID)
 
             if completed {
                 let currentCount = record[CKField.Challenge.completionCount] as? Int64 ?? 0
@@ -1078,7 +1096,7 @@ final class CloudKitSyncService: ObservableObject {
                 record[CKField.Challenge.participantCount] = currentCount + 1
             }
 
-            _ = try await cloudKitActor.saveRecord(record)
+            _ = try await publicDatabase.save(record)
         } catch {
             print("Failed to update challenge stats: \(error)")
         }
@@ -1127,7 +1145,7 @@ final class CloudKitSyncService: ObservableObject {
                 activityRecord[CKField.Activity.challengeName] = challenge.title
             }
             
-            _ = try await cloudKitActor.saveRecord(activityRecord)
+            _ = try await publicDatabase.save(activityRecord)
             print("✅ Created challenge completion activity for challengeID: \(challengeID)")
         } catch {
             print("⚠️ Failed to create challenge completion activity: \(error)")
@@ -1141,7 +1159,7 @@ final class CloudKitSyncService: ObservableObject {
 
         do {
             // Fetch the Users record
-            let userRecord = try await cloudKitActor.fetchRecord(with: recordID)
+            let userRecord = try await publicDatabase.record(for: recordID)
             
             // Update user stats in the Users table
             let currentPoints = userRecord["totalPoints"] as? Int64 ?? 0
@@ -1149,7 +1167,7 @@ final class CloudKitSyncService: ObservableObject {
             userRecord["challengesCompleted"] = Int64(challengesCompleted)
             userRecord["lastActiveAt"] = Date()
 
-            _ = try await cloudKitActor.saveRecord(userRecord)
+            _ = try await publicDatabase.save(userRecord)
             print("✅ Updated user stats in CloudKit")
         } catch {
             print("❌ Failed to update user stats: \(error)")
@@ -1233,7 +1251,7 @@ final class CloudKitSyncService: ObservableObject {
         
         let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
         
-        let results = try await cloudKitActor.executeQueryWithResults( query)
+        let results = try await publicDatabase.records(matching: query)
         
         var followingIDs: [String] = []
         for (_, result) in results.matchResults {
@@ -1265,7 +1283,7 @@ final class CloudKitSyncService: ObservableObject {
                 creatorInfo = cachedUser
             } else {
                 do {
-                    let userRecord = try await cloudKitActor.fetchRecord(with: CKRecord.ID(recordName: ownerID))
+                    let userRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: ownerID))
                     creatorInfo = CloudKitUser(from: userRecord)
                     userCache[ownerID] = creatorInfo
                 } catch {

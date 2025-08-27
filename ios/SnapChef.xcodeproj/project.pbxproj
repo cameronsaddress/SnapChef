@@ -24,6 +24,7 @@
 		1B2911A1C60F32EDF4885BFA /* FavoritesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17DE47EAAC6C60C491232D80 /* FavoritesView.swift */; };
 		1D25FCBBC734AFE9346CFCE6 /* LeaderboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EFE975B2ADB5C9E261250E8 /* LeaderboardView.swift */; };
 		1D29C7B5C01C48E1AD6626D4 /* MysteryMealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E39D96ACCF5D46EE6F4094CA /* MysteryMealView.swift */; };
+		1D3DDE294728BA36E2CAE856 /* CloudKitActor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6983A8D7AA98EB29D29182E0 /* CloudKitActor.swift */; };
 		1D441CCC08C09DEEFE3E770D /* RecipeLikeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC05392351018737EED0737 /* RecipeLikeManager.swift */; };
 		1DC73B59A4CEA9D2D154AF58 /* meal2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 4538A20809A0F4F689F7F5B1 /* meal2.jpg */; };
 		1E088B7D2B0CF38EA6559E3E /* CloudKitUserManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0091DBEDBDC94B14564A7FDA /* CloudKitUserManager.swift */; };
@@ -291,6 +292,7 @@
 		60199635F2175797D9C53234 /* CloudKitRecipe.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitRecipe.swift; path = SnapChef/Core/Models/CloudKitRecipe.swift; sourceTree = "<group>"; };
 		6074E73628C7740879D4B558 /* SafeVideoSaver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SafeVideoSaver.swift; path = SnapChef/Features/Sharing/Core/SafeVideoSaver.swift; sourceTree = "<group>"; };
 		609B6B5762D52F8382EC3FEB /* DeviceManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeviceManager.swift; path = SnapChef/Core/Services/DeviceManager.swift; sourceTree = "<group>"; };
+		6983A8D7AA98EB29D29182E0 /* CloudKitActor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitActor.swift; path = SnapChef/Core/Services/CloudKitActor.swift; sourceTree = "<group>"; };
 		6B590033D13C18D01FF5FAC5 /* PerformanceAnalyzer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PerformanceAnalyzer.swift; path = SnapChef/Features/Sharing/Platforms/TikTok/PerformanceAnalyzer.swift; sourceTree = "<group>"; };
 		6BDFFE3F7768F84376E9232D /* AppDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = SnapChef/App/AppDelegate.swift; sourceTree = "<group>"; };
 		6DE095E53679E0668984799F /* fridge1.jpg */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.jpeg; name = fridge1.jpg; path = SnapChef/Resources/fridge1.jpg; sourceTree = "<group>"; };
@@ -847,6 +849,7 @@
 				C407B905C2E4533B15733045 /* PaywallTriggerManager.swift */,
 				99D9AB655A8898FA9343AE6F /* CloudKitMigration.swift */,
 				FBC05392351018737EED0737 /* RecipeLikeManager.swift */,
+				6983A8D7AA98EB29D29182E0 /* CloudKitActor.swift */,
 			);
 			name = Services;
 			sourceTree = "<group>";
@@ -1398,6 +1401,7 @@
 				8932E37863CBF9D920958E17 /* PhotoDiskCache.swift in Sources */,
 				8504436D971B3A788CFB2BE8 /* CloudKitMigration.swift in Sources */,
 				1D441CCC08C09DEEFE3E770D /* RecipeLikeManager.swift in Sources */,
+				1D3DDE294728BA36E2CAE856 /* CloudKitActor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
