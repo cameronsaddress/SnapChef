@@ -1308,20 +1308,35 @@ final class UnifiedAuthManager: ObservableObject {
             print("🔍 DEBUG refreshCurrentUser - CloudKit record contents :")
             print("   username field: '\(record[CKField.User.username] as? String ?? "nil")'")
             print("   displayName field: '\(record[CKField.User.displayName] as? String ?? "nil")'")
-            print("   currentStreak field: '\(record[CKField.User.currentStreak] as? Int64 ?? -1)'")
-            print("   longestStreak field: '\(record[CKField.User.longestStreak] as? Int64 ?? -1)'")
-            print("   totalPoints field: '\(record[CKField.User.totalPoints] as? Int64 ?? -1)'")
-            print("   recipesCreated field: '\(record[CKField.User.recipesCreated] as? Int64 ?? -1)'")
-            print("   followerCount field: '\(record[CKField.User.followerCount] as? Int64 ?? -1)'")
-            print("   followingCount field: '\(record[CKField.User.followingCount] as? Int64 ?? -1)'")
             
-            let newUser = CloudKitUser(from: record)
+            // Create user from record
+            var newUser = CloudKitUser(from: record)
+            
+            // Fetch dynamic stats using the same method as UserProfileView
+            // This queries Follow records and Recipe records to get accurate counts
+            let cloudKitUserManager = CloudKitUserManager.shared
+            do {
+                let stats = try await cloudKitUserManager.getUserStats(for: recordID)
+                print("🔍 DEBUG refreshCurrentUser: Got stats - followers: \(stats.followerCount), following: \(stats.followingCount), recipes: \(stats.recipeCount)")
+                
+                // Update the user with the dynamic stats
+                newUser.followerCount = stats.followerCount
+                newUser.followingCount = stats.followingCount
+                newUser.recipesCreated = stats.recipeCount
+                newUser.currentStreak = stats.currentStreak
+            } catch {
+                print("⚠️ DEBUG refreshCurrentUser: Failed to get user stats, using defaults: \(error)")
+            }
+            
             print("🔍 DEBUG refreshCurrentUser: About to update currentUser on MainActor ")
             
             await MainActor.run {
                 print("🔍 DEBUG refreshCurrentUser: Updating currentUser on MainActor ")
                 self.currentUser = newUser
                 print("🔍 DEBUG refreshCurrentUser: currentUser updated successfully ")
+                print("   followerCount: \(newUser.followerCount)")
+                print("   followingCount: \(newUser.followingCount)")
+                print("   recipesCreated: \(newUser.recipesCreated)")
             }
             
             print("🔍 DEBUG refreshCurrentUser: Completed successfully ")
@@ -1460,25 +1475,20 @@ final class UnifiedAuthManager: ObservableObject {
         print("🔍 DEBUG updateSocialCounts: Starting for user recordID: \(recordID) ")
         
         do {
-            // Use CloudKitActor for thread-safe operations
-            let (followerCount, followingCount) = try await cloudKitActor.fetchFollowCounts(for: recordID)
+            // Use CloudKitUserManager's getUserStats like UserProfileView does
+            let cloudKitUserManager = CloudKitUserManager.shared
+            let stats = try await cloudKitUserManager.getUserStats(for: recordID)
             
-            print("📊 Updated social counts - Followers: \(followerCount), Following: \(followingCount) ")
+            print("📊 Updated social counts - Followers: \(stats.followerCount), Following: \(stats.followingCount), Recipes: \(stats.recipeCount) ")
             
-            // Update user record with the counts
-            let updates = UserStatUpdates(
-                followerCount: followerCount,
-                followingCount: followingCount
-            )
-            
-            print("🔍 DEBUG: About to call updateUserStats ")
-            try await updateUserStats(updates)
-            print("🔍 DEBUG: updateUserStats completed successfully ")
-            
-            // Refresh the entire user object from CloudKit to get all updates
-            print("🔍 DEBUG: About to call refreshCurrentUser ")
-            await refreshCurrentUser()
-            print("🔍 DEBUG: refreshCurrentUser completed successfully ")
+            // Update local state on MainActor
+            await MainActor.run {
+                self.currentUser?.followerCount = stats.followerCount
+                self.currentUser?.followingCount = stats.followingCount
+                self.currentUser?.recipesCreated = stats.recipeCount
+                self.currentUser?.currentStreak = stats.currentStreak
+                print("✅ Local user state updated with social counts")
+            }
             
         } catch {
             print("❌ Failed to update social counts: \(error)")
@@ -1498,37 +1508,19 @@ final class UnifiedAuthManager: ObservableObject {
         print("   User ID: \(recordID)")
         
         do {
-            // Use CloudKitActor for thread-safe operations
-            print("   Executing follow queries...")
-            let (followerCount, followingCount) = try await cloudKitActor.fetchFollowCounts(for: recordID)
-            print("   Follower query completed: \(followerCount) followers")
-            print("   Following query completed: \(followingCount) following")
+            // Use CloudKitUserManager's getUserStats like UserProfileView does
+            let cloudKitUserManager = CloudKitUserManager.shared
+            let stats = try await cloudKitUserManager.getUserStats(for: recordID)
             
-            print("📊 updateSocialCountsWithoutRefresh: Followers: \(followerCount), Following: \(followingCount)")
+            print("📊 updateSocialCountsWithoutRefresh: Followers: \(stats.followerCount), Following: \(stats.followingCount), Recipes: \(stats.recipeCount)")
             
-            // Update user record with counts (without refreshing)
-            let updates = UserStatUpdates(
-                followerCount: followerCount,
-                followingCount: followingCount
-            )
-            
-            print("   About to call updateUserStats...")
-            do {
-                try await updateUserStats(updates)
-                print("   updateUserStats completed successfully")
-            } catch {
-                // Log error but don't throw - this is a background update
-                print("⚠️ Failed to update user stats in CloudKit: \(error)")
-                print("   Error type: \(type(of: error))")
-                print("   Will use cached counts for now")
-                
-                // Still update local state even if CloudKit save fails
-                print("   Updating local state on MainActor...")
-                await MainActor.run {
-                    self.currentUser?.followerCount = followerCount
-                    self.currentUser?.followingCount = followingCount
-                }
-                print("   Local state updated")
+            // Update local state on MainActor
+            await MainActor.run {
+                self.currentUser?.followerCount = stats.followerCount
+                self.currentUser?.followingCount = stats.followingCount
+                self.currentUser?.recipesCreated = stats.recipeCount
+                self.currentUser?.currentStreak = stats.currentStreak
+                print("✅ Local user state updated with social counts (without refresh)")
             }
             
             // Don't call refreshCurrentUser here - it's already called in refreshAllSocialData
