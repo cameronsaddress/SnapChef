@@ -30,10 +30,9 @@ class RecipeLikeManager: ObservableObject {
     // MARK: - Initialization
     
     private init() {
-        // Load user likes on initialization
-        Task {
-            await loadUserLikes()
-        }
+        // Don't automatically load likes on init
+        // Views should explicitly call loadUserLikes() when they appear
+        // This prevents race conditions and ensures proper auth state
     }
     
     // MARK: - Public Methods
@@ -91,8 +90,9 @@ class RecipeLikeManager: ObservableObject {
                 print("✅ Successfully liked recipe in CloudKit: \(recipeID)")
             }
             
-            // Refresh the actual count from CloudKit after successful operation
-            await refreshLikeCount(for: recipeID)
+            // Don't immediately refresh from CloudKit - the optimistic update is accurate
+            // and CloudKit may not have indexed the new record yet
+            // The count will be refreshed when the view reappears or on pull-to-refresh
         } catch {
             print("❌ Failed to update like status: \(error)")
             
@@ -135,25 +135,14 @@ class RecipeLikeManager: ObservableObject {
     
     /// Refresh the like count for a specific recipe from CloudKit
     func refreshLikeCount(for recipeID: String) async {
-        do {
-            // First try to get it from the recipe record itself
-            let recordID = CKRecord.ID(recordName: recipeID)
-            let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-            let publicDB = container.publicCloudDatabase
-            
-            if let record = try? await publicDB.record(for: recordID) {
-                let count = Int(record["likeCount"] as? Int64 ?? 0)
-                await MainActor.run {
-                    self.recipeLikeCounts[recipeID] = count
-                    print("📊 Updated like count for \(recipeID): \(count)")
-                }
-            } else {
-                // Fallback to counting records if recipe not found
-                let count = await cloudKitManager.getLikeCount(for: recipeID)
-                await MainActor.run {
-                    self.recipeLikeCounts[recipeID] = count
-                    print("📊 Counted likes for \(recipeID): \(count)")
-                }
+        // Get the actual count from CloudKit (now reads from Recipe record first)
+        let count = await cloudKitManager.getLikeCount(for: recipeID)
+        
+        await MainActor.run {
+            // Only update if the count is different from what we have
+            if self.recipeLikeCounts[recipeID] != count {
+                self.recipeLikeCounts[recipeID] = count
+                print("📊 Updated like count for \(recipeID): \(count)")
             }
         }
     }

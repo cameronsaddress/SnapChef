@@ -132,8 +132,20 @@ struct RecipesView: View {
                 hasInitiallyLoaded = true
             }
 
-            // OPTIMIZATION: Start background CloudKit sync without blocking UI
+            // Load like data for authenticated users
             if cloudKitAuth.isAuthenticated {
+                // Load user's liked recipes and counts for all visible recipes
+                Task {
+                    await RecipeLikeManager.shared.loadUserLikes()
+                    
+                    // Get all recipe IDs and load their like counts
+                    let allRecipeIDs = filteredRecipes.map { $0.id.uuidString }
+                    if !allRecipeIDs.isEmpty {
+                        await RecipeLikeManager.shared.refreshLikeCounts(for: allRecipeIDs)
+                    }
+                }
+                
+                // OPTIMIZATION: Start background CloudKit sync without blocking UI
                 startBackgroundCloudKitSync()
             }
         }

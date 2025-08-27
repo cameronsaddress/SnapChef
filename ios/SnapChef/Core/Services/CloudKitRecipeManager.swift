@@ -1912,24 +1912,34 @@ class CloudKitRecipeManager: ObservableObject {
             throw RecipeError.uploadFailed
         }
         
+        // First check if already liked
+        if await hasUserLikedRecipe(recipeID: recipeID) {
+            print("⚠️ Recipe already liked: \(recipeID)")
+            return // Already liked, don't try to create duplicate
+        }
+        
         // Create a Like record - ensure ID doesn't start with underscore
         let cleanUserID = userID.hasPrefix("_") ? String(userID.dropFirst()) : userID
         let likeID = "like_\(cleanUserID)_\(recipeID)"
+        print("🔍 Creating RecipeLike with ID: \(likeID)")
+        print("🔍 userID field value: \(userID)")
+        print("🔍 recipeID field value: \(recipeID)")
+        
         let likeRecord = CKRecord(recordType: "RecipeLike", recordID: CKRecord.ID(recordName: likeID))
         likeRecord["userID"] = userID
         likeRecord["recipeID"] = recipeID
         likeRecord["likedAt"] = Date()
         
-        // Save to CloudKit
-        _ = try await publicDB.save(likeRecord)
+        // Save to CloudKit using CloudKitActor for safety
+        _ = try await CloudKitSyncService.shared.cloudKitActor.saveRecord(likeRecord)
         
         // Update the recipe's like count
         await updateRecipeLikeCount(recipeID: recipeID, increment: true)
         
         // Create activity for recipe owner (if it's not their own recipe)
         do {
-            // Fetch the recipe to get owner info and recipe name
-            let recipeRecord = try await publicDB.record(for: CKRecord.ID(recordName: recipeID))
+            // Fetch the recipe to get owner info and recipe name using CloudKitActor
+            let recipeRecord = try await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: CKRecord.ID(recordName: recipeID))
             let recipeOwnerID = recipeRecord["ownerID"] as? String
             let recipeName = recipeRecord["title"] as? String ?? recipeRecord["name"] as? String
             
@@ -1959,13 +1969,20 @@ class CloudKitRecipeManager: ObservableObject {
             throw RecipeError.uploadFailed
         }
         
+        // First check if actually liked
+        guard await hasUserLikedRecipe(recipeID: recipeID) else {
+            print("⚠️ Recipe not liked, cannot unlike: \(recipeID)")
+            return // Not liked, nothing to unlike
+        }
+        
         // Delete the Like record - ensure ID doesn't start with underscore
         let cleanUserID = userID.hasPrefix("_") ? String(userID.dropFirst()) : userID
         let likeID = "like_\(cleanUserID)_\(recipeID)"
         let recordID = CKRecord.ID(recordName: likeID)
         
         do {
-            _ = try await publicDB.deleteRecord(withID: recordID)
+            // Use CloudKitActor for safe deletion
+            try await CloudKitSyncService.shared.cloudKitActor.deleteRecord(with: recordID)
             
             // Update the recipe's like count
             await updateRecipeLikeCount(recipeID: recipeID, increment: false)
@@ -1989,7 +2006,8 @@ class CloudKitRecipeManager: ObservableObject {
         let recordID = CKRecord.ID(recordName: likeID)
         
         do {
-            _ = try await publicDB.record(for: recordID)
+            // Use CloudKitActor for safe fetching
+            _ = try await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID)
             return true
         } catch {
             return false
@@ -1998,12 +2016,36 @@ class CloudKitRecipeManager: ObservableObject {
     
     /// Get like count for a recipe
     func getLikeCount(for recipeID: String) async -> Int {
+        // First try to get the cached count from the Recipe record itself
+        let recordID = CKRecord.ID(recordName: recipeID)
+        do {
+            if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
+                if let likeCount = record["likeCount"] as? Int64 {
+                    return Int(likeCount)
+                }
+            }
+        } catch {
+            print("Could not fetch recipe record for like count: \(error)")
+        }
+        
+        // Fallback: Count the actual RecipeLike records
         let predicate = NSPredicate(format: "recipeID == %@", recipeID)
         let query = CKQuery(recordType: "RecipeLike", predicate: predicate)
+        print("🔍 Querying RecipeLike records with predicate: recipeID == \(recipeID)")
         
         do {
-            let (matchResults, _) = try await publicDB.records(matching: query, resultsLimit: 1000)
-            return matchResults.count
+            let results = try await CloudKitSyncService.shared.cloudKitActor.executeQueryWithResults(query)
+            let count = results.matchResults.count
+            print("🔍 Found \(count) RecipeLike records for recipe: \(recipeID)")
+            
+            // Update the Recipe record with the actual count for future use
+            if count > 0 {
+                Task {
+                    await updateRecipeLikeCount(recipeID: recipeID, absoluteCount: count)
+                }
+            }
+            
+            return count
         } catch {
             print("Failed to get like count: \(error)")
             return 0
@@ -2021,9 +2063,9 @@ class CloudKitRecipeManager: ObservableObject {
         let query = CKQuery(recordType: "RecipeLike", predicate: predicate)
         
         do {
-            let (matchResults, _) = try await publicDB.records(matching: query, resultsLimit: 1000)
-            let recipeIDs = matchResults.compactMap { result -> String? in
-                guard case .success(let record) = result.1 else { return nil }
+            let results = try await CloudKitSyncService.shared.cloudKitActor.executeQueryWithResults(query)
+            let recipeIDs = results.matchResults.compactMap { (_, result) -> String? in
+                guard case .success(let record) = result else { return nil }
                 return record["recipeID"] as? String
             }
             print("✅ Fetched \(recipeIDs.count) liked recipes for user")
@@ -2034,20 +2076,36 @@ class CloudKitRecipeManager: ObservableObject {
         }
     }
     
-    /// Update recipe's like count
+    /// Update recipe's like count by increment/decrement
     private func updateRecipeLikeCount(recipeID: String, increment: Bool) async {
         let recordID = CKRecord.ID(recordName: recipeID)
         
         do {
-            // Try to fetch from public database
-            if let record = try? await publicDB.record(for: recordID) {
+            // Try to fetch from public database using CloudKitActor
+            if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
                 let currentCount = record["likeCount"] as? Int64 ?? 0
                 record["likeCount"] = increment ? currentCount + 1 : max(0, currentCount - 1)
-                _ = try await publicDB.save(record)
-                print("✅ Updated like count for recipe: \(recipeID)")
+                _ = try await CloudKitSyncService.shared.cloudKitActor.saveRecord(record)
+                print("✅ Updated like count for recipe: \(recipeID) to \(record["likeCount"] ?? 0)")
             }
         } catch {
             print("⚠️ Could not update like count for recipe: \(error)")
+        }
+    }
+    
+    /// Update recipe's like count to an absolute value
+    private func updateRecipeLikeCount(recipeID: String, absoluteCount: Int) async {
+        let recordID = CKRecord.ID(recordName: recipeID)
+        
+        do {
+            // Try to fetch from public database using CloudKitActor
+            if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
+                record["likeCount"] = Int64(absoluteCount)
+                _ = try await CloudKitSyncService.shared.cloudKitActor.saveRecord(record)
+                print("✅ Set like count for recipe: \(recipeID) to \(absoluteCount)")
+            }
+        } catch {
+            print("⚠️ Could not set like count for recipe: \(error)")
         }
     }
 }
