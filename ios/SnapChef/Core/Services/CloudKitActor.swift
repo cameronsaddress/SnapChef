@@ -244,8 +244,9 @@ actor CloudKitActor {
 extension CloudKitActor {
     /// Fetch user record by user ID
     func fetchUserRecord(userID: String) async throws -> CKRecord {
-        // User records in CloudKit use the userID directly
-        let recordID = CKRecord.ID(recordName: userID)
+        // Check if userID already has "user_" prefix
+        let recordName = userID.hasPrefix("user_") ? userID : "user_\(userID)"
+        let recordID = CKRecord.ID(recordName: recordName)
         return try await fetchRecord(with: recordID)
     }
     
