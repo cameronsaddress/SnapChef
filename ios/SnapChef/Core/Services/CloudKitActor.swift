@@ -242,9 +242,10 @@ actor CloudKitActor {
 // MARK: - Convenience Extensions
 
 extension CloudKitActor {
-    /// Fetch user record by user ID (without "user_" prefix)
+    /// Fetch user record by user ID
     func fetchUserRecord(userID: String) async throws -> CKRecord {
-        let recordID = CKRecord.ID(recordName: "user_\(userID)")
+        // User records in CloudKit use the userID directly
+        let recordID = CKRecord.ID(recordName: userID)
         return try await fetchRecord(with: recordID)
     }
     
@@ -256,22 +257,20 @@ extension CloudKitActor {
     
     /// Fetch Follow records for social counts
     func fetchFollowCounts(for userID: String) async throws -> (followers: Int, following: Int) {
-        // The userID passed in is the internal CloudKit ID (like "_abc123")
-        // Follow records use "user_" prefix, so it becomes "user__abc123"
-        let followRecordID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
+        // Follow records use the userID directly without any prefix
+        // UserProfileView confirms this works correctly
         
         print("🔍 DEBUG fetchFollowCounts:")
         print("   Input userID: \(userID)")
-        print("   Follow record ID: \(followRecordID)")
         
         // Query for followers (people who follow this user)
-        let followerPredicate = NSPredicate(format: "followingID == %@ AND isActive == 1", followRecordID)
+        let followerPredicate = NSPredicate(format: "followingID == %@ AND isActive == 1", userID)
         let followerQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
         let followers = try await executeQuery(followerQuery, desiredKeys: ["followerID"])
         print("   Followers found: \(followers.count)")
         
         // Query for following (people this user follows)  
-        let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == 1", followRecordID)
+        let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == 1", userID)
         let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
         let following = try await executeQuery(followingQuery, desiredKeys: ["followingID"])
         print("   Following found: \(following.count)")

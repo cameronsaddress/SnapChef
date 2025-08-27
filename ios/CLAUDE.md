@@ -18,10 +18,10 @@ SnapChef is an iOS app that transforms fridge/pantry photos into personalized re
 
 #### 🔴 CRITICAL: CloudKit ID Structure
 - **CloudKit Internal IDs**: Start with underscore (e.g., "_abc123")
-- **User Record IDs**: Use "user_" prefix → "user__abc123" (double underscore is CORRECT)
-- **Follow Record IDs**: Must match User format → followerID/followingID = "user__abc123"
-- **Internal Storage**: CloudKitUser strips "user_" prefix for simplicity
-- **Queries**: ALWAYS add "user_" prefix when querying Follow records with user IDs
+- **User Record IDs**: Use the internal ID directly (e.g., "_abc123")
+- **Follow Record IDs**: Use userID directly in followerID/followingID fields
+- **Important**: NO "user_" prefix needed for Follow record queries
+- **CloudKitUserManager**: Queries Follow records with userID directly (confirmed working)
 
 ### Core Services
 - **UnifiedAuthManager** - All authentication and user management ✅
@@ -218,8 +218,8 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 - **Social Feed Fixed**: Username display and duplicate activities resolved
 - **New User Experience**: Fixed username setup errors for first-time users
 - **Share Consistency**: All share buttons use BrandedSharePopup with auto-feed sharing
-- **CloudKit ID Fix**: Fixed Follow record ID format to match User records ("user__xxx")
-- **Social Counts Fixed**: Follower/following counts now query with correct ID format
+- **CloudKit ID Fix**: Follow records use userID directly without "user_" prefix
+- **Social Counts Fixed**: CloudKitActor now queries Follow records correctly (matching CloudKitUserManager)
 
 ## 📝 API Integration
 
