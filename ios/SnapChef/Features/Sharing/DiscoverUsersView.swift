@@ -283,6 +283,43 @@ struct UserDiscoveryCard: View {
         self.onTap = onTap
         self._isFollowing = State(initialValue: user.isFollowing)
     }
+    
+    // Computed properties to simplify type-checking
+    private var buttonText: String {
+        if !UnifiedAuthManager.shared.isAuthenticated {
+            return "Sign In to Follow"
+        } else if isFollowing {
+            return "Following"
+        } else {
+            return "Follow"
+        }
+    }
+    
+    private var buttonTextColor: Color {
+        return (isFollowing || !UnifiedAuthManager.shared.isAuthenticated) ? .white : .black
+    }
+    
+    private var buttonMinWidth: CGFloat {
+        return UnifiedAuthManager.shared.isAuthenticated ? 80 : 120
+    }
+    
+    private var buttonBackgroundColor: Color {
+        if !UnifiedAuthManager.shared.isAuthenticated {
+            return Color(hex: "#667eea") // Simplified to single color
+        } else if isFollowing {
+            return Color.white.opacity(0.2)
+        } else {
+            return Color.white
+        }
+    }
+    
+    private var shouldShowGradient: Bool {
+        return !UnifiedAuthManager.shared.isAuthenticated
+    }
+    
+    private var buttonBorderColor: Color {
+        return (isFollowing && UnifiedAuthManager.shared.isAuthenticated) ? Color.white.opacity(0.5) : Color.clear
+    }
 
     var body: some View {
         Button(action: onTap) {
@@ -382,41 +419,34 @@ struct UserDiscoveryCard: View {
                         UnifiedAuthManager.shared.showAuthSheet = true
                     }
                 }) {
-                    Text {
-                        if !UnifiedAuthManager.shared.isAuthenticated {
-                            return "Sign In to Follow"
-                        } else if isFollowing {
-                            return "Following"
-                        } else {
-                            return "Follow"
-                        }
-                    }()
+                    Text(buttonText)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(isFollowing || !UnifiedAuthManager.shared.isAuthenticated ? .white : .black)
+                        .foregroundColor(buttonTextColor)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 7)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
-                        .frame(minWidth: UnifiedAuthManager.shared.isAuthenticated ? 80 : 120)
+                        .frame(minWidth: buttonMinWidth)
                         .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill {
-                                    if !UnifiedAuthManager.shared.isAuthenticated {
-                                        return AnyShapeStyle(LinearGradient(
-                                            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        ))
-                                    } else if isFollowing {
-                                        return AnyShapeStyle(Color.white.opacity(0.2))
-                                    } else {
-                                        return AnyShapeStyle(Color.white)
-                                    }
-                                }()
-                                .overlay(
+                            Group {
+                                if shouldShowGradient {
                                     RoundedRectangle(cornerRadius: 20)
-                                        .stroke(isFollowing && UnifiedAuthManager.shared.isAuthenticated ? Color.white.opacity(0.5) : Color.clear, lineWidth: 1)
-                                )
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                } else {
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .fill(buttonBackgroundColor)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 20)
+                                                .stroke(buttonBorderColor, lineWidth: 1)
+                                        )
+                                }
+                            }
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
