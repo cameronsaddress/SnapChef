@@ -496,20 +496,50 @@ struct UserProfileView: View {
 // MARK: - Recipe Grid Item
 struct RecipeGridItem: View {
     let recipe: RecipeData
+    @State private var showingDetail = false
+    @State private var fullRecipe: Recipe?
+    @State private var isLoadingRecipe = false
+    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Recipe Image
-            RoundedRectangle(cornerRadius: 12)
-                .fill(
-                    LinearGradient(
-                        colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .aspectRatio(1, contentMode: .fit)
-                .overlay(
+        Button(action: {
+            loadFullRecipe()
+        }) {
+            VStack(alignment: .leading, spacing: 8) {
+                // Recipe Image with Before/After photos
+                ZStack {
+                    if let fullRecipe = fullRecipe {
+                        // Show RecipePhotoView once we have the full recipe
+                        RecipePhotoView(
+                            recipe: fullRecipe,
+                            height: 120,
+                            showLabels: true
+                        )
+                        .aspectRatio(1, contentMode: .fit)
+                        .allowsHitTesting(false) // Prevent nested button interactions
+                    } else {
+                        // Show gradient placeholder while loading
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .aspectRatio(1, contentMode: .fit)
+                            .overlay(
+                                Group {
+                                    if isLoadingRecipe {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .scaleEffect(0.8)
+                                    }
+                                }
+                            )
+                    }
+                    
+                    // Like count overlay
                     VStack {
                         Spacer()
                         HStack {
@@ -530,17 +560,118 @@ struct RecipeGridItem: View {
                             .padding(8)
                         }
                     }
-                )
+                }
 
-            Text(recipe.title)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
-                .lineLimit(1)
+                Text(recipe.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
 
-            Text(recipe.createdAt.formatted(date: .abbreviated, time: .omitted))
-                .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.6))
+                Text(recipe.createdAt.formatted(date: .abbreviated, time: .omitted))
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.6))
+            }
         }
+        .buttonStyle(PlainButtonStyle())
+        .task {
+            // Preload the full recipe when the view appears
+            await loadFullRecipeAsync()
+        }
+        .sheet(isPresented: $showingDetail) {
+            if let fullRecipe = fullRecipe {
+                NavigationStack {
+                    RecipeDetailView(recipe: fullRecipe)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    showingDetail = false
+                                }
+                                .foregroundColor(.white)
+                            }
+                        }
+                }
+            }
+        }
+    }
+    
+    private func loadFullRecipe() {
+        guard fullRecipe == nil && !isLoadingRecipe else {
+            // If we already have the recipe or are loading, just show the sheet
+            if fullRecipe != nil {
+                showingDetail = true
+            }
+            return
+        }
+        
+        isLoadingRecipe = true
+        Task {
+            do {
+                // Fetch the full recipe from CloudKit
+                let fetchedRecipe = try await cloudKitRecipeManager.fetchRecipe(by: recipe.id)
+                await MainActor.run {
+                    self.fullRecipe = fetchedRecipe
+                    self.isLoadingRecipe = false
+                    self.showingDetail = true
+                }
+            } catch {
+                print("Failed to fetch full recipe: \(error)")
+                await MainActor.run {
+                    // Create a basic recipe as fallback
+                    self.fullRecipe = createBasicRecipe(from: recipe)
+                    self.isLoadingRecipe = false
+                    self.showingDetail = true
+                }
+            }
+        }
+    }
+    
+    private func loadFullRecipeAsync() async {
+        guard fullRecipe == nil && !isLoadingRecipe else { return }
+        
+        isLoadingRecipe = true
+        do {
+            // Fetch the full recipe from CloudKit
+            let fetchedRecipe = try await cloudKitRecipeManager.fetchRecipe(by: recipe.id)
+            await MainActor.run {
+                self.fullRecipe = fetchedRecipe
+                self.isLoadingRecipe = false
+            }
+        } catch {
+            print("Failed to preload full recipe: \(error)")
+            await MainActor.run {
+                self.isLoadingRecipe = false
+            }
+        }
+    }
+    
+    private func createBasicRecipe(from data: RecipeData) -> Recipe {
+        // Note: This is a fallback - the actual Recipe should be loaded from CloudKit
+        // The Recipe struct is quite different from RecipeData, so we can't create a proper one
+        // This should never actually be shown to the user
+        return Recipe(
+            id: UUID(uuidString: data.id) ?? UUID(),
+            ownerID: nil,
+            name: data.title,
+            description: "",
+            ingredients: [],
+            instructions: [],
+            cookTime: 30,
+            prepTime: 0,
+            servings: 2,
+            difficulty: .medium,
+            nutrition: Nutrition(calories: 0, protein: 0, carbs: 0, fat: 0, fiber: nil, sugar: nil, sodium: nil),
+            imageURL: data.imageURL,
+            createdAt: data.createdAt,
+            tags: [],
+            dietaryInfo: DietaryInfo(isVegetarian: false, isVegan: false, isGlutenFree: false, isDairyFree: false),
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
+        )
     }
 }
 
