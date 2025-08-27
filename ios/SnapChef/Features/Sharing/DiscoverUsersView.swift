@@ -372,25 +372,50 @@ struct UserDiscoveryCard: View {
 
                 // Follow Button
                 Button(action: {
-                    withAnimation(.spring(response: 0.3)) {
-                        isFollowing.toggle()
-                        onFollow()
+                    if UnifiedAuthManager.shared.isAuthenticated {
+                        withAnimation(.spring(response: 0.3)) {
+                            isFollowing.toggle()
+                            onFollow()
+                        }
+                    } else {
+                        // Show authentication prompt
+                        UnifiedAuthManager.shared.showAuthSheet = true
                     }
                 }) {
-                    Text(isFollowing ? "Following" : "Follow")
+                    Text {
+                        if !UnifiedAuthManager.shared.isAuthenticated {
+                            return "Sign In to Follow"
+                        } else if isFollowing {
+                            return "Following"
+                        } else {
+                            return "Follow"
+                        }
+                    }()
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(isFollowing ? .white : .black)
+                        .foregroundColor(isFollowing || !UnifiedAuthManager.shared.isAuthenticated ? .white : .black)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 7)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
-                        .frame(minWidth: 80)
+                        .frame(minWidth: UnifiedAuthManager.shared.isAuthenticated ? 80 : 120)
                         .background(
                             RoundedRectangle(cornerRadius: 20)
-                                .fill(isFollowing ? Color.white.opacity(0.2) : Color.white)
+                                .fill {
+                                    if !UnifiedAuthManager.shared.isAuthenticated {
+                                        return AnyShapeStyle(LinearGradient(
+                                            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        ))
+                                    } else if isFollowing {
+                                        return AnyShapeStyle(Color.white.opacity(0.2))
+                                    } else {
+                                        return AnyShapeStyle(Color.white)
+                                    }
+                                }()
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 20)
-                                        .stroke(isFollowing ? Color.white.opacity(0.5) : Color.clear, lineWidth: 1)
+                                        .stroke(isFollowing && UnifiedAuthManager.shared.isAuthenticated ? Color.white.opacity(0.5) : Color.clear, lineWidth: 1)
                                 )
                         )
                 }

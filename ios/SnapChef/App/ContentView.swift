@@ -293,97 +293,200 @@ struct SocialFeedView: View {
     }
 
     private var socialStatsHeader: some View {
-        VStack(spacing: 16) {
-            // User Info Row
-            HStack(spacing: 16) {
-                // Profile Image
-                if let user = authManager.currentUser {
-                    UserAvatarView(
-                        userID: user.recordID,
-                        username: user.username,
-                        displayName: user.displayName,
-                        size: 60
-                    )
-                }
+        Group {
+            if authManager.isAuthenticated {
+                // Authenticated user view
+                VStack(spacing: 16) {
+                    // User Info Row
+                    HStack(spacing: 16) {
+                        // Profile Image
+                        if let user = authManager.currentUser {
+                            UserAvatarView(
+                                userID: user.recordID,
+                                username: user.username,
+                                displayName: user.displayName,
+                                size: 60
+                            )
+                        }
 
-                // Stats
-                HStack(spacing: 24) {
-                    socialStatItem(
-                        count: {
-                            let count = authManager.currentUser?.followerCount ?? 0
-                            print("🔍 DEBUG SocialFeedView - Followers field: authManager.currentUser?.followerCount = \(count)")
-                            print("    └─ CloudKit field: CKField.User.followerCount")
-                            return count
-                        }(),
-                        label: "Followers"
-                    )
+                        // Stats
+                        HStack(spacing: 24) {
+                            socialStatItem(
+                                count: authManager.currentUser?.followerCount ?? 0,
+                                label: "Followers"
+                            )
 
-                    socialStatItem(
-                        count: {
-                            let count = authManager.currentUser?.followingCount ?? 0
-                            print("🔍 DEBUG SocialFeedView - Following field: authManager.currentUser?.followingCount = \(count)")
-                            print("    └─ CloudKit field: CKField.User.followingCount")
-                            return count
-                        }(),
-                        label: "Following"
-                    )
+                            socialStatItem(
+                                count: authManager.currentUser?.followingCount ?? 0,
+                                label: "Following"
+                            )
 
-                    socialStatItem(
-                        count: {
-                            let count = authManager.currentUser?.recipesCreated ?? 0
-                            print("🔍 DEBUG SocialFeedView - Recipes field: authManager.currentUser?.recipesCreated = \(count)")
-                            print("    └─ CloudKit field: CKField.User.recipesCreated")
-                            return count
-                        }(),
-                        label: "Recipes"
-                    )
-                }
+                            socialStatItem(
+                                count: authManager.currentUser?.recipesCreated ?? 0,
+                                label: "Recipes"
+                            )
+                        }
 
-                Spacer()
-            }
+                        Spacer()
+                    }
 
-            // Discover Button
-            Button(action: {
-                showingDiscoverUsers = true
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 16, weight: .semibold))
-                    Text("Discover Chefs")
-                        .font(.system(size: 16, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(
-                    LinearGradient(
-                        colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(12)
-            }
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(
+                    // Discover Button
+                    Button(action: {
+                        showingDiscoverUsers = true
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Discover Chefs")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
                             LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.3),
-                                    Color.white.opacity(0.1)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
+                                colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(12)
+                    }
+                }
+                .padding(20)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.white.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.3),
+                                            Color.white.opacity(0.1)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
                         )
                 )
-        )
+            } else {
+                // Unauthenticated user view - Beautiful login prompt
+                VStack(spacing: 20) {
+                    // Icon
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#667eea").opacity(0.3), Color(hex: "#764ba2").opacity(0.3)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 80, height: 80)
+                        
+                        Image(systemName: "person.3.fill")
+                            .font(.system(size: 35))
+                            .foregroundColor(.white)
+                    }
+                    
+                    // Welcome message
+                    VStack(spacing: 8) {
+                        Text("Join Our Community")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text("Connect with fellow food lovers and share your culinary creations")
+                            .font(.system(size: 15))
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    
+                    // Features list
+                    VStack(alignment: .leading, spacing: 12) {
+                        authFeatureRow(icon: "person.2.fill", text: "Follow your favorite chefs")
+                        authFeatureRow(icon: "square.and.arrow.up", text: "Share your recipe creations")
+                        authFeatureRow(icon: "trophy.fill", text: "Join cooking challenges")
+                        authFeatureRow(icon: "heart.fill", text: "Like and save recipes")
+                    }
+                    .padding(.vertical, 10)
+                    
+                    // Sign in button
+                    Button(action: {
+                        authManager.showAuthSheet = true
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.crop.circle.badge.checkmark")
+                                .font(.system(size: 18, weight: .semibold))
+                            Text("Sign In to Continue")
+                                .font(.system(size: 17, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(14)
+                        .shadow(color: Color(hex: "#667eea").opacity(0.4), radius: 12, y: 6)
+                    }
+                    
+                    // Discover button (still accessible)
+                    Button(action: {
+                        showingDiscoverUsers = true
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 14))
+                            Text("Browse Chefs")
+                                .font(.system(size: 14))
+                        }
+                        .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+                .padding(24)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.white.opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.2),
+                                            Color.white.opacity(0.05)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
+                )
+            }
+        }
+    }
+    
+    private func authFeatureRow(icon: String, text: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(Color(hex: "#667eea"))
+                .frame(width: 24)
+            
+            Text(text)
+                .font(.system(size: 15))
+                .foregroundColor(.white.opacity(0.9))
+            
+            Spacer()
+        }
     }
 
     private func socialStatItem(count: Int, label: String) -> some View {
