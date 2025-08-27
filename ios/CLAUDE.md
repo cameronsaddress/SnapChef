@@ -291,6 +291,18 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 
 ## 🔄 Latest Updates (Aug 27, 2025)
 
+### Activity Feed Performance Optimization Plan (Aug 27) 📈
+- **Created ACTIVITY_FEED_OPTIMIZATION_PLAN.md** with comprehensive optimization strategy
+- **Identified bottlenecks**: Sequential queries, redundant fetches, recipe validation overhead
+- **Key optimizations planned**:
+  - UserCacheManager for 5-minute user data caching
+  - Parallel query execution with TaskGroup
+  - Batch user fetching to reduce queries by 95%
+  - Remove redundant recipe validation checks
+  - Smart pagination for incremental loading
+- **Expected improvements**: 75% faster load times, 80% fewer queries
+- **No CloudKit schema changes required** - uses existing fields only
+
 ### CloudKit Crash Fix Complete (Aug 27) ✅
 - ✅ **Fixed EXC_BREAKPOINT crashes in Feed view**:
   - Created CloudKitActor with NSLock protection against double-resume
