@@ -9,6 +9,84 @@ Transform SnapChef's authentication from a barrier into an opportunity by implem
 **Timeline**: 3-4 days of development
 **Risk Level**: Low (fully backwards compatible)
 **Expected Impact**: 40-60% authentication rate within first week
+**Last Updated**: August 27, 2025
+
+## 🚨 MASTER TODO LIST - PROGRESSIVE AUTH IMPLEMENTATION
+
+### ✅ Completed Items
+- [x] Create AnonymousUserProfile model
+- [x] Implement KeychainProfileManager for secure storage
+- [x] Add basic trackAnonymousAction to UnifiedAuthManager
+- [x] Setup progressive auth state properties
+- [x] Create AuthenticationState enum
+- [x] Implement profile persistence across sessions
+
+### 🔴 Critical - iCloud Check System (PRIORITY 1)
+- [x] Create iCloudStatusManager to check account availability ✅
+- [x] Add proactive iCloud check on app launch ✅
+- [x] Implement iCloud check before key features ✅
+- [x] Create educational prompt explaining iCloud benefits ✅
+- [x] Add deep link to Settings → Apple ID → iCloud ✅
+- [x] Handle various CKAccountStatus states properly ✅
+- [ ] Create fallback for users without iCloud
+- [ ] Add "Set Up iCloud" nudge after onboarding
+- [ ] Track iCloud setup completion
+
+### 🟠 High Priority - Core Nudge System (PRIORITY 2)
+- [x] **Create AuthPromptManager.swift** - Main orchestrator ✅
+- [x] Implement prompt priority queue ✅
+- [x] Add cooldown system (24hr between prompts) ✅
+- [x] Create prompt scheduling logic ✅
+- [x] Add prompt dismissal tracking ✅
+- [x] Implement "Never Ask Again" preference ✅
+- [x] Create prompt display rules ✅
+- [ ] Add A/B testing framework
+- [x] Implement analytics tracking ✅
+
+### 🟡 Medium Priority - UI Components (PRIORITY 3)
+- [x] **Create AuthPromptCard.swift** - Slide-up card UI ✅
+- [x] **Create InlineAuthPrompt.swift** - Inline feature locks ✅
+- [ ] **Create ReengagementAuthView.swift** - Full screen prompt
+- [ ] **Create iCloudSetupPrompt.swift** - iCloud-specific prompt
+- [ ] Add swipe-to-dismiss gestures
+- [ ] Implement entrance/exit animations
+- [ ] Create benefit reveal animations
+- [ ] Add haptic feedback
+- [ ] Support dark mode
+- [ ] Create celebration animation for successful auth
+
+### 🟢 Integration Points (PRIORITY 4)
+- [ ] Add prompt check after first recipe creation
+- [ ] Integrate with video generation flow
+- [ ] Add to challenge viewing
+- [ ] Integrate with social features
+- [ ] Add to tab bar with badge
+- [ ] Create locked content previews
+- [ ] Add prompt to settings
+- [ ] Integrate with share functionality
+- [ ] Add to profile view
+
+### 🔵 Data & Analytics (PRIORITY 5)
+- [ ] Create AuthenticationAnalytics.swift
+- [ ] Track all prompt events
+- [ ] Measure conversion rates
+- [ ] Identify optimal timing
+- [ ] Track dismissal patterns
+- [ ] Monitor auth success rates
+- [ ] Create funnel analysis
+- [ ] Generate daily reports
+- [ ] A/B test different messages
+
+### ⚪ Nice to Have (PRIORITY 6)
+- [ ] Create onboarding skip for returning users
+- [ ] Add social proof elements
+- [ ] Implement referral system
+- [ ] Create seasonal prompts
+- [ ] Add gamification elements
+- [ ] Create video tutorials
+- [ ] Add FAQ section
+- [ ] Implement smart reminders
+- [ ] Create email capture fallback
 
 ---
 

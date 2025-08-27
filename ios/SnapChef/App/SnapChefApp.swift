@@ -129,6 +129,9 @@ struct SnapChefApp: App {
             await RecipeLikeManager.shared.loadUserLikes()
             print("✅ RecipeLikeManager initialized with user's liked recipes")
             
+            // Check iCloud status for progressive auth
+            await iCloudStatusManager.shared.checkiCloudStatus()
+            
             // Track daily app usage and update streak
             await trackDailyAppUsage()
 
