@@ -106,10 +106,6 @@ struct HomeView: View {
                             .padding(.top, 20)
                             .padding(.bottom, 20)
 
-                        // Food Preferences Card
-                        FoodPreferencesCard()
-                            .padding(.horizontal, 30)
-                            .padding(.top, 20)
 
                         // Mystery Meal Button
                         MysteryMealButton(

@@ -1668,42 +1668,6 @@ struct CameraDetectiveView: View {
                 
                 // Bottom controls
                 VStack(spacing: 16) {
-                    // Test button
-                    Button(action: {
-                        // Load test image and dismiss
-                        // Try both with and without extension
-                        let testImage = UIImage(named: "meal1") ?? UIImage(named: "meal1.jpg")
-                        
-                        if let image = testImage {
-                            capturedImage = image
-                            
-                            // Force dismiss after a slight delay to ensure binding updates
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                presentationMode.wrappedValue.dismiss()
-                            }
-                        }
-                    }) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "fork.knife")
-                                .font(.system(size: 16, weight: .semibold))
-                            
-                            Text("TEST: Sample Meal")
-                                .font(.system(size: 16, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.orange, Color.red],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .cornerRadius(25)
-                        .shadow(color: Color.orange.opacity(0.4), radius: 8, y: 4)
-                    }
-                    
                     // Main capture button
                     DetectiveCameraCaptureButton {
                         capturePhoto()
