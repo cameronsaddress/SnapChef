@@ -101,15 +101,14 @@ struct CameraView: View {
                     // Top controls (CameraTopControls temporarily commented out)
                     // TODO: Implement CameraTopControls
                     CameraTopBar(onClose: {
-                        // Properly clean up camera before switching tabs
-                        cameraModel.stopSession()
+                        // Stop camera session only if it's running
+                        if cameraModel.isSessionReady {
+                            cameraModel.stopSession()
+                        }
                         resetCaptureFlow()
                         
-                        // Add a small delay to ensure camera cleanup completes
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            // Go back to home tab
-                            selectedTab = 0
-                        }
+                        // Switch tabs immediately - no delay needed
+                        selectedTab = 0
                     })
                     
                     Spacer()
@@ -122,31 +121,7 @@ struct CameraView: View {
                             isDisabled: isProcessing,
                             triggerAnimation: $captureAnimation
                         )
-                        
-                        // Test button for development - sends test fridge image
-                        Button(action: sendTestFridgeImage) {
-                            HStack {
-                                Image(systemName: "photo.on.rectangle")
-                                    .font(.system(size: 16, weight: .medium))
-                                Text("Test Fridge")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(
-                                Capsule()
-                                    .fill(Color.blue.opacity(0.8))
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                    )
-                            )
-                            .shadow(color: Color.blue.opacity(0.3), radius: 8, y: 4)
-                        }
-                        .disabled(isProcessing)
-                        .opacity(isProcessing ? 0.5 : 1.0)
-                        .padding(.bottom, 30)
+                        .padding(.bottom, 50)
                     }
                 }
             }
@@ -165,14 +140,8 @@ struct CameraView: View {
                             captureMode = .fridge
                             showPantryStep = false
                             
-                            // Ensure camera is stopped before navigating
-                            cameraModel.stopSession()
-                            
-                            // Add a small delay to ensure cleanup completes
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                // Navigate back to home tab
-                                selectedTab = 0
-                            }
+                            // Navigate back to home tab immediately
+                            selectedTab = 0
                         })
                     )
             }
@@ -269,10 +238,8 @@ struct CameraView: View {
             enabled: deviceManager.shouldShowParticles
         ))
         .onDisappear {
-            // Only stop session if it hasn't been stopped already
-            if cameraModel.isSessionReady {
-                cameraModel.stopSession()
-            }
+            // Clean up when view disappears
+            // The camera session will be stopped by CameraModel's cleanup
             resetCaptureFlow()
         }
         .fullScreenCover(isPresented: $showingResults) {

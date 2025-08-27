@@ -217,19 +217,37 @@ class CameraModel: NSObject, ObservableObject {
         output.capturePhoto(with: settings, delegate: self)
     }
 
+    private var isStoppingSession = false
+    
     func stopSession() {
+        // Prevent multiple simultaneous stop calls
+        guard !isStoppingSession else {
+            print("🎥 Camera session stop already in progress")
+            return
+        }
+        
+        guard isSessionReady || session.isRunning else {
+            print("🎥 Camera session already stopped")
+            return
+        }
+        
         print("🎥 Stopping camera session...")
+        isStoppingSession = true
         isSessionReady = false
         let captureSession = session
         
         if captureSession.isRunning {
             // Stop the session asynchronously to avoid blocking
-            DispatchQueue.global(qos: .userInitiated).async {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 captureSession.stopRunning()
-                print("🎥 Camera session stopped")
+                print("🎥 Camera session stopped successfully")
+                DispatchQueue.main.async {
+                    self?.isStoppingSession = false
+                }
             }
         } else {
             print("🎥 Camera session was not running")
+            isStoppingSession = false
         }
     }
 }
