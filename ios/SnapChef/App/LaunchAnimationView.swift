@@ -31,20 +31,11 @@ struct LaunchAnimationView: View {
             MagicalBackground()
                 .ignoresSafeArea()
 
-            // SNAPCHEF logo with app icon
+            // SNAPCHEF logo
             VStack(spacing: 0) {
                 Spacer()
                 
                 SnapchefLogo()
-                
-                // App icon below the logo
-                Image("AppIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 120, height: 120)
-                    .cornerRadius(26)
-                    .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
-                    .padding(.top, 30)
                 
                 Spacer()
             }
