@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import CloudKit
+import CloudKit
 
 // MARK: - Emoji Flick Game
 struct EmojiFlickGame: View {
@@ -795,17 +796,17 @@ struct GameState {
     }
     
     static func saveGlobalHighScoreToCloudKit(score: Int) async {
-        let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-        let publicDB = container.publicCloudDatabase
-        
         // Create or update the high score record
         let recordID = CKRecord.ID(recordName: "EmojiGameGlobalHighScore")
+        
+        // Use CloudKitActor for safe operations
+        let actor = CloudKitActor()
         
         do {
             // Try to fetch existing record
             let record: CKRecord
             do {
-                record = try await publicDB.record(for: recordID)
+                record = try await actor.fetchRecord(with: recordID)
             } catch {
                 // Record doesn't exist, create new one
                 record = CKRecord(recordType: "GameHighScore", recordID: recordID)
@@ -821,7 +822,7 @@ struct GameState {
                 }
                 record["deviceID"] = deviceID
                 
-                _ = try await publicDB.save(record)
+                _ = try await actor.saveRecord(record)
                 print("✅ Global high score updated to \(score)")
             }
         } catch {
@@ -830,12 +831,13 @@ struct GameState {
     }
     
     static func fetchGlobalHighScore() async -> Int {
-        let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-        let publicDB = container.publicCloudDatabase
         let recordID = CKRecord.ID(recordName: "EmojiGameGlobalHighScore")
         
+        // Use CloudKitActor for safe operations
+        let actor = CloudKitActor()
+        
         do {
-            let record = try await publicDB.record(for: recordID)
+            let record = try await actor.fetchRecord(with: recordID)
             let score = record["score"] as? Int ?? 0
             
             // Cache it locally
