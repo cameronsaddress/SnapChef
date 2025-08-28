@@ -33,6 +33,7 @@ struct CameraView: View {
     @State private var showingUpgrade = false
     @State private var showConfetti = false
     @State private var showWelcomeMessage = false
+    @State private var isClosing = false
 
     // Two-step capture flow state
     enum CaptureMode {
@@ -101,14 +102,26 @@ struct CameraView: View {
                     // Top controls (CameraTopControls temporarily commented out)
                     // TODO: Implement CameraTopControls
                     CameraTopBar(onClose: {
-                        // Stop camera session only if it's running
-                        if cameraModel.isSessionReady {
-                            cameraModel.stopSession()
+                        // Start closing animation
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            isClosing = true
+                            shouldShowFullUI = false
                         }
-                        resetCaptureFlow()
                         
-                        // Switch tabs immediately - no delay needed
-                        selectedTab = 0
+                        // Small delay for smooth animation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            // Stop camera session only if it's running
+                            if cameraModel.isSessionReady {
+                                cameraModel.stopSession()
+                            }
+                            resetCaptureFlow()
+                            
+                            // Switch tabs after animation
+                            selectedTab = 0
+                            
+                            // Reset closing state for next time
+                            isClosing = false
+                        }
                     })
                     
                     Spacer()
@@ -144,6 +157,13 @@ struct CameraView: View {
                             selectedTab = 0
                         })
                     )
+            }
+            
+            // Black overlay when closing to prevent frozen frame
+            if isClosing {
+                Color.black
+                    .ignoresSafeArea()
+                    .transition(.opacity)
             }
             
             // Preview overlay
@@ -224,6 +244,8 @@ struct CameraView: View {
         }
         .onAppear {
             print("🔍 DEBUG: CameraView appeared - Start")
+            // Reset closing state when view appears
+            isClosing = false
             DispatchQueue.main.async {
                 print("🔍 DEBUG: CameraView - Async block started")
                 // Performance optimization: Progressive loading
@@ -1169,6 +1191,8 @@ struct CameraView: View {
         captureMode = .fridge
         fridgePhoto = nil
         showPantryStep = false
+        capturedImage = nil
+        showingPreview = false
     }
 
     private func determineRecipeQuality(_ recipe: Recipe) -> RecipeQuality {

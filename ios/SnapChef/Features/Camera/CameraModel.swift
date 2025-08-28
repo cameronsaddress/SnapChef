@@ -234,6 +234,11 @@ class CameraModel: NSObject, ObservableObject {
         print("🎥 Stopping camera session...")
         isStoppingSession = true
         isSessionReady = false
+        
+        // Clear the preview layer immediately to prevent frozen frame
+        preview?.removeFromSuperlayer()
+        preview = nil
+        
         let captureSession = session
         
         if captureSession.isRunning {
@@ -330,6 +335,20 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
 
 struct CameraPreview: UIViewRepresentable {
     @ObservedObject var cameraModel: CameraModel
+    
+    // Coordinator for proper cleanup
+    class Coordinator {
+        var previewLayer: AVCaptureVideoPreviewLayer?
+        
+        func cleanup() {
+            previewLayer?.removeFromSuperlayer()
+            previewLayer = nil
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: UIScreen.main.bounds)
@@ -339,6 +358,9 @@ struct CameraPreview: UIViewRepresentable {
         previewLayer.frame = view.bounds
         previewLayer.videoGravity = .resizeAspectFill
         view.layer.addSublayer(previewLayer)
+        
+        // Store preview layer in coordinator for cleanup
+        context.coordinator.previewLayer = previewLayer
 
         Task { @MainActor in
             cameraModel.preview = previewLayer
@@ -354,6 +376,9 @@ struct CameraPreview: UIViewRepresentable {
             newPreviewLayer.frame = uiView.bounds
             newPreviewLayer.videoGravity = .resizeAspectFill
             uiView.layer.addSublayer(newPreviewLayer)
+            
+            // Update coordinator reference
+            context.coordinator.previewLayer = newPreviewLayer
 
             Task { @MainActor in
                 cameraModel.preview = newPreviewLayer
@@ -364,5 +389,10 @@ struct CameraPreview: UIViewRepresentable {
         // Update existing preview layer
         previewLayer.frame = uiView.bounds
         previewLayer.session = cameraModel.session
+    }
+    
+    // Called when the view is being removed
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.cleanup()
     }
 }
