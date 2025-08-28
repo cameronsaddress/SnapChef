@@ -113,6 +113,7 @@ struct RecipeResultsView: View {
                                 showBrandedShare = true
                             },
                             onSave: {
+                                print("🔍 onSave callback triggered for recipe: \(recipe.name)")
                                 // Add animation for visual feedback
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                     saveRecipe(recipe)
@@ -593,7 +594,13 @@ struct DetectiveRecipeCard: View {
     @ViewBuilder
     private var actionButtonsSection: some View {
         HStack(spacing: 12) {
-            Button(action: onSave) {
+            Button(action: {
+                // Add debug logging
+                print("🔍 Save button tapped for recipe: \(recipe.name)")
+                print("🔍 Is authenticated: \(isAuthenticated)")
+                print("🔍 Is saved: \(isSaved)")
+                onSave()
+            }) {
                 HStack(spacing: 8) {
                     Image(systemName: isAuthenticated ? 
                           (isSaved ? "heart.fill" : "heart") : 
@@ -628,9 +635,14 @@ struct DetectiveRecipeCard: View {
                                Color.clear, lineWidth: 1)
                 )
             }
-            .disabled(!isAuthenticated)  // Only disable if not authenticated
+            .buttonStyle(PlainButtonStyle())  // Use plain style to avoid default behaviors
+            .allowsHitTesting(true)  // Ensure button is tappable
+            .contentShape(Rectangle())  // Expand hit area to full button
             
-            Button(action: onShare) {
+            Button(action: {
+                print("🔍 Share button tapped for recipe: \(recipe.name)")
+                onShare()
+            }) {
                 HStack(spacing: 8) {
                     Image(systemName: "square.and.arrow.up")
                     Text("Share")
@@ -643,6 +655,9 @@ struct DetectiveRecipeCard: View {
                 .background(Color.white.opacity(0.2))
                 .cornerRadius(12)
             }
+            .buttonStyle(PlainButtonStyle())
+            .allowsHitTesting(true)
+            .contentShape(Rectangle())
         }
     }
     
