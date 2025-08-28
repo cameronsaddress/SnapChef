@@ -291,6 +291,33 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 
 ## 🔄 Latest Updates (Aug 28, 2025)
 
+### Local-First Recipe Management & Duplicate Prevention (Aug 28) ✅
+- **Local-First Architecture Implementation**:
+  - Created `LocalRecipeStorage` for instant save/unsave operations
+  - Implemented `RecipeSyncQueue` for batched CloudKit background sync (5-second intervals)
+  - Added `PersistentSyncQueue` for retry logic (max 3 attempts, 7-day expiry)
+  - Recipe saves now instant with optimistic UI updates
+  - CloudKit sync happens transparently in background
+  - App works fully offline with sync on reconnection
+- **Recipe Save/Unsave Fix**:
+  - Fixed issue where recipes required multiple taps to save/unsave
+  - Fixed recipes that existed in CloudKit couldn't be toggled properly
+  - Save state now persisted in UserDefaults for instant access
+  - Migration logic added for existing CloudKit saved recipes
+- **Duplicate Recipe Prevention**:
+  - Updated CameraView to use LocalRecipeStorage for faster duplicate checking
+  - No longer makes CloudKit queries during recipe generation
+  - Checks recipe names with variations (lowercase, "and" vs "&")
+  - Significantly improved performance by eliminating network calls
+- **Files Created/Modified**:
+  - NEW: `LocalRecipeStorage.swift` - Central local state manager
+  - NEW: `RecipeSyncQueue.swift` - Background sync coordinator
+  - NEW: `PersistentSyncQueue.swift` - Failed operation retry system
+  - MODIFIED: `RecipeResultsView.swift` - Simplified save logic
+  - MODIFIED: `CameraView.swift` - Local storage for duplicate prevention
+  - MODIFIED: `AppState.swift` - Added local storage integration
+  - MODIFIED: `SnapChefApp.swift` - Added migration and retry logic
+
 ### Recipe Authentication & UI Updates (Aug 28) ✅
 - **Recipe Results Authentication**:
   - Added authentication prompts when unauthenticated users try to save/like recipes

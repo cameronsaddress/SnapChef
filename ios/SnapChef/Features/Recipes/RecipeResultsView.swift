@@ -17,7 +17,8 @@ struct RecipeResultsView: View {
     @State private var confettiTrigger = false
     @State private var contentVisible = false
     @State private var activeSheet: ActiveSheet?
-    @State private var savedRecipeIds: Set<UUID> = []
+    @StateObject private var localStorage = LocalRecipeStorage.shared
+    @State private var savedRecipeIds: Set<UUID> = []  // UI cache for instant updates
     @State private var showingExitConfirmation = false
     
     // Authentication states
@@ -75,25 +76,25 @@ struct RecipeResultsView: View {
         self.isPresented = isPresented
     }
     
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                // Dark detective background - exact same as DetectiveResultsView
-                LinearGradient(
-                    colors: [
-                        Color(hex: "#0f0625"),
-                        Color(hex: "#1a0033"),
-                        Color(hex: "#0a051a")
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 30) {
-                        // Recipe Cards with Detective styling
-                        ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
+    @ViewBuilder
+    private var mainContent: some View {
+        ZStack {
+            // Dark detective background - exact same as DetectiveResultsView
+            LinearGradient(
+                colors: [
+                    Color(hex: "#0f0625"),
+                    Color(hex: "#1a0033"),
+                    Color(hex: "#0a051a")
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 30) {
+                    // Recipe Cards with Detective styling
+                    ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                         DetectiveRecipeCard(
                             recipe: recipe,
                             isSaved: savedRecipeIds.contains(recipe.id),
@@ -127,11 +128,16 @@ struct RecipeResultsView: View {
                             value: cardEntranceAnimations[safe: index]
                         )
                     }
-                        
-                        Spacer(minLength: 50)
-                    }
+                    
+                    Spacer(minLength: 50)
                 }
             }
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            mainContent
             .navigationTitle("Your Recipes")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -184,30 +190,14 @@ struct RecipeResultsView: View {
                 print("🔍 DEBUG: Number of recipes: \(recipes.count)")
                 print("🔍 DEBUG: Auth status: \(authManager.isAuthenticated)")
                 
-                // Initialize saved state for recipes
+                // Initialize from LOCAL STORAGE (instant, no network calls)
                 for recipe in recipes {
-                    if appState.savedRecipes.contains(where: { $0.id == recipe.id }) {
+                    if localStorage.isRecipeSaved(recipe.id) {
                         savedRecipeIds.insert(recipe.id)
+                        print("💾 Recipe '\(recipe.name)' loaded as saved from local storage")
                     }
                 }
-                print("🔍 DEBUG: Saved recipe IDs initialized: \(savedRecipeIds.count) saved")
-                
-                // Also check CloudKit for saved recipes (in case appState is out of sync)
-                Task {
-                    if authManager.isAuthenticated {
-                        do {
-                            let cloudKitSavedRecipes = try await CloudKitRecipeManager.shared.getUserSavedRecipes()
-                            for recipe in recipes {
-                                if cloudKitSavedRecipes.contains(where: { $0.id == recipe.id }) {
-                                    savedRecipeIds.insert(recipe.id)
-                                    print("🔍 DEBUG: Recipe '\(recipe.name)' found as saved in CloudKit")
-                                }
-                            }
-                        } catch {
-                            print("🔍 DEBUG: Failed to check CloudKit for saved recipes: \(error)")
-                        }
-                    }
-                }
+                print("💾 Initialized \(savedRecipeIds.count) saved recipes from local storage")
                 
                 startAnimations()
             }
@@ -294,96 +284,78 @@ struct RecipeResultsView: View {
     private func saveRecipe(_ recipe: Recipe) {
         // Check authentication first
         guard authManager.isAuthenticated else {
-            // Store pending action and show auth prompt
             pendingAction = .save(recipe)
             showAuthPrompt = true
-            
-            // Haptic feedback for auth prompt
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.warning)
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
             return
         }
         
-        // Haptic feedback FIRST for immediate user feedback
-        let generator = UINotificationFeedbackGenerator()
+        // LOCAL-FIRST: Instant update, no waiting for network
+        let currentlySaved = localStorage.isRecipeSaved(recipe.id)
         
-        // Toggle save state
-        if savedRecipeIds.contains(recipe.id) {
-            // UNSAVE: Remove from saved
-            print("🔍 DEBUG: Unsaving recipe '\(recipe.name)' with ID: \(recipe.id)")
-            savedRecipeIds.remove(recipe.id)
+        // 1. Update UI state immediately (< 1ms)
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+            if currentlySaved {
+                savedRecipeIds.remove(recipe.id)
+            } else {
+                savedRecipeIds.insert(recipe.id)
+            }
+        }
+        
+        // 2. Haptic feedback (instant)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        
+        // 3. Update local storage (< 5ms)
+        if currentlySaved {
+            // UNSAVE
+            print("🗑 Unsaving recipe '\(recipe.name)' locally")
+            localStorage.unsaveRecipe(recipe.id)
             
-            // Remove from saved recipes
+            // Update AppState for other views
             appState.savedRecipes.removeAll { $0.id == recipe.id }
             appState.recentRecipes.removeAll { $0.id == recipe.id }
-            
-            // Remove photos
             appState.savedRecipesWithPhotos.removeAll { $0.recipe.id == recipe.id }
-            PhotoStorageManager.shared.removePhotos(for: [recipe.id])
-            
-            // Remove from CloudKit if authenticated
-            Task {
-                if authManager.isAuthenticated {
-                    do {
-                        // Remove from CloudKit saved recipes
-                        try await CloudKitRecipeManager.shared.removeRecipeFromUserProfile(
-                            recipe.id.uuidString,
-                            type: .saved
-                        )
-                        
-                        print("☁️ Recipe '\(recipe.name)' removed from CloudKit saved recipes")
-                    } catch {
-                        print("⚠️ Failed to remove recipe from CloudKit: \(error)")
-                        // Even if CloudKit fails, we've removed it locally
-                    }
-                }
-            }
-            
-            generator.notificationOccurred(.success)
-            print("🔍   - Recipe unsaved successfully")
             
         } else {
-            // SAVE: Add to saved
-            print("🔍 DEBUG: Saving recipe '\(recipe.name)'")
-            savedRecipeIds.insert(recipe.id)
+            // SAVE
+            print("💾 Saving recipe '\(recipe.name)' locally")
+            localStorage.saveRecipe(recipe, capturedImage: capturedImage)
             
-            // Save the recipe with the captured image
-            appState.addRecentRecipe(recipe)
-            appState.saveRecipeWithPhotos(recipe, beforePhoto: capturedImage, afterPhoto: nil)
-            
-            // Ensure the recipe is in savedRecipes array
+            // Update AppState for other views
             if !appState.savedRecipes.contains(where: { $0.id == recipe.id }) {
                 appState.savedRecipes.append(recipe)
-                print("🔍   - Added recipe to savedRecipes")
+                appState.addRecentRecipe(recipe)
             }
             
-            generator.notificationOccurred(.success)
-            print("🔍   - Recipe saved successfully")
-            
-            // Create activity for recipe save in background
-            Task {
-                if let userID = UnifiedAuthManager.shared.currentUser?.recordID {
-                    do {
-                        try await CloudKitSyncService.shared.createActivity(
-                            type: "recipeSaved",
-                            actorID: userID,
-                            recipeID: recipe.id.uuidString,
-                            recipeName: recipe.name
-                        )
-                    } catch {
-                        print("Failed to create recipe save activity: \(error)")
-                    }
+            // Store photos in AppState's saved recipes with photos
+            if let photo = capturedImage {
+                let savedRecipe = SavedRecipe(recipe: recipe, beforePhoto: photo, afterPhoto: nil)
+                if !appState.savedRecipesWithPhotos.contains(where: { $0.recipe.id == recipe.id }) {
+                    appState.savedRecipesWithPhotos.append(savedRecipe)
                 }
+            }
+        }
+        
+        // 4. Background activities (fire and forget)
+        Task {
+            // Track activity if saving (not unsaving)
+            if !currentlySaved, let userID = UnifiedAuthManager.shared.currentUser?.recordID {
+                try? await CloudKitSyncService.shared.createActivity(
+                    type: "recipeSaved",
+                    actorID: userID,
+                    recipeID: recipe.id.uuidString,
+                    recipeName: recipe.name
+                )
                 
-                // Track streak activities
                 await StreakManager.shared.recordActivity(for: .recipeCreation)
                 
-                // Check if recipe is healthy (under 500 calories)
                 if recipe.nutrition.calories < 500 {
                     await StreakManager.shared.recordActivity(for: .healthyEating)
                 }
             }
         }
+        
+        // CloudKit sync happens automatically in background via RecipeSyncQueue
     }
     
     private func startAnimations() {

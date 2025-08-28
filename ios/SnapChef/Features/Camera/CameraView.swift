@@ -523,26 +523,46 @@ struct CameraView: View {
             let startTime = Date()
 
             // Get existing recipe names to avoid duplicates
-            // Include both local recipes and CloudKit recipes
-            var existingRecipeNames = appState.allRecipes.map { $0.name }
-
-            // Fetch CloudKit recipes to include them in duplicate prevention
-            print("📱 Fetching CloudKit recipes for duplicate prevention...")
-            do {
-                let cloudKitSavedRecipes = try await cloudKitRecipeManager.getUserSavedRecipes()
-                let cloudKitCreatedRecipes = try await cloudKitRecipeManager.getUserCreatedRecipes()
-
-                // Add CloudKit recipe names to the list
-                let cloudKitRecipeNames = (cloudKitSavedRecipes + cloudKitCreatedRecipes).map { $0.name }
-                existingRecipeNames.append(contentsOf: cloudKitRecipeNames)
-
-                // Remove duplicates
-                existingRecipeNames = Array(Set(existingRecipeNames))
-
-                print("✅ Total recipes for duplicate prevention: \(existingRecipeNames.count) (Local: \(appState.allRecipes.count), CloudKit: \(cloudKitRecipeNames.count))")
-            } catch {
-                print("⚠️ Failed to fetch CloudKit recipes for duplicate prevention: \(error)")
-                // Continue with just local recipes
+            // Use LOCAL-FIRST approach with LocalRecipeStorage for instant access
+            var existingRecipeNames = Set<String>()
+            
+            // 1. Get recipes from LocalRecipeStorage (instant, reliable)
+            let localStorage = LocalRecipeStorage.shared
+            let localSavedIds = localStorage.getAllSavedRecipeIds()
+            
+            // Load recipe names from local storage
+            for recipeId in localSavedIds {
+                if let recipe = localStorage.loadRecipeFromFile(recipeId) {
+                    existingRecipeNames.insert(recipe.name)
+                    // Also add variations of the name to prevent similar recipes
+                    existingRecipeNames.insert(recipe.name.lowercased())
+                    existingRecipeNames.insert(recipe.name.replacingOccurrences(of: " and ", with: " & "))
+                    existingRecipeNames.insert(recipe.name.replacingOccurrences(of: " & ", with: " and "))
+                }
+            }
+            print("📱 Found \(localSavedIds.count) saved recipes in LocalRecipeStorage")
+            
+            // 2. Also include recipes from AppState (for backwards compatibility)
+            for recipe in appState.allRecipes {
+                existingRecipeNames.insert(recipe.name)
+                existingRecipeNames.insert(recipe.name.lowercased())
+            }
+            print("📱 Found \(appState.allRecipes.count) recipes in AppState")
+            
+            // 3. Include recently generated recipes from this session
+            for recipe in appState.recentRecipes {
+                existingRecipeNames.insert(recipe.name)
+                existingRecipeNames.insert(recipe.name.lowercased())
+            }
+            
+            // Convert to array for API (removing duplicates automatically via Set)
+            let existingRecipeNamesArray = Array(existingRecipeNames)
+            print("✅ Total unique recipe names for duplicate prevention: \(existingRecipeNamesArray.count)")
+            
+            // Log first few names for debugging
+            if !existingRecipeNamesArray.isEmpty {
+                let preview = existingRecipeNamesArray.prefix(5).joined(separator: ", ")
+                print("📋 Sample existing recipes: \(preview)...")
             }
 
             // Get food preferences from UserDefaults
@@ -570,7 +590,7 @@ struct CameraView: View {
                 mealType: selectedMealType,
                 cookingTimePreference: selectedCookingTime,
                 numberOfRecipes: numberOfRecipes,
-                existingRecipeNames: existingRecipeNames,
+                existingRecipeNames: existingRecipeNamesArray,
                 foodPreferences: foodPreferences,
                 llmProvider: llmProvider
             ) { result in
@@ -715,9 +735,9 @@ struct CameraView: View {
                                         let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: image)
                                         print("✅ Background: Recipe \(index + 1)/\(recipesToUpload.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
 
-                                        // Also add to user's saved recipes list
-                                        try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
-                                        print("✅ Background: Recipe added to user's saved list")
+                                        // Track as created (not saved - user must explicitly save)
+                                        try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .created)
+                                        print("✅ Background: Recipe tracked as created by user")
                                     } catch {
                                         print("❌ Background: Failed to save recipe \(index + 1)/\(recipesToUpload.count) to CloudKit: \(error)")
                                     }
@@ -882,26 +902,35 @@ struct CameraView: View {
             let startTime = Date()
 
             // Get existing recipe names to avoid duplicates
-            var existingRecipeNames = appState.allRecipes.map { $0.name }
-
-            // Fetch CloudKit recipes to include them in duplicate prevention
-            print("📱 Fetching CloudKit recipes for duplicate prevention...")
-            do {
-                let cloudKitSavedRecipes = try await cloudKitRecipeManager.getUserSavedRecipes()
-                let cloudKitCreatedRecipes = try await cloudKitRecipeManager.getUserCreatedRecipes()
-
-                // Add CloudKit recipe names to the list
-                let cloudKitRecipeNames = (cloudKitSavedRecipes + cloudKitCreatedRecipes).map { $0.name }
-                existingRecipeNames.append(contentsOf: cloudKitRecipeNames)
-
-                // Remove duplicates
-                existingRecipeNames = Array(Set(existingRecipeNames))
-
-                print("✅ Total recipes for duplicate prevention: \(existingRecipeNames.count) (Local: \(appState.allRecipes.count), CloudKit: \(cloudKitRecipeNames.count))")
-            } catch {
-                print("⚠️ Failed to fetch CloudKit recipes for duplicate prevention: \(error)")
-                // Continue with just local recipes
+            var existingRecipeNames = Set<String>()
+            
+            // Use LocalRecipeStorage for faster access to saved recipes
+            let localStorage = LocalRecipeStorage.shared
+            let localSavedIds = localStorage.getAllSavedRecipeIds()
+            
+            for recipeId in localSavedIds {
+                if let recipe = localStorage.loadRecipeFromFile(recipeId) {
+                    existingRecipeNames.insert(recipe.name)
+                    existingRecipeNames.insert(recipe.name.lowercased())
+                    
+                    // Add variations with "and" vs "&"
+                    let nameWithAnd = recipe.name.replacingOccurrences(of: "&", with: "and")
+                    let nameWithAmpersand = recipe.name.replacingOccurrences(of: "and", with: "&")
+                    existingRecipeNames.insert(nameWithAnd.lowercased())
+                    existingRecipeNames.insert(nameWithAmpersand.lowercased())
+                }
             }
+            
+            // Also add recipes from current app state
+            for recipe in appState.allRecipes {
+                existingRecipeNames.insert(recipe.name)
+                existingRecipeNames.insert(recipe.name.lowercased())
+            }
+            
+            // Convert to array for API
+            let existingRecipeNamesArray = Array(existingRecipeNames)
+            
+            print("✅ Total recipe names for duplicate prevention: \(existingRecipeNamesArray.count)")
 
             // Get food preferences from UserDefaults
             let foodPreferences = UserDefaults.standard.stringArray(forKey: "SelectedFoodPreferences") ?? []
@@ -929,7 +958,7 @@ struct CameraView: View {
                 mealType: selectedMealType,
                 cookingTimePreference: selectedCookingTime,
                 numberOfRecipes: numberOfRecipes,
-                existingRecipeNames: existingRecipeNames,
+                existingRecipeNames: existingRecipeNamesArray,
                 foodPreferences: foodPreferences,
                 llmProvider: llmProvider
             ) { result in
@@ -1067,9 +1096,9 @@ struct CameraView: View {
                                         let recipeID = try await cloudKitRecipeManager.uploadRecipe(recipe, fromLLM: true, beforePhoto: fridgeImage)
                                         print("✅ Background: Recipe \(index + 1)/\(recipesToUpload.count) saved to CloudKit with ID: \(recipeID) and shared before photo")
 
-                                        // Also add to user's saved recipes list
-                                        try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .saved)
-                                        print("✅ Background: Recipe added to user's saved list")
+                                        // Track as created (not saved - user must explicitly save)
+                                        try await cloudKitRecipeManager.addRecipeToUserProfile(recipeID, type: .created)
+                                        print("✅ Background: Recipe tracked as created by user")
                                     } catch {
                                         print("❌ Background: Failed to save recipe \(index + 1)/\(recipesToUpload.count) to CloudKit: \(error)")
                                     }

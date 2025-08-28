@@ -146,6 +146,12 @@ struct SnapChefApp: App {
             // - Follow record IDs were successfully normalized (removed user_ prefix)
             // - Cannot update followerCount/followingCount - fields not in production schema
             // - Username generation needs different approach for production
+            
+            // LOCAL-FIRST MIGRATION: Migrate existing saved recipes to local storage
+            await migrateToLocalFirstStorage()
+            
+            // Retry any failed sync operations from last session
+            await PersistentSyncQueue.shared.retryAllFailedOperations()
         }
     }
 
@@ -388,6 +394,37 @@ struct SnapChefApp: App {
             
             print("════════════════════════════════════════════════")
         }
+    }
+    
+    // MARK: - Local-First Migration
+    
+    private func migrateToLocalFirstStorage() async {
+        let migrationKey = "local_first_migration_completed_v1"
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { 
+            print("✅ Local-first migration already completed")
+            return 
+        }
+        
+        print("🔄 Starting migration to local-first storage...")
+        
+        // Migrate existing saved recipes to local storage
+        await MainActor.run {
+            let localStorage = LocalRecipeStorage.shared
+            let savedCount = appState.savedRecipes.count
+            
+            if savedCount > 0 {
+                localStorage.migrateFromAppState(appState.savedRecipes)
+                print("✅ Migrated \(savedCount) recipes to local-first storage")
+            } else {
+                print("ℹ️ No saved recipes to migrate")
+            }
+            
+            // Sync AppState with local storage
+            appState.syncWithLocalStorage()
+        }
+        
+        UserDefaults.standard.set(true, forKey: migrationKey)
+        print("✅ Local-first migration completed")
     }
     
     // MARK: - API Key Configuration

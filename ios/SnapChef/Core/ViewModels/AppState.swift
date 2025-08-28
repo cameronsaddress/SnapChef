@@ -204,6 +204,41 @@ final class AppState: ObservableObject {
     func clearAllRecipes() {
         recipesViewModel.clearAllRecipes()
     }
+    
+    // MARK: - Local-First Storage Methods
+    
+    /// Sync AppState with LocalRecipeStorage
+    func syncWithLocalStorage() {
+        let localStorage = LocalRecipeStorage.shared
+        
+        // Update savedRecipes to match local storage
+        savedRecipes = savedRecipes.filter { recipe in
+            localStorage.isRecipeSaved(recipe.id)
+        }
+        
+        print("📱 AppState synced with LocalRecipeStorage: \(savedRecipes.count) saved recipes")
+    }
+    
+    /// Add recipe to saved (local-first)
+    func addToSaved(_ recipe: Recipe, beforePhoto: UIImage? = nil) {
+        // Add to local storage first
+        LocalRecipeStorage.shared.saveRecipe(recipe, capturedImage: beforePhoto)
+        
+        // Update AppState
+        if !savedRecipes.contains(where: { $0.id == recipe.id }) {
+            savedRecipes.append(recipe)
+        }
+    }
+    
+    /// Remove recipe from saved (local-first)
+    func removeFromSaved(_ recipe: Recipe) {
+        // Remove from local storage first
+        LocalRecipeStorage.shared.unsaveRecipe(recipe.id)
+        
+        // Update AppState
+        savedRecipes.removeAll { $0.id == recipe.id }
+        recentRecipes.removeAll { $0.id == recipe.id }
+    }
 
     // Persistence methods moved to RecipesViewModel
 
