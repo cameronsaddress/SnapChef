@@ -4,7 +4,9 @@ struct RecipeResultsView: View {
     let recipes: [Recipe]
     let ingredients: [IngredientAPI]
     let capturedImage: UIImage?
+    var isPresented: Binding<Bool>?  // Optional binding for direct control
     @Environment(\.dismiss) var dismiss
+    @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var appState: AppState
     @StateObject private var authManager = UnifiedAuthManager.shared
     @State private var selectedRecipe: Recipe?
@@ -66,52 +68,32 @@ struct RecipeResultsView: View {
         }
     }
     
-    init(recipes: [Recipe], ingredients: [IngredientAPI] = [], capturedImage: UIImage? = nil) {
+    init(recipes: [Recipe], ingredients: [IngredientAPI] = [], capturedImage: UIImage? = nil, isPresented: Binding<Bool>? = nil) {
         self.recipes = recipes
         self.ingredients = ingredients
         self.capturedImage = capturedImage
+        self.isPresented = isPresented
     }
     
     var body: some View {
-        ZStack {
-            // Dark detective background - exact same as DetectiveResultsView
-            LinearGradient(
-                colors: [
-                    Color(hex: "#0f0625"),
-                    Color(hex: "#1a0033"),
-                    Color(hex: "#0a051a")
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            
-            ScrollView {
-                VStack(spacing: 30) {
-                    // Header with close button
-                    HStack {
-                        Button(action: { 
-                            // Simply dismiss - remove confirmation for now to test
-                            dismiss()
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 28))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [Color(hex: "#9b59b6"), Color(hex: "#8e44ad")],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        }
-                        
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
-                    
-                    // Recipe Cards with Detective styling
-                    ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
+        NavigationStack {
+            ZStack {
+                // Dark detective background - exact same as DetectiveResultsView
+                LinearGradient(
+                    colors: [
+                        Color(hex: "#0f0625"),
+                        Color(hex: "#1a0033"),
+                        Color(hex: "#0a051a")
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 30) {
+                        // Recipe Cards with Detective styling
+                        ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                         DetectiveRecipeCard(
                             recipe: recipe,
                             isSaved: savedRecipeIds.contains(recipe.id),
@@ -142,17 +124,65 @@ struct RecipeResultsView: View {
                             value: cardEntranceAnimations[safe: index]
                         )
                     }
-                    
-                    Spacer(minLength: 50)
+                        
+                        Spacer(minLength: 50)
+                    }
                 }
             }
-        }
-        .navigationBarHidden(true)
-        .onAppear {
-            print("🔍 DEBUG: RecipeResultsView appeared")
-            startAnimations()
-        }
-        .sheet(item: $activeSheet) { sheet in
+            .navigationTitle("Your Recipes")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        print("🔍 DEBUG: Close button tapped in RecipeResultsView")
+                        
+                        // Try direct binding control first
+                        if let binding = isPresented {
+                            print("🔍 DEBUG: Using direct binding to dismiss")
+                            binding.wrappedValue = false
+                        } else {
+                            print("🔍 DEBUG: No direct binding available")
+                        }
+                        
+                        // Try presentationMode
+                        print("🔍 DEBUG: Trying presentationMode.dismiss...")
+                        presentationMode.wrappedValue.dismiss()
+                        
+                        // Also try environment dismiss
+                        print("🔍 DEBUG: Trying environment dismiss...")
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color(hex: "#9b59b6"), Color(hex: "#8e44ad")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if !savedRecipeIds.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 14))
+                            Text("\(savedRecipeIds.count)")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundColor(Color(hex: "#4CAF50"))
+                    }
+                }
+            }
+            .onAppear {
+                print("🔍 DEBUG: RecipeResultsView appeared")
+                print("🔍 DEBUG: Number of recipes: \(recipes.count)")
+                print("🔍 DEBUG: Auth status: \(authManager.isAuthenticated)")
+                startAnimations()
+            }
+            .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .recipeDetail(let recipe):
                 // Use the same detail view as Detective
@@ -226,6 +256,10 @@ struct RecipeResultsView: View {
                 }
             )
         }
+        .onDisappear {
+            print("🔍 DEBUG: RecipeResultsView disappeared")
+        }
+        } // End NavigationStack
     }
     
     private func saveRecipe(_ recipe: Recipe) {

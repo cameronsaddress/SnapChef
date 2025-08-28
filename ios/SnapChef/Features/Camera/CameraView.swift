@@ -268,7 +268,8 @@ struct CameraView: View {
             RecipeResultsView(
                 recipes: generatedRecipes,
                 ingredients: detectedIngredients,
-                capturedImage: capturedImage
+                capturedImage: capturedImage,
+                isPresented: $showingResults  // Pass binding to control dismissal
             )
             .onDisappear {
                 // When recipe results are dismissed, go back to home tab
