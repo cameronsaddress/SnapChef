@@ -841,11 +841,15 @@ struct DetectiveView: View {
             
             HStack(spacing: 0) {
                 // Before Photo (Left Side)
-                Group {
+                ZStack {
                     if let beforePhoto = getBeforePhotoForRecipe(recipe) {
-                        Image(uiImage: beforePhoto)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
+                        GeometryReader { geometry in
+                            Image(uiImage: beforePhoto)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: geometry.size.width, height: geometry.size.height)
+                                .clipped()
+                        }
                     } else {
                         VStack {
                             Image(systemName: "photo.on.rectangle")
@@ -860,7 +864,6 @@ struct DetectiveView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
                 .overlay(
                     VStack {
                         Spacer()
@@ -889,11 +892,15 @@ struct DetectiveView: View {
                     selectedRecipeForPhoto = recipe
                     showingAfterPhotoCapture = true
                 }) {
-                    Group {
+                    ZStack {
                         if let afterPhoto = getAfterPhotoForRecipe(recipe) {
-                            Image(uiImage: afterPhoto)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
+                            GeometryReader { geometry in
+                                Image(uiImage: afterPhoto)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: geometry.size.width, height: geometry.size.height)
+                                    .clipped()
+                            }
                         } else {
                             VStack(spacing: 4) {
                                 Image(systemName: "camera.fill")
@@ -914,24 +921,23 @@ struct DetectiveView: View {
                             )
                         }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .overlay(
-                        VStack {
-                            Spacer()
-                            Text("AFTER")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule()
-                                        .fill(Color.black.opacity(0.6))
-                                )
-                                .padding(.bottom, 4)
-                        }
-                    )
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(
+                    VStack {
+                        Spacer()
+                        Text("AFTER")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(Color.black.opacity(0.6))
+                            )
+                            .padding(.bottom, 4)
+                    }
+                )
                 .buttonStyle(PlainButtonStyle())
             }
             .clipShape(RoundedRectangle(cornerRadius: 16))
