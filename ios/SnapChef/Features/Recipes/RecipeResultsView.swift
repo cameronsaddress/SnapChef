@@ -585,76 +585,76 @@ struct DetectiveRecipeCard: View {
     @ViewBuilder
     private var actionButtonsSection: some View {
         HStack(spacing: 12) {
-            Button(action: {
+            // Save button with full-area tap target
+            ZStack {
+                // Background layer
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        !isAuthenticated ? 
+                        AnyShapeStyle(LinearGradient(
+                            colors: [Color(hex: "#667eea").opacity(0.3), Color(hex: "#764ba2").opacity(0.3)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )) : 
+                        AnyShapeStyle(isSaved ? 
+                         Color(hex: "#4CAF50").opacity(0.3) : 
+                         Color.white.opacity(0.2))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(!isAuthenticated ? 
+                                   Color(hex: "#667eea").opacity(0.5) : 
+                                   Color.clear, lineWidth: 1)
+                    )
+                
+                // Content layer
+                HStack(spacing: 8) {
+                    Image(systemName: isAuthenticated ? 
+                          (isSaved ? "heart.fill" : "heart") : 
+                          "lock.fill")
+                    Text(isAuthenticated ? 
+                         (isSaved ? "Saved" : "Save") : 
+                         "Sign In to Save")
+                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .allowsHitTesting(false) // Prevent content from blocking taps
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 44) // Fixed height for consistent tap area
+            .contentShape(Rectangle()) // Make entire area tappable
+            .onTapGesture {
                 // Add debug logging
                 print("🔍 Save button tapped for recipe: \(recipe.name)")
                 print("🔍 Is authenticated: \(isAuthenticated)")
                 print("🔍 Is saved: \(isSaved)")
                 onSave()
-            }) {
-                ZStack {
-                    // Background layer
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            !isAuthenticated ? 
-                            AnyShapeStyle(LinearGradient(
-                                colors: [Color(hex: "#667eea").opacity(0.3), Color(hex: "#764ba2").opacity(0.3)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )) : 
-                            AnyShapeStyle(isSaved ? 
-                             Color(hex: "#4CAF50").opacity(0.3) : 
-                             Color.white.opacity(0.2))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(!isAuthenticated ? 
-                                       Color(hex: "#667eea").opacity(0.5) : 
-                                       Color.clear, lineWidth: 1)
-                        )
-                    
-                    // Content layer
-                    HStack(spacing: 8) {
-                        Image(systemName: isAuthenticated ? 
-                              (isSaved ? "heart.fill" : "heart") : 
-                              "lock.fill")
-                        Text(isAuthenticated ? 
-                             (isSaved ? "Saved" : "Save") : 
-                             "Sign In to Save")
-                    }
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 44) // Fixed height for consistent tap area
-                .contentShape(Rectangle()) // Make entire area tappable
             }
-            .buttonStyle(PlainButtonStyle())  // Use plain style to avoid default behaviors
             
-            Button(action: {
+            // Share button with full-area tap target
+            ZStack {
+                // Background layer
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.2))
+                
+                // Content layer
+                HStack(spacing: 8) {
+                    Image(systemName: "square.and.arrow.up")
+                    Text("Share")
+                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .allowsHitTesting(false) // Prevent content from blocking taps
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 44) // Fixed height for consistent tap area
+            .contentShape(Rectangle()) // Make entire area tappable
+            .onTapGesture {
                 print("🔍 Share button tapped for recipe: \(recipe.name)")
                 onShare()
-            }) {
-                ZStack {
-                    // Background layer
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.2))
-                    
-                    // Content layer
-                    HStack(spacing: 8) {
-                        Image(systemName: "square.and.arrow.up")
-                        Text("Share")
-                    }
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 44) // Fixed height for consistent tap area
-                .contentShape(Rectangle()) // Make entire area tappable
             }
-            .buttonStyle(PlainButtonStyle())
         }
     }
     
