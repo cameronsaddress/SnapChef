@@ -91,12 +91,8 @@ struct RecipeResultsView: View {
                     // Header with close button
                     HStack {
                         Button(action: { 
-                            // Check if any recipes are saved
-                            if savedRecipeIds.isEmpty && !recipes.isEmpty {
-                                showingExitConfirmation = true
-                            } else {
-                                dismiss()
-                            }
+                            // Simply dismiss - remove confirmation for now to test
+                            dismiss()
                         }) {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 28))
@@ -120,6 +116,7 @@ struct RecipeResultsView: View {
                             recipe: recipe,
                             isSaved: savedRecipeIds.contains(recipe.id),
                             capturedImage: capturedImage,
+                            isAuthenticated: authManager.isAuthenticated,
                             onSelect: {
                                 activeSheet = .recipeDetail(recipe)
                                 confettiTrigger = true
@@ -138,10 +135,10 @@ struct RecipeResultsView: View {
                         )
                         .padding(.horizontal, 20)
                         .opacity(cardEntranceAnimations[safe: index] == true ? 1 : 0)
-                        .scaleEffect(cardEntranceAnimations[safe: index] == true ? 1 : 0.8)
+                        .scaleEffect(cardEntranceAnimations[safe: index] == true ? 1 : 0.9)
                         .animation(
-                            .spring(response: 0.8, dampingFraction: 0.7)
-                                .delay(1.2 + Double(index) * 0.2),
+                            .spring(response: 0.6, dampingFraction: 0.8)
+                                .delay(0.1 + Double(index) * 0.1),
                             value: cardEntranceAnimations[safe: index]
                         )
                     }
@@ -302,9 +299,9 @@ struct RecipeResultsView: View {
             sparkleAnimation = true
         }
         
-        // Stagger card entrance animations
+        // Stagger card entrance animations - start immediately
         for i in 0..<min(recipes.count, 5) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2 + Double(i) * 0.2) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1 + Double(i) * 0.1) {
                 if i < cardEntranceAnimations.count {
                     cardEntranceAnimations[i] = true
                 }
@@ -325,11 +322,10 @@ struct DetectiveRecipeCard: View {
     let recipe: Recipe
     let isSaved: Bool
     let capturedImage: UIImage?
+    let isAuthenticated: Bool  // Pass auth status from parent
     let onSelect: () -> Void
     let onShare: () -> Void
     let onSave: () -> Void
-    
-    @StateObject private var authManager = UnifiedAuthManager.shared
     
     var body: some View {
         mainCardView
@@ -531,10 +527,10 @@ struct DetectiveRecipeCard: View {
         HStack(spacing: 12) {
             Button(action: onSave) {
                 HStack(spacing: 8) {
-                    Image(systemName: authManager.isAuthenticated ? 
+                    Image(systemName: isAuthenticated ? 
                           (isSaved ? "heart.fill" : "heart") : 
                           "lock.fill")
-                    Text(authManager.isAuthenticated ? 
+                    Text(isAuthenticated ? 
                          (isSaved ? "Saved" : "Save") : 
                          "Sign In to Save")
                 }
@@ -544,7 +540,7 @@ struct DetectiveRecipeCard: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background {
-                    if !authManager.isAuthenticated {
+                    if !isAuthenticated {
                         LinearGradient(
                             colors: [Color(hex: "#667eea").opacity(0.3), Color(hex: "#764ba2").opacity(0.3)],
                             startPoint: .leading,
@@ -559,12 +555,12 @@ struct DetectiveRecipeCard: View {
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(!authManager.isAuthenticated ? 
+                        .stroke(!isAuthenticated ? 
                                Color(hex: "#667eea").opacity(0.5) : 
                                Color.clear, lineWidth: 1)
                 )
             }
-            .disabled(isSaved && authManager.isAuthenticated)
+            .disabled(isSaved && isAuthenticated)
             
             Button(action: onShare) {
                 HStack(spacing: 8) {
