@@ -1181,7 +1181,11 @@ struct ActionButton: View {
     let action: () -> Void
     
     var body: some View {
-        Button(action: action) {
+        // Use ZStack with onTapGesture for reliable tap detection
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(color)
+            
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .semibold))
@@ -1189,12 +1193,13 @@ struct ActionButton: View {
                     .font(.system(size: 16, weight: .semibold))
             }
             .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(color)
-            )
+            .allowsHitTesting(false) // Prevent content from blocking taps
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 44) // Fixed height for consistent tap target
+        .contentShape(Rectangle()) // Make entire area tappable
+        .onTapGesture {
+            action()
         }
     }
 }
