@@ -49,6 +49,7 @@ class LocalRecipeStorage: ObservableObject {
     /// Instantly save a recipe locally with optional image
     func saveRecipe(_ recipe: Recipe, capturedImage: UIImage? = nil) {
         // 1. Update local state immediately
+        objectWillChange.send()  // Trigger UI update
         savedRecipeIds.insert(recipe.id.uuidString)
         persistToUserDefaults()
         
@@ -75,6 +76,7 @@ class LocalRecipeStorage: ObservableObject {
     /// Instantly unsave a recipe locally
     func unsaveRecipe(_ recipeId: UUID) {
         // 1. Update local state immediately
+        objectWillChange.send()  // Trigger UI update
         savedRecipeIds.remove(recipeId.uuidString)
         persistToUserDefaults()
         

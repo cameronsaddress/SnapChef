@@ -18,7 +18,13 @@ struct RecipeResultsView: View {
     @State private var contentVisible = false
     @State private var activeSheet: ActiveSheet?
     @StateObject private var localStorage = LocalRecipeStorage.shared
-    @State private var savedRecipeIds: Set<UUID> = []  // UI cache for instant updates
+    
+    // Computed property that directly reflects localStorage state
+    private var savedRecipeIds: Set<UUID> {
+        Set(recipes.compactMap { recipe in
+            localStorage.isRecipeSaved(recipe.id) ? recipe.id : nil
+        })
+    }
     @State private var showingExitConfirmation = false
     
     // Authentication states
@@ -190,15 +196,7 @@ struct RecipeResultsView: View {
                 print("🔍 DEBUG: RecipeResultsView appeared")
                 print("🔍 DEBUG: Number of recipes: \(recipes.count)")
                 print("🔍 DEBUG: Auth status: \(authManager.isAuthenticated)")
-                
-                // Initialize from LOCAL STORAGE (instant, no network calls)
-                for recipe in recipes {
-                    if localStorage.isRecipeSaved(recipe.id) {
-                        savedRecipeIds.insert(recipe.id)
-                        print("💾 Recipe '\(recipe.name)' loaded as saved from local storage")
-                    }
-                }
-                print("💾 Initialized \(savedRecipeIds.count) saved recipes from local storage")
+                print("💾 Currently saved recipes: \(savedRecipeIds.count)")
                 
                 startAnimations()
             }
@@ -294,45 +292,38 @@ struct RecipeResultsView: View {
         // LOCAL-FIRST: Instant update, no waiting for network
         let currentlySaved = localStorage.isRecipeSaved(recipe.id)
         
-        // 1. Update UI state immediately (< 1ms)
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
-            if currentlySaved {
-                savedRecipeIds.remove(recipe.id)
-            } else {
-                savedRecipeIds.insert(recipe.id)
-            }
-        }
-        
-        // 2. Haptic feedback (instant)
+        // 1. Haptic feedback (instant)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         
-        // 3. Update local storage (< 5ms)
-        if currentlySaved {
-            // UNSAVE
-            print("🗑 Unsaving recipe '\(recipe.name)' locally")
-            localStorage.unsaveRecipe(recipe.id)
+        // 2. Update local storage with animation
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+            if currentlySaved {
+                // UNSAVE
+                print("🗑 Unsaving recipe '\(recipe.name)' locally")
+                localStorage.unsaveRecipe(recipe.id)
             
-            // Update AppState for other views
-            appState.savedRecipes.removeAll { $0.id == recipe.id }
-            appState.recentRecipes.removeAll { $0.id == recipe.id }
-            appState.savedRecipesWithPhotos.removeAll { $0.recipe.id == recipe.id }
-            
-        } else {
-            // SAVE
-            print("💾 Saving recipe '\(recipe.name)' locally")
-            localStorage.saveRecipe(recipe, capturedImage: capturedImage)
-            
-            // Update AppState for other views
-            if !appState.savedRecipes.contains(where: { $0.id == recipe.id }) {
-                appState.savedRecipes.append(recipe)
-                appState.addRecentRecipe(recipe)
-            }
-            
-            // Store photos in AppState's saved recipes with photos
-            if let photo = capturedImage {
-                let savedRecipe = SavedRecipe(recipe: recipe, beforePhoto: photo, afterPhoto: nil)
-                if !appState.savedRecipesWithPhotos.contains(where: { $0.recipe.id == recipe.id }) {
-                    appState.savedRecipesWithPhotos.append(savedRecipe)
+                // Update AppState for other views
+                appState.savedRecipes.removeAll { $0.id == recipe.id }
+                appState.recentRecipes.removeAll { $0.id == recipe.id }
+                appState.savedRecipesWithPhotos.removeAll { $0.recipe.id == recipe.id }
+                
+            } else {
+                // SAVE
+                print("💾 Saving recipe '\(recipe.name)' locally")
+                localStorage.saveRecipe(recipe, capturedImage: capturedImage)
+                
+                // Update AppState for other views
+                if !appState.savedRecipes.contains(where: { $0.id == recipe.id }) {
+                    appState.savedRecipes.append(recipe)
+                    appState.addRecentRecipe(recipe)
+                }
+                
+                // Store photos in AppState's saved recipes with photos
+                if let photo = capturedImage {
+                    let savedRecipe = SavedRecipe(recipe: recipe, beforePhoto: photo, afterPhoto: nil)
+                    if !appState.savedRecipesWithPhotos.contains(where: { $0.recipe.id == recipe.id }) {
+                        appState.savedRecipesWithPhotos.append(savedRecipe)
+                    }
                 }
             }
         }
