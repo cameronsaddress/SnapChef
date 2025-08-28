@@ -195,7 +195,7 @@ struct HomeView: View {
             fallingFoodManager.cleanup()
         }
         .fullScreenCover(isPresented: $showingCamera) {
-            CameraView()
+            CameraView(isPresented: $showingCamera)
         }
         .fullScreenCover(isPresented: $showingMysteryMeal) {
             MysteryMealView()

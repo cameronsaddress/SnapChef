@@ -192,6 +192,23 @@ struct RecipeResultsView: View {
                 }
                 print("🔍 DEBUG: Saved recipe IDs initialized: \(savedRecipeIds.count) saved")
                 
+                // Also check CloudKit for saved recipes (in case appState is out of sync)
+                Task {
+                    if authManager.isAuthenticated {
+                        do {
+                            let cloudKitSavedRecipes = try await CloudKitRecipeManager.shared.getUserSavedRecipes()
+                            for recipe in recipes {
+                                if cloudKitSavedRecipes.contains(where: { $0.id == recipe.id }) {
+                                    savedRecipeIds.insert(recipe.id)
+                                    print("🔍 DEBUG: Recipe '\(recipe.name)' found as saved in CloudKit")
+                                }
+                            }
+                        } catch {
+                            print("🔍 DEBUG: Failed to check CloudKit for saved recipes: \(error)")
+                        }
+                    }
+                }
+                
                 startAnimations()
             }
             .sheet(item: $activeSheet) { sheet in
@@ -293,7 +310,7 @@ struct RecipeResultsView: View {
         // Toggle save state
         if savedRecipeIds.contains(recipe.id) {
             // UNSAVE: Remove from saved
-            print("🔍 DEBUG: Unsaving recipe '\(recipe.name)'")
+            print("🔍 DEBUG: Unsaving recipe '\(recipe.name)' with ID: \(recipe.id)")
             savedRecipeIds.remove(recipe.id)
             
             // Remove from saved recipes
@@ -306,15 +323,18 @@ struct RecipeResultsView: View {
             
             // Remove from CloudKit if authenticated
             Task {
-                if let userID = UnifiedAuthManager.shared.currentUser?.recordID {
+                if authManager.isAuthenticated {
                     do {
+                        // Remove from CloudKit saved recipes
                         try await CloudKitRecipeManager.shared.removeRecipeFromUserProfile(
                             recipe.id.uuidString,
                             type: .saved
                         )
-                        print("☁️ Recipe removed from CloudKit")
+                        
+                        print("☁️ Recipe '\(recipe.name)' removed from CloudKit saved recipes")
                     } catch {
-                        print("Failed to remove recipe from CloudKit: \(error)")
+                        print("⚠️ Failed to remove recipe from CloudKit: \(error)")
+                        // Even if CloudKit fails, we've removed it locally
                     }
                 }
             }

@@ -12,12 +12,14 @@ struct CameraView: View {
     @EnvironmentObject var cloudKitDataManager: CloudKitDataManager
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @Binding var selectedTab: Int
+    var isPresented: Binding<Bool>?  // Optional binding to dismiss the camera
     
     // Performance optimization: Lazy loading of heavy views
     @State private var shouldShowFullUI = false
 
-    init(selectedTab: Binding<Int>? = nil) {
+    init(selectedTab: Binding<Int>? = nil, isPresented: Binding<Bool>? = nil) {
         self._selectedTab = selectedTab ?? .constant(0)
+        self.isPresented = isPresented
     }
 
     @State private var isProcessing = false
@@ -116,8 +118,13 @@ struct CameraView: View {
                             }
                             resetCaptureFlow()
                             
-                            // Switch tabs after animation
-                            selectedTab = 0
+                            // If camera was presented modally from HomeView, dismiss it
+                            if let cameraPresented = isPresented {
+                                cameraPresented.wrappedValue = false
+                            } else {
+                                // Otherwise switch tabs (when used from tab bar)
+                                selectedTab = 0
+                            }
                             
                             // Reset closing state for next time
                             isClosing = false
@@ -209,7 +216,15 @@ struct CameraView: View {
                             VStack(spacing: 8) {
                                 Button(action: {
                                     showingPreview = false
-                                    if captureMode == .fridge {
+                                    
+                                    // For single photo mode, process immediately
+                                    if captureMode == .fridge && !showPantryStep {
+                                        if let image = capturedImage {
+                                            processImage(image)
+                                        }
+                                    }
+                                    // For multi-photo mode - continue to pantry
+                                    else if captureMode == .fridge {
                                         fridgePhoto = capturedImage
                                         captureMode = .pantry
                                         showPantryStep = true
@@ -272,6 +287,10 @@ struct CameraView: View {
                 isPresented: $showingResults  // Pass binding to control dismissal
             )
             .onDisappear {
+                // When results are dismissed, also dismiss the camera if it was presented from HomeView
+                if let cameraPresented = isPresented {
+                    cameraPresented.wrappedValue = false
+                }
                 // When recipe results are dismissed, go back to home tab
                 selectedTab = 0 // Switch to home tab
                 // Reset the capture flow for next time
