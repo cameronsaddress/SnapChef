@@ -592,63 +592,69 @@ struct DetectiveRecipeCard: View {
                 print("🔍 Is saved: \(isSaved)")
                 onSave()
             }) {
-                HStack(spacing: 8) {
-                    Image(systemName: isAuthenticated ? 
-                          (isSaved ? "heart.fill" : "heart") : 
-                          "lock.fill")
-                    Text(isAuthenticated ? 
-                         (isSaved ? "Saved" : "Save") : 
-                         "Sign In to Save")
-                }
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background {
-                    if !isAuthenticated {
-                        LinearGradient(
-                            colors: [Color(hex: "#667eea").opacity(0.3), Color(hex: "#764ba2").opacity(0.3)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    } else if isSaved {
-                        Color(hex: "#4CAF50").opacity(0.3)
-                    } else {
-                        Color.white.opacity(0.2)
-                    }
-                }
-                .cornerRadius(12)
-                .overlay(
+                ZStack {
+                    // Background layer
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(!isAuthenticated ? 
-                               Color(hex: "#667eea").opacity(0.5) : 
-                               Color.clear, lineWidth: 1)
-                )
+                        .fill(
+                            !isAuthenticated ? 
+                            AnyShapeStyle(LinearGradient(
+                                colors: [Color(hex: "#667eea").opacity(0.3), Color(hex: "#764ba2").opacity(0.3)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )) : 
+                            AnyShapeStyle(isSaved ? 
+                             Color(hex: "#4CAF50").opacity(0.3) : 
+                             Color.white.opacity(0.2))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(!isAuthenticated ? 
+                                       Color(hex: "#667eea").opacity(0.5) : 
+                                       Color.clear, lineWidth: 1)
+                        )
+                    
+                    // Content layer
+                    HStack(spacing: 8) {
+                        Image(systemName: isAuthenticated ? 
+                              (isSaved ? "heart.fill" : "heart") : 
+                              "lock.fill")
+                        Text(isAuthenticated ? 
+                             (isSaved ? "Saved" : "Save") : 
+                             "Sign In to Save")
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 44) // Fixed height for consistent tap area
+                .contentShape(Rectangle()) // Make entire area tappable
             }
             .buttonStyle(PlainButtonStyle())  // Use plain style to avoid default behaviors
-            .allowsHitTesting(true)  // Ensure button is tappable
-            .contentShape(Rectangle())  // Expand hit area to full button
             
             Button(action: {
                 print("🔍 Share button tapped for recipe: \(recipe.name)")
                 onShare()
             }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "square.and.arrow.up")
-                    Text("Share")
+                ZStack {
+                    // Background layer
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.2))
+                    
+                    // Content layer
+                    HStack(spacing: 8) {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("Share")
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
                 }
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color.white.opacity(0.2))
-                .cornerRadius(12)
+                .frame(height: 44) // Fixed height for consistent tap area
+                .contentShape(Rectangle()) // Make entire area tappable
             }
             .buttonStyle(PlainButtonStyle())
-            .allowsHitTesting(true)
-            .contentShape(Rectangle())
         }
     }
     
