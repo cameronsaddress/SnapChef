@@ -200,18 +200,30 @@ struct EmojiFlickGame: View {
                     showTutorial = false
                 }
                 
-                // Fetch global high score
-                if !gameState.hasLoadedGlobalScore {
-                    gameState.isLoadingGlobalScore = true
-                    Task {
-                        let globalScore = await GameState.fetchGlobalHighScore()
-                        await MainActor.run {
+                // Always fetch global high score on appear to get latest
+                gameState.isLoadingGlobalScore = true
+                Task {
+                    let globalScore = await GameState.fetchGlobalHighScore()
+                    await MainActor.run {
+                        // Only update if fetched score is higher than cached
+                        if globalScore > gameState.globalHighScore {
                             gameState.globalHighScore = globalScore
-                            gameState.isLoadingGlobalScore = false
-                            gameState.hasLoadedGlobalScore = true
                         }
+                        gameState.isLoadingGlobalScore = false
+                        gameState.hasLoadedGlobalScore = true
                     }
                 }
+            }
+        }
+        .onDisappear {
+            print("🔍 DEBUG: [EmojiFlickGame] disappearing")
+            // Save current high score if it's new
+            gameState.saveHighScore()
+            
+            // Also fetch latest global score to ensure we have the most recent
+            Task {
+                let globalScore = await GameState.fetchGlobalHighScore()
+                print("📊 Latest global high score on exit: \(globalScore)")
             }
         }
     }
@@ -841,13 +853,40 @@ struct GameState {
             let score = record["score"] as? Int ?? 0
             
             // Cache it locally
-            UserDefaults.standard.set(score, forKey: "emojiFlickGlobalHighScore")
+            if score > 0 {
+                UserDefaults.standard.set(score, forKey: "emojiFlickGlobalHighScore")
+            }
             
+            print("✅ Fetched global high score: \(score)")
             return score
         } catch {
-            print("❌ Failed to fetch global high score: \(error)")
-            // Return cached value
-            return UserDefaults.standard.integer(forKey: "emojiFlickGlobalHighScore")
+            // If record doesn't exist, try to create it with initial value
+            if let ckError = error as? CKError, ckError.code == .unknownItem {
+                print("📝 Global high score record doesn't exist, creating initial record")
+                
+                // Create initial record with score of 0
+                let record = CKRecord(recordType: "GameHighScore", recordID: recordID)
+                record["score"] = 0
+                record["lastUpdated"] = Date()
+                record["deviceID"] = await MainActor.run {
+                    UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
+                }
+                
+                do {
+                    _ = try await actor.saveRecord(record)
+                    print("✅ Created initial global high score record")
+                    return 0
+                } catch {
+                    print("❌ Failed to create initial record: \(error)")
+                }
+            } else {
+                print("❌ Failed to fetch global high score: \(error)")
+            }
+            
+            // Return cached value as fallback
+            let cachedValue = UserDefaults.standard.integer(forKey: "emojiFlickGlobalHighScore")
+            print("📱 Using cached global high score: \(cachedValue)")
+            return cachedValue
         }
     }
 }
