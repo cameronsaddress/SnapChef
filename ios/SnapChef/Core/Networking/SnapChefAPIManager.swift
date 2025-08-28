@@ -1239,8 +1239,10 @@ final class SnapChefAPIManager {
         // Get the current user's ID for ownership
         let currentUserID = UnifiedAuthManager.shared.currentUser?.recordID
         
+        // Generate a new unique ID for each detective recipe instead of using the API's hardcoded ID
+        // This prevents conflicts when multiple detective recipes are created
         return DetectiveRecipe(
-            id: UUID(uuidString: apiRecipe.id) ?? UUID(),
+            id: UUID(), // Always generate a new UUID
             ownerID: currentUserID,
             name: apiRecipe.name,
             description: apiRecipe.description,

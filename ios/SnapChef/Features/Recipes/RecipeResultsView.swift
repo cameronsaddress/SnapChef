@@ -98,7 +98,10 @@ struct RecipeResultsView: View {
             .ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: 30) {
+                LazyVStack(spacing: 30) {
+                    // Add top padding to avoid navigation bar overlap
+                    Color.clear.frame(height: 1)
+                    
                     // Recipe Cards with Detective styling
                     ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
                         DetectiveRecipeCard(
@@ -127,6 +130,7 @@ struct RecipeResultsView: View {
                             }
                         )
                         .padding(.horizontal, 20)
+                        .allowsHitTesting(true) // Force hit testing to be enabled
                         .opacity(cardEntranceAnimations[safe: index] == true ? 1 : 0)
                         .scaleEffect(cardEntranceAnimations[safe: index] == true ? 1 : 0.9)
                         .animation(
@@ -139,6 +143,7 @@ struct RecipeResultsView: View {
                     Spacer(minLength: 50)
                 }
             }
+            // Removed .onTapGesture { } that was intercepting button taps
         }
     }
     
@@ -585,29 +590,14 @@ struct DetectiveRecipeCard: View {
     @ViewBuilder
     private var actionButtonsSection: some View {
         HStack(spacing: 12) {
-            // Save button with full-area tap target
-            ZStack {
-                // Background layer
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        !isAuthenticated ? 
-                        AnyShapeStyle(LinearGradient(
-                            colors: [Color(hex: "#667eea").opacity(0.3), Color(hex: "#764ba2").opacity(0.3)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )) : 
-                        AnyShapeStyle(isSaved ? 
-                         Color(hex: "#4CAF50").opacity(0.3) : 
-                         Color.white.opacity(0.2))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(!isAuthenticated ? 
-                                   Color(hex: "#667eea").opacity(0.5) : 
-                                   Color.clear, lineWidth: 1)
-                    )
-                
-                // Content layer
+            // Save button - with explicit hit testing priority
+            Button {
+                // Add debug logging
+                print("🔍 Save button tapped for recipe: \(recipe.name)")
+                print("🔍 Is authenticated: \(isAuthenticated)")
+                print("🔍 Is saved: \(isSaved)")
+                onSave()
+            } label: {
                 HStack(spacing: 8) {
                     Image(systemName: isAuthenticated ? 
                           (isSaved ? "heart.fill" : "heart") : 
@@ -619,26 +609,38 @@ struct DetectiveRecipeCard: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .foregroundColor(.white)
-                .allowsHitTesting(false) // Prevent content from blocking taps
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            !isAuthenticated ? 
+                            AnyShapeStyle(LinearGradient(
+                                colors: [Color(hex: "#667eea").opacity(0.3), Color(hex: "#764ba2").opacity(0.3)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )) : 
+                            AnyShapeStyle(isSaved ? 
+                             Color(hex: "#4CAF50").opacity(0.3) : 
+                             Color.white.opacity(0.2))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(!isAuthenticated ? 
+                                       Color(hex: "#667eea").opacity(0.5) : 
+                                       Color.clear, lineWidth: 1)
+                        )
+                )
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 44) // Fixed height for consistent tap area
-            .contentShape(Rectangle()) // Make entire area tappable
-            .onTapGesture {
-                // Add debug logging
-                print("🔍 Save button tapped for recipe: \(recipe.name)")
-                print("🔍 Is authenticated: \(isAuthenticated)")
-                print("🔍 Is saved: \(isSaved)")
-                onSave()
-            }
+            .buttonStyle(.plain)
+            .zIndex(1)
             
-            // Share button with full-area tap target
-            ZStack {
-                // Background layer
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.2))
-                
-                // Content layer
+            // Share button - with explicit hit testing priority
+            Button {
+                print("🔍 Share button tapped for recipe: \(recipe.name)")
+                onShare()
+            } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "square.and.arrow.up")
                     Text("Share")
@@ -646,15 +648,16 @@ struct DetectiveRecipeCard: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .foregroundColor(.white)
-                .allowsHitTesting(false) // Prevent content from blocking taps
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.2))
+                )
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 44) // Fixed height for consistent tap area
-            .contentShape(Rectangle()) // Make entire area tappable
-            .onTapGesture {
-                print("🔍 Share button tapped for recipe: \(recipe.name)")
-                onShare()
-            }
+            .buttonStyle(.plain)
+            .zIndex(1)
         }
     }
     

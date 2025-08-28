@@ -465,6 +465,7 @@ struct DetectiveResultsView: View {
     private func saveToRecipeBook() {
         print("🔍 DEBUG: Detective recipe save started for '\(detectedRecipe.reconstructedRecipe.name)'")
         print("🔍   - savedRecipes count before: \(appState.savedRecipes.count)")
+        print("🔍   - Original image available: true (always present for detective recipes)")
         
         // Add detective badge to recipe
         let recipeWithBadge = Recipe(
@@ -492,7 +493,20 @@ struct DetectiveResultsView: View {
             shareCaption: detectedRecipe.reconstructedRecipe.shareCaption
         )
         
+        // Save to LocalRecipeStorage with the detective photo as the before photo
+        LocalRecipeStorage.shared.saveRecipe(recipeWithBadge, capturedImage: detectedRecipe.originalImage)
+        
+        // Also update AppState
         appState.savedRecipes.append(recipeWithBadge)
+        
+        // Save the photo to AppState's savedRecipesWithPhotos
+        let savedRecipe = SavedRecipe(
+            recipe: recipeWithBadge,
+            beforePhoto: detectedRecipe.originalImage,
+            afterPhoto: nil
+        )
+        appState.savedRecipesWithPhotos.append(savedRecipe)
+        print("🔍 DEBUG: Detective photo saved with recipe")
         
         print("🔍   - savedRecipes count after append: \(appState.savedRecipes.count)")
         print("🔍   - Recipe now in savedRecipes: \(appState.savedRecipes.contains(where: { $0.id == recipeWithBadge.id }))")

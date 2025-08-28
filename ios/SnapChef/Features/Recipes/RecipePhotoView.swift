@@ -55,7 +55,14 @@ struct RecipePhotoView: View {
     }
     
     private func refreshCache() async {
+        print("🔍 DEBUG: RecipePhotoView - Refreshing cache for recipe '\(recipe.name)' (ID: \(recipe.id))")
+        print("🔍 DEBUG: Is Detective Recipe: \(recipe.isDetectiveRecipe ?? false)")
         cachedStoredPhotos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+        if let photos = cachedStoredPhotos {
+            print("🔍 DEBUG: Cache refreshed - Has fridge photo: \(photos.fridgePhoto != nil), Has meal photo: \(photos.mealPhoto != nil)")
+        } else {
+            print("🔍 DEBUG: Cache refreshed - No photos found in PhotoStorageManager")
+        }
         lastCacheUpdate = Date()
     }
 
@@ -67,17 +74,26 @@ struct RecipePhotoView: View {
     private var displayBeforePhoto: UIImage? {
         // OPTIMIZATION: Use PhotoStorageManager as primary source for instant display
         if let storedPhoto = storedPhotos?.fridgePhoto {
+            print("🔍 DEBUG: RecipePhotoView - Found fridge photo in PhotoStorageManager for recipe \(recipe.id)")
             return storedPhoto
+        } else {
+            print("🔍 DEBUG: RecipePhotoView - No fridge photo in PhotoStorageManager for recipe \(recipe.id)")
         }
         
         // Legacy fallback to appState for immediate display of older recipes
         if let legacyPhoto = savedRecipe?.beforePhoto {
+            print("🔍 DEBUG: RecipePhotoView - Using legacy photo from appState for recipe \(recipe.id)")
             // Trigger migration only if not already done or in progress
             triggerPhotoMigrationIfNeeded()
             return legacyPhoto
         }
         
         // Fall back to CloudKit photo (slower, loaded asynchronously)
+        if beforePhoto != nil {
+            print("🔍 DEBUG: RecipePhotoView - Using CloudKit photo for recipe \(recipe.id)")
+        } else {
+            print("🔍 DEBUG: RecipePhotoView - No photo available for recipe \(recipe.id)")
+        }
         return beforePhoto
     }
 

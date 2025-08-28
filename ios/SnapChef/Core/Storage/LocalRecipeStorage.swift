@@ -58,11 +58,17 @@ class LocalRecipeStorage: ObservableObject {
         
         // 3. Store photo if provided
         if let image = capturedImage {
+            print("🔍 DEBUG: Storing photo for recipe '\(recipe.name)' (ID: \(recipe.id))")
+            print("🔍 DEBUG: Is Detective Recipe: \(recipe.isDetectiveRecipe ?? false)")
+            print("🔍 DEBUG: Photo size: \(image.size.width)x\(image.size.height)")
             PhotoStorageManager.shared.storePhotos(
                 fridgePhoto: image,
                 mealPhoto: nil,
                 for: recipe.id
             )
+            print("🔍 DEBUG: Photo stored in PhotoStorageManager")
+        } else {
+            print("🔍 DEBUG: No photo provided for recipe '\(recipe.name)'")
         }
         
         // 4. Queue for background CloudKit sync
