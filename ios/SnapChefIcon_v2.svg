@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Border gradient matching original -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5B9FEF;stop-opacity:1" />
+      <stop offset="25%" style="stop-color:#6B8FF0;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#8B7FE8;stop-opacity:1" />
+      <stop offset="75%" style="stop-color:#B86FD8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E85FA8;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Background -->
+    <radialGradient id="bgGrad" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" style="stop-color:#2C2860;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1B1745;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Glitch effects -->
+    <filter id="glitchBlur">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="0.5" />
+    </filter>
+  </defs>
+  
+  <!-- Outer border (iOS rounded rect) -->
+  <rect width="1024" height="1024" rx="227" ry="227" fill="url(#borderGrad)" />
+  
+  <!-- Inner background -->
+  <rect x="32" y="32" width="960" height="960" rx="195" ry="195" fill="url(#bgGrad)" />
+  
+  <!-- Chef Hat Centered -->
+  <g transform="translate(512, 360)">
+    <!-- Cyan shadow/glitch -->
+    <g transform="translate(-12, -8)" opacity="0.65">
+      <!-- Puffy top of hat -->
+      <path d="M -120 -30 
+               C -120 -110, -80 -150, 0 -150
+               C 80 -150, 120 -110, 120 -30
+               C 120 -30, 120 0, 110 10
+               L 110 120
+               L -110 120
+               L -110 10
+               C -120 0, -120 -30, -120 -30 Z" 
+            fill="#00D9FF" filter="url(#glitchBlur)" />
+      <!-- Hat bands -->
+      <rect x="-90" y="35" width="180" height="30" fill="#00D9FF" />
+      <rect x="-90" y="75" width="180" height="30" fill="#00D9FF" />
+    </g>
+    
+    <!-- Magenta shadow/glitch -->
+    <g transform="translate(12, 8)" opacity="0.65">
+      <!-- Puffy top of hat -->
+      <path d="M -120 -30 
+               C -120 -110, -80 -150, 0 -150
+               C 80 -150, 120 -110, 120 -30
+               C 120 -30, 120 0, 110 10
+               L 110 120
+               L -110 120
+               L -110 10
+               C -120 0, -120 -30, -120 -30 Z" 
+            fill="#FF00FF" filter="url(#glitchBlur)" />
+      <!-- Hat bands -->
+      <rect x="-90" y="35" width="180" height="30" fill="#FF00FF" />
+      <rect x="-90" y="75" width="180" height="30" fill="#FF00FF" />
+    </g>
+    
+    <!-- Main white hat -->
+    <g>
+      <!-- Main puffy chef hat shape -->
+      <path d="M -120 -30 
+               C -120 -110, -80 -150, 0 -150
+               C 80 -150, 120 -110, 120 -30
+               C 120 -30, 120 0, 110 10
+               L 110 120
+               L -110 120
+               L -110 10
+               C -120 0, -120 -30, -120 -30 Z" 
+            fill="#FFFFFF" stroke="#1B1745" stroke-width="7" stroke-linejoin="round" />
+      
+      <!-- Top band (lighter shade) -->
+      <rect x="-90" y="35" width="180" height="30" rx="2" 
+            fill="#E8E4F3" stroke="#1B1745" stroke-width="5" />
+      
+      <!-- Bottom band (lighter shade) -->
+      <rect x="-90" y="75" width="180" height="30" rx="2" 
+            fill="#E8E4F3" stroke="#1B1745" stroke-width="5" />
+      
+      <!-- Vertical pleat lines on puffy part -->
+      <path d="M -60 -100 L -60 -10" stroke="#1B1745" stroke-width="3" opacity="0.2" />
+      <path d="M -30 -120 L -30 -10" stroke="#1B1745" stroke-width="3" opacity="0.2" />
+      <path d="M 0 -130 L 0 -10" stroke="#1B1745" stroke-width="3" opacity="0.2" />
+      <path d="M 30 -120 L 30 -10" stroke="#1B1745" stroke-width="3" opacity="0.2" />
+      <path d="M 60 -100 L 60 -10" stroke="#1B1745" stroke-width="3" opacity="0.2" />
+    </g>
+  </g>
+  
+  <!-- SNAPCHEF! Text -->
+  <g transform="translate(512, 760)">
+    <!-- Cyan glitch -->
+    <text x="-6" y="0" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Arial Black', sans-serif" 
+          font-size="120" font-weight="900" letter-spacing="-2"
+          fill="#00D9FF" text-anchor="middle" opacity="0.8">SNAPCHEF!</text>
+    
+    <!-- Magenta glitch -->
+    <text x="6" y="0" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Arial Black', sans-serif" 
+          font-size="120" font-weight="900" letter-spacing="-2"
+          fill="#FF00FF" text-anchor="middle" opacity="0.8">SNAPCHEF!</text>
+    
+    <!-- Main text with outline -->
+    <text x="0" y="0" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Arial Black', sans-serif" 
+          font-size="120" font-weight="900" letter-spacing="-2"
+          fill="#FFFFFF" stroke="#1B1745" stroke-width="6" text-anchor="middle">SNAPCHEF!</text>
+    
+    <!-- Subtle inner highlight -->
+    <text x="0" y="0" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Arial Black', sans-serif" 
+          font-size="120" font-weight="900" letter-spacing="-2"
+          fill="#FFFFFF" text-anchor="middle">SNAPCHEF!</text>
+  </g>
+  
+  <!-- Subtle inner border glow -->
+  <rect x="32" y="32" width="960" height="960" rx="195" ry="195" 
+        fill="none" stroke="url(#borderGrad)" stroke-width="2" opacity="0.3" />
+</svg>

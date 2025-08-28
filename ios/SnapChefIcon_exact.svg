@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Exact gradient from the PNG border -->
+    <linearGradient id="borderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FA5F5;stop-opacity:1" />
+      <stop offset="20%" style="stop-color:#5E96F6;stop-opacity:1" />
+      <stop offset="40%" style="stop-color:#7B7FF2;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#9B6FE8;stop-opacity:1" />
+      <stop offset="80%" style="stop-color:#C45FD8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E94FC8;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Dark navy background matching original -->
+    <radialGradient id="backgroundFill" cx="50%" cy="45%" r="65%">
+      <stop offset="0%" style="stop-color:#262052;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1A1640;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Glitch colors exactly matching PNG -->
+    <linearGradient id="cyanGlitch">
+      <stop offset="0%" style="stop-color:#00E5FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00C8E8;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="magentaGlitch">
+      <stop offset="0%" style="stop-color:#FF00E5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E800C8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- iOS rounded square border - complete all around -->
+  <rect width="1024" height="1024" rx="230" ry="230" fill="url(#borderGradient)" />
+  
+  <!-- Inner background -->
+  <rect x="24" y="24" width="976" height="976" rx="206" ry="206" fill="url(#backgroundFill)" />
+  
+  <!-- Chef Hat Group - Positioned exactly as in PNG -->
+  <g transform="translate(512, 380)">
+    
+    <!-- Cyan glitch layer (left offset) -->
+    <g transform="translate(-15, -10)" opacity="0.9">
+      <!-- Hat top puffy part -->
+      <path d="M 0 -140
+               C -90 -140, -160 -100, -160 -40
+               C -160 -10, -150 10, -140 20
+               L -140 25
+               L -120 25
+               L -120 130
+               L 120 130
+               L 120 25
+               L 140 25
+               L 140 20
+               C 150 10, 160 -10, 160 -40
+               C 160 -100, 90 -140, 0 -140 Z"
+            fill="url(#cyanGlitch)" />
+      <!-- Hat band rectangles -->
+      <rect x="-100" y="35" width="200" height="32" fill="url(#cyanGlitch)" />
+      <rect x="-100" y="80" width="200" height="32" fill="url(#cyanGlitch)" />
+    </g>
+    
+    <!-- Magenta glitch layer (right offset) -->
+    <g transform="translate(15, 10)" opacity="0.9">
+      <!-- Hat top puffy part -->
+      <path d="M 0 -140
+               C -90 -140, -160 -100, -160 -40
+               C -160 -10, -150 10, -140 20
+               L -140 25
+               L -120 25
+               L -120 130
+               L 120 130
+               L 120 25
+               L 140 25
+               L 140 20
+               C 150 10, 160 -10, 160 -40
+               C 160 -100, 90 -140, 0 -140 Z"
+            fill="url(#magentaGlitch)" />
+      <!-- Hat band rectangles -->
+      <rect x="-100" y="35" width="200" height="32" fill="url(#magentaGlitch)" />
+      <rect x="-100" y="80" width="200" height="32" fill="url(#magentaGlitch)" />
+    </g>
+    
+    <!-- Main white chef hat -->
+    <g>
+      <!-- Hat puffy top with exact shape from PNG -->
+      <path d="M 0 -140
+               C -90 -140, -160 -100, -160 -40
+               C -160 -10, -150 10, -140 20
+               L -140 25
+               L -120 25
+               L -120 130
+               L 120 130
+               L 120 25
+               L 140 25
+               L 140 20
+               C 150 10, 160 -10, 160 -40
+               C 160 -100, 90 -140, 0 -140 Z"
+            fill="#FFFFFF" stroke="#1A1640" stroke-width="6" />
+      
+      <!-- First band (light purple-gray) -->
+      <rect x="-100" y="35" width="200" height="32" rx="3" 
+            fill="#DDD8E8" stroke="#1A1640" stroke-width="5" />
+      
+      <!-- Second band (light purple-gray) -->
+      <rect x="-100" y="80" width="200" height="32" rx="3" 
+            fill="#DDD8E8" stroke="#1A1640" stroke-width="5" />
+      
+      <!-- Subtle pleat lines on puffy part matching PNG -->
+      <path d="M -70 -110 C -68 -80, -68 -50, -70 -20" 
+            fill="none" stroke="#1A1640" stroke-width="2.5" opacity="0.15" />
+      <path d="M -35 -125 C -33 -95, -33 -60, -35 -25" 
+            fill="none" stroke="#1A1640" stroke-width="2.5" opacity="0.15" />
+      <path d="M 0 -135 C 2 -105, 2 -65, 0 -30" 
+            fill="none" stroke="#1A1640" stroke-width="2.5" opacity="0.15" />
+      <path d="M 35 -125 C 37 -95, 37 -60, 35 -25" 
+            fill="none" stroke="#1A1640" stroke-width="2.5" opacity="0.15" />
+      <path d="M 70 -110 C 72 -80, 72 -50, 70 -20" 
+            fill="none" stroke="#1A1640" stroke-width="2.5" opacity="0.15" />
+    </g>
+  </g>
+  
+  <!-- SNAPCHEF! Text - Exact positioning and style -->
+  <g transform="translate(512, 750)">
+    <!-- Cyan glitch text -->
+    <text x="-10" y="0" 
+          font-family="Arial Black, Helvetica, sans-serif" 
+          font-size="145" 
+          font-weight="900" 
+          letter-spacing="-3"
+          fill="url(#cyanGlitch)" 
+          text-anchor="middle" 
+          opacity="0.85">SNAPCHEF!</text>
+    
+    <!-- Magenta glitch text -->
+    <text x="10" y="0" 
+          font-family="Arial Black, Helvetica, sans-serif" 
+          font-size="145" 
+          font-weight="900" 
+          letter-spacing="-3"
+          fill="url(#magentaGlitch)" 
+          text-anchor="middle" 
+          opacity="0.85">SNAPCHEF!</text>
+    
+    <!-- Main white text with dark outline -->
+    <text x="0" y="0" 
+          font-family="Arial Black, Helvetica, sans-serif" 
+          font-size="145" 
+          font-weight="900" 
+          letter-spacing="-3"
+          fill="#FFFFFF" 
+          stroke="#1A1640" 
+          stroke-width="7" 
+          text-anchor="middle">SNAPCHEF!</text>
+  </g>
+</svg>

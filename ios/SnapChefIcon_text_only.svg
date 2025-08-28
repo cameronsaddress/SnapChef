@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Exact gradient from the PNG border -->
+    <linearGradient id="borderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FA5F5;stop-opacity:1" />
+      <stop offset="20%" style="stop-color:#5E96F6;stop-opacity:1" />
+      <stop offset="40%" style="stop-color:#7B7FF2;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#9B6FE8;stop-opacity:1" />
+      <stop offset="80%" style="stop-color:#C45FD8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E94FC8;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Dark navy background matching original -->
+    <radialGradient id="backgroundFill" cx="50%" cy="45%" r="65%">
+      <stop offset="0%" style="stop-color:#262052;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1A1640;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Glitch colors exactly matching PNG -->
+    <linearGradient id="cyanGlitch">
+      <stop offset="0%" style="stop-color:#00E5FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00C8E8;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="magentaGlitch">
+      <stop offset="0%" style="stop-color:#FF00E5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E800C8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- iOS rounded square border - complete all around -->
+  <rect width="1024" height="1024" rx="230" ry="230" fill="url(#borderGradient)" />
+  
+  <!-- Inner background -->
+  <rect x="24" y="24" width="976" height="976" rx="206" ry="206" fill="url(#backgroundFill)" />
+  
+  <!-- SNAP text on top line - centered vertically with CHEF -->
+  <g transform="translate(512, 380)">
+    <!-- Cyan glitch -->
+    <text x="-20" y="0" 
+          font-family="Arial Black, Helvetica, sans-serif" 
+          font-size="300" 
+          font-weight="900" 
+          font-stretch="expanded"
+          letter-spacing="-12"
+          fill="url(#cyanGlitch)" 
+          text-anchor="middle" 
+          opacity="0.85">SNAP</text>
+    
+    <!-- Magenta glitch -->
+    <text x="20" y="0" 
+          font-family="Arial Black, Helvetica, sans-serif" 
+          font-size="300" 
+          font-weight="900"
+          font-stretch="expanded"
+          letter-spacing="-12"
+          fill="url(#magentaGlitch)" 
+          text-anchor="middle" 
+          opacity="0.85">SNAP</text>
+    
+    <!-- Main white text -->
+    <text x="0" y="0" 
+          font-family="Arial Black, Helvetica, sans-serif" 
+          font-size="300" 
+          font-weight="900"
+          font-stretch="expanded"
+          letter-spacing="-12"
+          fill="#FFFFFF" 
+          stroke="#1A1640" 
+          stroke-width="12" 
+          text-anchor="middle">SNAP</text>
+  </g>
+  
+  <!-- CHEF text on bottom line - centered vertically with SNAP -->
+  <g transform="translate(512, 644)">
+    <!-- Cyan glitch -->
+    <text x="-20" y="0" 
+          font-family="Arial Black, Helvetica, sans-serif" 
+          font-size="300" 
+          font-weight="900"
+          font-stretch="expanded"
+          letter-spacing="-12"
+          fill="url(#cyanGlitch)" 
+          text-anchor="middle" 
+          opacity="0.85">CHEF</text>
+    
+    <!-- Magenta glitch -->
+    <text x="20" y="0" 
+          font-family="Arial Black, Helvetica, sans-serif" 
+          font-size="300" 
+          font-weight="900"
+          font-stretch="expanded"
+          letter-spacing="-12"
+          fill="url(#magentaGlitch)" 
+          text-anchor="middle" 
+          opacity="0.85">CHEF</text>
+    
+    <!-- Main white text -->
+    <text x="0" y="0" 
+          font-family="Arial Black, Helvetica, sans-serif" 
+          font-size="300" 
+          font-weight="900"
+          font-stretch="expanded"
+          letter-spacing="-12"
+          fill="#FFFFFF" 
+          stroke="#1A1640" 
+          stroke-width="12" 
+          text-anchor="middle">CHEF</text>
+  </g>
+</svg>
