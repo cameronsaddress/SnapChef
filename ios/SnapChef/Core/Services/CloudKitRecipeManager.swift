@@ -403,9 +403,7 @@ class CloudKitRecipeManager: ObservableObject {
             return Set<String>()
         }
         
-        print("🔍 DEBUG CloudKitRecipeManager: Fetching all recipe IDs for userID: \(currentUserID)")
         let predicate = NSPredicate(format: "ownerID == %@", currentUserID)
-        print("🔍 DEBUG CloudKitRecipeManager: fetchAllRecipeIDs predicate: \(predicate)")
         let query = CKQuery(recordType: "Recipe", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
 
@@ -452,8 +450,6 @@ class CloudKitRecipeManager: ObservableObject {
             // Extract recipe IDs
             for record in records {
                 if let recipeID = record["id"] as? String {
-                    let recordOwnerID = record["ownerID"] as? String ?? "Unknown"
-                    print("🔍 DEBUG CloudKitRecipeManager: Found recipe ID: \(recipeID), ownerID: \(recordOwnerID)")
                     allRecipeIDs.insert(recipeID)
                 }
             }
@@ -547,21 +543,15 @@ class CloudKitRecipeManager: ObservableObject {
     func fetchRecipe(by recipeID: String) async throws -> Recipe {
         let logger = CloudKitDebugLogger.shared
         let startTime = Date()
-        print("🔍 DEBUG CloudKitRecipeManager: fetchRecipe starting for recipeID: \(recipeID)")
         // Check local cache first
         if let cached = cachedRecipes[recipeID] {
-            print("🔍 DEBUG CloudKitRecipeManager: Recipe found in cache: \(recipeID)")
-            print("📱 Recipe found in cache: \(recipeID)")
             return cached
         }
-
-        print("🔍 DEBUG CloudKitRecipeManager: Recipe not in cache, fetching from CloudKit: \(recipeID)")
         // Fetch from CloudKit with enhanced error handling
         let recordID = CKRecord.ID(recordName: recipeID)
 
         do {
             // Try public database first (recipes are stored in public for social features)
-            print("🔍 DEBUG CloudKitRecipeManager: Trying public database for recipeID: \(recipeID)")
             logger.logFetchStart(recordType: "Recipe", query: "byID: \(recipeID)", database: "publicDB")
             let record = try await fetchRecordWithRetry(recordID: recordID, database: publicDB, maxRetries: 2)
             let recipe = try parseRecipeFromRecord(record)
@@ -570,7 +560,6 @@ class CloudKitRecipeManager: ObservableObject {
             // Store owner information in cache
             let ownerID = record["ownerID"] as? String ?? ""
             let ownerName = record["ownerName"] as? String ?? ""
-            print("🔍 DEBUG CloudKitRecipeManager: Recipe fetched from public DB - ownerID: '\(ownerID)', ownerName: '\(ownerName)'")
             CloudKitRecipeCache.shared.addRecipeToCache(recipe, ownerID: ownerID, ownerName: ownerName)
             
             let duration = Date().timeIntervalSince(startTime)
@@ -581,8 +570,6 @@ class CloudKitRecipeManager: ObservableObject {
             // If not in public, try private database for user's own recipes
             let publicDuration = Date().timeIntervalSince(startTime)
             logger.logFetchFailure(recordType: "Recipe", database: "publicDB", error: publicError, duration: publicDuration)
-            print("🔍 DEBUG CloudKitRecipeManager: Public DB failed with CKError, trying private database for recipeID: \(recipeID)")
-            print("🔍 DEBUG CloudKitRecipeManager: Public DB error: \(publicError)")
             do {
                 let record = try await fetchRecordWithRetry(recordID: recordID, database: privateDB, maxRetries: 2)
                 let recipe = try parseRecipeFromRecord(record)
@@ -591,7 +578,6 @@ class CloudKitRecipeManager: ObservableObject {
                 // Store owner information in cache
                 let ownerID = record["ownerID"] as? String ?? ""
                 let ownerName = record["ownerName"] as? String ?? ""
-                print("🔍 DEBUG CloudKitRecipeManager: Recipe fetched from private DB - ownerID: '\(ownerID)', ownerName: '\(ownerName)'")
                 CloudKitRecipeCache.shared.addRecipeToCache(recipe, ownerID: ownerID, ownerName: ownerName)
                 
                 // Note: View count increment disabled due to CloudKit permission restrictions
@@ -933,37 +919,24 @@ class CloudKitRecipeManager: ObservableObject {
         Task {
             // Only load CloudKit data if authenticated
             guard UnifiedAuthManager.shared.isAuthenticated else {
-                print("📱 User not authenticated - skipping CloudKit recipe references")
                 return
             }
             
             guard let userID = getCurrentUserID() else { 
-                print("🔍 DEBUG CloudKitRecipeManager: No user ID found for loading recipe references")
                 return 
             }
-            
-            print("🔍 DEBUG CloudKitRecipeManager: Loading recipe references for userID: \(userID)")
 
             do {
-                print("🔍 DEBUG CloudKitRecipeManager: Fetching user profile for userID: \(userID)")
                 let profileRecord = try await fetchOrCreateUserProfile(userID)
-                print("🔍 DEBUG CloudKitRecipeManager: Got user profile record: \(profileRecord.recordID.recordName)")
 
                 // Get IDs and filter out placeholder values
                 let rawSavedIDs = profileRecord["savedRecipeIDs"] as? [String] ?? []
                 let rawCreatedIDs = profileRecord["createdRecipeIDs"] as? [String] ?? []
                 let rawFavoritedIDs = profileRecord["favoritedRecipeIDs"] as? [String] ?? []
                 
-                print("🔍 DEBUG CloudKitRecipeManager: Raw recipe IDs - saved: \(rawSavedIDs.count), created: \(rawCreatedIDs.count), favorited: \(rawFavoritedIDs.count)")
-                
                 let savedIDs = rawSavedIDs.filter { $0 != "_placeholder_" }
                 let createdIDs = rawCreatedIDs.filter { $0 != "_placeholder_" }
                 let favoritedIDs = rawFavoritedIDs.filter { $0 != "_placeholder_" }
-                
-                print("🔍 DEBUG CloudKitRecipeManager: Filtered recipe IDs - saved: \(savedIDs.count), created: \(createdIDs.count), favorited: \(favoritedIDs.count)")
-                print("🔍 DEBUG CloudKitRecipeManager: Saved recipe IDs: \(savedIDs.prefix(3))")
-                print("🔍 DEBUG CloudKitRecipeManager: Created recipe IDs: \(createdIDs.prefix(3))")
-                print("🔍 DEBUG CloudKitRecipeManager: Favorited recipe IDs: \(favoritedIDs.prefix(3))")
 
                 await MainActor.run {
                     self.userSavedRecipeIDs = Set(savedIDs)
@@ -971,11 +944,7 @@ class CloudKitRecipeManager: ObservableObject {
                     self.userFavoritedRecipeIDs = Set(favoritedIDs)
                 }
 
-                print("✅ Loaded user recipe references: \(savedIDs.count) saved, \(createdIDs.count) created, \(favoritedIDs.count) favorited")
             } catch {
-                print("❌ DEBUG CloudKitRecipeManager: Failed to load user recipe references for userID: \(userID)")
-                print("❌ DEBUG CloudKitRecipeManager: Error: \(error)")
-                print("❌ DEBUG CloudKitRecipeManager: Error type: \(type(of: error))")
                 print("❌ Failed to load user recipe references: \(error)")
             }
         }
@@ -985,17 +954,12 @@ class CloudKitRecipeManager: ObservableObject {
     func getUserSavedRecipes() async throws -> [Recipe] {
         // Check if user is authenticated with Apple/Google/Facebook
         guard UnifiedAuthManager.shared.isAuthenticated else {
-            print("📱 User not authenticated - returning empty saved recipes")
             return []
         }
         
         guard let currentUserID = getCurrentUserID() else {
-            print("🔍 DEBUG CloudKitRecipeManager: No current user ID found for saved recipes")
             return []
         }
-        
-        print("🔍 DEBUG CloudKitRecipeManager: Getting saved recipes for userID: \(currentUserID)")
-        print("📖 Getting user's saved recipes...")
 
         // Skip loading from CloudKit since those fields don't exist
         // TODO: In the future, query SavedRecipe records to get the user's saved recipes
@@ -1003,13 +967,9 @@ class CloudKitRecipeManager: ObservableObject {
 
         // If we have any saved recipe IDs tracked locally, fetch those recipes
         if !userSavedRecipeIDs.isEmpty {
-            print("🔍 DEBUG CloudKitRecipeManager: Fetching \(userSavedRecipeIDs.count) saved recipe IDs: \(Array(userSavedRecipeIDs).prefix(5))")
             let recipes = try await fetchRecipes(by: Array(userSavedRecipeIDs))
-            print("🔍 DEBUG CloudKitRecipeManager: Successfully retrieved \(recipes.count) saved recipes")
-            print("📖 Retrieved \(recipes.count) saved recipes")
             return recipes
         } else {
-            print("📖 No saved recipes tracked locally")
             return []
         }
     }
@@ -1023,57 +983,84 @@ class CloudKitRecipeManager: ObservableObject {
         }
         
         guard let currentUserID = getCurrentUserID() else {
-            print("🔍 DEBUG CloudKitRecipeManager: No current user ID found for created recipes")
             return []
         }
         
         print("🍳 Getting user's CREATED recipes...")
         print("   Current User ID: \(currentUserID)")
-        print("   This will query: ownerID == '\(currentUserID)'")
+        print("   Querying CloudKit for recipes where ownerID == '\(currentUserID)'")
 
-        // Ensure references are loaded first
-        if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
-            // Try to load references if they haven't been loaded yet
-            guard let userID = getCurrentUserID() else {
-                print("⚠️ No user ID found for loading created recipes")
-                return []
+        // Query CloudKit directly for recipes owned by this user
+        // This is more reliable than relying on the createdRecipeIDs field which isn't being populated
+        let predicate = NSPredicate(format: "ownerID == %@", currentUserID)
+        let query = CKQuery(recordType: "Recipe", predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        
+        var allRecipes: [Recipe] = []
+        var cursor: CKQueryOperation.Cursor?
+        
+        repeat {
+            let operation: CKQueryOperation
+            if let cursor = cursor {
+                operation = CKQueryOperation(cursor: cursor)
+            } else {
+                operation = CKQueryOperation(query: query)
             }
-
-            print("📱 Loading recipe references for user: \(userID)")
-
-            do {
-                let profileRecord = try await fetchOrCreateUserProfile(userID)
-
-                // Get IDs and filter out placeholder values
-                let savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                let createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                let favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-
-                await MainActor.run {
-                    self.userSavedRecipeIDs = Set(savedIDs)
-                    self.userCreatedRecipeIDs = Set(createdIDs)
-                    self.userFavoritedRecipeIDs = Set(favoritedIDs)
+            
+            operation.resultsLimit = 50 // Fetch in batches
+            
+            let (records, nextCursor) = try await withCheckedThrowingContinuation { continuation in
+                var fetchedRecords: [CKRecord] = []
+                
+                operation.recordMatchedBlock = { recordID, result in
+                    switch result {
+                    case .success(let record):
+                        fetchedRecords.append(record)
+                    case .failure(let error):
+                        print("❌ Failed to fetch record \(recordID): \(error)")
+                    }
                 }
-
-                print("✅ Loaded recipe references: \(savedIDs.count) saved, \(createdIDs.count) created, \(favoritedIDs.count) favorited")
-            } catch {
-                print("❌ Failed to load recipe references: \(error)")
+                
+                operation.queryResultBlock = { result in
+                    switch result {
+                    case .success(let cursor):
+                        continuation.resume(returning: (fetchedRecords, cursor))
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+                
+                publicDB.add(operation)
             }
-        } else {
-            print("📱 Using cached references: \(userCreatedRecipeIDs.count) created")
-        }
-
-        print("🔍 DEBUG CloudKitRecipeManager: Fetching \(userCreatedRecipeIDs.count) created recipe IDs: \(Array(userCreatedRecipeIDs).prefix(5))")
-        let recipes = try await fetchRecipes(by: Array(userCreatedRecipeIDs))
-        print("🔍 DEBUG CloudKitRecipeManager: Successfully retrieved \(recipes.count) created recipes")
-        print("🍳 Retrieved \(recipes.count) created recipes")
-        return recipes
+            
+            // Parse recipes from records
+            for record in records {
+                do {
+                    let recipe = try parseRecipeFromRecord(record)
+                    allRecipes.append(recipe)
+                    
+                    // Cache the recipe
+                    if let recipeID = record["id"] as? String {
+                        cachedRecipes[recipeID] = recipe
+                        // Also update our local tracking
+                        userCreatedRecipeIDs.insert(recipeID)
+                    }
+                } catch {
+                    print("⚠️ Failed to parse recipe: \(error)")
+                }
+            }
+            
+            cursor = nextCursor
+            print("📊 Fetched batch of \(records.count) recipes (total: \(allRecipes.count))")
+        } while cursor != nil
+        
+        print("🍳 Retrieved \(allRecipes.count) created recipes for user \(currentUserID)")
+        return allRecipes
     }
 
     /// Get user's favorited recipes (optimized)
     func getUserFavoritedRecipes() async throws -> [Recipe] {
         guard let currentUserID = getCurrentUserID() else {
-            print("🔍 DEBUG CloudKitRecipeManager: No current user ID found for favorited recipes")
             return []
         }
         
