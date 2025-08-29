@@ -291,6 +291,19 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 
 ## 🔄 Latest Updates (Aug 29, 2025)
 
+### Pantry Photo Authentication Feature (Aug 29) ✅
+- **Pantry button now visible to all users** (both authenticated and unauthenticated)
+- **Authentication required for dual photo feature**:
+  - Unauthenticated users see "Sign In to Add Pantry" with lock icon
+  - Authenticated users see "Add Pantry Photo" with camera icon
+  - Beautiful auth prompt with Sign in with Apple integration
+- **Fixed pantry prompt flow**:
+  - Pantry overlay now correctly shows after fridge photo approval
+  - Users can skip and use fridge photo only
+  - After authentication, users continue directly to pantry capture
+- **Files Modified**:
+  - `CameraView.swift` - Added PantryAuthPromptView and fixed flow logic
+
 ### Usage Limits & Abuse Prevention (Aug 29) ✅
 - **Recipe Generation Daily Limits**:
   - Honeymoon (Days 1-7): 10 recipes/day
