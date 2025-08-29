@@ -47,15 +47,12 @@ struct TikTokShareView: View {
 
                 ScrollView {
                     VStack(spacing: 24) {
-                        header
-
                         if isGenerating || isCheckingAuth {
                             premiumProgressIndicator
                         } else if showSuccess {
                             successState
                         } else {
                             hashtagChips
-                            captionPreview
                         }
 
                         generateButton
@@ -164,121 +161,22 @@ struct TikTokShareView: View {
     }
 
     private var hashtagChips: some View {
-        let optimizedTags = generateSmartHashtags()
-        return VStack(alignment: .leading, spacing: 16) {
-            // Header section
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Select Hashtags")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-
-                Text("Choose hashtags for your TikTok video • \(selectedHashtags.count)/5 selected")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
-            }
-
-            // Hashtag grid with selectable chips
-            VStack(alignment: .leading, spacing: 12) {
-                let rows = optimizedTags.chunked(into: 3)
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    HStack(spacing: 8) {
-                        ForEach(Array(row.enumerated()), id: \.offset) { _, tag in
-                            SelectableHashtagChip(
-                                hashtag: tag,
-                                isSelected: selectedHashtags.contains(tag)
-                            ) {
-                                toggleHashtagSelection(tag)
-                            }
-                        }
-                        Spacer()
-                    }
-                }
-            }
-
-            // Selection actions
-            HStack(spacing: 12) {
-                Button("Select All") {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedHashtags = Array(optimizedTags.prefix(5))
-                    }
-                }
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.cyan)
-
-                Button("Clear All") {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedHashtags.removeAll()
-                    }
-                }
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.pink)
-
-                Spacer()
-
-                Text("\(selectedHashtags.count)/5")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.white.opacity(0.8))
-            }
-            .padding(.top, 8)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.08))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.2),
-                                    Color.white.opacity(0.05)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
-        )
-    }
-
-
-    // MARK: - Caption Preview
-
-    private var captionPreview: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Caption Preview")
-                .font(.system(size: 18, weight: .bold))
+            Text("Hashtags")
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
-
-            let caption = buildCaptionPreview()
-
-            ScrollView {
-                Text(caption)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.black.opacity(0.3))
-                    )
-            }
-            .frame(maxHeight: 120)
-
-            HStack {
-                Text("\(caption.count)/2200 characters")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
-
-                Spacer()
-
-                if caption.count > 2_200 {
-                    Text("Too long")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.red)
+            
+            // Simple list of pre-selected hashtags
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(selectedHashtags, id: \.self) { tag in
+                    HStack(spacing: 4) {
+                        Image(systemName: "number")
+                            .font(.system(size: 12))
+                            .foregroundColor(.cyan)
+                        Text(tag)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.9))
+                    }
                 }
             }
         }
@@ -287,13 +185,11 @@ struct TikTokShareView: View {
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.white.opacity(0.06))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
-                )
         )
-        .transition(.opacity.combined(with: .scale))
     }
+
+
+    // Caption preview removed per request
 
     private func buildCaptionPreview() -> String {
         let title: String
@@ -881,7 +777,7 @@ struct TikTokShareView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "bolt.fill")
                                     .font(.system(size: 16, weight: .bold))
-                                Text("Generate & Share Video")
+                                Text("Create Video")
                                     .font(.system(size: 18, weight: .bold))
                             }
                             .foregroundColor(.white)
