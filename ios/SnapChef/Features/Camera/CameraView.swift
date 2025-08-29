@@ -218,18 +218,13 @@ struct CameraView: View {
                                 Button(action: {
                                     showingPreview = false
                                     
-                                    // For single photo mode, process immediately
-                                    if captureMode == .fridge && !showPantryStep {
-                                        if let image = capturedImage {
-                                            processImage(image)
-                                        }
-                                    }
-                                    // For multi-photo mode - continue to pantry
-                                    else if captureMode == .fridge {
+                                    // After capturing fridge photo, always show pantry prompt
+                                    if captureMode == .fridge {
                                         fridgePhoto = capturedImage
-                                        captureMode = .pantry
-                                        showPantryStep = true
-                                    } else {
+                                        showPantryStep = true  // Show pantry overlay
+                                    } 
+                                    // After capturing pantry photo, process both
+                                    else if captureMode == .pantry {
                                         if let fridgeImage = fridgePhoto {
                                             processBothImages(fridgeImage: fridgeImage, pantryImage: capturedImage!)
                                         }
@@ -369,6 +364,7 @@ struct CameraView: View {
                         onContinue: {
                             // Continue to pantry capture
                             showPantryStep = false
+                            captureMode = .pantry
                         },
                         onBack: {
                             // Go back to fridge capture
