@@ -25,8 +25,8 @@ class UserCacheManager: ObservableObject {
     /// In-memory cache of user data
     private var cache: [String: CachedUser] = [:]
     
-    /// Cache timeout in seconds (5 minutes)
-    private let cacheTimeout: TimeInterval = 300
+    /// Cache timeout in seconds (30 minutes for user data)
+    private let cacheTimeout: TimeInterval = 1800
     
     /// Reference to CloudKit actor for safe operations
     private let cloudKitActor = CloudKitActor()

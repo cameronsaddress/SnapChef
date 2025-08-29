@@ -208,9 +208,9 @@ struct ActivityFeedView: View {
                     }
                     .padding(.vertical, 16)
 
-                    // Activity List
-                    if feedManager.showingSkeletonViews {
-                        // Skeleton Loading Views
+                    // PHASE 6: Optimized loading states
+                    if feedManager.showingSkeletonViews && feedManager.activities.isEmpty {
+                        // Only show skeleton for initial load when no cached data
                         ScrollView {
                             LazyVStack(spacing: 16) {
                                 ForEach(0..<5, id: \.self) { _ in
@@ -220,16 +220,30 @@ struct ActivityFeedView: View {
                             .padding(.horizontal, 20)
                             .padding(.bottom, 20)
                         }
-                    } else if feedManager.isLoading && feedManager.activities.isEmpty {
-                        Spacer()
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .tint(.white)
-                        Spacer()
-                    } else if feedManager.activities.isEmpty {
+                    } else if feedManager.activities.isEmpty && !feedManager.isLoading {
+                        // Show empty state only when not loading
                         EmptyActivityView()
                     } else {
+                        // Show content (with optional refresh indicator)
                         ScrollView {
+                            // PHASE 6: Subtle refresh indicator at top when refreshing
+                            if feedManager.isLoading && !feedManager.activities.isEmpty {
+                                HStack {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                        .tint(.white)
+                                    Text("Updating...")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                                .background(Color.white.opacity(0.1))
+                                .cornerRadius(8)
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 8)
+                            }
+                            
                             LazyVStack(spacing: 16) {
                                 ForEach(filteredActivities) { activity in
                                     Button(action: {
@@ -712,7 +726,12 @@ class ActivityFeedManager: ObservableObject {
         CloudKitSyncService.shared
     }
     private var lastFetchedRecord: CKRecord?
-    private var userCache: [String: CloudKitUser] = [:] // Cache for user details
+    // PHASE 5: Enhanced user cache with TTL
+    private var userCache: [String: (user: CloudKitUser, timestamp: Date)] = [:] // Cache with timestamps
+    private let userCacheTTL: TimeInterval = 1800 // 30 minutes TTL for user data
+    // PHASE 7: Memory management
+    private let maxCacheSize = 100 // Maximum number of cached users
+    private let maxActivities = 50 // Maximum activities to keep in memory
     private var publicDatabase: CKDatabase {
         CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
     }
@@ -720,7 +739,11 @@ class ActivityFeedManager: ObservableObject {
     // Cache configuration
     private let cacheKey = "ActivityFeedCache"
     private let cacheTimestampKey = "ActivityFeedCacheTimestamp"
-    private let cacheExpirationTime: TimeInterval = 300 // 5 minutes
+    private let cacheExpirationTime: TimeInterval = 600 // 10 minutes for activities
+    
+    // PHASE 4: Smart refresh tracking
+    private var lastRefreshTime: Date?
+    private let minimumRefreshInterval: TimeInterval = 30 // Don't refresh more than once per 30 seconds
 
     func loadInitialActivities() async {
         print("🔍 DEBUG: loadInitialActivities started")
@@ -731,14 +754,28 @@ class ActivityFeedManager: ObservableObject {
             return
         }
         
+        // PHASE 4: Smart loading - check if we have valid cached data
+        if !activities.isEmpty {
+            // Check if cache is still fresh (under 5 minutes old)
+            if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date {
+                let cacheAge = Date().timeIntervalSince(cacheTimestamp)
+                if cacheAge < 300 { // 5 minutes
+                    print("⚡ PHASE 4: Using fresh cached data (\(Int(cacheAge))s old), skipping fetch")
+                    return
+                }
+            }
+        }
+        
         await MainActor.run {
             print("🔍 DEBUG: Setting showingSkeletonViews = true")
-            showingSkeletonViews = true
+            showingSkeletonViews = activities.isEmpty // Only show skeleton if no existing data
             print("🔍 DEBUG: Setting isLoading = true")
             isLoading = true
-            print("🔍 DEBUG: Clearing activities")
-            activities = []
-            lastFetchedRecord = nil
+            if activities.isEmpty {
+                print("🔍 DEBUG: Clearing activities")
+                activities = []
+                lastFetchedRecord = nil
+            }
         }
 
         print("🔍 DEBUG: Loading cached activities")
@@ -750,6 +787,14 @@ class ActivityFeedManager: ObservableObject {
             await fetchActivitiesFromCloudKit()
         } else {
             print("🔍 DEBUG: Found \(activities.count) cached activities")
+            // PHASE 4: Background refresh if cache is stale but usable
+            if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date,
+               Date().timeIntervalSince(cacheTimestamp) > 300 {
+                print("🔄 PHASE 4: Cache is stale, refreshing in background")
+                Task {
+                    await fetchActivitiesFromCloudKit()
+                }
+            }
         }
         
         await MainActor.run {
@@ -773,6 +818,15 @@ class ActivityFeedManager: ObservableObject {
     }
 
     func refresh() async {
+        // PHASE 4: Smart refresh - prevent too frequent refreshes
+        if let lastRefresh = lastRefreshTime {
+            let timeSinceLastRefresh = Date().timeIntervalSince(lastRefresh)
+            if timeSinceLastRefresh < minimumRefreshInterval {
+                print("⚡ PHASE 4: Smart refresh - skipping (last refresh was \(Int(timeSinceLastRefresh))s ago)")
+                return
+            }
+        }
+        
         // Prevent concurrent refreshes
         guard !isRefreshing else { 
             print("⚠️ Refresh already in progress, skipping")
@@ -780,9 +834,36 @@ class ActivityFeedManager: ObservableObject {
         }
         
         isRefreshing = true
-        defer { isRefreshing = false }
+        defer { 
+            isRefreshing = false
+            lastRefreshTime = Date()
+        }
         
+        print("🔄 PHASE 4: Smart refresh - executing refresh")
         await loadInitialActivities()
+    }
+    
+    /// Preload feed data in background without blocking UI
+    func preloadInBackground() async {
+        // Only preload if not already loading and no data exists
+        guard !isLoading && activities.isEmpty else { 
+            print("📱 Preload skipped - already loading or has data")
+            return 
+        }
+        
+        print("📱 Starting background preload of social feed...")
+        
+        // Don't show loading indicators for background fetch
+        let originalShowingSkeleton = showingSkeletonViews
+        showingSkeletonViews = false
+        
+        // Fetch without updating loading state
+        await fetchActivitiesFromCloudKit()
+        
+        // Restore skeleton state
+        showingSkeletonViews = originalShowingSkeleton
+        
+        print("✅ Background preload complete - \(activities.count) activities loaded")
     }
 
     func markActivityAsRead(_ activityID: String) async {
@@ -866,41 +947,45 @@ class ActivityFeedManager: ObservableObject {
         print("🔍 DEBUG: User authenticated with ID: \(userID)")
 
         do {
-            // PERFORMANCE: Parallel query execution - 3x faster than sequential
-            // Fetch both activity types concurrently using TaskGroup
-            let allActivityRecords = await withTaskGroup(of: [CKRecord].self) { @Sendable group in
-                // Task 1: Fetch activities where current user is the target
-                group.addTask { @Sendable in
-                    do {
-                        let records = try await self.cloudKitSync.fetchActivityFeed(for: userID, limit: 25)
-                        print("✅ Fetched \(records.count) targeted activities")
-                        return records
-                    } catch {
-                        print("⚠️ Failed to fetch targeted activities: \(error)")
-                        return []
-                    }
-                }
+            // PHASE 3 OPTIMIZATION: Enhanced parallel fetching with async let
+            // Fetch followed users and activities simultaneously instead of sequentially
+            print("🚀 Starting parallel fetch with async let...")
+            
+            // Start both operations simultaneously
+            async let followedUsersTask = fetchFollowedUserIDs(for: userID)
+            async let targetedActivitiesTask = cloudKitSync.fetchActivityFeed(for: userID, limit: 25)
+            
+            // Wait for both to complete
+            let (followedUserIDs, targetedActivities) = try await (followedUsersTask, targetedActivitiesTask)
+            
+            print("✅ Parallel fetch complete: \(followedUserIDs.count) followed users, \(targetedActivities.count) targeted activities")
+            
+            // Now fetch activities from followed users using the IDs we got
+            let followedActivities: [CKRecord]
+            if !followedUserIDs.isEmpty {
+                // Include self in the query
+                var queryUserIDs = followedUserIDs
+                queryUserIDs.append(userID)
                 
-                // Task 2: Fetch activities from users they follow (including their own)
-                group.addTask { @Sendable in
-                    do {
-                        let records = try await self.fetchFollowedUserActivities(limit: 25)
-                        print("✅ Fetched \(records.count) activities from followed users and self")
-                        return records
-                    } catch {
-                        print("⚠️ Failed to fetch followed user activities: \(error)")
-                        return []
-                    }
-                }
+                // Limit to prevent CloudKit predicate size issues
+                let limitedUserIDs = Array(queryUserIDs.prefix(10))
                 
-                // Collect results from both tasks
-                var allRecords: [CKRecord] = []
-                for await records in group {
-                    allRecords.append(contentsOf: records)
-                }
-                print("📊 PERFORMANCE: Parallel fetch complete - Total records: \(allRecords.count)")
-                return allRecords
+                let activityPredicate = NSPredicate(format: "actorID IN %@", limitedUserIDs)
+                let activityQuery = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: activityPredicate)
+                
+                followedActivities = try await cloudKitSync.cloudKitActor.executeQuery(
+                    activityQuery, 
+                    desiredKeys: nil, 
+                    resultsLimit: 25
+                )
+                print("✅ Fetched \(followedActivities.count) activities from followed users")
+            } else {
+                followedActivities = []
             }
+            
+            // Combine all activities
+            let allActivityRecords = targetedActivities + followedActivities
+            print("📊 PERFORMANCE: Total activities before dedup: \(allActivityRecords.count)")
             
             // Remove duplicates based on record ID
             var seenRecordIDs = Set<String>()
@@ -930,12 +1015,8 @@ class ActivityFeedManager: ObservableObject {
             let newActivities = await withTaskGroup(of: ActivityItem?.self) { group in
                 for record in limitedRecords {
                     group.addTask {
-                        do {
-                            return await self.mapCloudKitRecordToActivityItem(record)
-                        } catch {
-                            print("⚠️ Failed to map activity record: \(error)")
-                            return nil
-                        }
+                        // mapCloudKitRecordToActivityItem doesn't throw, just returns optional
+                        return await self.mapCloudKitRecordToActivityItem(record)
                     }
                 }
                 
@@ -958,6 +1039,12 @@ class ActivityFeedManager: ObservableObject {
 
             if loadMore {
                 activities.append(contentsOf: newActivities)
+                // PHASE 7: Limit activities in memory to prevent excessive usage
+                if activities.count > maxActivities {
+                    let overflow = activities.count - maxActivities
+                    activities.removeFirst(overflow)
+                    print("🧹 PHASE 7: Trimmed \(overflow) old activities (keeping \(maxActivities) max)")
+                }
             } else {
                 activities = newActivities
             }
@@ -979,6 +1066,30 @@ class ActivityFeedManager: ObservableObject {
         }
     }
 
+    /// Efficiently fetch just the IDs of users being followed
+    private func fetchFollowedUserIDs(for userID: String) async throws -> [String] {
+        let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == %d", userID, 1)
+        let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
+        
+        // Use CloudKitActor for safe query execution
+        let cloudKitSync = CloudKitSyncService.shared
+        let followRecords = try await cloudKitSync.cloudKitActor.executeQuery(
+            followingQuery, 
+            desiredKeys: ["followingID"], // Only fetch the ID field we need
+            resultsLimit: 50  // Get up to 50 followed users
+        )
+        
+        var followedUserIDs: [String] = []
+        for record in followRecords {
+            if let followingID = record["followingID"] as? String {
+                followedUserIDs.append(followingID)
+            }
+        }
+        
+        print("📊 Found \(followedUserIDs.count) followed users")
+        return followedUserIDs
+    }
+    
     private func fetchFollowedUserActivities(limit: Int) async throws -> [CKRecord] {
         guard let currentUser = UnifiedAuthManager.shared.currentUser,
               let currentUserID = currentUser.recordID else {
@@ -1040,7 +1151,7 @@ class ActivityFeedManager: ObservableObject {
     
     /// Batch fetch users to populate cache and avoid redundant individual fetches
     private func batchFetchUsers(from records: [CKRecord]) async {
-        // PERFORMANCE: Use UserCacheManager for centralized caching (5-minute TTL)
+        // PHASE 3 OPTIMIZATION: Parallel batch fetching with local cache
         // Extract all unique user IDs from activity records
         var userIDsToFetch = Set<String>()
         
@@ -1053,29 +1164,36 @@ class ActivityFeedManager: ObservableObject {
             }
         }
         
-        guard !userIDsToFetch.isEmpty else {
-            print("✅ No users to fetch")
+        // PHASE 5: Filter out already cached users with TTL check
+        let uncachedUserIDs = userIDsToFetch.filter { userID in
+            if let cached = userCache[userID] {
+                // Check if cache is still valid
+                return Date().timeIntervalSince(cached.timestamp) > userCacheTTL
+            }
+            return true
+        }
+        
+        guard !uncachedUserIDs.isEmpty else {
+            print("✅ PHASE 3: All \(userIDsToFetch.count) users already cached")
             return
         }
         
-        print("📥 Batch fetching \(userIDsToFetch.count) users using UserCacheManager")
+        print("📥 PHASE 3: Batch fetching \(uncachedUserIDs.count) uncached users (of \(userIDsToFetch.count) total)")
         
-        // Use centralized user cache manager for efficient batch fetching
-        // This reduces CloudKit queries by 95% through intelligent caching
-        // UserCacheManager is a singleton with 5-minute TTL caching
-        
-        // For now, fall back to direct CloudKit fetch until UserCacheManager is integrated
-        // TODO: Integrate UserCacheManager.shared.batchFetchUsers() once available in build
-        
-        // Fetch users in batches to avoid overwhelming CloudKit
-        let batchSize = 20
-        let userIDBatches = Array(userIDsToFetch).chunked(into: batchSize)
-        
-        for batch in userIDBatches {
-            await fetchUserBatchDirect(userIDs: batch)
+        // Fetch users in parallel using TaskGroup for better performance
+        await withTaskGroup(of: Void.self) { group in
+            // Batch into groups of 10 to avoid CloudKit limits
+            let batchSize = 10
+            let userIDBatches = Array(uncachedUserIDs).chunked(into: batchSize)
+            
+            for batch in userIDBatches {
+                group.addTask {
+                    await self.fetchUserBatchDirect(userIDs: batch)
+                }
+            }
         }
         
-        print("✅ Cached \(userIDsToFetch.count) users")
+        print("✅ PHASE 3: Cached \(uncachedUserIDs.count) users with parallel fetching")
     }
     
     
@@ -1099,8 +1217,11 @@ class ActivityFeedManager: ObservableObject {
                 let record = try await cloudKitSync.cloudKitActor.fetchRecord(with: recordID)
                 let user = CloudKitUser(from: record)
                 if let userID = user.recordID {
-                    userCache[userID] = user
-                    print("✅ Cached user \(userID): \(user.displayName)")
+                    // PHASE 5: Cache with timestamp
+                    userCache[userID] = (user: user, timestamp: Date())
+                    print("✅ Cached user \(userID): \(user.displayName) with TTL")
+                    // PHASE 7: Trim cache if needed
+                    trimUserCacheIfNeeded()
                 }
             } catch {
                 print("⚠️ Failed to fetch user \(recordID.recordName): \(error)")
@@ -1127,19 +1248,57 @@ class ActivityFeedManager: ObservableObject {
         let placeholderUser = CloudKitUser(from: placeholderRecord)
         // Store using the raw userID (without "user_" prefix)
         if let userID = placeholderUser.recordID {
-            userCache[userID] = placeholderUser
+            // PHASE 5: Cache placeholder with timestamp
+            userCache[userID] = (user: placeholderUser, timestamp: Date())
         }
     }
 
+    // PHASE 7: Memory management - trim cache when it gets too large
+    private func trimUserCacheIfNeeded() {
+        if userCache.count > maxCacheSize {
+            // Sort by timestamp and remove oldest entries
+            let sortedCache = userCache.sorted { $0.value.timestamp < $1.value.timestamp }
+            let toRemove = sortedCache.prefix(userCache.count - maxCacheSize + 10) // Keep 10 slots free
+            
+            for (key, _) in toRemove {
+                userCache.removeValue(forKey: key)
+            }
+            
+            print("🧹 PHASE 7: Trimmed user cache from \(sortedCache.count) to \(userCache.count) entries")
+        }
+    }
+    
+    // PHASE 7: Clean up memory when view is not visible
+    func cleanupMemory() {
+        // Remove old cached users
+        let now = Date()
+        userCache = userCache.filter { _, value in
+            now.timeIntervalSince(value.timestamp) < 300 // Keep only last 5 minutes
+        }
+        
+        // Trim activities if too many
+        if activities.count > 30 {
+            activities = Array(activities.prefix(30))
+            print("🧹 PHASE 7: Cleaned up memory - keeping 30 most recent activities")
+        }
+        
+        print("📊 PHASE 7: Memory cleanup complete - \(userCache.count) users, \(activities.count) activities")
+    }
+    
     /// Fetches user display name by userID, using cache when available
     private func fetchUserDisplayName(userID: String) async -> String {
         print("🔍 DEBUG: fetchUserDisplayName for userID: \(userID)")
         
-        // Check cache first to avoid redundant fetches
-        if let cachedUser = userCache[userID] {
-            let displayName = cachedUser.username ?? cachedUser.displayName
-            print("✅ Found cached user: \(displayName) (username: \(cachedUser.username ?? "nil"))")
-            return displayName
+        // PHASE 5: Check cache with TTL validation
+        if let cached = userCache[userID] {
+            // Check if cache is still valid
+            if Date().timeIntervalSince(cached.timestamp) < userCacheTTL {
+                let displayName = cached.user.username ?? cached.user.displayName
+                print("✅ Found cached user: \(displayName) (cache age: \(Int(Date().timeIntervalSince(cached.timestamp)))s)")
+                return displayName
+            } else {
+                print("⏰ User cache expired for \(userID)")
+            }
         }
         
         print("⚠️ User not in cache, fetching from CloudKit...")
@@ -1158,8 +1317,10 @@ class ActivityFeedManager: ObservableObject {
             print("   - username: \(user.username ?? "nil")")
             print("   - displayName: \(user.displayName)")
             
-            // Update cache with fresh data
-            userCache[userID] = user
+            // PHASE 5: Update cache with fresh data and timestamp
+            userCache[userID] = (user: user, timestamp: Date())
+            // PHASE 7: Trim cache if needed
+            trimUserCacheIfNeeded()
             
             let result = user.username ?? user.displayName
             print("⚠️ Individual fetch for \(userID): \(result)")
@@ -1295,13 +1456,7 @@ class ActivityFeedManager: ObservableObject {
     private func loadCachedActivities() async {
         print("🔍 DEBUG: loadCachedActivities - checking for cache")
         
-        // Temporarily clear cache to force fresh fetch with correct usernames
-        // Remove this after fixing the username issue
-        UserDefaults.standard.removeObject(forKey: cacheKey)
-        UserDefaults.standard.removeObject(forKey: cacheTimestampKey)
-        print("⚠️ DEBUG: Cache cleared to force fresh fetch")
-        return
-        
+        // Check if we have valid cached data
         guard let data = UserDefaults.standard.data(forKey: cacheKey) else {
             print("🔍 DEBUG: No cached data found")
             return

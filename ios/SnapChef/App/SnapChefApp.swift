@@ -87,6 +87,15 @@ struct SnapChefApp: App {
         if UserDefaults.standard.object(forKey: "SelectedLLMProvider") == nil {
             UserDefaults.standard.set("gemini", forKey: "SelectedLLMProvider")
         }
+        
+        // Preload social feed after 5 seconds if authenticated
+        Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+            if UnifiedAuthManager.shared.isAuthenticated {
+                print("🚀 Starting background social feed preload...")
+                await ActivityFeedManager().preloadInBackground()
+            }
+        }
 
         // Initialize social media SDKs
         SDKInitializer.initializeSDKs()
