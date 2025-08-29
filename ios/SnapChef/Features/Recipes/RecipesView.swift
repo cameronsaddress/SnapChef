@@ -103,6 +103,10 @@ struct RecipesView: View {
                     .padding(.bottom, 100)
             }
                 .scrollContentBackground(.hidden)
+                .refreshable {
+                    // User-initiated pull to refresh
+                    await cloudKitRecipeCache.forceRefreshFromCloudKit()
+                }
 
                 // Floating Filter Button
                 VStack {

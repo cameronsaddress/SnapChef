@@ -36,7 +36,7 @@ class CloudKitRecipeCache: ObservableObject {
     // User defaults keys
     private let lastFetchKey = "CloudKitRecipesLastFetch"
     private let cachedRecipesKey = "CloudKitCachedRecipes"
-    private let recipeFetchInterval: TimeInterval = 300 // 5 minutes
+    private let recipeFetchInterval: TimeInterval = 1800 // 30 minutes - recipes don't change that often
     
     // Enhanced caching
     private let cacheVersion = "v2" // Increment when cache structure changes
@@ -125,6 +125,17 @@ class CloudKitRecipeCache: ObservableObject {
 
         print("🗑️ CloudKitCache: Cache cleared")
     }
+    
+    /// Force refresh recipes from CloudKit (user-initiated)
+    func forceRefreshFromCloudKit() async {
+        print("🔄 User-initiated force refresh from CloudKit")
+        
+        // Clear cache timestamp to force refresh
+        lastFetchDate = nil
+        
+        // Fetch fresh data
+        _ = await getRecipes(forceRefresh: true)
+    }
 
     /// Add a single recipe to the cache
     func addRecipeToCache(_ recipe: Recipe, ownerID: String = "", ownerName: String = "") {
@@ -159,15 +170,21 @@ class CloudKitRecipeCache: ObservableObject {
             print("📱 CloudKitCache: No previous fetch date, will fetch from CloudKit")
             return true
         }
+        
+        // Check if cache is empty (always fetch if empty)
+        if cachedRecipes.isEmpty {
+            print("📱 CloudKitCache: Cache is empty, will fetch from CloudKit")
+            return true
+        }
 
         // Check if enough time has passed since last fetch
         let timeSinceLastFetch = Date().timeIntervalSince(lastFetch)
         let shouldFetch = timeSinceLastFetch > recipeFetchInterval
 
         if shouldFetch {
-            print("📱 CloudKitCache: \(Int(timeSinceLastFetch))s since last fetch, will refresh (threshold: \(Int(recipeFetchInterval))s)")
+            print("📱 CloudKitCache: \(Int(timeSinceLastFetch/60)) minutes since last fetch, will refresh")
         } else {
-            print("📱 CloudKitCache: Only \(Int(timeSinceLastFetch))s since last fetch, using cache")
+            print("📱 CloudKitCache: Only \(Int(timeSinceLastFetch/60)) minutes since last fetch, using cache")
         }
 
         return shouldFetch
@@ -176,19 +193,17 @@ class CloudKitRecipeCache: ObservableObject {
     private func fetchNewRecipesOnly() async throws -> [Recipe] {
         print("📱 CloudKitCache: Fetching only new recipes from CloudKit...")
 
-        // Get all recipe IDs from CloudKit
-        let savedRecipes = try await cloudKitManager.getUserSavedRecipes()
+        // FIXED: Only fetch created recipes (which are ALL user's recipes by ownerID)
+        // This prevents double fetching since getUserCreatedRecipes already gets all recipes
+        // where the user is the owner, which includes both created and saved recipes
         let createdRecipes = try await cloudKitManager.getUserCreatedRecipes()
 
-        // Combine all recipes
-        let allCloudKitRecipes = savedRecipes + createdRecipes
-
         // Filter out recipes we already have locally
-        let newRecipes = allCloudKitRecipes.filter { recipe in
+        let newRecipes = createdRecipes.filter { recipe in
             !localRecipeIDs.contains(recipe.id)
         }
 
-        print("📱 CloudKitCache: Found \(newRecipes.count) new recipes out of \(allCloudKitRecipes.count) total")
+        print("📱 CloudKitCache: Found \(newRecipes.count) new recipes out of \(createdRecipes.count) total")
 
         return newRecipes
     }

@@ -18,6 +18,13 @@ class CloudKitRecipeManager: ObservableObject {
     @Published var userCreatedRecipeIDs: Set<String> = []
     @Published var userFavoritedRecipeIDs: Set<String> = []
     
+    // Local cache persistence for created recipes
+    private let localRecipeCacheKey = "cloudkit_local_recipe_cache_v1"
+    private let localRecipeCacheTimestampKey = "cloudkit_local_recipe_cache_timestamp"
+    private let cacheExpirationInterval: TimeInterval = 1800 // 30 minutes
+    private var localRecipeCache: [Recipe] = []
+    private var cacheTimestamp: Date?
+    
     // OPTIMIZATION: Photo fetch caching and deduplication
     private var photoFetchCache: [String: (before: UIImage?, after: UIImage?)] = [:]
     private var activeFetches: Set<String> = []
@@ -26,6 +33,7 @@ class CloudKitRecipeManager: ObservableObject {
     private init() {
         self.publicDB = container.publicCloudDatabase
         self.privateDB = container.privateCloudDatabase
+        loadLocalRecipeCache()
         loadUserRecipeReferences()
     }
 
@@ -865,30 +873,39 @@ class CloudKitRecipeManager: ObservableObject {
     func addRecipeToUserProfile(_ recipeID: String, type: RecipeListType) async throws {
         guard let userID = getCurrentUserID() else { return }
 
-        // For now, just track the recipe ID locally since CloudKit User record doesn't have list fields
-        // The recipe itself is already saved to CloudKit in the Recipe table
+        // Track locally for instant UI update
         switch type {
         case .saved:
             userSavedRecipeIDs.insert(recipeID)
             print("✅ Recipe \(recipeID) marked as saved locally")
         case .created:
             userCreatedRecipeIDs.insert(recipeID)
+            // Also update local cache when a new recipe is created
+            if let recipe = cachedRecipes[recipeID] {
+                localRecipeCache.append(recipe)
+                saveLocalRecipeCache(localRecipeCache)
+            }
             print("✅ Recipe \(recipeID) marked as created locally")
         case .favorited:
             userFavoritedRecipeIDs.insert(recipeID)
             print("✅ Recipe \(recipeID) marked as favorited locally")
         }
         
+        // Persist to UserDefaults for next app launch
+        persistRecipeReferences()
+        
         // Update save count on recipe
         if type == .saved {
             await incrementSaveCount(for: recipeID)
         }
         
-        // TODO: In the future, create a SavedRecipe record type in CloudKit
-        // to properly track which recipes each user has saved
-        // For now, the recipe is saved to CloudKit Recipe table and tracked locally
-        
         print("✅ Recipe \(recipeID) successfully tracked as \(type)")
+    }
+    
+    private func persistRecipeReferences() {
+        UserDefaults.standard.set(Array(userSavedRecipeIDs), forKey: "user_saved_recipe_ids")
+        UserDefaults.standard.set(Array(userCreatedRecipeIDs), forKey: "user_created_recipe_ids")
+        UserDefaults.standard.set(Array(userFavoritedRecipeIDs), forKey: "user_favorited_recipe_ids")
     }
 
     /// Remove recipe reference from user profile
@@ -916,6 +933,20 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Load user's recipe references
     func loadUserRecipeReferences() {
+        // First load from UserDefaults for instant availability
+        if let savedIDs = UserDefaults.standard.array(forKey: "user_saved_recipe_ids") as? [String] {
+            userSavedRecipeIDs = Set(savedIDs)
+        }
+        if let createdIDs = UserDefaults.standard.array(forKey: "user_created_recipe_ids") as? [String] {
+            userCreatedRecipeIDs = Set(createdIDs)
+        }
+        if let favoritedIDs = UserDefaults.standard.array(forKey: "user_favorited_recipe_ids") as? [String] {
+            userFavoritedRecipeIDs = Set(favoritedIDs)
+        }
+        
+        print("📱 Loaded recipe references from cache - saved: \(userSavedRecipeIDs.count), created: \(userCreatedRecipeIDs.count), favorited: \(userFavoritedRecipeIDs.count)")
+        
+        // Then check CloudKit in background (this is a fallback in case UserDefaults is out of sync)
         Task {
             // Only load CloudKit data if authenticated
             guard UnifiedAuthManager.shared.isAuthenticated else {
@@ -939,15 +970,56 @@ class CloudKitRecipeManager: ObservableObject {
                 let favoritedIDs = rawFavoritedIDs.filter { $0 != "_placeholder_" }
 
                 await MainActor.run {
-                    self.userSavedRecipeIDs = Set(savedIDs)
-                    self.userCreatedRecipeIDs = Set(createdIDs)
-                    self.userFavoritedRecipeIDs = Set(favoritedIDs)
+                    // Merge CloudKit data with local data
+                    self.userSavedRecipeIDs = self.userSavedRecipeIDs.union(Set(savedIDs))
+                    self.userCreatedRecipeIDs = self.userCreatedRecipeIDs.union(Set(createdIDs))
+                    self.userFavoritedRecipeIDs = self.userFavoritedRecipeIDs.union(Set(favoritedIDs))
+                    
+                    // Persist the merged data
+                    self.persistRecipeReferences()
                 }
 
             } catch {
-                print("❌ Failed to load user recipe references: \(error)")
+                print("⚠️ CloudKit sync failed, using local cache: \(error)")
             }
         }
+    }
+    
+    // MARK: - Local Cache Management
+    
+    private func loadLocalRecipeCache() {
+        // Load cached recipes from UserDefaults
+        if let data = UserDefaults.standard.data(forKey: localRecipeCacheKey),
+           let recipes = try? JSONDecoder().decode([Recipe].self, from: data) {
+            localRecipeCache = recipes
+            print("📱 Loaded \(recipes.count) recipes from local cache")
+        }
+        
+        // Load cache timestamp
+        cacheTimestamp = UserDefaults.standard.object(forKey: localRecipeCacheTimestampKey) as? Date
+        
+        if let timestamp = cacheTimestamp {
+            let age = Date().timeIntervalSince(timestamp)
+            print("📱 Local recipe cache is \(Int(age))s old")
+        }
+    }
+    
+    private func saveLocalRecipeCache(_ recipes: [Recipe]) {
+        localRecipeCache = recipes
+        cacheTimestamp = Date()
+        
+        // Save to UserDefaults
+        if let data = try? JSONEncoder().encode(recipes) {
+            UserDefaults.standard.set(data, forKey: localRecipeCacheKey)
+            UserDefaults.standard.set(cacheTimestamp, forKey: localRecipeCacheTimestampKey)
+            print("💾 Saved \(recipes.count) recipes to local cache")
+        }
+    }
+    
+    private func isCacheValid() -> Bool {
+        guard let timestamp = cacheTimestamp else { return false }
+        let age = Date().timeIntervalSince(timestamp)
+        return age < cacheExpirationInterval
     }
 
     /// Get user's saved recipes (optimized)
@@ -974,9 +1046,9 @@ class CloudKitRecipeManager: ObservableObject {
         }
     }
 
-    /// Get user's created recipes (optimized)
+    /// Get user's created recipes (optimized with local cache)
     func getUserCreatedRecipes() async throws -> [Recipe] {
-        // Check if user is authenticated with Apple/Google/Facebook
+        // Check if user is authenticated
         guard UnifiedAuthManager.shared.isAuthenticated else {
             print("📱 User not authenticated - returning empty created recipes")
             return []
@@ -986,12 +1058,45 @@ class CloudKitRecipeManager: ObservableObject {
             return []
         }
         
-        print("🍳 Getting user's CREATED recipes...")
-        print("   Current User ID: \(currentUserID)")
-        print("   Querying CloudKit for recipes where ownerID == '\(currentUserID)'")
-
-        // Query CloudKit directly for recipes owned by this user
-        // This is more reliable than relying on the createdRecipeIDs field which isn't being populated
+        // OPTIMIZATION: Return local cache immediately if valid
+        if isCacheValid() && !localRecipeCache.isEmpty {
+            print("📱 Using local recipe cache: \(localRecipeCache.count) recipes (cache valid)")
+            
+            // Start background refresh if cache is getting old (>15 minutes)
+            if let timestamp = cacheTimestamp, 
+               Date().timeIntervalSince(timestamp) > 900 {
+                Task {
+                    print("🔄 Starting background cache refresh...")
+                    do {
+                        let freshRecipes = try await fetchCreatedRecipesFromCloudKit()
+                        saveLocalRecipeCache(freshRecipes)
+                    } catch {
+                        print("⚠️ Background refresh failed: \(error)")
+                    }
+                }
+            }
+            
+            return localRecipeCache
+        }
+        
+        // Cache is invalid or empty, fetch from CloudKit
+        print("🔄 Local cache invalid or empty, fetching from CloudKit...")
+        let recipes = try await fetchCreatedRecipesFromCloudKit()
+        
+        // Save to local cache
+        saveLocalRecipeCache(recipes)
+        
+        return recipes
+    }
+    
+    private func fetchCreatedRecipesFromCloudKit() async throws -> [Recipe] {
+        guard let currentUserID = getCurrentUserID() else {
+            return []
+        }
+        
+        print("🍳 Fetching created recipes from CloudKit for user: \(currentUserID)")
+        
+        // Query CloudKit for recipes owned by this user
         let predicate = NSPredicate(format: "ownerID == %@", currentUserID)
         let query = CKQuery(recordType: "Recipe", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
@@ -1007,7 +1112,7 @@ class CloudKitRecipeManager: ObservableObject {
                 operation = CKQueryOperation(query: query)
             }
             
-            operation.resultsLimit = 50 // Fetch in batches
+            operation.resultsLimit = 50
             
             let (records, nextCursor) = try await withCheckedThrowingContinuation { continuation in
                 var fetchedRecords: [CKRecord] = []
@@ -1042,7 +1147,6 @@ class CloudKitRecipeManager: ObservableObject {
                     // Cache the recipe
                     if let recipeID = record["id"] as? String {
                         cachedRecipes[recipeID] = recipe
-                        // Also update our local tracking
                         userCreatedRecipeIDs.insert(recipeID)
                     }
                 } catch {
@@ -1054,7 +1158,7 @@ class CloudKitRecipeManager: ObservableObject {
             print("📊 Fetched batch of \(records.count) recipes (total: \(allRecipes.count))")
         } while cursor != nil
         
-        print("🍳 Retrieved \(allRecipes.count) created recipes for user \(currentUserID)")
+        print("🍳 Retrieved \(allRecipes.count) created recipes from CloudKit")
         return allRecipes
     }
 
