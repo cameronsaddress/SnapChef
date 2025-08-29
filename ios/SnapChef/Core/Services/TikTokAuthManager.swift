@@ -64,29 +64,61 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
         defer { isLoading = false }
 
         return try await withCheckedThrowingContinuation { continuation in
+            // Use a flag to ensure continuation is only resumed once
+            var hasResumed = false
+            
             let authRequest = TikTokAuthRequest(
                 scopes: requiredScopes,
                 redirectURI: redirectURI
             )
+            
+            print("🔐 TikTok Auth: Creating auth request with redirect URI: \(redirectURI)")
 
             authRequest.send { [weak self] response in
                 Task { @MainActor in
+                    guard !hasResumed else {
+                        print("🔐 TikTok Auth: Continuation already resumed, ignoring duplicate callback")
+                        return
+                    }
+                    hasResumed = true
+                    
                     guard let self = self else {
+                        print("🔐 TikTok Auth: Self was deallocated")
                         continuation.resume(throwing: TikTokAuthError.authenticationFailed)
                         return
                     }
 
                     if let authResponse = response as? TikTokAuthResponse {
+                        print("🔐 TikTok Auth: Received auth response")
                         do {
                             let user = try await self.handleAuthResponse(authResponse)
                             continuation.resume(returning: user)
                         } catch {
+                            print("🔐 TikTok Auth: Error handling response: \(error)")
                             continuation.resume(throwing: error)
                         }
+                    } else if let error = response as? NSError {
+                        print("🔐 TikTok Auth: Received error response: \(error)")
+                        // Check for redirect URI mismatch error
+                        if error.domain.contains("10028") || error.localizedDescription.contains("redirect uri") {
+                            continuation.resume(throwing: TikTokAuthError.invalidRedirectURI)
+                        } else {
+                            continuation.resume(throwing: TikTokAuthError.authenticationFailed)
+                        }
                     } else {
+                        print("🔐 TikTok Auth: Unknown response type: \(String(describing: response))")
                         continuation.resume(throwing: TikTokAuthError.authenticationFailed)
                     }
                 }
+            }
+            
+            // Add a timeout to prevent hanging forever
+            Task {
+                try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
+                guard !hasResumed else { return }
+                hasResumed = true
+                print("🔐 TikTok Auth: Authentication timed out")
+                continuation.resume(throwing: TikTokAuthError.timeout)
             }
         }
     }
@@ -590,6 +622,8 @@ enum TikTokAuthError: LocalizedError, Sendable {
     case tokenExpiredNoRefresh
     case refreshTokenInvalid
     case rateLimited
+    case invalidRedirectURI
+    case timeout
 
     var errorDescription: String? {
         switch self {
@@ -615,6 +649,10 @@ enum TikTokAuthError: LocalizedError, Sendable {
             return "Your TikTok session is no longer valid. Please sign in again."
         case .rateLimited:
             return "Too many requests. Please wait a moment and try again."
+        case .invalidRedirectURI:
+            return "TikTok redirect URI mismatch. Please check TIKTOK_REDIRECT_URI_FIX.md for setup instructions."
+        case .timeout:
+            return "Authentication timed out. Please try again."
         }
     }
 
