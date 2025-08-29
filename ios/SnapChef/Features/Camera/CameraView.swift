@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import AuthenticationServices
 
 struct CameraView: View {
     @StateObject private var cameraModel = CameraModel()
@@ -1294,6 +1295,8 @@ struct PantryStepOverlay: View {
     let onBack: () -> Void
 
     @State private var pulseAnimation = false
+    @State private var showAuthPrompt = false
+    @StateObject private var authManager = UnifiedAuthManager.shared
 
     var body: some View {
         ZStack {
@@ -1331,7 +1334,9 @@ struct PantryStepOverlay: View {
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
 
-                    Text("Add your pantry for even better recipes!")
+                    Text(authManager.isAuthenticated 
+                        ? "Add your pantry for even better recipes!"
+                        : "Sign in to combine fridge + pantry photos!")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
@@ -1340,12 +1345,18 @@ struct PantryStepOverlay: View {
 
                 // Action buttons
                 VStack(spacing: 16) {
-                    // Continue button (primary)
-                    Button(action: onContinue) {
+                    // Continue button (primary) - check authentication
+                    Button(action: {
+                        if authManager.isAuthenticated {
+                            onContinue()
+                        } else {
+                            showAuthPrompt = true
+                        }
+                    }) {
                         HStack(spacing: 12) {
-                            Image(systemName: "camera.fill")
+                            Image(systemName: authManager.isAuthenticated ? "camera.fill" : "lock.fill")
                                 .font(.system(size: 18, weight: .semibold))
-                            Text("Add Pantry Photo")
+                            Text(authManager.isAuthenticated ? "Add Pantry Photo" : "Sign In to Add Pantry")
                                 .font(.system(size: 18, weight: .semibold))
                         }
                         .foregroundColor(.white)
@@ -1353,13 +1364,15 @@ struct PantryStepOverlay: View {
                         .padding(.vertical, 16)
                         .background(
                             LinearGradient(
-                                colors: [Color.orange, Color.orange.opacity(0.8)],
+                                colors: authManager.isAuthenticated 
+                                    ? [Color.orange, Color.orange.opacity(0.8)]
+                                    : [Color.purple, Color.purple.opacity(0.8)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
                         .clipShape(Capsule())
-                        .shadow(color: Color.orange.opacity(0.3), radius: 8, y: 4)
+                        .shadow(color: authManager.isAuthenticated ? Color.orange.opacity(0.3) : Color.purple.opacity(0.3), radius: 8, y: 4)
                         .scaleEffect(pulseAnimation ? 1.05 : 1.0)
                     }
 
@@ -1403,6 +1416,174 @@ struct PantryStepOverlay: View {
                 print("🔍 DEBUG: PantryStepOverlay - Async block completed")
             }
             print("🔍 DEBUG: PantryStepOverlay appeared - End")
+        }
+        .sheet(isPresented: $showAuthPrompt) {
+            PantryAuthPromptView(
+                isPresented: $showAuthPrompt,
+                onAuthenticated: {
+                    // After successful authentication, continue to pantry capture
+                    onContinue()
+                }
+            )
+        }
+    }
+}
+
+// MARK: - Pantry Authentication Prompt
+struct PantryAuthPromptView: View {
+    @Binding var isPresented: Bool
+    let onAuthenticated: () -> Void
+    @StateObject private var authManager = UnifiedAuthManager.shared
+    @State private var isAuthenticating = false
+    @State private var errorMessage: String?
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Gradient background
+                LinearGradient(
+                    colors: [
+                        Color(hex: "#667eea"),
+                        Color(hex: "#764ba2")
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                VStack(spacing: 30) {
+                    Spacer()
+                    
+                    // Icon
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(width: 100, height: 100)
+                        
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 45))
+                            .foregroundColor(.white)
+                    }
+                    
+                    // Title
+                    Text("Sign In Required")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    // Description
+                    VStack(spacing: 12) {
+                        Text("Pantry photo feature requires an account")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white.opacity(0.9))
+                            .multilineTextAlignment(.center)
+                        
+                        Text("Sign in to combine fridge and pantry photos for better recipe suggestions!")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
+                    }
+                    
+                    // Benefits
+                    VStack(alignment: .leading, spacing: 16) {
+                        FeatureRow(icon: "camera.on.rectangle", text: "Combine multiple photos")
+                        FeatureRow(icon: "cloud.fill", text: "Save recipes to your account")
+                        FeatureRow(icon: "person.2.fill", text: "Share with friends")
+                        FeatureRow(icon: "bookmark.fill", text: "Build your cookbook")
+                    }
+                    .padding(.horizontal, 40)
+                    
+                    Spacer()
+                    
+                    // Sign in with Apple button
+                    SignInWithAppleButton(
+                        .signIn,
+                        onRequest: { request in
+                            request.requestedScopes = [.fullName, .email]
+                        },
+                        onCompletion: { result in
+                            handleAppleSignIn(result)
+                        }
+                    )
+                    .signInWithAppleButtonStyle(.white)
+                    .frame(height: 50)
+                    .cornerRadius(25)
+                    .padding(.horizontal, 40)
+                    .disabled(isAuthenticating)
+                    
+                    // Skip button
+                    Button(action: {
+                        isPresented = false
+                    }) {
+                        Text("Maybe Later")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.8))
+                            .underline()
+                    }
+                    .padding(.bottom, 20)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { isPresented = false }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+            }
+        }
+    }
+    
+    private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
+        isAuthenticating = true
+        
+        switch result {
+        case .success(let authorization):
+            Task {
+                do {
+                    try await authManager.signInWithApple(authorization: authorization)
+                    
+                    // Wait a moment for auth to propagate
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                    
+                    // Check if now authenticated
+                    if authManager.isAuthenticated {
+                        isPresented = false
+                        onAuthenticated()
+                    }
+                } catch {
+                    errorMessage = "Authentication failed. Please try again."
+                    print("Authentication error: \(error)")
+                }
+                isAuthenticating = false
+            }
+            
+        case .failure(let error):
+            errorMessage = "Sign in cancelled or failed."
+            print("Apple Sign In failed: \(error)")
+            isAuthenticating = false
+        }
+    }
+    
+    struct FeatureRow: View {
+        let icon: String
+        let text: String
+        
+        var body: some View {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(.white)
+                    .frame(width: 28)
+                
+                Text(text)
+                    .font(.system(size: 16))
+                    .foregroundColor(.white.opacity(0.9))
+                
+                Spacer()
+            }
         }
     }
 }
