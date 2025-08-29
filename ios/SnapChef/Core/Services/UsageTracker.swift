@@ -341,8 +341,9 @@ final class UsageTracker: ObservableObject {
     }
 
     private func isPremiumUser() -> Bool {
-        // Use actual SubscriptionManager check
-        return SubscriptionManager.shared.isPremium
+        // Use cached premium status to avoid StoreKit initialization
+        // This prevents "No active account" errors on startup
+        return SubscriptionManager.shared.isPremiumCached
     }
 
     private func trackAnalyticsEvent(_ eventName: String, metadata: [String: Any]) {

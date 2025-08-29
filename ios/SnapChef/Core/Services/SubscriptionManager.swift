@@ -7,7 +7,7 @@ class SubscriptionManager: ObservableObject {
     static let shared = SubscriptionManager()
 
     // MARK: - Published Properties
-    @Published var isPremium = false
+    @Published private(set) var isPremium = false
     @Published var isLoading = false
     @Published var products: [Product] = []
     @Published var purchasedSubscriptions: [Product] = []
@@ -39,17 +39,27 @@ class SubscriptionManager: ObservableObject {
     // MARK: - Properties
     private var updateListenerTask: Task<Void, Error>?
     private let productIDs = ProductID.allCases.map { $0.rawValue }
+    private var hasInitialized = false
 
     // MARK: - Initialization
     private init() {
+        // Delay StoreKit initialization to avoid "No active account" errors
+        // This will be initialized when first needed
+    }
+    
+    // MARK: - Lazy Initialization
+    func initializeIfNeeded() async {
+        guard !hasInitialized else { return }
+        hasInitialized = true
+        
+        print("🛍️ Initializing StoreKit for premium features...")
+        
         // Start listening for transactions
         updateListenerTask = listenForTransactions()
 
         // Load products and check subscription status
-        Task {
-            await loadProducts()
-            await updateSubscriptionStatus()
-        }
+        await loadProducts()
+        await updateSubscriptionStatus()
     }
 
     deinit {
@@ -78,6 +88,8 @@ class SubscriptionManager: ObservableObject {
 
     // MARK: - Purchase
     func purchase(_ product: Product) async throws -> StoreKit.Transaction? {
+        // Ensure StoreKit is initialized
+        await initializeIfNeeded()
         // Attempt purchase
         let result = try await product.purchase()
 
@@ -110,6 +122,9 @@ class SubscriptionManager: ObservableObject {
 
     // MARK: - Restore Purchases
     func restorePurchases() async {
+        // Ensure StoreKit is initialized
+        await initializeIfNeeded()
+        
         do {
             // Sync with App Store on background queue to avoid blocking main thread
             try await Task.detached(priority: .userInitiated) {
@@ -243,6 +258,20 @@ class SubscriptionManager: ObservableObject {
         }
     }
 
+    // MARK: - Safe Premium Status Check
+    
+    /// Check premium status without initializing StoreKit
+    /// This prevents "No active account" errors on startup
+    var isPremiumCached: Bool {
+        return isPremium
+    }
+    
+    /// Check and update premium status (initializes StoreKit if needed)
+    func checkPremiumStatus() async -> Bool {
+        await initializeIfNeeded()
+        return isPremium
+    }
+    
     // MARK: - Premium Challenge Management
 
     /// Get available premium challenges
