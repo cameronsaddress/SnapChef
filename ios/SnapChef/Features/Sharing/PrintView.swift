@@ -169,14 +169,122 @@ struct PrintView: View {
         <html>
         <head>
             <style>
-                body { font-family: -apple-system, sans-serif; line-height: 1.6; color: #333; }
-                h1 { color: #000; margin-bottom: 8px; }
-                h2 { color: #333; margin-top: 24px; margin-bottom: 12px; }
-                .info { color: #666; margin-bottom: 20px; }
-                .ingredient { margin-bottom: 8px; }
-                .instruction { margin-bottom: 12px; }
-                .nutrition { display: inline-block; width: 48%; margin-bottom: 8px; }
-                .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #999; font-size: 12px; text-align: center; }
+                @media print {
+                    body { 
+                        font-family: -apple-system, Arial, sans-serif; 
+                        line-height: 1.6; 
+                        color: #000000 !important; 
+                        background: white !important;
+                        font-size: 12pt;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    h1 { 
+                        color: #000000 !important; 
+                        margin-bottom: 12px; 
+                        font-size: 20pt;
+                        page-break-after: avoid;
+                    }
+                    h2 { 
+                        color: #000000 !important; 
+                        margin-top: 24px; 
+                        margin-bottom: 12px;
+                        font-size: 14pt;
+                        page-break-after: avoid;
+                        border-bottom: 2px solid #000000;
+                        padding-bottom: 4px;
+                    }
+                    p { 
+                        color: #000000 !important;
+                        margin: 8px 0;
+                    }
+                    .info { 
+                        color: #333333 !important; 
+                        margin-bottom: 20px;
+                        font-size: 11pt;
+                    }
+                    .ingredient { 
+                        margin-bottom: 8px; 
+                        color: #000000 !important;
+                        page-break-inside: avoid;
+                        font-size: 11pt;
+                    }
+                    .instruction { 
+                        margin-bottom: 16px; 
+                        color: #000000 !important;
+                        page-break-inside: avoid;
+                        font-size: 11pt;
+                        line-height: 1.5;
+                    }
+                    .nutrition { 
+                        display: inline-block; 
+                        width: 48%; 
+                        margin-bottom: 8px; 
+                        color: #000000 !important;
+                        font-size: 10pt;
+                    }
+                    .footer { 
+                        margin-top: 40px; 
+                        padding-top: 20px; 
+                        border-top: 1px solid #666666; 
+                        color: #333333 !important; 
+                        font-size: 9pt; 
+                        text-align: center;
+                        page-break-before: avoid;
+                    }
+                }
+                /* Screen/Preview styles */
+                body { 
+                    font-family: -apple-system, Arial, sans-serif; 
+                    line-height: 1.6; 
+                    color: #000000; 
+                    background: white;
+                    padding: 20px;
+                }
+                h1 { 
+                    color: #000000; 
+                    margin-bottom: 12px;
+                    font-size: 24px;
+                }
+                h2 { 
+                    color: #000000; 
+                    margin-top: 24px; 
+                    margin-bottom: 12px;
+                    font-size: 18px;
+                    border-bottom: 2px solid #000000;
+                    padding-bottom: 4px;
+                }
+                p {
+                    color: #000000;
+                    margin: 8px 0;
+                }
+                .info { 
+                    color: #333333; 
+                    margin-bottom: 20px;
+                }
+                .ingredient { 
+                    margin-bottom: 8px; 
+                    color: #000000;
+                }
+                .instruction { 
+                    margin-bottom: 16px; 
+                    color: #000000;
+                    line-height: 1.5;
+                }
+                .nutrition { 
+                    display: inline-block; 
+                    width: 48%; 
+                    margin-bottom: 8px; 
+                    color: #000000;
+                }
+                .footer { 
+                    margin-top: 40px; 
+                    padding-top: 20px; 
+                    border-top: 1px solid #666666; 
+                    color: #333333; 
+                    font-size: 12px; 
+                    text-align: center;
+                }
             </style>
         </head>
         <body>

@@ -1111,10 +1111,11 @@ struct RecipePrintView: View {
                     VStack(alignment: .center, spacing: 12) {
                         Text("SnapChef Recipe")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Color(UIColor.darkGray))
 
                         Text(recipe.name)
                             .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(.black)
                             .multilineTextAlignment(.center)
 
                         HStack(spacing: 20) {
@@ -1123,7 +1124,7 @@ struct RecipePrintView: View {
                             Label(recipe.difficulty.rawValue, systemImage: "star")
                         }
                         .font(.system(size: 14))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Color(UIColor.darkGray))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.bottom, 10)
@@ -1134,13 +1135,16 @@ struct RecipePrintView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Ingredients")
                             .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.black)
 
                         ForEach(recipe.ingredients) { ingredient in
                             HStack {
                                 Text("•")
                                     .font(.system(size: 16))
+                                    .foregroundColor(.black)
                                 Text("\(ingredient.quantity) \(ingredient.unit ?? "") \(ingredient.name)")
                                     .font(.system(size: 16))
+                                    .foregroundColor(.black)
                             }
                         }
                     }
@@ -1152,14 +1156,17 @@ struct RecipePrintView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Instructions")
                             .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.black)
 
                         ForEach(Array(recipe.instructions.enumerated()), id: \.offset) { index, instruction in
                             HStack(alignment: .top, spacing: 12) {
                                 Text("\(index + 1).")
                                     .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.black)
                                     .frame(width: 25, alignment: .trailing)
                                 Text(instruction)
                                     .font(.system(size: 16))
+                                    .foregroundColor(.black)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             .padding(.bottom, 8)
@@ -1173,6 +1180,7 @@ struct RecipePrintView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Nutrition Facts (per serving)")
                             .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.black)
 
                         HStack(spacing: 20) {
                             Text("Calories: \(recipe.nutrition.calories)")
@@ -1181,6 +1189,7 @@ struct RecipePrintView: View {
                             Text("Fat: \(recipe.nutrition.fat)g")
                         }
                         .font(.system(size: 14))
+                        .foregroundColor(.black)
                     }
 
                     Spacer(minLength: 40)
@@ -1188,7 +1197,7 @@ struct RecipePrintView: View {
                     // Footer
                     Text("Created with SnapChef • \(Date().formatted(date: .abbreviated, time: .omitted))")
                         .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Color(UIColor.darkGray))
                         .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .padding(30)
@@ -1196,6 +1205,7 @@ struct RecipePrintView: View {
                 .cornerRadius(0)
             }
             .background(Color.gray.opacity(0.1))
+            .environment(\.colorScheme, .light) // Force light mode for print
             .navigationTitle("Print Preview")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
