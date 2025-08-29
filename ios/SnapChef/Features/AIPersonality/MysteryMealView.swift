@@ -272,21 +272,24 @@ struct MysteryMealView: View {
         
         // Randomly select which cuisine to land on
         let targetCuisineIndex = Int.random(in: 0..<cuisines.count)
-        let targetCuisine = cuisines[targetCuisineIndex]
         
         // Calculate the angle needed to land on this cuisine
         // The wheel starts with Italian at the top (90 degrees)
-        // The pointer is on the right (0 degrees)
+        // The pointer is on the right (0 degrees in SwiftUI coordinate system)
         // Each segment is 45 degrees (360/8)
         let segmentAngle = 360.0 / Double(cuisines.count)
         
         // Calculate target angle: we want the selected segment to align with the pointer (right side)
-        // Since Italian starts at top (90°) and goes clockwise:
-        // Italian: 90° to 45°, Mexican: 45° to 0°, Chinese: 0° to -45° (315°), etc.
-        let targetSegmentStartAngle = 90.0 - (Double(targetCuisineIndex) * segmentAngle)
+        // Segments start at 0° (right) and go clockwise
+        // First segment (Italian, index 0): 0° to 45°
+        // Second segment (Mexican, index 1): 45° to 90°
+        // The pointer is at 0° (right side), so to align segment with pointer:
+        let segmentStartAngle = Double(targetCuisineIndex) * segmentAngle
+        let segmentMidAngle = segmentStartAngle + (segmentAngle / 2.0)
         
-        // We want the middle of the segment to align with the pointer
-        let targetAngle = targetSegmentStartAngle - (segmentAngle / 2.0)
+        // We need to rotate the wheel so the segment's middle aligns with 0° (pointer position)
+        // If segment is at angle X, we rotate by -X to bring it to 0°
+        let targetAngle = -segmentMidAngle
         
         // Add multiple rotations for visual effect
         let minRotations = Double.random(in: 5...7)
@@ -304,10 +307,25 @@ struct MysteryMealView: View {
 
         // Set the selected cuisine after spin completes
         DispatchQueue.main.asyncAfter(deadline: .now() + spinDuration) {
-            selectedCuisine = targetCuisine
+            // Calculate which cuisine is actually at the pointer position
+            // Normalize the final rotation angle to 0-360 range
+            var normalizedAngle = finalRotation.truncatingRemainder(dividingBy: 360)
+            while normalizedAngle < 0 {
+                normalizedAngle += 360
+            }
             
-            // Generate a recipe for the selected cuisine
-            generateRecipeForCuisine(targetCuisine)
+            // The wheel has rotated by normalizedAngle degrees
+            // The pointer is at 0° (right side)
+            // We need to find which segment is now at 0°
+            // Since the wheel rotated clockwise by normalizedAngle,
+            // the segment that was at normalizedAngle is now at 0°
+            let segmentAtPointer = normalizedAngle / segmentAngle
+            let actualCuisineIndex = Int(segmentAtPointer.rounded()) % cuisines.count
+            
+            selectedCuisine = cuisines[actualCuisineIndex]
+            
+            // Generate a recipe for the actual selected cuisine
+            generateRecipeForCuisine(cuisines[actualCuisineIndex])
         }
     }
     
@@ -1387,50 +1405,7 @@ struct FortuneWheelView: View {
                 .rotationEffect(.degrees(rotation))
 
                 // Premium pointer design
-                HStack {
-                    Spacer()
-                    
-                    ZStack {
-                        // Pointer glow
-                        Triangle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#ff6b6b").opacity(0.6),
-                                        Color(hex: "#ff6b6b").opacity(0.2)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: 50, height: 40)
-                            .blur(radius: 8)
-                            .rotationEffect(.degrees(-90))
-                        
-                        // Main pointer
-                        Triangle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#ff6b6b"),
-                                        Color(hex: "#ef5350")
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .frame(width: 45, height: 35)
-                            .rotationEffect(.degrees(-90))
-                            .overlay(
-                                Triangle()
-                                    .stroke(Color.white, lineWidth: 2)
-                                    .frame(width: 45, height: 35)
-                                    .rotationEffect(.degrees(-90))
-                            )
-                            .shadow(color: Color.black.opacity(0.3), radius: 5, y: 2)
-                    }
-                    .offset(x: 15) // Positioned to point at wheel edge
-                }
+                // Triangle removed - selection happens after spin completes
             }
             .onAppear {
                 withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
@@ -1578,17 +1553,7 @@ struct WheelSegment: View {
     }
 }
 
-// MARK: - Triangle Shape
-struct Triangle: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.closeSubpath()
-        return path
-    }
-}
+// Triangle shape removed - no longer needed
 
 // MARK: - Mystery Recipe Card
 struct MysteryRecipeCard: View {

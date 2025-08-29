@@ -464,7 +464,7 @@
 				027AD74E091AC56960637058 /* Products */,
 				C5652B40604108248A1E9076 /* Frameworks */,
 				F4737935B5BA6D0B9ABCEB27 /* SnapChef */,
-				FAE14391640BA3821562690E /*  */,
+				FAE14391640BA3821562690E,
 				F56F891D2E3D282000AF95B7 /* Recovered References */,
 				358FFFFCEF94607D3AEF5F6C /* Features */,
 				DE1AE878754E3F7811D721D6 /* Core */,
@@ -1149,7 +1149,7 @@
 			name = "Recovered References";
 			sourceTree = "<group>";
 		};
-		FAE14391640BA3821562690E /*  */ = {
+		FAE14391640BA3821562690E = {
 			isa = PBXGroup;
 			children = (
 				6AC0B6CEF8F1C858C2CB572F /* Users */,
