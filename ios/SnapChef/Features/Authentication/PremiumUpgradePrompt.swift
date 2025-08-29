@@ -183,6 +183,12 @@ struct PremiumUpgradePrompt: View {
                     }
                 }
                 .padding(.top, 8)
+                
+                // Abuse protection disclaimer
+                Text("Fair use limits apply to prevent abuse")
+                    .font(.system(size: 9))
+                    .foregroundColor(.white.opacity(0.3))
+                    .padding(.top, 4)
             }
             .padding(32)
             .background(

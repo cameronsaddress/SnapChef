@@ -289,7 +289,26 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 - **COMPLETE_CODE_TRACE.md** - App flow analysis
 - **FILE_USAGE_ANALYSIS.md** - File usage status
 
-## 🔄 Latest Updates (Aug 28, 2025)
+## 🔄 Latest Updates (Aug 29, 2025)
+
+### Usage Limits & Abuse Prevention (Aug 29) ✅
+- **Recipe Generation Daily Limits**:
+  - Honeymoon (Days 1-7): 10 recipes/day
+  - Trial (Days 8-30): 6 recipes/day
+  - Standard (Day 31+): 3 recipes/day
+  - Premium: 25 recipes/day (capped to prevent abuse)
+- **Recipe Detective Limits**:
+  - Free users: 6 lifetime uses total
+  - Premium users: 15 per day (resets at midnight)
+- **Video Exports**: Unlimited for all users (no caps)
+- **Abuse Protection**: Added "Fair use limits apply" disclaimer to premium purchase UI
+- **Files Modified**:
+  - `UserLifecycle.swift` - Updated daily limits for all phases
+  - `UsageTracker.swift` - Added premium caps for detective feature
+  - `SubscriptionView.swift` - Added abuse protection disclaimer
+  - `PremiumUpgradePrompt.swift` - Added abuse protection disclaimer
+
+## 🔄 Previous Updates (Aug 28, 2025)
 
 ### Local-First Recipe Management & Duplicate Prevention (Aug 28) ✅
 - **Local-First Architecture Implementation**:

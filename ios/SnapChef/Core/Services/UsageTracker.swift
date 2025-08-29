@@ -61,8 +61,8 @@ final class UsageTracker: ObservableObject {
     
     // Detective Feature Limits
     private enum DetectiveLimits {
-        static let DETECTIVE_LIFETIME_LIMIT_FREE = 3  // 3 lifetime uses for free users
-        static let DETECTIVE_DAILY_LIMIT_PREMIUM = -1  // Unlimited for premium users
+        static let DETECTIVE_LIFETIME_LIMIT_FREE = 6  // 6 lifetime uses for free users
+        static let DETECTIVE_DAILY_LIMIT_PREMIUM = 15  // 15 per day for premium users
     }
 
     // MARK: - Initialization
@@ -165,7 +165,8 @@ final class UsageTracker: ObservableObject {
     /// Check if user can use Recipe Detective feature
     func canUseDetective() -> Bool {
         if isPremiumUser() {
-            return true  // Premium users have unlimited access
+            // Premium users have daily limit of 25
+            return detectiveAnalysesUsed < DetectiveLimits.DETECTIVE_DAILY_LIMIT_PREMIUM
         }
         
         // Free users have lifetime limit
@@ -186,10 +187,11 @@ final class UsageTracker: ObservableObject {
         ])
     }
     
-    /// Get remaining detective uses for free users (-1 for unlimited)
+    /// Get remaining detective uses for free users (daily count for premium)
     func getDetectiveUsesRemaining() -> Int {
         if isPremiumUser() {
-            return -1  // Unlimited
+            // Premium users have daily limit
+            return max(0, DetectiveLimits.DETECTIVE_DAILY_LIMIT_PREMIUM - detectiveAnalysesUsed)
         }
         
         return max(0, DetectiveLimits.DETECTIVE_LIFETIME_LIMIT_FREE - totalDetectiveAnalyses)
@@ -433,11 +435,16 @@ extension UsageTracker {
     
     /// Get a user-friendly usage status string for Recipe Detective
     func getDetectiveStatusText() -> String {
+        let remaining = getDetectiveUsesRemaining()
+        
         if isPremiumUser() {
-            return "♾️ Unlimited"
+            if remaining == 0 {
+                return "🚫 Daily limit reached"
+            } else {
+                return "\(remaining) left today"
+            }
         }
         
-        let remaining = getDetectiveUsesRemaining()
         if remaining == 0 {
             return "🚫 Limit reached"
         } else {

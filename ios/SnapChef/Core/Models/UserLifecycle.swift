@@ -125,33 +125,33 @@ public struct DailyLimits: Sendable, Equatable {
 
     // MARK: - Predefined Limits
 
-    /// Honeymoon phase limits (unlimited everything)
+    /// Honeymoon phase limits (limited to 10 recipes)
     public static let honeymoon = DailyLimits(
-        recipes: -1,
+        recipes: 10,
         videos: -1,
         premiumEffects: true,
         challengeMultiplier: 1.0
     )
 
-    /// Trial phase limits (generous but limited)
+    /// Trial phase limits (6 recipes per day)
     public static let trial = DailyLimits(
-        recipes: 10,
-        videos: 5,
+        recipes: 6,
+        videos: -1,
         premiumEffects: false,
         challengeMultiplier: 1.0
     )
 
-    /// Standard phase limits (basic free tier)
+    /// Standard phase limits (basic free tier - 3 recipes per day)
     public static let starterStandard = DailyLimits(
         recipes: 3,
-        videos: 1,
+        videos: -1,
         premiumEffects: false,
         challengeMultiplier: 1.0
     )
 
-    /// Premium tier limits (unlimited everything)
+    /// Premium tier limits (25 recipes per day max)
     public static let premium = DailyLimits(
-        recipes: -1,
+        recipes: 25,
         videos: -1,
         premiumEffects: true,
         challengeMultiplier: 2.0

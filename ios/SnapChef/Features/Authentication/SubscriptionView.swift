@@ -138,6 +138,12 @@ struct SubscriptionView: View {
                             .font(.system(size: 14))
                             .foregroundColor(.white.opacity(0.8))
                             .padding(.top, 8)
+                            
+                            // Abuse protection disclaimer
+                            Text("Fair use limits apply to prevent abuse")
+                                .font(.system(size: 10))
+                                .foregroundColor(.white.opacity(0.4))
+                                .padding(.top, 4)
                         }
                         .padding(.bottom, 40)
 
