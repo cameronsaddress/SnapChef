@@ -14,14 +14,17 @@ struct ChallengeDetailView: View {
     @State private var joinSuccess = false
     
     // Submission state
-    @State private var showSubmissionSheet = false
     @State private var selectedImage: UIImage?
     @State private var submissionDescription = ""
     @State private var isSubmitting = false
-    @State private var imageSourceType: ImageSourceType? = nil
+    @State private var activeSheet: ActiveSheet? = nil
     
-    enum ImageSourceType: Identifiable {
-        case camera, photoLibrary
+    enum ActiveSheet: Identifiable {
+        case submission
+        case camera
+        case photoLibrary
+        case brandedShare
+        
         var id: Int { hashValue }
     }
     
@@ -30,7 +33,6 @@ struct ChallengeDetailView: View {
     @State private var pointsEarned = 0
     @State private var coinsEarned = 0
     @State private var showSharePrompt = false
-    @State private var showBrandedShare = false
     
     // Get the actual challenge from GamificationManager if it exists
     private var displayChallenge: Challenge {
@@ -117,22 +119,32 @@ struct ChallengeDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showSubmissionSheet) {
-            submissionSheet
-        }
-        .sheet(item: $imageSourceType) { sourceType in
-            switch sourceType {
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .submission:
+                submissionSheet
             case .camera:
                 ChallengeCameraView(image: $selectedImage)
+                    .onDisappear {
+                        // Return to submission sheet after camera
+                        if selectedImage != nil {
+                            activeSheet = .submission
+                        }
+                    }
             case .photoLibrary:
                 ChallengeImagePicker(image: $selectedImage)
-            }
-        }
-        .sheet(isPresented: $showBrandedShare) {
-            if let shareContent = createShareContent() {
-                BrandedSharePopup(content: shareContent)
-                    .presentationDetents([.height(420)])
-                    .presentationDragIndicator(.hidden)
+                    .onDisappear {
+                        // Return to submission sheet after photo picker
+                        if selectedImage != nil {
+                            activeSheet = .submission
+                        }
+                    }
+            case .brandedShare:
+                if let shareContent = createShareContent() {
+                    BrandedSharePopup(content: shareContent)
+                        .presentationDetents([.height(420)])
+                        .presentationDragIndicator(.hidden)
+                }
             }
         }
     }
@@ -179,7 +191,7 @@ struct ChallengeDetailView: View {
         VStack(spacing: 16) {
             // Main submit button with enhanced design
             Button(action: {
-                showSubmissionSheet = true
+                activeSheet = .submission
             }) {
                 HStack(spacing: 12) {
                     ZStack {
@@ -502,10 +514,7 @@ struct ChallengeDetailView: View {
                                 // Image source selection buttons
                                 HStack(spacing: 16) {
                                     Button(action: { 
-                                        showSubmissionSheet = false
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                            imageSourceType = .camera
-                                        }
+                                        activeSheet = .camera
                                     }) {
                                         VStack(spacing: 12) {
                                             ZStack {
@@ -555,10 +564,7 @@ struct ChallengeDetailView: View {
                                     .buttonStyle(ScaleButtonStyle())
                                     
                                     Button(action: { 
-                                        showSubmissionSheet = false
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                            imageSourceType = .photoLibrary
-                                        }
+                                        activeSheet = .photoLibrary
                                     }) {
                                         VStack(spacing: 12) {
                                             ZStack {
@@ -715,7 +721,7 @@ struct ChallengeDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {
-                        showSubmissionSheet = false
+                        activeSheet = nil
                     }) {
                         Image(systemName: "xmark")
                             .font(.system(size: 16, weight: .semibold))
@@ -726,14 +732,6 @@ struct ChallengeDetailView: View {
                                     .fill(.ultraThinMaterial)
                             )
                     }
-                }
-            }
-        }
-        .onChange(of: selectedImage) { _ in
-            // If an image was selected from camera/gallery, reopen submission sheet
-            if selectedImage != nil && !showSubmissionSheet {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    showSubmissionSheet = true
                 }
             }
         }
@@ -827,7 +825,7 @@ struct ChallengeDetailView: View {
                     
                     Button(action: {
                         showSharePrompt = false
-                        showBrandedShare = true
+                        activeSheet = .brandedShare
                     }) {
                         Text("Share Now")
                             .fontWeight(.semibold)
@@ -905,7 +903,7 @@ struct ChallengeDetailView: View {
         guard !isSubmitting else { return }
         
         isSubmitting = true
-        showSubmissionSheet = false
+        activeSheet = nil
         
         Task {
             // Calculate rewards
@@ -987,9 +985,15 @@ struct ChallengeDetailView: View {
     }
     
     private func createShareContent() -> ShareContent? {
-        // ShareContent might not have a public initializer, return nil for now
-        // This would need to be fixed with proper ShareContent initialization
-        return nil
+        let shareText = "I just completed the \(displayChallenge.title) challenge on SnapChef! 🎉 Earned \(pointsEarned) points!"
+        
+        let content = ShareContent(
+            type: .challenge(displayChallenge),
+            beforeImage: selectedImage,
+            afterImage: nil,
+            text: shareText
+        )
+        return content
     }
 }
 

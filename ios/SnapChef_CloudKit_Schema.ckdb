@@ -1,11 +1,14 @@
 -- SnapChef CloudKit Schema Definition
--- Version: 4.0
--- Last Updated: August 24, 2025
+-- Version: 4.1
+-- Last Updated: August 29, 2025
 -- Source: Production CloudKit Dashboard with enhancements
 --
 -- IMPORTANT: This is the authoritative schema for production
 -- User is the primary record type for authentication
 -- Users and UserProfile are deprecated but kept for compatibility
+--
+-- Version 4.1 Changes (Aug 29, 2025):
+-- - Added GameHighScore record type for EmojiFlick game global leaderboard
 --
 -- Version 4.0 Changes:
 -- - Fixed followingCount to be QUERYABLE SORTABLE
@@ -274,6 +277,24 @@ DEFINE SCHEMA
         userID              STRING QUERYABLE,
         GRANT READ, WRITE TO "_creator",
         GRANT CREATE TO "_icloud"
+    );
+
+    RECORD TYPE GameHighScore (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE QUERYABLE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE,
+        deviceID        STRING,
+        gameType        STRING QUERYABLE,
+        lastUpdated     TIMESTAMP QUERYABLE SORTABLE,
+        score           INT64 QUERYABLE SORTABLE,
+        userID          STRING QUERYABLE,
+        userName        STRING,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
     );
 
     RECORD TYPE Leaderboard (
