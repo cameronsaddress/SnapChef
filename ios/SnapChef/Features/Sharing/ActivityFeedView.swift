@@ -1219,7 +1219,7 @@ class ActivityFeedManager: ObservableObject {
                 if let userID = user.recordID {
                     // PHASE 5: Cache with timestamp
                     userCache[userID] = (user: user, timestamp: Date())
-                    print("✅ Cached user \(userID): \(user.displayName) with TTL")
+                    // print("✅ Cached user \(userID): \(user.displayName) with TTL")
                     // PHASE 7: Trim cache if needed
                     trimUserCacheIfNeeded()
                 }
@@ -1287,14 +1287,14 @@ class ActivityFeedManager: ObservableObject {
     
     /// Fetches user display name by userID, using cache when available
     private func fetchUserDisplayName(userID: String) async -> String {
-        print("🔍 DEBUG: fetchUserDisplayName for userID: \(userID)")
+        // print("🔍 DEBUG: fetchUserDisplayName for userID: \(userID)")
         
         // PHASE 5: Check cache with TTL validation
         if let cached = userCache[userID] {
             // Check if cache is still valid
             if Date().timeIntervalSince(cached.timestamp) < userCacheTTL {
                 let displayName = cached.user.username ?? cached.user.displayName
-                print("✅ Found cached user: \(displayName) (cache age: \(Int(Date().timeIntervalSince(cached.timestamp)))s)")
+                // print("✅ Found cached user: \(displayName) (cache age: \(Int(Date().timeIntervalSince(cached.timestamp)))s)")
                 return displayName
             } else {
                 print("⏰ User cache expired for \(userID)")
@@ -1361,7 +1361,7 @@ class ActivityFeedManager: ObservableObject {
 
         // Fetch actor (user) details dynamically
         let actorName = await fetchUserDisplayName(userID: actorID)
-        print("🔍 DEBUG: Creating ActivityItem for \(actorID) with name '\(actorName)'")
+        // print("🔍 DEBUG: Creating ActivityItem for \(actorID) with name '\(actorName)'")
         
         // Extract optional fields
         let targetUserID = record[CKField.Activity.targetUserID] as? String

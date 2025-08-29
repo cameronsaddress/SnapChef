@@ -146,7 +146,7 @@ final class iCloudStatusManager: ObservableObject {
             case .available:
                 hasSetupiCloud = true
                 shouldShowiCloudPrompt = false
-                print("✅ iCloud is available and signed in")
+                // print("✅ iCloud is available and signed in")
                 
             case .noAccount:
                 hasSetupiCloud = false

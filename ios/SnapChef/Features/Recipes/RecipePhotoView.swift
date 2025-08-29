@@ -55,14 +55,8 @@ struct RecipePhotoView: View {
     }
     
     private func refreshCache() async {
-        print("🔍 DEBUG: RecipePhotoView - Refreshing cache for recipe '\(recipe.name)' (ID: \(recipe.id))")
-        print("🔍 DEBUG: Is Detective Recipe: \(recipe.isDetectiveRecipe ?? false)")
+        // Silently refresh cache - removed debug logging for production
         cachedStoredPhotos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
-        if let photos = cachedStoredPhotos {
-            print("🔍 DEBUG: Cache refreshed - Has fridge photo: \(photos.fridgePhoto != nil), Has meal photo: \(photos.mealPhoto != nil)")
-        } else {
-            print("🔍 DEBUG: Cache refreshed - No photos found in PhotoStorageManager")
-        }
         lastCacheUpdate = Date()
     }
 
@@ -74,26 +68,17 @@ struct RecipePhotoView: View {
     private var displayBeforePhoto: UIImage? {
         // OPTIMIZATION: Use PhotoStorageManager as primary source for instant display
         if let storedPhoto = storedPhotos?.fridgePhoto {
-            print("🔍 DEBUG: RecipePhotoView - Found fridge photo in PhotoStorageManager for recipe \(recipe.id)")
             return storedPhoto
-        } else {
-            print("🔍 DEBUG: RecipePhotoView - No fridge photo in PhotoStorageManager for recipe \(recipe.id)")
         }
         
         // Legacy fallback to appState for immediate display of older recipes
         if let legacyPhoto = savedRecipe?.beforePhoto {
-            print("🔍 DEBUG: RecipePhotoView - Using legacy photo from appState for recipe \(recipe.id)")
             // Trigger migration only if not already done or in progress
             triggerPhotoMigrationIfNeeded()
             return legacyPhoto
         }
         
         // Fall back to CloudKit photo (slower, loaded asynchronously)
-        if beforePhoto != nil {
-            print("🔍 DEBUG: RecipePhotoView - Using CloudKit photo for recipe \(recipe.id)")
-        } else {
-            print("🔍 DEBUG: RecipePhotoView - No photo available for recipe \(recipe.id)")
-        }
         return beforePhoto
     }
 
@@ -174,9 +159,11 @@ struct RecipePhotoView: View {
             cachedSavedRecipe = appState.savedRecipesWithPhotos.first(where: { $0.recipe.id == recipe.id })
             
             // OPTIMIZATION: Only load from CloudKit if no local photos exist AND not already fetching
-            if (displayBeforePhoto == nil || displayAfterPhoto == nil) && !isFetchingFromCloudKit {
+            // Always prioritize local storage - CloudKit is only for missing data
+            if displayBeforePhoto == nil && !isFetchingFromCloudKit {
                 // Check if another instance is already fetching this recipe
                 if !RecipePhotoView.fetchCoordinator.isAlreadyFetching(recipe.id) {
+                    // Only fetch from CloudKit if we truly have no local photo
                     loadPhotosFromCloudKit()
                 } else {
                     // Another instance is fetching - wait for completion
@@ -354,7 +341,7 @@ struct RecipePhotoView: View {
             }
             
             do {
-                print("📸 RecipePhotoView: Loading photos from CloudKit for recipe \(recipe.id)")
+                // Silently fetch photos from CloudKit
                 let photos = try await cloudKitRecipeManager.fetchRecipePhotos(for: recipe.id.uuidString)
 
                 // Only update if we don't already have these photos locally
@@ -372,7 +359,6 @@ struct RecipePhotoView: View {
                         mealPhoto: photos.after,
                         for: recipe.id
                     )
-                    print("📸 RecipePhotoView: Stored CloudKit photos in PhotoStorageManager for recipe \(recipe.id)")
                     
                     // Refresh cache after storing new photos
                     await self.refreshCache()
@@ -384,7 +370,7 @@ struct RecipePhotoView: View {
                 // Notify coordinator that fetch is complete
                 RecipePhotoView.fetchCoordinator.completeFetch(for: recipe.id, photos: photos)
             } catch {
-                print("⚠️ RecipePhotoView: Failed to load photos from CloudKit: \(error)")
+                // Silently handle CloudKit fetch errors
                 self.isLoadingPhotos = false
                 self.isFetchingFromCloudKit = false
                 
@@ -434,7 +420,7 @@ struct RecipePhotoView: View {
                 
                 await MainActor.run {
                     PhotoMigrationCoordinator.shared.completeMigration(for: recipe.id)
-                    print("📸 RecipePhotoView: Successfully migrated photos for recipe \(recipe.id)")
+                    // Migration completed silently
                 }
                 
                 // Refresh cache after successful migration

@@ -992,7 +992,7 @@ class CloudKitRecipeManager: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: localRecipeCacheKey),
            let recipes = try? JSONDecoder().decode([Recipe].self, from: data) {
             localRecipeCache = recipes
-            print("📱 Loaded \(recipes.count) recipes from local cache")
+            // print("📱 Loaded \(recipes.count) recipes from local cache")
         }
         
         // Load cache timestamp
@@ -1704,9 +1704,26 @@ class CloudKitRecipeManager: ObservableObject {
             return (nil, nil)
         }
         
-        // OPTIMIZATION: Return cached photos if available
+        // OPTIMIZATION 1: Check PhotoStorageManager first (local disk cache)
+        if let recipeUUID = UUID(uuidString: recipeID) {
+            let (fridgePhoto, mealPhoto) = await MainActor.run {
+                if let photos = PhotoStorageManager.shared.getPhotos(for: recipeUUID) {
+                    return (photos.fridgePhoto, photos.mealPhoto)
+                }
+                return (nil, nil)
+            }
+            
+            if fridgePhoto != nil || mealPhoto != nil {
+                print("📸 CloudKit: Returning locally stored photos for recipe \(recipeID) from PhotoStorageManager")
+                // Also cache in memory for this session
+                photoFetchCache[recipeID] = (fridgePhoto, mealPhoto)
+                return (fridgePhoto, mealPhoto)
+            }
+        }
+        
+        // OPTIMIZATION 2: Return memory-cached photos if available
         if let cachedPhotos = photoFetchCache[recipeID] {
-            print("📸 CloudKit: Returning cached photos for recipe \(recipeID)")
+            print("📸 CloudKit: Returning memory-cached photos for recipe \(recipeID)")
             return cachedPhotos
         }
         
@@ -2064,6 +2081,71 @@ class CloudKitRecipeManager: ObservableObject {
             print("Failed to get like count: \(error)")
             return 0
         }
+    }
+    
+    /// Batch fetch like counts for multiple recipes efficiently
+    func batchFetchLikeCounts(for recipeIDs: [String]) async -> [String: Int] {
+        guard !recipeIDs.isEmpty else { return [:] }
+        
+        print("📊 Batch fetching like counts for \(recipeIDs.count) recipes")
+        var likeCounts: [String: Int] = [:]
+        
+        // CloudKit has a limit of 400 items per query, so chunk if necessary
+        let chunkSize = 50  // Conservative chunk size for better performance
+        let chunks = stride(from: 0, to: recipeIDs.count, by: chunkSize).map {
+            Array(recipeIDs[$0..<min($0 + chunkSize, recipeIDs.count)])
+        }
+        
+        // Process chunks in parallel
+        await withTaskGroup(of: [(String, Int)].self) { group in
+            for chunk in chunks {
+                group.addTask {
+                    await self.fetchLikeCountsChunk(for: chunk)
+                }
+            }
+            
+            // Collect results
+            for await chunkResults in group {
+                for (recipeID, count) in chunkResults {
+                    likeCounts[recipeID] = count
+                }
+            }
+        }
+        
+        print("✅ Batch fetched like counts: \(likeCounts.count) recipes processed")
+        return likeCounts
+    }
+    
+    /// Helper method to fetch like counts for a chunk of recipe IDs
+    private func fetchLikeCountsChunk(for recipeIDs: [String]) async -> [(String, Int)] {
+        // First, try to fetch all Recipe records to get cached counts
+        var results: [(String, Int)] = []
+        
+        // Fetch Recipe records in parallel
+        await withTaskGroup(of: (String, Int).self) { group in
+            for recipeID in recipeIDs {
+                group.addTask {
+                    let recordID = CKRecord.ID(recordName: recipeID)
+                    do {
+                        if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
+                            if let likeCount = record["likeCount"] as? Int64 {
+                                return (recipeID, Int(likeCount))
+                            }
+                        }
+                    } catch {
+                        // Silently handle errors, will return 0
+                    }
+                    return (recipeID, 0)
+                }
+            }
+            
+            // Collect results
+            for await result in group {
+                results.append(result)
+            }
+        }
+        
+        return results
     }
     
     /// Fetch all recipes liked by the current user

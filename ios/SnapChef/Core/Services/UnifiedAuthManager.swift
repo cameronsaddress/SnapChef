@@ -1696,9 +1696,9 @@ public struct CloudKitUser: Identifiable {
         let rawUsername = record[CKField.User.username] as? String
         let rawDisplayName = record[CKField.User.displayName] as? String
         
-        print("🔍 DEBUG CloudKitUser init: Processing user record \(fullRecordID)")
-        print("    └─ Raw username field: '\(rawUsername ?? "nil")'")
-        print("    └─ Raw displayName field: '\(rawDisplayName ?? "nil")'")
+        // print("🔍 DEBUG CloudKitUser init: Processing user record \(fullRecordID)")
+        // print("    └─ Raw username field: '\(rawUsername ?? "nil")'")
+        // print("    └─ Raw displayName field: '\(rawDisplayName ?? "nil")'")
         
         // ONLY use username field - ignore displayName completely
         if let username = rawUsername, !username.isEmpty {

@@ -36,7 +36,7 @@ class CloudKitRecipeCache: ObservableObject {
     // User defaults keys
     private let lastFetchKey = "CloudKitRecipesLastFetch"
     private let cachedRecipesKey = "CloudKitCachedRecipes"
-    private let recipeFetchInterval: TimeInterval = 1800 // 30 minutes - recipes don't change that often
+    private let recipeFetchInterval: TimeInterval = 86400 * 365 // Never auto-refresh - only fetch missing recipes
     
     // Enhanced caching
     private let cacheVersion = "v2" // Increment when cache structure changes
@@ -71,12 +71,17 @@ class CloudKitRecipeCache: ObservableObject {
             return []
         }
 
-        // Check if we need to refresh
-        let shouldRefresh = forceRefresh || shouldFetchFromCloudKit()
-
-        if !shouldRefresh && !cachedRecipes.isEmpty {
-            print("📱 CloudKitCache: Using cached recipes (count: \(cachedRecipes.count))")
+        // If we have cached recipes, ALWAYS use them unless force refresh
+        if !cachedRecipes.isEmpty && !forceRefresh {
+            print("📱 CloudKitCache: Using cached recipes (count: \(cachedRecipes.count)) - never re-downloading existing recipes")
             return cachedRecipes
+        }
+
+        // Only fetch if cache is empty or force refresh requested
+        if cachedRecipes.isEmpty {
+            print("📱 CloudKitCache: Cache is empty, fetching recipes from CloudKit...")
+        } else if forceRefresh {
+            print("📱 CloudKitCache: Force refresh requested, checking for new recipes...")
         }
 
         // If already loading, wait for current load to complete
@@ -97,13 +102,14 @@ class CloudKitRecipeCache: ObservableObject {
             if !newRecipes.isEmpty {
                 mergeRecipes(newRecipes)
                 saveToCache()
+                print("✅ CloudKitCache: Added \(newRecipes.count) new recipes, total: \(cachedRecipes.count)")
+            } else {
+                print("✅ CloudKitCache: No new recipes found")
             }
 
             // Update last fetch date
             lastFetchDate = Date()
             UserDefaults.standard.set(lastFetchDate, forKey: lastFetchKey)
-
-            print("✅ CloudKitCache: Updated cache with \(newRecipes.count) new recipes, total: \(cachedRecipes.count)")
         } catch {
             print("❌ CloudKitCache: Failed to fetch recipes: \(error)")
         }
@@ -165,29 +171,15 @@ class CloudKitRecipeCache: ObservableObject {
     // MARK: - Private Methods
 
     private func shouldFetchFromCloudKit() -> Bool {
-        // If we've never fetched, we should fetch
-        guard let lastFetch = lastFetchDate else {
-            print("📱 CloudKitCache: No previous fetch date, will fetch from CloudKit")
-            return true
-        }
-        
-        // Check if cache is empty (always fetch if empty)
+        // Only fetch if cache is completely empty
         if cachedRecipes.isEmpty {
             print("📱 CloudKitCache: Cache is empty, will fetch from CloudKit")
             return true
         }
-
-        // Check if enough time has passed since last fetch
-        let timeSinceLastFetch = Date().timeIntervalSince(lastFetch)
-        let shouldFetch = timeSinceLastFetch > recipeFetchInterval
-
-        if shouldFetch {
-            print("📱 CloudKitCache: \(Int(timeSinceLastFetch/60)) minutes since last fetch, will refresh")
-        } else {
-            print("📱 CloudKitCache: Only \(Int(timeSinceLastFetch/60)) minutes since last fetch, using cache")
-        }
-
-        return shouldFetch
+        
+        // Never auto-refresh if we have cached recipes
+        print("📱 CloudKitCache: Have \(cachedRecipes.count) cached recipes - not fetching")
+        return false
     }
 
     private func fetchNewRecipesOnly() async throws -> [Recipe] {
@@ -243,7 +235,7 @@ class CloudKitRecipeCache: ObservableObject {
            let decoded = try? JSONDecoder().decode([Recipe].self, from: data) {
             cachedRecipes = decoded
             localRecipeIDs = Set(decoded.map { $0.id })
-            print("📱 CloudKitCache: Loaded \(cachedRecipes.count) recipes from local cache")
+            // print("📱 CloudKitCache: Loaded \(cachedRecipes.count) recipes from local cache")
         }
         
         // Load owner information cache

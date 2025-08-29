@@ -24,7 +24,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         // TikTok SDK initialization with sandbox credentials
         // The SDK will be initialized when first used
         #if canImport(TikTokOpenShareSDK)
-        print("✅ TikTok OpenShareSDK available for use")
+        // print("✅ TikTok OpenShareSDK available for use")
         #endif
 
         print("✅ AppDelegate initialized")

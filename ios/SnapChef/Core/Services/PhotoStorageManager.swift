@@ -26,7 +26,7 @@ public final class PhotoStorageManager: ObservableObject {
     // Memory management properties
     private var lastCleanupTime = Date()
     private let cleanupInterval: TimeInterval = 300 // 5 minutes
-    private let maxStoredPhotos = 100 // Maximum photos to keep in memory
+    private let maxStoredPhotos = 10000 // Soft limit for monitoring (no longer enforced)
 
     // Photo storage structure
     public struct RecipePhotos {
@@ -47,26 +47,154 @@ public final class PhotoStorageManager: ObservableObject {
 
     private init() {
         logger.info("📸 PhotoStorageManager initialized")
+        
+        // Load persisted photos from disk on initialization
+        loadPersistedPhotos()
 
         // Start periodic cleanup timer
         startPeriodicCleanup()
+    }
+    
+    // MARK: - Disk Persistence
+    
+    /// Get the documents directory for photo storage
+    private var documentsDirectory: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+    }
+    
+    /// Get the photos storage directory
+    private var photosDirectory: URL {
+        documentsDirectory.appendingPathComponent("RecipePhotos")
+    }
+    
+    /// Ensure photos directory exists
+    private func ensurePhotosDirectoryExists() {
+        if !FileManager.default.fileExists(atPath: photosDirectory.path) {
+            try? FileManager.default.createDirectory(at: photosDirectory, withIntermediateDirectories: true)
+        }
+    }
+    
+    /// Get file URL for a specific photo
+    private func photoFileURL(recipeId: UUID, photoType: String) -> URL {
+        photosDirectory.appendingPathComponent("\(recipeId.uuidString)_\(photoType).jpg")
+    }
+    
+    /// Load all persisted photos from disk
+    private func loadPersistedPhotos() {
+        ensurePhotosDirectoryExists()
+        
+        logger.info("📸 Loading persisted photos from disk at: \(self.photosDirectory.path)")
+        var loadedCount = 0
+        
+        // Get all files in photos directory
+        do {
+            let files = try FileManager.default.contentsOfDirectory(at: photosDirectory, includingPropertiesForKeys: nil)
+            logger.info("📸 Found \(files.count) files in photos directory")
+            
+            var recipePhotoGroups: [UUID: (fridge: UIImage?, pantry: UIImage?, meal: UIImage?)] = [:]
+            
+            for fileURL in files {
+                let filename = fileURL.lastPathComponent
+                logger.info("📸 Processing file: \(filename)")
+                
+                // Parse filename: recipeId_photoType.jpg
+                let components = filename.replacingOccurrences(of: ".jpg", with: "").split(separator: "_")
+                if components.count >= 2 {
+                    if let recipeId = UUID(uuidString: String(components[0])) {
+                        if let imageData = try? Data(contentsOf: fileURL),
+                           let image = UIImage(data: imageData) {
+                            
+                            let photoType = String(components[1])
+                            
+                            if recipePhotoGroups[recipeId] == nil {
+                                recipePhotoGroups[recipeId] = (nil, nil, nil)
+                            }
+                            
+                            switch photoType {
+                            case "fridge":
+                                recipePhotoGroups[recipeId]?.fridge = image
+                            case "pantry":
+                                recipePhotoGroups[recipeId]?.pantry = image
+                            case "meal":
+                                recipePhotoGroups[recipeId]?.meal = image
+                            default:
+                                logger.warning("📸 Unknown photo type: \(photoType)")
+                            }
+                            loadedCount += 1
+                            logger.info("📸 Loaded \(photoType) photo for recipe \(recipeId)")
+                        } else {
+                            logger.warning("📸 Failed to load image data from: \(filename)")
+                        }
+                    } else {
+                        logger.warning("📸 Invalid UUID in filename: \(String(components[0]))")
+                    }
+                } else {
+                    logger.warning("📸 Invalid filename format: \(filename)")
+                }
+            }
+            
+            // Create RecipePhotos objects from grouped photos
+            for (recipeId, photos) in recipePhotoGroups {
+                recipePhotos[recipeId] = RecipePhotos(
+                    recipeId: recipeId,
+                    fridgePhoto: photos.fridge,
+                    pantryPhoto: photos.pantry,
+                    mealPhoto: photos.meal
+                )
+            }
+        } catch {
+            logger.error("📸 Failed to read photos directory: \(error)")
+        }
+        
+        logger.info("📸 Loaded \(loadedCount) photos for \(self.recipePhotos.count) recipes from disk")
+    }
+    
+    /// Save photo to disk
+    private func savePhotoToDisk(_ photo: UIImage, recipeId: UUID, photoType: String) {
+        ensurePhotosDirectoryExists()
+        
+        let fileURL = photoFileURL(recipeId: recipeId, photoType: photoType)
+        
+        // Compress and save as JPEG
+        if let data = photo.jpegData(compressionQuality: 0.8) {
+            do {
+                try data.write(to: fileURL)
+                logger.info("📸 Saved \(photoType) photo for recipe \(recipeId) to disk at: \(fileURL.path)")
+                
+                // Verify file was saved
+                if FileManager.default.fileExists(atPath: fileURL.path) {
+                    logger.info("📸 Verified: Photo file exists at \(fileURL.lastPathComponent)")
+                }
+            } catch {
+                logger.error("📸 Failed to save photo to disk: \(error)")
+            }
+        } else {
+            logger.error("📸 Failed to compress photo for saving")
+        }
+    }
+    
+    /// Delete photo from disk
+    private func deletePhotoFromDisk(recipeId: UUID, photoType: String) {
+        let fileURL = photoFileURL(recipeId: recipeId, photoType: photoType)
+        try? FileManager.default.removeItem(at: fileURL)
     }
 
     /// Store fridge photo for multiple recipes (called after recipe generation)
     public func storeFridgePhoto(_ photo: UIImage, for recipeIds: [UUID]) {
         logger.info("📸 Storing fridge photo for \(recipeIds.count) recipes")
         
-        // Compress photo for storage efficiency
-        let compressedPhoto = compressPhoto(photo, maxSizeKB: 500)
-
+        // Don't compress - use original for better quality and ensure save works
         for recipeId in recipeIds {
             let existing = recipePhotos[recipeId]
             recipePhotos[recipeId] = RecipePhotos(
                 recipeId: recipeId,
-                fridgePhoto: compressedPhoto,
+                fridgePhoto: photo,
                 pantryPhoto: existing?.pantryPhoto,
                 mealPhoto: existing?.mealPhoto
             )
+            
+            // Save to disk for persistence
+            savePhotoToDisk(photo, recipeId: recipeId, photoType: "fridge")
         }
 
         logger.info("📸 Total stored photos: \(self.recipePhotos.count)")
@@ -75,17 +203,17 @@ public final class PhotoStorageManager: ObservableObject {
     /// Store meal photo for a specific recipe (called after cooking)
     public func storeMealPhoto(_ photo: UIImage, for recipeId: UUID) {
         logger.info("📸 Storing meal photo for recipe \(recipeId)")
-        
-        // Compress photo for storage efficiency
-        let compressedPhoto = compressPhoto(photo, maxSizeKB: 500)
 
         let existing = recipePhotos[recipeId]
         recipePhotos[recipeId] = RecipePhotos(
             recipeId: recipeId,
             fridgePhoto: existing?.fridgePhoto,
             pantryPhoto: existing?.pantryPhoto,
-            mealPhoto: compressedPhoto
+            mealPhoto: photo
         )
+        
+        // Save to disk for persistence
+        savePhotoToDisk(photo, recipeId: recipeId, photoType: "meal")
     }
 
     /// Store pantry photo for multiple recipes
@@ -100,6 +228,9 @@ public final class PhotoStorageManager: ObservableObject {
                 pantryPhoto: photo,
                 mealPhoto: existing?.mealPhoto
             )
+            
+            // Save to disk for persistence
+            savePhotoToDisk(photo, recipeId: recipeId, photoType: "pantry")
         }
 
         logger.info("📸 Total stored photos: \(self.recipePhotos.count)")
@@ -107,21 +238,51 @@ public final class PhotoStorageManager: ObservableObject {
 
     /// Store all photos for a recipe (called when syncing from CloudKit)
     public func storePhotos(fridgePhoto: UIImage?, pantryPhoto: UIImage? = nil, mealPhoto: UIImage?, for recipeId: UUID) {
+        // Check if we already have these photos
+        let existing = recipePhotos[recipeId]
+        
+        // If we already have photos and no new ones provided, skip
+        if existing != nil && fridgePhoto == nil && mealPhoto == nil && pantryPhoto == nil {
+            logger.info("📸 Skipping store - already have photos for recipe \(recipeId)")
+            return
+        }
+        
         logger.info("📸 Storing CloudKit photos for recipe \(recipeId)")
 
+        // Preserve existing photo if new one is nil
+        let finalFridge = fridgePhoto ?? existing?.fridgePhoto
+        let finalPantry = pantryPhoto ?? existing?.pantryPhoto
+        let finalMeal = mealPhoto ?? existing?.mealPhoto
+        
+        // Always save new photos to disk
+        if let photo = fridgePhoto {
+            savePhotoToDisk(photo, recipeId: recipeId, photoType: "fridge")
+        } else if let photo = finalFridge, existing?.fridgePhoto == nil {
+            // Save existing photo if it wasn't saved before
+            savePhotoToDisk(photo, recipeId: recipeId, photoType: "fridge")
+        }
+        
+        if let photo = pantryPhoto {
+            savePhotoToDisk(photo, recipeId: recipeId, photoType: "pantry")
+        } else if let photo = finalPantry, existing?.pantryPhoto == nil {
+            savePhotoToDisk(photo, recipeId: recipeId, photoType: "pantry")
+        }
+        
+        if let photo = mealPhoto {
+            savePhotoToDisk(photo, recipeId: recipeId, photoType: "meal")
+        } else if let photo = finalMeal, existing?.mealPhoto == nil {
+            savePhotoToDisk(photo, recipeId: recipeId, photoType: "meal")
+        }
+        
+        // Update in-memory cache
         recipePhotos[recipeId] = RecipePhotos(
             recipeId: recipeId,
-            fridgePhoto: fridgePhoto,
-            pantryPhoto: pantryPhoto,
-            mealPhoto: mealPhoto
+            fridgePhoto: finalFridge,
+            pantryPhoto: finalPantry,
+            mealPhoto: finalMeal
         )
 
-        // OPTIMIZATION: Clear CloudKit cache since we have new local data
-        Task { @MainActor in
-            CloudKitRecipeManager.shared.clearPhotoCache(for: recipeId.uuidString)
-        }
-
-        logger.info("📸 Total stored photos now: \(self.recipePhotos.count)")
+        logger.info("📸 Stored photos for recipe \(recipeId). Total recipes with photos: \(self.recipePhotos.count)")
     }
 
     /// Get photos for a recipe
@@ -209,8 +370,14 @@ public final class PhotoStorageManager: ObservableObject {
         logger.info("📸 Removing photos for \(recipeIDs.count) recipes")
 
         var removedCount = 0
-        for recipeID in recipeIDs where recipePhotos.removeValue(forKey: recipeID) != nil {
-            removedCount += 1
+        for recipeID in recipeIDs {
+            if recipePhotos.removeValue(forKey: recipeID) != nil {
+                // Also remove from disk
+                deletePhotoFromDisk(recipeId: recipeID, photoType: "fridge")
+                deletePhotoFromDisk(recipeId: recipeID, photoType: "pantry")
+                deletePhotoFromDisk(recipeId: recipeID, photoType: "meal")
+                removedCount += 1
+            }
         }
 
         logger.info("📸 Removed \(removedCount) photo sets")
@@ -249,35 +416,22 @@ public final class PhotoStorageManager: ObservableObject {
         }
     }
 
-    /// Background cleanup of orphaned and old photos
+    /// Background cleanup - now only logs memory usage, doesn't delete photos
     public func performBackgroundCleanup() {
         cleanupQueue.async { [weak self] in
             guard let self = self else { return }
 
             Task { @MainActor in
-                self.logger.info("📸 Starting background photo cleanup")
+                self.logger.info("📸 Checking photo storage status")
 
-                _ = self.getMemoryUsageInfo()
-
-                // Remove photos older than 7 days
-                let oldPhotoIDs = self.getOldPhotos(olderThan: 7 * 24 * 60 * 60) // 7 days
-                if !oldPhotoIDs.isEmpty {
-                    self.logger.info("📸 Removing \(oldPhotoIDs.count) old photos")
-                    self.removePhotos(for: oldPhotoIDs)
-                }
-
-                // If still over limit, remove oldest photos
+                let memoryInfo = self.getMemoryUsageInfo()
+                self.logger.info("📸 Current storage: \(memoryInfo.photoCount) photos, \(String(format: "%.1f", memoryInfo.estimatedMemoryMB)) MB")
+                
+                // No longer removing photos - we want to keep all recipes and photos
+                // Only log if we're over the soft limit for monitoring purposes
                 if self.recipePhotos.count > self.maxStoredPhotos {
-                    let sortedPhotos = self.recipePhotos.sorted { $0.value.capturedAt < $1.value.capturedAt }
-                    let excessCount = self.recipePhotos.count - self.maxStoredPhotos
-                    let toRemove = Array(sortedPhotos.prefix(excessCount)).map { $0.key }
-
-                    self.logger.info("📸 Removing \(toRemove.count) excess photos")
-                    self.removePhotos(for: toRemove)
+                    self.logger.info("📸 Note: Storage has \(self.recipePhotos.count) photos (soft limit: \(self.maxStoredPhotos))")
                 }
-
-                let memoryInfoAfter = self.getMemoryUsageInfo()
-                self.logger.info("📸 Cleanup complete - \(memoryInfoAfter.photoCount) photos, \(String(format: "%.1f", memoryInfoAfter.estimatedMemoryMB)) MB")
             }
         }
     }
@@ -412,11 +566,24 @@ public final class PhotoStorageManager: ObservableObject {
     public func storePhotos(fridgePhoto: UIImage?, mealPhoto: UIImage?, for recipeId: UUID) {
         logger.info("📸 Storing photos for recipe \(recipeId)")
         
+        // Check if we already have these photos
+        let existing = recipePhotos[recipeId]
+        
+        // Save to disk for persistence
+        if let photo = fridgePhoto {
+            savePhotoToDisk(photo, recipeId: recipeId, photoType: "fridge")
+        }
+        
+        if let photo = mealPhoto {
+            savePhotoToDisk(photo, recipeId: recipeId, photoType: "meal")
+        }
+        
+        // Update in-memory cache
         recipePhotos[recipeId] = RecipePhotos(
             recipeId: recipeId,
-            fridgePhoto: fridgePhoto,
-            pantryPhoto: nil,
-            mealPhoto: mealPhoto
+            fridgePhoto: fridgePhoto ?? existing?.fridgePhoto,
+            pantryPhoto: existing?.pantryPhoto,
+            mealPhoto: mealPhoto ?? existing?.mealPhoto
         )
         
         logger.info("📸 Total stored photos: \(self.recipePhotos.count)")

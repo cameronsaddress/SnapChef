@@ -113,7 +113,7 @@ struct SnapChefApp: App {
         // Initialize notification system with comprehensive spam prevention
         Task {
             let granted = await notificationManager.requestNotificationPermission()
-            print("📱 Notification permission granted: \(granted)")
+            // print("📱 Notification permission granted: \(granted)")
             
             if granted {
                 // Setup default notifications (with limits and controls)
@@ -213,7 +213,7 @@ struct SnapChefApp: App {
     
     @MainActor
     private func trackDailyAppUsage() async {
-        print("📅 Tracking daily app usage for streak...")
+        // print("📅 Tracking daily app usage for streak...")
         
         // Check if authenticated
         guard authManager.isAuthenticated, let currentUser = authManager.currentUser else {

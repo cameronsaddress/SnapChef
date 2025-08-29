@@ -126,7 +126,6 @@ struct RecipesView: View {
         .navigationBarHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .task {
-            print("🔍 DEBUG: RecipesView appeared")
             
             // Defer UI state changes to avoid modifying state during view update
             await MainActor.run {
@@ -136,10 +135,13 @@ struct RecipesView: View {
                 hasInitiallyLoaded = true
             }
 
-            // Load like data for authenticated users
-            if cloudKitAuth.isAuthenticated {
-                // Load user's liked recipes and counts for all visible recipes
-                Task {
+            // Load like data - wait a bit for authentication to complete
+            Task {
+                // Give authentication time to complete (it happens async in app init)
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                
+                if cloudKitAuth.isAuthenticated {
+                    // Load user's liked recipes and counts for all visible recipes
                     await RecipeLikeManager.shared.loadUserLikes()
                     
                     // Get all recipe IDs and load their like counts
@@ -148,16 +150,13 @@ struct RecipesView: View {
                         await RecipeLikeManager.shared.refreshLikeCounts(for: allRecipeIDs)
                     }
                 }
-                
-                // OPTIMIZATION: Start background CloudKit sync without blocking UI
-                startBackgroundCloudKitSync()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            // OPTIMIZATION: Background sync when returning to foreground
-            if cloudKitAuth.isAuthenticated && hasInitiallyLoaded {
-                startBackgroundCloudKitSync()
-            }
+            // Don't auto-sync on foreground - rely on local data
+            // if cloudKitAuth.isAuthenticated && hasInitiallyLoaded {
+            //     startBackgroundCloudKitSync()
+            // }
         }
         .refreshable {
             // OPTIMIZATION: Pull to refresh is faster - only trigger explicit sync
@@ -189,13 +188,6 @@ struct RecipesView: View {
         // Show local recipes immediately, then merge CloudKit recipes
         let localRecipes = appState.recentRecipes + appState.savedRecipes
         let cloudKitRecipes = cloudKitRecipeCache.cachedRecipes
-        
-        // DEBUG: Log recipe counts
-        print("🔍 DEBUG: RecipesView filteredRecipes called")
-        print("🔍   - recentRecipes count: \(appState.recentRecipes.count)")
-        print("🔍   - savedRecipes count: \(appState.savedRecipes.count)")
-        print("🔍   - localRecipes total: \(localRecipes.count)")
-        print("🔍   - cloudKitRecipes count: \(cloudKitRecipes.count)")
 
         // Remove duplicates - local recipes take precedence
         let localRecipeIds = Set(localRecipes.map { $0.id })
@@ -344,7 +336,8 @@ struct RecipesView: View {
         let recipesNeedingPhotos = recipes.filter { recipe in
             // Check PhotoStorageManager first (single source of truth)
             if let photos = photoStorage.getPhotos(for: recipe.id) {
-                return photos.fridgePhoto == nil || photos.mealPhoto == nil
+                // Only fetch if we have NO fridge photo (the essential one)
+                return photos.fridgePhoto == nil
             }
             // Fallback check for recipes not in PhotoStorageManager
             return !appState.savedRecipesWithPhotos.contains(where: { $0.recipe.id == recipe.id })
@@ -951,7 +944,7 @@ struct RecipeGridCard: View {
             isLoadingUsername = false
         }
         
-        print("✅ RecipeCard: Set creator username to '\(ownerName)' for recipe '\(recipe.name)'")
+        // print("✅ RecipeCard: Set creator username to '\(ownerName)' for recipe '\(recipe.name)'")
     }
     
     /// Get the owner name for a recipe

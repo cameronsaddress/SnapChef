@@ -255,7 +255,7 @@ class UserCacheManager: ObservableObject {
     /// Cache user info
     private func cacheUser(_ userID: String, info: CachedUser) {
         cache[userID] = info
-        print("💾 Cached user: \(userID) (username: \(info.username))")
+        // print("💾 Cached user: \(userID) (username: \(info.username))")
         
         // Optional: Implement cache size limit
         if cache.count > 100 {

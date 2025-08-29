@@ -16,7 +16,7 @@ class KeychainManager {
 
     /// Stores the API key in the keychain
     func storeAPIKey(_ key: String) {
-        print("🔐 KeychainManager: Storing API key with length \(key.count)")
+        // print("🔐 KeychainManager: Storing API key with length \(key.count)")
         let data = key.data(using: .utf8)!
         
         // First delete any existing item to ensure clean state
@@ -32,10 +32,10 @@ class KeychainManager {
         ]
         
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
-        print("🔐 KeychainManager: Add status = \(addStatus)")
+        // print("🔐 KeychainManager: Add status = \(addStatus)")
         
         if addStatus == noErr {
-            print("✅ API key successfully stored in keychain")
+            // print("✅ API key successfully stored in keychain")
         } else {
             print("❌ Failed to store API key, error code: \(addStatus)")
         }
@@ -54,17 +54,17 @@ class KeychainManager {
         var dataTypeRef: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
         
-        print("🔐 KeychainManager: Get API key status = \(status)")
+        // print("🔐 KeychainManager: Get API key status = \(status)")
 
         if status == noErr {
             if let data = dataTypeRef as? Data,
                let key = String(data: data, encoding: .utf8) {
-                print("🔐 KeychainManager: Retrieved API key with length \(key.count)")
+                // print("🔐 KeychainManager: Retrieved API key with length \(key.count)")
                 return key
             }
         }
         
-        print("🔐 KeychainManager: No API key found in keychain")
+        // print("🔐 KeychainManager: No API key found in keychain")
         return nil
     }
 
@@ -78,11 +78,11 @@ class KeychainManager {
 
         let deleteStatus = SecItemDelete(query as CFDictionary)
         if deleteStatus == noErr {
-            print("🔐 KeychainManager: Successfully deleted API key")
+            // print("🔐 KeychainManager: Successfully deleted API key")
         } else if deleteStatus == errSecItemNotFound {
-            print("🔐 KeychainManager: No API key to delete")
+            // print("🔐 KeychainManager: No API key to delete")
         } else {
-            print("🔐 KeychainManager: Delete status = \(deleteStatus)")
+            // print("🔐 KeychainManager: Delete status = \(deleteStatus)")
         }
     }
 

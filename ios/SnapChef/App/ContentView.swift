@@ -35,7 +35,7 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            print("🔍 DEBUG: ContentView appeared")
+            // print("🔍 DEBUG: ContentView appeared")
         }
     }
 }

@@ -144,11 +144,11 @@ struct HomeView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .particleExplosion(trigger: $particleTrigger)
         .onAppear {
-            print("🔍 DEBUG: HomeView appeared - Start")
+            // print("🔍 DEBUG: HomeView appeared - Start")
             
             // Defer state modifications to avoid "Modifying state during view update" warnings
             DispatchQueue.main.async {
-                print("🔍 DEBUG: HomeView - Async block started")
+                // print("🔍 DEBUG: HomeView - Async block started")
                 
                 // Track screen view
                 Task {
@@ -157,7 +157,7 @@ struct HomeView: View {
                 
                 // Simple fade in for mystery meal animation (only if animations enabled)
                 if deviceManager.animationsEnabled {
-                    print("🔍 DEBUG: HomeView - Setting mysteryMealAnimation")
+                    // print("🔍 DEBUG: HomeView - Setting mysteryMealAnimation")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     withAnimation(.easeInOut(duration: deviceManager.recommendedAnimationDuration * 2)) {
                         mysteryMealAnimation = true
@@ -169,7 +169,7 @@ struct HomeView: View {
                 
                 // Start button shake after 3 seconds (only if continuous animations enabled)
                 if deviceManager.shouldUseContinuousAnimations {
-                    print("🔍 DEBUG: HomeView - Scheduling button shake")
+                    // print("🔍 DEBUG: HomeView - Scheduling button shake")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                         startButtonShake()
                     }
@@ -177,14 +177,14 @@ struct HomeView: View {
                 
                 // Start falling food animation (only if particles enabled)
                 if deviceManager.shouldShowParticles {
-                    print("🔍 DEBUG: HomeView - Starting falling food animation")
+                    // print("🔍 DEBUG: HomeView - Starting falling food animation")
                     fallingFoodManager.startFallingFood()
                 }
                 
-                print("🔍 DEBUG: HomeView - Async block completed")
+                // print("🔍 DEBUG: HomeView - Async block completed")
             }
             
-            print("🔍 DEBUG: HomeView appeared - End")
+            // print("🔍 DEBUG: HomeView appeared - End")
             
             // Additional delayed check
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

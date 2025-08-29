@@ -147,14 +147,23 @@ class RecipeLikeManager: ObservableObject {
         }
     }
     
-    /// Batch refresh like counts for multiple recipes
+    /// Batch refresh like counts for multiple recipes efficiently
     func refreshLikeCounts(for recipeIDs: [String]) async {
-        await withTaskGroup(of: Void.self) { group in
-            for recipeID in recipeIDs {
-                group.addTask { [weak self] in
-                    await self?.refreshLikeCount(for: recipeID)
+        guard !recipeIDs.isEmpty else { return }
+        
+        print("📊 Batch refreshing like counts for \(recipeIDs.count) recipes")
+        
+        // Use the new batch fetch method
+        let counts = await cloudKitManager.batchFetchLikeCounts(for: recipeIDs)
+        
+        await MainActor.run {
+            // Update all counts at once
+            for (recipeID, count) in counts {
+                if self.recipeLikeCounts[recipeID] != count {
+                    self.recipeLikeCounts[recipeID] = count
                 }
             }
+            print("✅ Batch updated \(counts.count) like counts")
         }
     }
     

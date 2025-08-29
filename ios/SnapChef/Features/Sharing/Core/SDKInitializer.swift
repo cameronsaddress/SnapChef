@@ -11,7 +11,7 @@ import UIKit
 @MainActor
 final class SDKInitializer {
     static func initializeSDKs() {
-        print("🚀 Initializing social media SDKs...")
+        // print("🚀 Initializing social media SDKs...")
 
         // TikTok SDK registration removed - using direct URL scheme approach
         // let tiktokSDK = TikTokSDKManager()
@@ -24,7 +24,7 @@ final class SDKInitializer {
 
         // Log available platforms
         let availablePlatforms = SocialSDKManager.shared.getAvailablePlatforms()
-        print("📱 Available social platforms: \(availablePlatforms.map { $0.rawValue }.joined(separator: ", "))")
+        // print("📱 Available social platforms: \(availablePlatforms.map { $0.rawValue }.joined(separator: ", "))")
     }
 
     /// Handle URL callbacks from social platforms
