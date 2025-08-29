@@ -65,16 +65,22 @@ class CloudKitRecipeCache: ObservableObject {
 
     /// Get recipes with intelligent caching - only fetches missing recipes
     func getRecipes(forceRefresh: Bool = false) async -> [Recipe] {
-        // If not authenticated, return empty
-        guard authManager.isAuthenticated else {
-            print("📱 CloudKitCache: User not authenticated, returning empty recipes")
-            return []
-        }
-
         // If we have cached recipes, ALWAYS use them unless force refresh
+        // This ensures local-first approach works even when not authenticated
         if !cachedRecipes.isEmpty && !forceRefresh {
             print("📱 CloudKitCache: Using cached recipes (count: \(cachedRecipes.count)) - never re-downloading existing recipes")
             return cachedRecipes
+        }
+        
+        // If not authenticated and need to fetch, return local cache or empty
+        guard authManager.isAuthenticated else {
+            if !cachedRecipes.isEmpty {
+                print("📱 CloudKitCache: User not authenticated, returning \(cachedRecipes.count) locally cached recipes")
+                return cachedRecipes
+            } else {
+                print("📱 CloudKitCache: User not authenticated and no local cache, returning empty")
+                return []
+            }
         }
 
         // Only fetch if cache is empty or force refresh requested
@@ -235,7 +241,7 @@ class CloudKitRecipeCache: ObservableObject {
            let decoded = try? JSONDecoder().decode([Recipe].self, from: data) {
             cachedRecipes = decoded
             localRecipeIDs = Set(decoded.map { $0.id })
-            // print("📱 CloudKitCache: Loaded \(cachedRecipes.count) recipes from local cache")
+            print("📱 CloudKitCache: Loaded \(cachedRecipes.count) recipes from local cache")
         }
         
         // Load owner information cache

@@ -585,9 +585,19 @@ UserChallenge Record:
 - ✅ All authentication through UnifiedAuthManager
 - ✅ CloudKit user record management working
 - ✅ Progressive authentication with anonymous tracking
+- ⚠️ **Known Issue**: Authentication race condition causing initial CloudKit sync to fail
 
-### Current Priority
-1. Fix ProfileView CloudKit sync
-2. Implement streak persistence
-3. Achievement tracking
-4. Challenge progress sync
+### Photo & Recipe Caching (Updated Aug 29, 2025)
+- ✅ **Photo Persistence Working**: Photos saved to `Documents/RecipePhotos/` and loaded on app launch
+- ✅ **3-Tier Caching**: Disk → Memory → CloudKit (minimizes API calls)
+- ✅ **Local-First Success**: 62 photos for 58 recipes loading from disk
+- ✅ **CloudKit Optimization**: Only downloads photos not in local storage
+
+### Current Issues & Priority
+1. **Authentication Race Condition**: CloudKit sync attempts before auth completes
+   - Symptoms: "User not authenticated" errors during initial load
+   - Impact: Initial recipe/photo sync may fail, requiring app restart
+2. Fix ProfileView CloudKit sync
+3. Implement streak persistence
+4. Achievement tracking
+5. Challenge progress sync

@@ -134,18 +134,39 @@ struct SnapChefApp: App {
             // Initialize CloudKit authentication managers
             await initializeAuthentication()
             
+            // Wait for authentication to fully complete (up to 2 seconds)
+            var authCheckAttempts = 0
+            while authCheckAttempts < 20 && !UnifiedAuthManager.shared.isAuthenticated {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                authCheckAttempts += 1
+            }
+            
+            if UnifiedAuthManager.shared.isAuthenticated {
+                print("✅ Authentication confirmed, proceeding with CloudKit operations")
+            } else {
+                print("⚠️ Authentication not completed after 2 seconds, proceeding anyway")
+            }
+            
             // Initialize RecipeLikeManager to load user's liked recipes
-            await RecipeLikeManager.shared.loadUserLikes()
-            print("✅ RecipeLikeManager initialized with user's liked recipes")
+            if UnifiedAuthManager.shared.isAuthenticated {
+                await RecipeLikeManager.shared.loadUserLikes()
+                print("✅ RecipeLikeManager initialized with user's liked recipes")
+            }
             
             // Check iCloud status for progressive auth
             await iCloudStatusManager.shared.checkiCloudStatus()
             
             // Track daily app usage and update streak
-            await trackDailyAppUsage()
+            if UnifiedAuthManager.shared.isAuthenticated {
+                await trackDailyAppUsage()
+            }
 
-            // Sync CloudKit photos to PhotoStorageManager
-            await syncCloudKitPhotosToStorage()
+            // Sync CloudKit photos to PhotoStorageManager (only if authenticated)
+            if UnifiedAuthManager.shared.isAuthenticated {
+                await syncCloudKitPhotosToStorage()
+            } else {
+                print("⚠️ Skipping CloudKit photo sync - user not authenticated")
+            }
             
             // MIGRATION: Run CloudKit data migration (Remove after successful run)
             // Uncomment the line below to run the migration ONCE
