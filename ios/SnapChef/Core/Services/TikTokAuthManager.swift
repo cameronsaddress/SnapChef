@@ -26,7 +26,7 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
 
     // MARK: - Private Properties
     private let keychainKey = "com.snapchef.tiktok.tokens"
-    private let redirectURI = "snapchef://tiktok-auth-callback"
+    private let redirectURI = "snapchef://tiktok/callback"
 
     // TikTok OAuth Configuration
     private var clientID: String {
