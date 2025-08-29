@@ -471,32 +471,46 @@ struct TikTokShareView: View {
     }
 
     private func generate() {
+        print("🎬 TikTok: Generate button pressed")
+        print("🎬 TikTok: Selected hashtags: \(selectedHashtags)")
+        
         // Check if user has reached daily video limit
         if usageTracker.hasReachedVideoLimit() {
+            print("🎬 TikTok: Daily video limit reached")
             // Show paywall if limit reached
             if paywallTrigger.shouldShowPaywall(for: .videoLimitReached) {
+                print("🎬 TikTok: Showing paywall for video limit")
                 // Show limit reached message and paywall
                 showLimitReached = true
                 return
             }
         }
 
+        print("🎬 TikTok: Starting generate and share flow")
         Task {
             await generateAndShareIntelligently()
         }
     }
     
     private func generateAndShareIntelligently() async {
+        print("🎬 TikTok: Starting intelligent share flow")
+        
         // Step 1: Check TikTok authentication
+        print("🎬 TikTok: Step 1 - Checking TikTok authentication status")
         isCheckingAuth = true
         let isAuthenticated = await checkTikTokAuthentication()
         isCheckingAuth = false
+        print("🎬 TikTok: Authentication status: \(isAuthenticated ? "Authenticated" : "Not authenticated")")
         
         if !isAuthenticated {
             // Step 2: Try to authenticate if not authenticated
+            print("🎬 TikTok: Step 2 - Attempting to authenticate with TikTok")
             do {
                 try await authenticateWithTikTok()
+                print("🎬 TikTok: Authentication successful")
             } catch {
+                print("🎬 TikTok: Authentication failed with error: \(error.localizedDescription)")
+                print("🎬 TikTok: Falling back to ShareKit method")
                 // Authentication failed, fallback to sharekit method
                 await performGeneration(useDirectPost: false)
                 return
@@ -504,30 +518,52 @@ struct TikTokShareView: View {
         }
         
         // Step 3: Generate and post directly
+        print("🎬 TikTok: Step 3 - Generating video and posting directly")
         await performGeneration(useDirectPost: true)
     }
     
     private func checkTikTokAuthentication() async -> Bool {
-        return TikTokAuthManager.shared.isAuthenticatedUser()
+        let isAuth = TikTokAuthManager.shared.isAuthenticatedUser()
+        print("🎬 TikTok: Checking auth - isAuthenticatedUser: \(isAuth)")
+        if let tokens = TikTokAuthManager.shared.getCurrentTokens() {
+            print("🎬 TikTok: Has stored tokens, access token exists: \(!tokens.accessToken.isEmpty)")
+        } else {
+            print("🎬 TikTok: No stored tokens found")
+        }
+        return isAuth
     }
     
     private func authenticateWithTikTok() async throws {
-        _ = try await TikTokAuthManager.shared.authenticate()
+        print("🎬 TikTok: Starting OAuth authentication flow")
+        print("🎬 TikTok: Redirect URI: snapchef://tiktok/callback")
+        
+        let user = try await TikTokAuthManager.shared.authenticate()
+        print("🎬 TikTok: Authentication completed, user: \(user.displayName)")
         
         // Update contentAPI with new token
         await MainActor.run {
             if let tokens = TikTokAuthManager.shared.getCurrentTokens() {
+                print("🎬 TikTok: Setting access token in contentAPI")
                 contentAPI.setAccessToken(tokens.accessToken)
+            } else {
+                print("🎬 TikTok: WARNING - No tokens available after authentication")
             }
         }
     }
 
     private func performGeneration(useDirectPost: Bool) async {
-        guard let inputs = content.toRenderInputs() else { return }
+        print("🎬 TikTok: Starting video generation (useDirectPost: \(useDirectPost))")
+        
+        guard let inputs = content.toRenderInputs() else {
+            print("🎬 TikTok: ERROR - Failed to get render inputs from content")
+            return
+        }
         let (recipe, media) = inputs
+        print("🎬 TikTok: Got recipe: \(recipe.title)")
 
         await MainActor.run {
             // Track video generation for usage limits
+            print("🎬 TikTok: Tracking video creation for usage limits")
             usageTracker.trackVideoCreated()
             UserLifecycleManager.shared.trackVideoShared()
 
@@ -540,8 +576,13 @@ struct TikTokShareView: View {
         }
 
         do {
-            let url = try await engine.render(template: template, recipe: recipe, media: media) { _ in }
+            print("🎬 TikTok: Calling engine.render with template: \(template)")
+            let url = try await engine.render(template: template, recipe: recipe, media: media) { _ in
+                // Progress tracking - RenderProgress type structure unknown
+            }
             self.videoURL = url
+            print("🎬 TikTok: Video generated successfully at: \(url.path)")
+            print("🎬 TikTok: Video file size: \((try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0) bytes")
 
             // Success haptic feedback
             await MainActor.run {
@@ -573,11 +614,14 @@ struct TikTokShareView: View {
 
             // Share based on authentication status and direct post capability
             if useDirectPost {
+                print("🎬 TikTok: Using direct post to TikTok API")
                 await postDirectlyToTikTok(url: url)
             } else {
+                print("🎬 TikTok: Using TikTok app share (ShareKit)")
                 await shareToTikTokAutomatically(url: url)
             }
         } catch {
+                print("🎬 TikTok: ERROR - Video generation failed: \(error.localizedDescription)")
                 await MainActor.run {
                     // Error haptic feedback
                     let errorFeedback = UINotificationFeedbackGenerator()
@@ -606,14 +650,18 @@ struct TikTokShareView: View {
 
     @MainActor
     private func shareToTikTokAutomatically(url: URL) async {
+        print("🎬 TikTok: Starting automatic share to TikTok app")
         // Request photo permission first
+        print("🎬 TikTok: Requesting photo library permission")
         let hasPermission = await withCheckedContinuation { continuation in
             ViralVideoExporter.requestPhotoPermission { granted in
+                print("🎬 TikTok: Photo permission granted: \(granted)")
                 continuation.resume(returning: granted)
             }
         }
 
         guard hasPermission else {
+            print("🎬 TikTok: ERROR - Photo access denied")
             self.currentTikTokError = TikTokExportError.photoAccessDenied
             self.showRetryAlert = true
             self.retryAction = {
@@ -626,8 +674,15 @@ struct TikTokShareView: View {
         }
 
         // Save video to Photos
+        print("🎬 TikTok: Saving video to Photos library")
         let saveResult = await withCheckedContinuation { continuation in
             ViralVideoExporter.saveToPhotos(videoURL: url) { result in
+                switch result {
+                case .success(let id):
+                    print("🎬 TikTok: Video saved to Photos with identifier: \(id)")
+                case .failure(let error):
+                    print("🎬 TikTok: ERROR - Failed to save to Photos: \(error)")
+                }
                 continuation.resume(returning: result)
             }
         }
@@ -668,14 +723,22 @@ struct TikTokShareView: View {
                 print("📋 Final caption being sent (non-recipe): \(caption)")
             }
 
+            print("🎬 TikTok: Calling shareToTikTok with identifier: \(identifier)")
             let shareResult = await withCheckedContinuation { continuation in
                 ViralVideoExporter.shareToTikTok(localIdentifiers: [identifier], caption: caption) { result in
+                    switch result {
+                    case .success:
+                        print("🎬 TikTok: Share to TikTok app successful")
+                    case .failure(let error):
+                        print("🎬 TikTok: ERROR - Share to TikTok failed: \(error)")
+                    }
                     continuation.resume(returning: result)
                 }
             }
 
             switch shareResult {
             case .success:
+                print("🎬 TikTok: SUCCESS - TikTok app should now be open with video")
                 // Success - TikTok app should now be open
                 self.isGenerating = false
                 
@@ -697,6 +760,7 @@ struct TikTokShareView: View {
                 }
 
             case .failure(let error):
+                print("🎬 TikTok: Final share failed with error: \(error)")
                 // Handle TikTok sharing errors with user-friendly messages
                 self.currentTikTokError = error
                 self.showRetryAlert = true
@@ -809,30 +873,39 @@ struct TikTokShareView: View {
 
     @MainActor
     private func postDirectlyToTikTok(url: URL) async {
+        print("🎬 TikTok: Starting direct post to TikTok")
         do {
+            print("🎬 TikTok: Ensuring valid token")
             // Ensure we have a valid token (will refresh if needed)
-            _ = try await TikTokAuthManager.shared.ensureValidToken()
+            let token = try await TikTokAuthManager.shared.ensureValidToken()
+            print("🎬 TikTok: Got valid token: \(String(token.prefix(10)))...")
 
             // Build caption from content and selected hashtags
             // Note: caption is handled directly by contentAPI.uploadWithShareContent
+            print("🎬 TikTok: Uploading video with caption and hashtags: \(selectedHashtags)")
 
             // Upload with progress tracking
             let publishId = try await contentAPI.uploadWithShareContent(
                 content: content,
                 videoURL: url
-            ) { _ in
+            ) { progress in
+                print("🎬 TikTok: Upload progress: \(Int(progress * 100))%")
                 // Update UI with upload progress
             }
+            print("🎬 TikTok: Upload complete, publishId: \(publishId)")
 
             // Check status periodically
             var attempts = 0
             let maxAttempts = 10
+            print("🎬 TikTok: Checking publish status...")
 
             while attempts < maxAttempts {
                 let status = try await contentAPI.checkPublishStatus(publishId: publishId)
+                print("🎬 TikTok: Publish status (attempt \(attempts + 1)/\(maxAttempts)): \(status.data.status)")
 
                 switch status.data.status {
                 case "SENT_TO_USER_INBOX":
+                    print("🎬 TikTok: SUCCESS - Video sent to user inbox!")
                     // Success!
                     await MainActor.run {
                         let successFeedback = UINotificationFeedbackGenerator()
@@ -855,9 +928,12 @@ struct TikTokShareView: View {
                     return
 
                 case "FAILED":
-                    throw TikTokAPIError.uploadFailed(status.data.fail_reason ?? "Upload failed")
+                    let reason = status.data.fail_reason ?? "Upload failed"
+                    print("🎬 TikTok: FAILED - Reason: \(reason)")
+                    throw TikTokAPIError.uploadFailed(reason)
 
                 default:
+                    print("🎬 TikTok: Still processing, waiting 2 seconds...")
                     // Still processing, wait and retry
                     try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
                     attempts += 1
@@ -865,8 +941,10 @@ struct TikTokShareView: View {
             }
 
             // Timeout
+            print("🎬 TikTok: ERROR - Upload timeout after \(maxAttempts) attempts")
             throw TikTokAPIError.uploadFailed("Upload timeout - please check your TikTok app")
         } catch {
+            print("🎬 TikTok: ERROR in postDirectlyToTikTok: \(error)")
             await MainActor.run {
                 let errorFeedback = UINotificationFeedbackGenerator()
                 errorFeedback.notificationOccurred(.error)
