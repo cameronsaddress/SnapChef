@@ -262,13 +262,13 @@ public actor RenderPlanner {
 
         // OVERLAY SEQUENCE: Perfectly timed viral text sequence with alternating animations
 
-        // OVERLAY PHASE 1: "From only this pic" (0-3s) - Slide in from RIGHT
+        // OVERLAY PHASE 1: "Random fridge items" (0-3s) - Slide in from RIGHT
         overlays.append(.init(
             start: .zero,
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "I took a pic of my fridge",
+                    text: "Random fridge items ✓",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .right
@@ -276,13 +276,13 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 2: "AI used whats in my fridge" (3-6s) - Slide in from LEFT  
+        // OVERLAY PHASE 2: "AI magic happens" (3-6s) - Slide in from LEFT  
         overlays.append(.init(
             start: CMTime(seconds: 3, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "and Snap Chef AI",
+                    text: "AI magic happens ✨",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -290,13 +290,14 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 3: "to make easy recipes" (6-9s) - Slide in from RIGHT
+        // OVERLAY PHASE 3: Recipe name with time (6-9s) - Slide in from RIGHT
+        let recipeText = "\(recipe.title) in \(recipe.timeMinutes) mins"
         overlays.append(.init(
             start: CMTime(seconds: 6, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "created easy recipes",
+                    text: recipeText,
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .right
@@ -304,13 +305,13 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 4: "of what we like to eat" (9-12s) - Slide in from LEFT
+        // OVERLAY PHASE 4: "Your friends: HOW?!" (9-12s) - Slide in from LEFT
         overlays.append(.init(
             start: CMTime(seconds: 9, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "of foods we like to eat!",
+                    text: "Your friends: HOW?! 🤯",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -324,7 +325,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createCTATextOverlay(
-                    text: "Get it free on the App Store",
+                    text: "Make this recipe - Get app",
                     config: cfg,
                     screenScale: cfg.contentsScale
                 )
