@@ -276,13 +276,13 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 2: "Open fridge" (3-6s) - Slide in from LEFT  
+        // OVERLAY PHASE 2: "Open your fridge" (3-6s) - Slide in from LEFT  
         overlays.append(.init(
             start: CMTime(seconds: 3, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "Open fridge 📸",
+                    text: "Open your fridge",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -324,7 +324,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createCTATextOverlay(
-                    text: "Make this recipe - Get app",
+                    text: "Awesome recipes from what you have",
                     config: cfg,
                     screenScale: cfg.contentsScale
                 )
@@ -1234,21 +1234,21 @@ public actor RenderPlanner {
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
         gradientLayer.cornerRadius = 25
 
-        // Create "SNAPCHEF!" text with 72pt heavy font
+        // Create "Get the SNAPCHEF! App!" text with 56pt heavy font (smaller to fit)
         let logoTextLayer = CATextLayer()
-        let logoFont = CTFontCreateWithName("HelveticaNeue-Black" as CFString, 72, nil) // FIXED: Already using heaviest weight
+        let logoFont = CTFontCreateWithName("HelveticaNeue-Black" as CFString, 56, nil) // Reduced size for longer text
         logoTextLayer.font = logoFont
-        logoTextLayer.fontSize = 72
+        logoTextLayer.fontSize = 56
         logoTextLayer.foregroundColor = UIColor.white.cgColor
         logoTextLayer.alignmentMode = .center
         logoTextLayer.contentsScale = screenScale
-        logoTextLayer.string = "SNAPCHEF!" // Already ALL CAPS
+        logoTextLayer.string = "Get the SNAPCHEF! App!"
 
         // Calculate text dimensions
         let logoTextAttributes: [NSAttributedString.Key: Any] = [
             .font: logoFont
         ]
-        let logoTextSize = ("SNAPCHEF!" as NSString).size(withAttributes: logoTextAttributes)
+        let logoTextSize = ("Get the SNAPCHEF! App!" as NSString).size(withAttributes: logoTextAttributes)
         let logoPadding: CGFloat = 40 // Large padding for prominent logo
         let logoContainerWidth = logoTextSize.width + logoPadding * 2
         let logoContainerHeight = logoTextSize.height + logoPadding * 2
