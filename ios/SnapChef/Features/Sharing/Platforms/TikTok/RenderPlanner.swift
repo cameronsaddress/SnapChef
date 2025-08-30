@@ -190,10 +190,10 @@ public actor RenderPlanner {
         // 11-13s: Dramatic meal reveal with glow
         // 13-15s: CTA (to be handled by another agent)
 
-        // PHASE 1: HOOK - Subtle chaos with reduced intensity (0-3s)
+        // PHASE 1: BEFORE PHOTO - Show fridge/before photo for first 6 seconds (0-6s)
         items.append(.init(
             kind: .still(media.beforeFridge),
-            timeRange: CMTimeRange(start: .zero, duration: CMTime(seconds: 3, preferredTimescale: 600)),
+            timeRange: CMTimeRange(start: .zero, duration: CMTime(seconds: 6, preferredTimescale: 600)),
             transform: .kenBurns(maxScale: 1.05, seed: 42), // Subtle movement
             filters: [
                 .premiumColorGrade(style: .natural), // Remove green tint with natural colors
@@ -203,39 +203,11 @@ public actor RenderPlanner {
             ]
         ))
 
-        // PHASE 2: PROMISE - Smooth transition morph (3-5s)
-        items.append(.init(
-            kind: .still(media.afterFridge),
-            timeRange: CMTimeRange(start: CMTime(seconds: 3, preferredTimescale: 600),
-                                 duration: CMTime(seconds: 2, preferredTimescale: 600)),
-            transform: .kenBurns(maxScale: 1.05, seed: 1), // Gentle movement for hope
-            filters: [
-                .premiumColorGrade(style: .natural), // Clean, natural colors
-                .foodEnhancer(intensity: 0.7),
-                .lightLeak(position: CGPoint(x: 0.7, y: 0.3), intensity: 0.3) // Subtle hope glow
-            ]
-        ))
-
-        // PHASE 3: TRANSFORMATION - Fast-paced ingredient montage (5-11s)
-        items.append(.init(
-            kind: .still(createIngredientMontageImage(ingredients: recipe.ingredients, media: media)),
-            timeRange: CMTimeRange(start: CMTime(seconds: 5, preferredTimescale: 600),
-                                 duration: CMTime(seconds: 6, preferredTimescale: 600)),
-            transform: .kenBurns(maxScale: 1.06, seed: 7), // Reduced movement
-            filters: [
-                .premiumColorGrade(style: .natural), // Natural vibrant colors
-                .velocityRamp(factor: config.velocityRampFactor), // Beat sync speed
-                .lightLeak(position: CGPoint(x: 0.8, y: 0.2), intensity: 0.4),
-                .breatheEffect(intensity: config.breatheIntensity, bpm: beatMap.bpm),
-                .parallaxMove(direction: CGVector(dx: 1, dy: 0.5), intensity: config.parallaxIntensity)
-            ]
-        ))
-
-        // PHASE 4: REVEAL - Meal reveal with natural colors (11-13s)
+        // PHASE 2: AFTER PHOTO - Transition to cooked meal at "AI enters chat" (6-12s)
         items.append(.init(
             kind: .still(media.cookedMeal),
-            timeRange: CMTimeRange(start: CMTime(seconds: 11, preferredTimescale: 600),
-                                 duration: CMTime(seconds: 2, preferredTimescale: 600)),
+            timeRange: CMTimeRange(start: CMTime(seconds: 6, preferredTimescale: 600),
+                                 duration: CMTime(seconds: 6, preferredTimescale: 600)),
             transform: .kenBurns(maxScale: 1.08, seed: 99), // Subtle reveal zoom
             filters: [
                 .premiumColorGrade(style: .natural), // Clean natural colors without tint
@@ -247,11 +219,11 @@ public actor RenderPlanner {
             ]
         ))
 
-        // PHASE 5: CTA Setup (13-15s) - Clean background for CTA
+        // PHASE 3: CTA Setup (12-15s) - Clean background for CTA
         items.append(.init(
             kind: .still(media.cookedMeal),
-            timeRange: CMTimeRange(start: CMTime(seconds: 13, preferredTimescale: 600),
-                                 duration: CMTime(seconds: 2, preferredTimescale: 600)),
+            timeRange: CMTimeRange(start: CMTime(seconds: 12, preferredTimescale: 600),
+                                 duration: CMTime(seconds: 3, preferredTimescale: 600)),
             transform: .identity, // Static for readability
             filters: [
                 .gaussianBlur(radius: 2), // Subtle blur to highlight CTA
@@ -324,7 +296,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createCTATextOverlay(
-                    text: "Awesome recipes from what you have",
+                    text: "Get the SNAPCHEF App!",
                     config: cfg,
                     screenScale: cfg.contentsScale
                 )
@@ -1022,17 +994,17 @@ public actor RenderPlanner {
         // STEP 1: Create CTA container ABOVE the logo (at 35% screen height)
         let ctaContainer = CALayer()
 
-        // STEP 2: Create large SnapChef logo at 40% screen height (middle)
-        let logoContainer = createSnapChefLogo(config: config, screenScale: screenScale)
-        // Get the actual logo size from the container
-        let actualLogoSize = logoContainer.frame.size
-        logoContainer.frame = CGRect(
-            x: (config.size.width - actualLogoSize.width) / 2, // FIXED: Center horizontally
-            y: config.size.height * 0.4 - actualLogoSize.height / 2, // Vertically centered at 40%
-            width: actualLogoSize.width,
-            height: actualLogoSize.height
-        )
-        logoContainer.opacity = 0.0 // Start invisible for fade in
+        // STEP 2: Logo removed per user request - no longer showing "Get the SNAPCHEF! App!"
+        // let logoContainer = createSnapChefLogo(config: config, screenScale: screenScale)
+        // // Get the actual logo size from the container
+        // let actualLogoSize = logoContainer.frame.size
+        // logoContainer.frame = CGRect(
+        //     x: (config.size.width - actualLogoSize.width) / 2, // FIXED: Center horizontally
+        //     y: config.size.height * 0.4 - actualLogoSize.height / 2, // Vertically centered at 40%
+        //     width: actualLogoSize.width,
+        //     height: actualLogoSize.height
+        // )
+        // logoContainer.opacity = 0.0 // Start invisible for fade in
 
         // STEP 3: Setup CTA styling (moved from bottom to above logo)
 
@@ -1105,7 +1077,7 @@ public actor RenderPlanner {
         )
 
         // Debug positioning
-        print("[RenderPlanner] Logo container frame: \(logoContainer.frame)")
+        // print("[RenderPlanner] Logo container frame: \(logoContainer.frame)")  // Logo removed
         print("[RenderPlanner] CTA container frame: \(ctaContainer.frame)")
         print("[RenderPlanner] CTA main text layer frame: \(mainTextLayer.frame)")
 
@@ -1145,16 +1117,16 @@ public actor RenderPlanner {
 
         ctaSparkEmitter.emitterCells = foodCells
 
-        // ANIMATIONS: Logo and CTA fade in together
-        // Logo fade in animation (0-0.5s)
-        let logoFadeIn = CABasicAnimation(keyPath: "opacity")
-        logoFadeIn.fromValue = 0.0
-        logoFadeIn.toValue = 1.0
-        logoFadeIn.duration = 0.5
-        logoFadeIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
-        logoFadeIn.beginTime = AVCoreAnimationBeginTimeAtZero
-        logoFadeIn.fillMode = .both
-        logoFadeIn.isRemovedOnCompletion = false
+        // ANIMATIONS: CTA fade in (logo removed)
+        // Logo fade in animation removed
+        // let logoFadeIn = CABasicAnimation(keyPath: "opacity")
+        // logoFadeIn.fromValue = 0.0
+        // logoFadeIn.toValue = 1.0
+        // logoFadeIn.duration = 0.5
+        // logoFadeIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        // logoFadeIn.beginTime = AVCoreAnimationBeginTimeAtZero
+        // logoFadeIn.fillMode = .both
+        // logoFadeIn.isRemovedOnCompletion = false
 
         // CTA fade in animation (0.2s delay for stagger effect)
         let ctaFadeIn = CABasicAnimation(keyPath: "opacity")
@@ -1204,14 +1176,14 @@ public actor RenderPlanner {
         ctaContainer.addSublayer(appStoreBadge) // App Store badge
 
         // Apply animations
-        logoContainer.add(logoFadeIn, forKey: "logoFadeIn")
+        // logoContainer.add(logoFadeIn, forKey: "logoFadeIn")  // Logo removed
         ctaContainer.add(ctaFadeIn, forKey: "ctaFadeIn")
         ctaContainer.add(ctaPulse, forKey: "ctaPulse")
         gradientLayer.add(glowPulse, forKey: "glowPulse")
         ctaSparkEmitter.add(sparkStart, forKey: "sparkStart")
 
-        // Add both logo and CTA to main container
-        container.addSublayer(logoContainer)
+        // Add only CTA to main container (logo removed)
+        // container.addSublayer(logoContainer)  // Logo removed per user request
         container.addSublayer(ctaContainer)
         return container
     }
