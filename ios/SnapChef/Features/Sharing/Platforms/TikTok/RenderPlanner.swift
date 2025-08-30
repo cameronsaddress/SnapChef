@@ -276,13 +276,13 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 4: "Dinner Served, / Easy and Fun!" (9-12s) - Slide in from LEFT
+        // OVERLAY PHASE 4: "Easy Dinner / From What You Have!" (9-12s) - Slide in from LEFT
         overlays.append(.init(
             start: CMTime(seconds: 9, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "Dinner Served,\nEasy and Fun!",
+                    text: "Easy Dinner\nFrom What You Have!",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -1089,7 +1089,7 @@ public actor RenderPlanner {
         let appStoreBadge = createAppStoreBadge(config: config, screenScale: screenScale)
         appStoreBadge.frame = CGRect(
             x: (containerFrame.width - 120) / 2,
-            y: textSize.height + padding + 10,
+            y: containerFrame.height - 40,  // Position near bottom of container
             width: 120,
             height: 30
         )

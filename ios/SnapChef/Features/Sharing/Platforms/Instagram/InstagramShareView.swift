@@ -33,6 +33,10 @@ struct InstagramShareView: View {
     }
     
     init(content: ShareContent, isStory: Bool) {
+        print("🔍 InstagramShareView init - beforeImage: \(content.beforeImage != nil), afterImage: \(content.afterImage != nil)")
+        if let before = content.beforeImage {
+            print("🔍 InstagramShareView init - beforeImage size: \(before.size)")
+        }
         self.content = content
         self.isStory = isStory
         _shareMode = State(initialValue: isStory ? .story : .feed)
@@ -421,6 +425,8 @@ Made with SnapChef 🍳
     }
 
     private func generateAndShare() {
+        print("🔍 InstagramShareView.generateAndShare - content has beforeImage: \(content.beforeImage != nil), afterImage: \(content.afterImage != nil)")
+        
         // If image is already generated, share directly
         if generatedImage != nil {
             shareToInstagram()
@@ -430,9 +436,12 @@ Made with SnapChef 🍳
             
             Task {
                 do {
+                    let template = getAutoTemplate()
+                    print("🔍 InstagramShareView.generateAndShare - using template: \(template)")
+                    
                     // Generate image based on auto-selected template
                     let image = try await InstagramContentGenerator.shared.generateContent(
-                        template: getAutoTemplate(),
+                        template: template,
                         content: content,
                         isStory: shareMode == .story,
                         backgroundColor: getBackgroundColor(),

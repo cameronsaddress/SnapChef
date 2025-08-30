@@ -24,6 +24,12 @@ class InstagramContentGenerator: ObservableObject {
         backgroundColor: Color,
         sticker: StickerType?
     ) async throws -> UIImage {
+        print("🔍 InstagramContentGenerator.generateContent - template: \(template)")
+        print("🔍 InstagramContentGenerator.generateContent - beforeImage: \(content.beforeImage != nil), afterImage: \(content.afterImage != nil)")
+        if let before = content.beforeImage {
+            print("🔍 InstagramContentGenerator.generateContent - beforeImage size: \(before.size)")
+        }
+        
         let size = isStory ? storySize : postSize
 
         // Create the SwiftUI view for the content
@@ -159,9 +165,13 @@ struct InstagramContentView: View {
     let isStory: Bool
     
     var body: some View {
-        ZStack {
+        let _ = print("🔍 InstagramContentView.body - beforeImage: \(content.beforeImage != nil), afterImage: \(content.afterImage != nil)")
+        let _ = print("🔍 InstagramContentView.body - template: \(template)")
+        
+        return ZStack {
             // Use before/after photos or single photo as background
             if let beforeImage = content.beforeImage {
+                let _ = print("🔍 InstagramContentView.body - Using photo background with image size: \(beforeImage.size)")
                 if let afterImage = content.afterImage {
                     // Show both before and after photos side by side
                     HStack(spacing: 0) {
@@ -214,6 +224,7 @@ struct InstagramContentView: View {
                 }
             } else {
                 // Fallback to color background
+                let _ = print("🔍 InstagramContentView.body - No beforeImage, using color background")
                 backgroundColor
                     .ignoresSafeArea()
             }

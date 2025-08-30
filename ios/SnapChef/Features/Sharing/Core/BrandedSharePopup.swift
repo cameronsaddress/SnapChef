@@ -250,12 +250,22 @@ struct BrandedSharePopup: View {
                 }
                 
             case .instagram, .instagramStory:
+                print("🔍 BrandedSharePopup: Instagram share for \(content.type)")
+                print("🔍 BrandedSharePopup: Input content has beforeImage: \(content.beforeImage != nil), afterImage: \(content.afterImage != nil)")
+                
                 // Load photos for Instagram share
                 if case .recipe(let recipe) = content.type {
+                    print("🔍 BrandedSharePopup: Loading photos for recipe \(recipe.id)")
                     let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+                    print("🔍 BrandedSharePopup: PhotoStorage returned - fridge: \(photos?.fridgePhoto != nil), pantry: \(photos?.pantryPhoto != nil), meal: \(photos?.mealPhoto != nil)")
                     
                     let beforeImage = photos?.fridgePhoto ?? photos?.pantryPhoto ?? content.beforeImage
                     let afterImage = photos?.mealPhoto ?? content.afterImage
+                    
+                    print("🔍 BrandedSharePopup: Final images - before: \(beforeImage != nil), after: \(afterImage != nil)")
+                    if let before = beforeImage {
+                        print("🔍 BrandedSharePopup: beforeImage size: \(before.size)")
+                    }
                     
                     // Create new ShareContent with photos
                     instagramShareContent = ShareContent(
