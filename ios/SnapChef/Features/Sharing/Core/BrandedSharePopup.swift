@@ -250,11 +250,28 @@ struct BrandedSharePopup: View {
                 }
                 
             case .instagram, .instagramStory:
+                print("🔍 Instagram: Starting Instagram share")
+                print("🔍 Instagram: Content type: \(content.type)")
+                print("🔍 Instagram: Original content has beforeImage: \(content.beforeImage != nil)")
+                print("🔍 Instagram: Original content has afterImage: \(content.afterImage != nil)")
+                
                 // Load photos for Instagram share
                 if case .recipe(let recipe) = content.type {
+                    print("🔍 Instagram: Recipe ID: \(recipe.id)")
                     let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
-                    let beforeImage = photos?.fridgePhoto ?? photos?.pantryPhoto
-                    let afterImage = photos?.mealPhoto
+                    print("🔍 Instagram: PhotoStorage returned photos: \(photos != nil)")
+                    
+                    if let photos = photos {
+                        print("🔍 Instagram: Has fridgePhoto: \(photos.fridgePhoto != nil)")
+                        print("🔍 Instagram: Has pantryPhoto: \(photos.pantryPhoto != nil)")
+                        print("🔍 Instagram: Has mealPhoto: \(photos.mealPhoto != nil)")
+                    }
+                    
+                    let beforeImage = photos?.fridgePhoto ?? photos?.pantryPhoto ?? content.beforeImage
+                    let afterImage = photos?.mealPhoto ?? content.afterImage
+                    
+                    print("🔍 Instagram: Final beforeImage: \(beforeImage != nil)")
+                    print("🔍 Instagram: Final afterImage: \(afterImage != nil)")
                     
                     // Create new ShareContent with photos
                     instagramShareContent = ShareContent(
@@ -263,8 +280,10 @@ struct BrandedSharePopup: View {
                         afterImage: afterImage,
                         text: content.text
                     )
+                    print("🔍 Instagram: Created instagramShareContent with photos")
                 } else {
                     // For non-recipe content, use original content
+                    print("🔍 Instagram: Non-recipe content, using original")
                     instagramShareContent = content
                 }
                 

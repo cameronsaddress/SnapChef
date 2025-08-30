@@ -262,13 +262,13 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 3: "Take a Pic / AI enters chat" (6-9s) - Slide in from RIGHT
+        // OVERLAY PHASE 3: "Take a Pic / With SNAPCHEF AI" (6-9s) - Slide in from RIGHT
         overlays.append(.init(
             start: CMTime(seconds: 6, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "Take a Pic\nAI enters chat",
+                    text: "Take a Pic\nWith SNAPCHEF AI",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .right
@@ -276,13 +276,13 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 4: "Dinner served" (9-12s) - Slide in from LEFT
+        // OVERLAY PHASE 4: "Dinner Served, / Easy and Fun!" (9-12s) - Slide in from LEFT
         overlays.append(.init(
             start: CMTime(seconds: 9, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "Dinner served 🤌",
+                    text: "Dinner Served,\nEasy and Fun!",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -1027,11 +1027,11 @@ public actor RenderPlanner {
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
         gradientLayer.cornerRadius = 20
 
-        // Create main CTA text
+        // Create main CTA text (50% larger)
         let mainTextLayer = CATextLayer()
-        let font = CTFontCreateWithName("HelveticaNeue-Black" as CFString, config.ctaFontSize * 1.4, nil)
+        let font = CTFontCreateWithName("HelveticaNeue-Black" as CFString, config.ctaFontSize * 2.1, nil) // 50% larger (1.4 * 1.5)
         mainTextLayer.font = font
-        mainTextLayer.fontSize = config.ctaFontSize * 1.4
+        mainTextLayer.fontSize = config.ctaFontSize * 2.1 // 50% larger
         mainTextLayer.foregroundColor = UIColor.white.cgColor
         mainTextLayer.alignmentMode = .center
         mainTextLayer.contentsScale = screenScale
@@ -1048,9 +1048,9 @@ public actor RenderPlanner {
             .font: font
         ]
         let textSize = (text as NSString).size(withAttributes: textAttributes)
-        let padding: CGFloat = 30 // Adequate padding for CTA
+        let padding: CGFloat = 45 // Increased padding for larger CTA (50% larger)
         let containerWidth = min(textSize.width + padding * 2, config.size.width - 60)
-        let containerHeight = max(textSize.height + padding * 2, 80) // Minimum height for CTA
+        let containerHeight = max(textSize.height + padding * 2, 120) // Increased minimum height for larger CTA
 
         print("[RenderPlanner] CTA calculated text size: \(textSize)")
         print("[RenderPlanner] CTA container size: \(CGSize(width: containerWidth, height: containerHeight))")
