@@ -262,13 +262,13 @@ public actor RenderPlanner {
 
         // OVERLAY SEQUENCE: Perfectly timed viral text sequence with alternating animations
 
-        // OVERLAY PHASE 1: "Random fridge items" (0-3s) - Slide in from RIGHT
+        // OVERLAY PHASE 1: "POV: You're hungry" (0-3s) - Slide in from RIGHT
         overlays.append(.init(
             start: .zero,
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "Random fridge items ✓",
+                    text: "POV: You're hungry",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .right
@@ -276,13 +276,13 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 2: "AI magic happens" (3-6s) - Slide in from LEFT  
+        // OVERLAY PHASE 2: "Open fridge" (3-6s) - Slide in from LEFT  
         overlays.append(.init(
             start: CMTime(seconds: 3, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "AI magic happens ✨",
+                    text: "Open fridge 📸",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -290,14 +290,13 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 3: Recipe name with time (6-9s) - Slide in from RIGHT
-        let recipeText = "\(recipe.title) in \(recipe.timeMinutes) mins"
+        // OVERLAY PHASE 3: "AI enters chat" (6-9s) - Slide in from RIGHT
         overlays.append(.init(
             start: CMTime(seconds: 6, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: recipeText,
+                    text: "AI enters chat",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .right
@@ -305,13 +304,13 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 4: "Your friends: HOW?!" (9-12s) - Slide in from LEFT
+        // OVERLAY PHASE 4: "Dinner served" (9-12s) - Slide in from LEFT
         overlays.append(.init(
             start: CMTime(seconds: 9, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "Your friends: HOW?! 🤯",
+                    text: "Dinner served 🤌",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -1075,10 +1074,10 @@ public actor RenderPlanner {
         print("[RenderPlanner] CTA calculated text size: \(textSize)")
         print("[RenderPlanner] CTA container size: \(CGSize(width: containerWidth, height: containerHeight))")
 
-        // FIXED: Position CTA ABOVE the logo (around 35% screen height)
+        // FIXED: Position CTA BELOW the logo with proper spacing
         let containerFrame = CGRect(
             x: (config.size.width - containerWidth) / 2,
-            y: config.size.height * 0.35 - containerHeight / 2, // MOVED: 35% instead of 92%
+            y: config.size.height * 0.55 - containerHeight / 2, // MOVED: 55% to be well below logo at 40%
             width: containerWidth,
             height: containerHeight
         )
