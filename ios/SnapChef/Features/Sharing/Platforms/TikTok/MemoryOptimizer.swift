@@ -27,8 +27,8 @@ public final class MemoryOptimizer: @unchecked Sendable {
     private let tasksLock = NSLock()
 
     // MARK: - Enhanced Memory Limits
-    private let criticalMemoryThreshold: UInt64 = 300 * 1_024 * 1_024 // 300MB critical threshold
-    private let warningMemoryThreshold: UInt64 = 250 * 1_024 * 1_024 // 250MB warning threshold
+    private let criticalMemoryThreshold: UInt64 = 500 * 1_024 * 1_024 // 500MB critical threshold (increased for video generation)
+    private let warningMemoryThreshold: UInt64 = 400 * 1_024 * 1_024 // 400MB warning threshold
     
     // Fix: Thread-safe lock for pixelBufferPools dictionary access
     private let poolsLock = NSLock()

@@ -79,6 +79,7 @@ struct SnapChefApp: App {
         configureNavigationBar()
         configureTableView()
         configureWindow()
+        configureImageCache()
 
         // Check CloudKit environment (determined by Xcode build configuration)
         detectCloudKitEnvironment()
@@ -96,6 +97,14 @@ struct SnapChefApp: App {
                 await ActivityFeedManager().preloadInBackground()
             }
         }
+        
+        // Preload discover users after 3 seconds - commented out temporarily
+        // Task {
+        //     try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+        //     print("🚀 Starting background discover users preload...")
+        //     let discoverManager = DiscoverUsersManager()
+        //     await discoverManager.loadUsers(for: .suggested)
+        // }
 
         // Initialize social media SDKs
         SDKInitializer.initializeSDKs()
@@ -205,6 +214,27 @@ struct SnapChefApp: App {
 
     private func configureWindow() {
         UIScrollView.appearance().backgroundColor = .clear
+    }
+    
+    private func configureImageCache() {
+        // Configure URLCache for better image caching
+        let memoryCapacity = 50 * 1024 * 1024 // 50 MB
+        let diskCapacity = 200 * 1024 * 1024 // 200 MB
+        let cache = URLCache(
+            memoryCapacity: memoryCapacity,
+            diskCapacity: diskCapacity,
+            diskPath: "ImageCache"
+        )
+        URLCache.shared = cache
+        
+        // Configure URL session for image loading
+        let config = URLSessionConfiguration.default
+        config.urlCache = cache
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
+        
+        print("📸 Image cache configured: \(memoryCapacity / 1024 / 1024)MB memory, \(diskCapacity / 1024 / 1024)MB disk")
     }
 
     private func handleIncomingURL(_ url: URL) {

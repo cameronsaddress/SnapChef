@@ -157,26 +157,69 @@ struct InstagramContentView: View {
     let backgroundColor: Color
     let sticker: StickerType?
     let isStory: Bool
-
+    
     var body: some View {
         ZStack {
-            // Background
-            backgroundColor
-                .ignoresSafeArea()
-
-            // Template-specific content
-            switch template {
-            case .classic:
-                ClassicTemplate(content: content, isStory: isStory)
-            case .modern:
-                ModernTemplate(content: content, isStory: isStory)
-            case .minimal:
-                MinimalTemplate(content: content, isStory: isStory)
-            case .bold:
-                BoldTemplate(content: content, isStory: isStory)
-            case .gradient:
-                GradientTemplate(content: content, isStory: isStory)
+            // Use before/after photos or single photo as background
+            if let beforeImage = content.beforeImage {
+                if let afterImage = content.afterImage {
+                    // Show both before and after photos side by side
+                    HStack(spacing: 0) {
+                        // Before photo (left half)
+                        Image(uiImage: beforeImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: size.width / 2, height: size.height)
+                            .clipped()
+                        
+                        // After photo (right half)
+                        Image(uiImage: afterImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: size.width / 2, height: size.height)
+                            .clipped()
+                    }
+                    .frame(width: size.width, height: size.height)
+                    .overlay(
+                        // Dark overlay for text readability
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.7),
+                                Color.black.opacity(0.4),
+                                Color.black.opacity(0.7)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                } else {
+                    // Only before photo available
+                    Image(uiImage: beforeImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: size.width, height: size.height)
+                        .clipped()
+                        .overlay(
+                            // Dark overlay for text readability
+                            LinearGradient(
+                                colors: [
+                                    Color.black.opacity(0.7),
+                                    Color.black.opacity(0.3),
+                                    Color.black.opacity(0.7)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                }
+            } else {
+                // Fallback to color background
+                backgroundColor
+                    .ignoresSafeArea()
             }
+            
+            // Content overlay on photo
+            PhotoOverlayContent(content: content, isStory: isStory)
 
             // Sticker overlay (for stories)
             if isStory, let sticker = sticker {
@@ -211,218 +254,149 @@ struct InstagramContentView: View {
     }
 }
 
-// MARK: - Template Views
+// MARK: - Photo Overlay Content
+struct PhotoOverlayContent: View {
+    let content: ShareContent
+    let isStory: Bool
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Top section
+            Spacer()
+            
+            // Main content
+            VStack(spacing: 20) {
+                if case .recipe(let recipe) = content.type {
+                    // Before/After labels if both photos exist
+                    if content.beforeImage != nil && content.afterImage != nil {
+                        HStack(spacing: 40) {
+                            Text("BEFORE")
+                                .font(.system(size: isStory ? 18 : 16, weight: .bold))
+                                .foregroundColor(.white.opacity(0.9))
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.5))
+                                )
+                            
+                            Text("AFTER")
+                                .font(.system(size: isStory ? 18 : 16, weight: .bold))
+                                .foregroundColor(.white.opacity(0.9))
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule()
+                                        .fill(Color(hex: "#00F2EA").opacity(0.8))
+                                )
+                        }
+                        .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
+                    }
+                    
+                    // Title with background blur
+                    Text(recipe.name.uppercased())
+                        .font(.system(size: isStory ? 48 : 38, weight: .heavy, design: .rounded))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 30)
+                        .shadow(color: .black.opacity(0.8), radius: 10, x: 0, y: 5)
+                    
+                    // Subtitle
+                    Text(content.afterImage != nil ? "Fridge to Feast Transformation!" : "From Fridge to Feast!")
+                        .font(.system(size: isStory ? 22 : 18, weight: .medium))
+                        .foregroundColor(Color(hex: "#00F2EA"))
+                        .shadow(color: .black.opacity(0.8), radius: 5, x: 0, y: 2)
+
+                    // Stats bar with glass morphism
+                    HStack(spacing: 30) {
+                        InstagramStatBadge(icon: "clock", value: "\(recipe.prepTime + recipe.cookTime)m")
+                        InstagramStatBadge(icon: "flame", value: "\(recipe.nutrition.calories) cal")
+                        InstagramStatBadge(icon: "person.2", value: "\(recipe.servings) servings")
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 15)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.white.opacity(0.15))
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                    .padding(.horizontal, 30)
+                }
+            }
+            
+            Spacer()
+            Spacer()
+        }
+    }
+}
+
+// MARK: - Instagram Stat Badge
+struct InstagramStatBadge: View {
+    let icon: String
+    let value: String
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 22, weight: .semibold))
+            Text(value)
+                .font(.system(size: 14, weight: .bold))
+        }
+        .foregroundColor(.white)
+        .shadow(color: .black.opacity(0.5), radius: 3, x: 0, y: 2)
+    }
+}
+
+// MARK: - Classic Template (keeping for backward compatibility)
 struct ClassicTemplate: View {
     let content: ShareContent
     let isStory: Bool
-
+    
     var body: some View {
-        VStack(spacing: 20) {
-            if case .recipe(let recipe) = content.type {
-                Text(recipe.name.uppercased())
-                    .font(.system(size: isStory ? 48 : 36, weight: .bold))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-
-                // Recipe image placeholder
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.2))
-                    .frame(width: isStory ? 300 : 250, height: isStory ? 400 : 250)
-                    .overlay(
-                        VStack(spacing: 12) {
-                            Image(systemName: "photo")
-                                .font(.system(size: 60))
-                                .foregroundColor(.white.opacity(0.5))
-
-                            Text(recipe.difficulty.emoji)
-                                .font(.system(size: 80))
-                        }
-                    )
-
-                // Stats
-                HStack(spacing: 30) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "clock")
-                            .font(.system(size: 24))
-                        Text("\(recipe.prepTime + recipe.cookTime)m")
-                            .font(.system(size: 18, weight: .semibold))
-                    }
-
-                    VStack(spacing: 4) {
-                        Image(systemName: "flame")
-                            .font(.system(size: 24))
-                        Text("\(recipe.nutrition.calories)")
-                            .font(.system(size: 18, weight: .semibold))
-                    }
-
-                    VStack(spacing: 4) {
-                        Image(systemName: "person.2")
-                            .font(.system(size: 24))
-                        Text("\(recipe.servings)")
-                            .font(.system(size: 18, weight: .semibold))
-                    }
-                }
-                .foregroundColor(.white)
-            }
-        }
+        PhotoOverlayContent(content: content, isStory: isStory)
     }
 }
 
 struct ModernTemplate: View {
     let content: ShareContent
     let isStory: Bool
-
+    
     var body: some View {
-        GeometryReader { geometry in
-            VStack(alignment: .leading, spacing: 0) {
-                // Top section with diagonal cut
-                ZStack(alignment: .topLeading) {
-                    Color.white.opacity(0.1)
-                        .frame(height: geometry.size.height * 0.4)
-                        .clipShape(DiagonalShape())
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        if case .recipe(let recipe) = content.type {
-                            Text(recipe.name)
-                                .font(.system(size: isStory ? 42 : 32, weight: .heavy))
-                                .foregroundColor(.white)
-
-                            Text(recipe.description)
-                                .font(.system(size: isStory ? 18 : 16))
-                                .foregroundColor(.white.opacity(0.8))
-                                .lineLimit(3)
-                        }
-                    }
-                    .padding(30)
-                }
-
-                Spacer()
-
-                // Bottom info
-                if case .recipe(let recipe) = content.type {
-                    HStack {
-                        Label("\(recipe.prepTime + recipe.cookTime) min", systemImage: "clock")
-                        Spacer()
-                        Label(recipe.difficulty.rawValue, systemImage: "star.fill")
-                    }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
-                    .padding(30)
-                }
-            }
-        }
+        // Use the same photo overlay for consistency
+        PhotoOverlayContent(content: content, isStory: isStory)
     }
 }
 
 struct MinimalTemplate: View {
     let content: ShareContent
     let isStory: Bool
-
+    
     var body: some View {
-        VStack(spacing: 40) {
-            Spacer()
-
-            if case .recipe(let recipe) = content.type {
-                Text(recipe.name)
-                    .font(.system(size: isStory ? 36 : 28, weight: .light))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-
-                Divider()
-                    .background(Color.white.opacity(0.3))
-                    .frame(width: 100)
-
-                Text("\(recipe.prepTime + recipe.cookTime) minutes")
-                    .font(.system(size: 18, weight: .light))
-                    .foregroundColor(.white.opacity(0.8))
-            }
-
-            Spacer()
-        }
+        // Use the same photo overlay for consistency
+        PhotoOverlayContent(content: content, isStory: isStory)
     }
 }
 
 struct BoldTemplate: View {
     let content: ShareContent
     let isStory: Bool
-
+    
     var body: some View {
-        ZStack {
-            // Large emoji background
-            if case .recipe(let recipe) = content.type {
-                Text(recipe.difficulty.emoji)
-                    .font(.system(size: 300))
-                    .opacity(0.1)
-
-                VStack(spacing: 20) {
-                    Text(recipe.name.uppercased())
-                        .font(.system(size: isStory ? 52 : 40, weight: .black))
-                        .foregroundColor(.white)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 20)
-
-                    Text("READY IN \(recipe.prepTime + recipe.cookTime) MINUTES")
-                        .font(.system(size: 20, weight: .heavy))
-                        .foregroundColor(.white.opacity(0.9))
-                }
-            }
-        }
+        // Use the same photo overlay for consistency
+        PhotoOverlayContent(content: content, isStory: isStory)
     }
 }
 
 struct GradientTemplate: View {
     let content: ShareContent
     let isStory: Bool
-
+    
     var body: some View {
-        ZStack {
-            // Animated gradient overlay
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.1),
-                    Color.clear,
-                    Color.white.opacity(0.1)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            if case .recipe(let recipe) = content.type {
-                VStack(spacing: 30) {
-                    Spacer()
-
-                    Text(recipe.name)
-                        .font(.system(size: isStory ? 44 : 34, weight: .bold, design: .serif))
-                        .foregroundColor(.white)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 30)
-
-                    // Gradient divider
-                    LinearGradient(
-                        colors: [
-                            Color.clear,
-                            Color.white.opacity(0.5),
-                            Color.clear
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    .frame(height: 2)
-                    .frame(width: 200)
-
-                    VStack(spacing: 8) {
-                        Text("\(recipe.nutrition.calories) calories")
-                        Text("\(recipe.servings) servings")
-                    }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
-
-                    Spacer()
-                }
-            }
-        }
+        // Use the same photo overlay for consistency
+        PhotoOverlayContent(content: content, isStory: isStory)
     }
 }
 

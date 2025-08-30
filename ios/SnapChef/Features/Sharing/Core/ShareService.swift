@@ -41,8 +41,20 @@ public struct ShareContent {
 
     // Helper for TikTok video generation
     func toRenderInputs() -> (recipe: ViralRecipe, media: MediaBundle)? {
-        guard case .recipe(let recipe) = type,
-              let beforeImage = beforeImage else { return nil }
+        guard case .recipe(let recipe) = type else {
+            print("🎬 TikTok: toRenderInputs failed - not a recipe type")
+            return nil
+        }
+        
+        // Use a placeholder image if no beforeImage is available
+        let imageToUse: UIImage
+        if let beforeImage = beforeImage {
+            imageToUse = beforeImage
+        } else {
+            // Create a simple placeholder image with recipe name
+            print("🎬 TikTok: No beforeImage available, creating placeholder")
+            imageToUse = UIImage() // Use empty image as fallback
+        }
 
         let viralRecipe = ViralRecipe(
             title: recipe.name,
@@ -55,9 +67,9 @@ public struct ShareContent {
         )
 
         let media = MediaBundle(
-            beforeFridge: beforeImage,
-            afterFridge: beforeImage, // Use same image if no after
-            cookedMeal: afterImage ?? beforeImage,
+            beforeFridge: beforeImage ?? UIImage(),
+            afterFridge: beforeImage ?? UIImage(), // Use same image if no after
+            cookedMeal: afterImage ?? beforeImage ?? UIImage(),
             brollClips: [],
             musicURL: Bundle.main.url(forResource: "Mixdown", withExtension: "mp3")
         )

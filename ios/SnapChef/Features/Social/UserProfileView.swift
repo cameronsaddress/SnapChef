@@ -95,21 +95,14 @@ struct UserProfileView: View {
     // MARK: - Profile Header
     private func profileHeader(user: CloudKitUser) -> some View {
         VStack(spacing: 16) {
-            // Profile Image
+            // Profile Image using UserAvatarView (same as DiscoverUsersView and SocialFeedView)
             ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 100, height: 100)
-
-                Text((user.username ?? user.displayName ?? "U").prefix(1).uppercased())
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundColor(.white)
+                UserAvatarView(
+                    userID: user.recordID,
+                    username: user.username,
+                    displayName: user.displayName,
+                    size: 100
+                )
 
                 if user.isVerified {
                     VStack {

@@ -2,12 +2,11 @@ import SwiftUI
 import CloudKit
 
 // MARK: - User Profile Model
-struct UserProfile: Identifiable {
+struct UserProfile: Identifiable, Codable {
     let id: String
     let username: String
     let displayName: String
     let profileImageURL: String?
-    let profileImage: UIImage?
     var followerCount: Int
     var followingCount: Int
     let recipesCreated: Int
@@ -20,6 +19,16 @@ struct UserProfile: Identifiable {
     var lastActive: Date?
     var cuisineSpecialty: String?
     var cookingLevel: String?
+    
+    // Non-codable properties
+    var profileImage: UIImage? = nil
+    
+    enum CodingKeys: String, CodingKey {
+        case id, username, displayName, profileImageURL
+        case followerCount, followingCount, recipesCreated
+        case isVerified, isFollowing, bio
+        case joinedDate, lastActive, cuisineSpecialty, cookingLevel
+    }
 
     var followerText: String {
         if followerCount == 1 {
@@ -34,9 +43,163 @@ struct UserProfile: Identifiable {
     }
 }
 
+// MARK: - Simple Discover Users Manager
+@MainActor
+class SimpleDiscoverUsersManager: ObservableObject {
+    @Published var users: [UserProfile] = []
+    @Published var searchResults: [UserProfile] = []
+    @Published var isLoading = false
+    @Published var isSearching = false
+    @Published var hasMore = false
+    @Published var selectedUser: UserProfile?
+    @Published var showingSkeletonViews = false
+    
+    func loadUsers(for category: DiscoverUsersView.DiscoverCategory) async {
+        showingSkeletonViews = users.isEmpty
+        isLoading = true
+        
+        do {
+            var fetchedUsers: [CloudKitUser] = []
+            
+            switch category {
+            case .suggested:
+                fetchedUsers = try await UnifiedAuthManager.shared.getSuggestedUsers(limit: 20)
+            case .trending:
+                fetchedUsers = try await UnifiedAuthManager.shared.getTrendingUsers(limit: 20)
+            case .newChefs:
+                fetchedUsers = try await UnifiedAuthManager.shared.getNewUsers(limit: 100)
+            case .verified:
+                fetchedUsers = try await UnifiedAuthManager.shared.getVerifiedUsers(limit: 20)
+            }
+            
+            // Convert to UserProfile
+            var convertedUsers: [UserProfile] = []
+            for cloudKitUser in fetchedUsers {
+                var userProfile = convertToUserProfile(cloudKitUser)
+                
+                // Check actual follow status if authenticated
+                if UnifiedAuthManager.shared.isAuthenticated {
+                    userProfile.isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: userProfile.id)
+                }
+                
+                convertedUsers.append(userProfile)
+            }
+            
+            users = convertedUsers
+            
+        } catch {
+            print("❌ Failed to load users: \(error)")
+            users = []
+        }
+        
+        showingSkeletonViews = false
+        isLoading = false
+    }
+    
+    func searchUsers(_ query: String) {
+        guard !query.isEmpty else {
+            searchResults = []
+            return
+        }
+        
+        Task {
+            isSearching = true
+            
+            do {
+                let cloudKitResults = try await UnifiedAuthManager.shared.searchUsers(query: query)
+                
+                var convertedResults: [UserProfile] = []
+                for cloudKitUser in cloudKitResults {
+                    var userProfile = convertToUserProfile(cloudKitUser)
+                    
+                    if UnifiedAuthManager.shared.isAuthenticated {
+                        userProfile.isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: userProfile.id)
+                    }
+                    
+                    convertedResults.append(userProfile)
+                }
+                
+                await MainActor.run {
+                    searchResults = convertedResults
+                    isSearching = false
+                }
+                
+            } catch {
+                print("❌ Search failed: \(error)")
+                await MainActor.run {
+                    searchResults = []
+                    isSearching = false
+                }
+            }
+        }
+    }
+    
+    func toggleFollow(_ user: UserProfile) async {
+        do {
+            if user.isFollowing {
+                try await UnifiedAuthManager.shared.unfollowUser(userID: user.id)
+            } else {
+                try await UnifiedAuthManager.shared.followUser(userID: user.id)
+            }
+            
+            // Update local state
+            if let index = users.firstIndex(where: { $0.id == user.id }) {
+                users[index].isFollowing.toggle()
+                users[index].followerCount += users[index].isFollowing ? 1 : -1
+            }
+            if let index = searchResults.firstIndex(where: { $0.id == user.id }) {
+                searchResults[index].isFollowing.toggle()
+                searchResults[index].followerCount += searchResults[index].isFollowing ? 1 : -1
+            }
+            
+        } catch {
+            print("❌ Failed to toggle follow: \(error)")
+        }
+    }
+    
+    func refreshFollowStatus() async {
+        guard UnifiedAuthManager.shared.isAuthenticated else { return }
+        
+        for i in 0..<users.count {
+            users[i].isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: users[i].id)
+        }
+        
+        for i in 0..<searchResults.count {
+            searchResults[i].isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: searchResults[i].id)
+        }
+    }
+    
+    func loadMore() async {
+        // Simple implementation - for now just return since pagination is not fully implemented
+        hasMore = false
+    }
+    
+    private func convertToUserProfile(_ cloudKitUser: CloudKitUser) -> UserProfile {
+        let finalUsername = cloudKitUser.username ?? cloudKitUser.displayName.lowercased().replacingOccurrences(of: " ", with: "")
+        
+        return UserProfile(
+            id: cloudKitUser.recordID ?? "",
+            username: finalUsername,
+            displayName: cloudKitUser.displayName,
+            profileImageURL: cloudKitUser.profileImageURL,
+            followerCount: cloudKitUser.followerCount,
+            followingCount: cloudKitUser.followingCount,
+            recipesCreated: cloudKitUser.recipesCreated,
+            isVerified: cloudKitUser.isVerified,
+            isFollowing: false,
+            bio: nil,
+            joinedDate: cloudKitUser.createdAt,
+            lastActive: cloudKitUser.lastLoginAt,
+            cuisineSpecialty: nil,
+            cookingLevel: nil,
+            profileImage: nil
+        )
+    }
+}
+
 // MARK: - Discover Users View
 struct DiscoverUsersView: View {
-    @StateObject private var viewModel = DiscoverUsersViewModel()
+    @StateObject private var manager = SimpleDiscoverUsersManager()
     @EnvironmentObject var appState: AppState
     @State private var searchText = ""
     @State private var selectedCategory: DiscoverCategory = .suggested
@@ -70,13 +233,7 @@ struct DiscoverUsersView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
                         .onChange(of: searchText) { newValue in
-                            // Debounced search
-                            Task {
-                                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-                                if searchText == newValue {
-                                    await viewModel.searchUsers(newValue)
-                                }
-                            }
+                            manager.searchUsers(newValue)
                         }
 
                     // Category Pills
@@ -91,7 +248,7 @@ struct DiscoverUsersView: View {
                                         withAnimation(.spring(response: 0.3)) {
                                             selectedCategory = category
                                             Task {
-                                                await viewModel.loadUsers(for: category)
+                                                await manager.loadUsers(for: category)
                                             }
                                         }
                                     }
@@ -103,16 +260,37 @@ struct DiscoverUsersView: View {
                     .padding(.vertical, 16)
 
                     // Users List
-                    if viewModel.isLoading && viewModel.users.isEmpty {
+                    if manager.showingSkeletonViews && manager.users.isEmpty {
+                        // Show skeleton views during initial load
+                        DiscoverUsersSkeletonList()
+                    } else if manager.isLoading && manager.users.isEmpty {
                         Spacer()
                         ProgressView()
                             .scaleEffect(1.5)
                             .tint(.white)
                         Spacer()
-                    } else if viewModel.users.isEmpty {
+                    } else if manager.users.isEmpty && !manager.isLoading {
                         EmptyDiscoverView(category: selectedCategory)
                     } else {
                         ScrollView {
+                            // Subtle refresh indicator when refreshing with cached data
+                            if manager.isLoading && !manager.users.isEmpty {
+                                HStack {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                        .tint(.white)
+                                    Text("Updating...")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                                .background(Color.white.opacity(0.1))
+                                .cornerRadius(8)
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 8)
+                            }
+                            
                             LazyVStack(spacing: 16) {
                                 ForEach(filteredUsers) { user in
                                     UserDiscoveryCard(
@@ -120,7 +298,7 @@ struct DiscoverUsersView: View {
                                         onFollow: {
                                             if UnifiedAuthManager.shared.isAuthenticated {
                                                 Task {
-                                                    await viewModel.toggleFollow(user)
+                                                    await manager.toggleFollow(user)
                                                 }
                                             } else {
                                                 UnifiedAuthManager.shared.promptAuthForFeature(.socialSharing)
@@ -128,18 +306,18 @@ struct DiscoverUsersView: View {
                                         },
                                         onTap: {
                                             // Navigate to user profile
-                                            viewModel.selectedUser = user
+                                            manager.selectedUser = user
                                         }
                                     )
                                 }
 
-                                if viewModel.hasMore {
+                                if manager.hasMore {
                                     ProgressView()
                                         .tint(.white)
                                         .padding()
                                         .onAppear {
                                             Task {
-                                                await viewModel.loadMore()
+                                                await manager.loadMore()
                                             }
                                         }
                                 }
@@ -148,7 +326,7 @@ struct DiscoverUsersView: View {
                             .padding(.bottom, 20)
                         }
                         .refreshable {
-                            await viewModel.loadUsers(for: selectedCategory)
+                            await manager.loadUsers(for: selectedCategory)
                         }
                     }
                 }
@@ -157,14 +335,14 @@ struct DiscoverUsersView: View {
             .navigationBarTitleDisplayMode(.large)
         }
         .task {
-            await viewModel.loadUsers(for: selectedCategory)
+            await manager.loadUsers(for: selectedCategory)
         }
         .onAppear {
             Task {
-                await viewModel.refreshFollowStatus()
+                await manager.refreshFollowStatus()
             }
         }
-        .sheet(item: $viewModel.selectedUser) { user in
+        .sheet(item: $manager.selectedUser) { user in
             UserProfileView(
                 userID: user.id,
                 userName: user.username  // Always use username, not displayName
@@ -177,13 +355,13 @@ struct DiscoverUsersView: View {
     }
 
     private var filteredUsers: [UserProfile] {
-        if !searchText.isEmpty && !viewModel.searchResults.isEmpty {
-            return viewModel.searchResults
+        if !searchText.isEmpty && !manager.searchResults.isEmpty {
+            return manager.searchResults
         } else if searchText.isEmpty {
-            return viewModel.users
+            return manager.users
         } else {
             // Local filtering as fallback
-            return viewModel.users.filter {
+            return manager.users.filter {
                 $0.username.localizedCaseInsensitiveContains(searchText) ||
                 $0.displayName.localizedCaseInsensitiveContains(searchText)
             }
@@ -324,30 +502,14 @@ struct UserDiscoveryCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 16) {
-                // Profile Image
+                // Profile Image using UserAvatarView (same as SocialFeedView)
                 ZStack {
-                    if let profileImage = user.profileImage {
-                        Image(uiImage: profileImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 60, height: 60)
-                            .clipShape(Circle())
-                    } else {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 60, height: 60)
-                            .overlay(
-                                Text(user.username.prefix(1).uppercased())
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.white)
-                            )
-                    }
+                    UserAvatarView(
+                        userID: user.id,
+                        username: user.username,
+                        displayName: user.displayName,
+                        size: 60
+                    )
 
                     if user.isVerified {
                         Image(systemName: "checkmark.seal.fill")
@@ -534,264 +696,88 @@ struct EmptyDiscoverView: View {
     }
 }
 
-// MARK: - Discover Users View Model
-@MainActor
-class DiscoverUsersViewModel: ObservableObject {
-    @Published var users: [UserProfile] = []
-    @Published var isLoading = false
-    @Published var hasMore = true
-    @Published var selectedUser: UserProfile?
-    @Published var searchResults: [UserProfile] = []
-    @Published var isSearching = false
-
-    private let cloudKitSync = CloudKitSyncService.shared
-    private var lastFetchedRecord: CKRecord?
-    private var cloudKitUsers: [UserProfile] = []
-
-    func loadUsers(for category: DiscoverUsersView.DiscoverCategory) async {
-        isLoading = true
-        users = []
-        lastFetchedRecord = nil
-
-        // Load CloudKit users only
-        await loadCloudKitUsers(for: category)
-
-        // Use only CloudKit users
-        users = cloudKitUsers
-
-        hasMore = false
-        isLoading = false
-    }
-
-    private func loadCloudKitUsers(for category: DiscoverUsersView.DiscoverCategory) async {
-        do {
-            var fetchedUsers: [CloudKitUser] = []
-            
-            switch category {
-            case .suggested:
-                fetchedUsers = try await UnifiedAuthManager.shared.getSuggestedUsers(limit: 20)
-            case .trending:
-                fetchedUsers = try await UnifiedAuthManager.shared.getTrendingUsers(limit: 20)
-            case .newChefs:
-                // Get the newest 100 users based on recent activity
-                fetchedUsers = try await UnifiedAuthManager.shared.getNewUsers(limit: 100)
-            case .verified:
-                fetchedUsers = try await UnifiedAuthManager.shared.getVerifiedUsers(limit: 20)
+// MARK: - Skeleton Views
+struct DiscoverUsersSkeletonList: View {
+    var body: some View {
+        LazyVStack(spacing: 16) {
+            ForEach(0..<5, id: \.self) { _ in
+                DiscoverUserSkeletonCard()
             }
-            
-            // Convert to UserProfile and check follow status for each user
-            var convertedUsers: [UserProfile] = []
-            for cloudKitUser in fetchedUsers {
-                // CRITICAL FIX: Refresh social counts from Follow records before conversion
-                // This ensures we show the most up-to-date follower/following counts
-                var updatedCloudKitUser = cloudKitUser
-                if let userID = updatedCloudKitUser.recordID {
-                    let actualFollowerCount = await getActualFollowerCount(userID: userID)
-                    let actualFollowingCount = await getActualFollowingCount(userID: userID)
-                    
-                    print("🔍 DEBUG DiscoverUsers: Social counts for user \(userID):")
-                    print("    └─ Stored followerCount: \(updatedCloudKitUser.followerCount)")
-                    print("    └─ Actual followerCount: \(actualFollowerCount)")
-                    print("    └─ Stored followingCount: \(updatedCloudKitUser.followingCount)")
-                    print("    └─ Actual followingCount: \(actualFollowingCount)")
-                    
-                    // Update the CloudKitUser with actual counts
-                    updatedCloudKitUser.followerCount = actualFollowerCount
-                    updatedCloudKitUser.followingCount = actualFollowingCount
-                }
-                
-                var userProfile = convertToUserProfile(updatedCloudKitUser)
-                
-                // Check actual follow status if authenticated
-                if UnifiedAuthManager.shared.isAuthenticated {
-                    userProfile.isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: userProfile.id)
-                }
-                
-                convertedUsers.append(userProfile)
-            }
-            
-            cloudKitUsers = convertedUsers
-        } catch {
-            if let authError = error as? UnifiedAuthError {
-                switch authError {
-                case .networkError:
-                    print("❌ Network connection issue")
-                case .cloudKitNotAvailable:
-                    print("❌ CloudKit not available - user may not be signed into iCloud")
-                case .cloudKitError(let underlyingError):
-                    print("❌ CloudKit error: \(underlyingError.localizedDescription)")
-                default:
-                    print("❌ Failed to load users: \(error.localizedDescription)")
-                }
-            } else if let ckError = error as? CKError {
-                print("❌ CloudKit Error Code: \(ckError.code.rawValue)")
-                print("  CloudKit Error: \(ckError.localizedDescription)")
-                if ckError.code == .notAuthenticated {
-                    print("  ⚠️ User is not signed into iCloud")
-                } else if ckError.code == .networkUnavailable || ckError.code == .networkFailure {
-                    print("  ⚠️ Network is unavailable")
-                }
-            } else {
-                print("❌ Unexpected error: \(error)")
-            }
-            cloudKitUsers = []
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
     }
+}
 
-
-    private func convertToUserProfile(_ cloudKitUser: CloudKitUser) -> UserProfile {
-        print("🔍 DEBUG DiscoverUsers: Converting CloudKitUser to UserProfile")
-        print("    └─ CloudKitUser username: '\(cloudKitUser.username ?? "nil")'")
-        print("    └─ CloudKitUser displayName: '\(cloudKitUser.displayName)'")
-        print("    └─ CloudKitUser followerCount: \(cloudKitUser.followerCount)")
-        print("    └─ CloudKitUser followingCount: \(cloudKitUser.followingCount)")
-        print("    └─ CloudKitUser recipesCreated: \(cloudKitUser.recipesCreated)")
-        
-        // CRITICAL FIX: Use the corrected username from CloudKitUser
-        // The CloudKitUser init has been fixed to properly extract usernames
-        let finalUsername = cloudKitUser.username ?? cloudKitUser.displayName.lowercased().replacingOccurrences(of: " ", with: "")
-        let finalDisplayName = cloudKitUser.displayName
-        
-        print("    └─ Final username for UserProfile: '\(finalUsername)'")
-        print("    └─ Final displayName for UserProfile: '\(finalDisplayName)'")
-        
-        return UserProfile(
-            id: cloudKitUser.recordID ?? "",
-            username: finalUsername,
-            displayName: finalDisplayName,
-            profileImageURL: cloudKitUser.profileImageURL,
-            profileImage: nil,
-            followerCount: cloudKitUser.followerCount,
-            followingCount: cloudKitUser.followingCount,
-            recipesCreated: cloudKitUser.recipesCreated,
-            isVerified: cloudKitUser.isVerified,
-            isFollowing: false, // Updated after creation based on actual follow status
-            bio: nil,
-            joinedDate: cloudKitUser.createdAt,
-            lastActive: cloudKitUser.lastLoginAt,
-            cuisineSpecialty: nil,
-            cookingLevel: nil
+struct DiscoverUserSkeletonCard: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Profile Image Skeleton
+            Circle()
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 60, height: 60)
+                .overlay(
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.clear, Color.white.opacity(0.1), Color.clear],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .rotationEffect(.degrees(isAnimating ? 360 : 0))
+                )
+            
+            VStack(alignment: .leading, spacing: 6) {
+                // Name skeleton
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 120, height: 16)
+                
+                // Username skeleton
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 80, height: 14)
+                
+                // Stats skeleton
+                HStack(spacing: 12) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 60, height: 12)
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 50, height: 12)
+                }
+            }
+            
+            Spacer()
+            
+            // Follow button skeleton
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 80, height: 32)
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
         )
-    }
-
-    func searchUsers(_ query: String) async {
-        guard !query.isEmpty else {
-            searchResults = []
-            return
-        }
-
-        isSearching = true
-
-        // Search CloudKit users only
-        do {
-            let cloudKitResults = try await UnifiedAuthManager.shared.searchUsers(query: query)
-            
-            // Convert to UserProfile and check follow status for each user
-            var convertedResults: [UserProfile] = []
-            for cloudKitUser in cloudKitResults {
-                var userProfile = convertToUserProfile(cloudKitUser)
-                
-                // Check actual follow status if authenticated
-                if UnifiedAuthManager.shared.isAuthenticated {
-                    userProfile.isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: userProfile.id)
-                }
-                
-                convertedResults.append(userProfile)
+        .onAppear {
+            withAnimation(
+                .linear(duration: 2)
+                .repeatForever(autoreverses: false)
+            ) {
+                isAnimating = true
             }
-            
-            searchResults = convertedResults
-        } catch {
-            print("Failed to search CloudKit users: \(error)")
-            searchResults = []
-        }
-
-        isSearching = false
-    }
-
-    func loadMore() async {
-        guard hasMore && !isLoading else { return }
-
-        isLoading = true
-
-        // CloudKit pagination not implemented - using mock data
-
-        isLoading = false
-    }
-
-    func toggleFollow(_ user: UserProfile) async {
-        // Perform follow/unfollow for CloudKit users
-        do {
-            if user.isFollowing {
-                try await UnifiedAuthManager.shared.unfollowUser(userID: user.id)
-            } else {
-                try await UnifiedAuthManager.shared.followUser(userID: user.id)
-            }
-
-            // Update local state
-            if let index = users.firstIndex(where: { $0.id == user.id }) {
-                users[index].isFollowing.toggle()
-                users[index].followerCount += users[index].isFollowing ? 1 : -1
-            }
-            if let index = searchResults.firstIndex(where: { $0.id == user.id }) {
-                searchResults[index].isFollowing.toggle()
-                searchResults[index].followerCount += searchResults[index].isFollowing ? 1 : -1
-            }
-
-            print("✅ Toggle follow completed for user: \(user.displayName)")
-        } catch {
-            print("Failed to toggle follow: \(error)")
         }
     }
-    
-    /// Refresh follow status for all users when returning to the view
-    func refreshFollowStatus() async {
-        guard UnifiedAuthManager.shared.isAuthenticated else { return }
-        
-        // Refresh follow status for main users list
-        for i in 0..<users.count {
-            users[i].isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: users[i].id)
-        }
-        
-        // Refresh follow status for search results
-        for i in 0..<searchResults.count {
-            searchResults[i].isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: searchResults[i].id)
-        }
-    }
-    
-    /// Get actual follower count from Follow records
-    private func getActualFollowerCount(userID: String) async -> Int {
-        do {
-            let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
-            let predicate = NSPredicate(format: "followingID == %@ AND isActive == 1", userID)
-            let query = CKQuery(recordType: "Follow", predicate: predicate)
-            
-            let results = try await database.records(matching: query)
-            let count = results.matchResults.count
-            print("🔍 DEBUG getActualFollowerCount: User \(userID) has \(count) followers")
-            return count
-        } catch {
-            print("❌ DEBUG getActualFollowerCount: Error for user \(userID): \(error)")
-            return 0
-        }
-    }
-    
-    /// Get actual following count from Follow records
-    private func getActualFollowingCount(userID: String) async -> Int {
-        do {
-            let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
-            let predicate = NSPredicate(format: "followerID == %@ AND isActive == 1", userID)
-            let query = CKQuery(recordType: "Follow", predicate: predicate)
-            
-            let results = try await database.records(matching: query)
-            let count = results.matchResults.count
-            print("🔍 DEBUG getActualFollowingCount: User \(userID) has \(count) following")
-            return count
-        } catch {
-            print("❌ DEBUG getActualFollowingCount: Error for user \(userID): \(error)")
-            return 0
-        }
-    }
-    
 }
 
 #Preview {

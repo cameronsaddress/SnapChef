@@ -141,10 +141,15 @@ struct RecipeDetailView: View {
     @ViewBuilder
     private var shareButton: some View {
         Button(action: {
+            // Get photos from PhotoStorageManager
+            let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+            let beforeImage = photos?.fridgePhoto ?? photos?.pantryPhoto
+            let afterImage = photos?.mealPhoto
+            
             shareContent = ShareContent(
                 type: .recipe(recipe),
-                beforeImage: nil,
-                afterImage: nil
+                beforeImage: beforeImage,
+                afterImage: afterImage
             )
             showBrandedShare = true
         }) {

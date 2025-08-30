@@ -12,229 +12,239 @@ struct InstagramShareView: View {
     let content: ShareContent
     let isStory: Bool
     @Environment(\.dismiss) var dismiss
-    @State private var selectedTemplate: InstagramTemplate = .classic
-    @State private var backgroundColor = Color(hex: "#E4405F")
+    @State private var shareMode: ShareMode = .feed
     @State private var isGenerating = false
     @State private var generatedImage: UIImage?
-    @State private var showingShareOptions = false
-    @State private var selectedSticker: StickerType?
     @State private var captionText = ""
     @State private var errorMessage: String?
-
-    private var backgroundGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(hex: "#833AB4"),
-                Color(hex: "#C13584"),
-                Color(hex: "#E1306C"),
-                Color(hex: "#FD1D1D"),
-                Color(hex: "#F77737")
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+    @State private var storyBackgroundStyle: StoryBackgroundStyle = .photo
+    @State private var showTextOverlay = true
+    @State private var captionCopied = false
+    
+    enum ShareMode: String, CaseIterable {
+        case feed = "Feed"
+        case story = "Story"
+    }
+    
+    enum StoryBackgroundStyle: String, CaseIterable {
+        case photo = "Photo"
+        case gradient = "Gradient"
+        case solid = "Solid"
+    }
+    
+    init(content: ShareContent, isStory: Bool) {
+        self.content = content
+        self.isStory = isStory
+        _shareMode = State(initialValue: isStory ? .story : .feed)
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Instagram gradient background
-                backgroundGradient
-                .ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        VStack(spacing: 8) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 24, weight: .bold))
-                                Text(isStory ? "Instagram Story" : "Instagram Post")
-                                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                // Clean white background
+                Color(UIColor.systemBackground)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Header with segmented control
+                    VStack(spacing: 16) {
+                        HStack {
+                            Button(action: { dismiss() }) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(.primary)
+                                    .frame(width: 30, height: 30)
                             }
-                            .foregroundColor(.white)
-
-                            Text(isStory ? "Create an engaging story" : "Design your perfect post")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.8))
+                            
+                            Spacer()
+                            
+                            Text("Share to Instagram")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                            
+                            // Invisible spacer for balance
+                            Color.clear
+                                .frame(width: 30, height: 30)
                         }
-                        .padding(.top, 20)
+                        .padding(.horizontal)
+                        
+                        // Segmented Control
+                        Picker("Share Mode", selection: $shareMode) {
+                            ForEach(ShareMode.allCases, id: \.self) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .padding(.horizontal)
+                    }
+                    .padding(.vertical)
+                    .background(Color(UIColor.systemBackground))
+                    
+                    ScrollView {
+                        VStack(spacing: 24) {
 
-                        // Template Selection
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Choose a template")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
+                            // Large Preview (70% of screen)
+                            VStack(spacing: 12) {
+                                Text("Preview")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                // Preview with shadow
+                                InstagramPreview(
+                                    content: content,
+                                    template: getAutoTemplate(),
+                                    isStory: shareMode == .story,
+                                    backgroundColor: getBackgroundColor()
+                                )
+                                .frame(height: UIScreen.main.bounds.height * 0.5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(UIColor.systemBackground))
+                                        .shadow(color: .black.opacity(0.1), radius: 20, y: 10)
+                                )
+                            }
+                            .padding(.horizontal, 20)
 
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(InstagramTemplate.allCases, id: \.self) { template in
-                                        InstagramTemplateCard(
-                                            template: template,
-                                            isSelected: selectedTemplate == template,
-                                            action: {
-                                                selectedTemplate = template
+                            // Mode-specific options
+                            if shareMode == .feed {
+                                // Caption Section for Feed
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Text("Caption")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(.primary)
+                                        
+                                        Spacer()
+                                        
+                                        Text("\(captionText.count)/2200")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(captionText.count > 2200 ? .red : .secondary)
+                                    }
+                                    
+                                    TextEditor(text: $captionText)
+                                        .frame(height: 120)
+                                        .padding(12)
+                                        .background(Color(UIColor.secondarySystemBackground))
+                                        .cornerRadius(12)
+                                        .foregroundColor(.primary)
+                                        .scrollContentBackground(.hidden)
+                                        .onAppear {
+                                            if captionText.isEmpty {
+                                                captionText = generateCaption()
                                             }
-                                        )
+                                        }
+                                    
+                                    // Inline hashtags
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 8) {
+                                            ForEach(getTopHashtags(), id: \.self) { hashtag in
+                                                Text("#\(hashtag)")
+                                                    .font(.system(size: 12, weight: .medium))
+                                                    .foregroundColor(Color(hex: "#FF0050"))
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 4)
+                                                    .background(
+                                                        Capsule()
+                                                            .fill(Color(hex: "#FF0050").opacity(0.1))
+                                                    )
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-
-                        // Preview
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Preview")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-
-                            InstagramPreview(
-                                content: content,
-                                template: selectedTemplate,
-                                isStory: isStory,
-                                backgroundColor: backgroundColor
-                            )
-                        }
-                        .padding(.horizontal, 20)
-
-                        if isStory {
-                            // Story Stickers
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("Add Stickers")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.white)
-
-                                ScrollView(.horizontal, showsIndicators: false) {
+                                .padding(.horizontal, 20)
+                            } else {
+                                // Story Options
+                                VStack(alignment: .leading, spacing: 16) {
+                                    Text("Background Style")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.primary)
+                                    
                                     HStack(spacing: 12) {
-                                        ForEach(StickerType.allCases, id: \.self) { sticker in
-                                            StickerOption(
-                                                sticker: sticker,
-                                                isSelected: selectedSticker == sticker,
-                                                action: {
-                                                    selectedSticker = sticker
+                                        ForEach(StoryBackgroundStyle.allCases, id: \.self) { style in
+                                            Button(action: { storyBackgroundStyle = style }) {
+                                                VStack(spacing: 8) {
+                                                    RoundedRectangle(cornerRadius: 8)
+                                                        .fill(getStylePreview(style))
+                                                        .frame(width: 60, height: 90)
+                                                        .overlay(
+                                                            RoundedRectangle(cornerRadius: 8)
+                                                                .stroke(
+                                                                    storyBackgroundStyle == style ? Color(hex: "#FF0050") : Color.clear,
+                                                                    lineWidth: 2
+                                                                )
+                                                        )
+                                                    
+                                                    Text(style.rawValue)
+                                                        .font(.system(size: 12, weight: .medium))
+                                                        .foregroundColor(.primary)
                                                 }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 20)
-                        } else {
-                            // Post Caption
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Caption")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.white)
-
-                                TextEditor(text: $captionText)
-                                    .frame(height: 100)
-                                    .padding(12)
-                                    .background(Color.white.opacity(0.1))
-                                    .cornerRadius(12)
-                                    .foregroundColor(.white)
-                                    .scrollContentBackground(.hidden)
-                                    .onAppear {
-                                        if captionText.isEmpty {
-                                            captionText = generateCaption()
-                                        }
-                                    }
-                            }
-                            .padding(.horizontal, 20)
-                        }
-
-                        // Background Color Picker
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Background Color")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(InstagramColors.all, id: \.self) { color in
-                                        ColorOption(
-                                            color: color,
-                                            isSelected: backgroundColor == color,
-                                            action: {
-                                                backgroundColor = color
                                             }
-                                        )
+                                            .buttonStyle(PlainButtonStyle())
+                                        }
                                     }
+                                    
+                                    Toggle("Show Text Overlay", isOn: $showTextOverlay)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .tint(Color(hex: "#FF0050"))
                                 }
+                                .padding(.horizontal, 20)
                             }
-                        }
-                        .padding(.horizontal, 20)
 
-                        // Hashtags
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Suggested Hashtags")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
 
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 8) {
-                                ForEach(suggestedHashtags, id: \.self) { hashtag in
-                                    InstagramHashtag(hashtag: hashtag)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-
-                        // Generate and Share Button
-                        Button(action: generateAndShare) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(hex: "#833AB4"),
-                                                Color(hex: "#E1306C")
-                                            ],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(height: 56)
-
-                                if isGenerating {
-                                    HStack(spacing: 12) {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        Text("Creating...")
+                            // Share Button
+                            VStack(spacing: 8) {
+                                Button(action: generateAndShare) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [
+                                                        Color(hex: "#FF0050"),
+                                                        Color(hex: "#00F2EA")
+                                                    ],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(height: 56)
+                                        
+                                        if isGenerating {
+                                            HStack(spacing: 12) {
+                                                ProgressView()
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                Text("Creating...")
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundColor(.white)
+                                            }
+                                        } else {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: "square.and.arrow.up")
+                                                Text(shareMode == .story ? "Share to Story" : "Share to Instagram")
+                                            }
                                             .font(.system(size: 16, weight: .semibold))
                                             .foregroundColor(.white)
+                                        }
                                     }
-                                } else {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "square.and.arrow.up")
-                                        Text(isStory ? "Share to Story" : "Share to Instagram")
-                                    }
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.white)
+                                }
+                                .disabled(isGenerating)
+                                
+                                if captionCopied {
+                                    Text("Caption copied to clipboard!")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                        .transition(.opacity.combined(with: .scale))
                                 }
                             }
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 40)
                         }
-                        .disabled(isGenerating)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 40)
                     }
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.white)
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Share") {
-                        generateAndShare()
-                    }
-                    .foregroundColor(.white)
-                    .fontWeight(.semibold)
-                }
-            }
+            .navigationBarHidden(true)
         }
         .alert("Error", isPresented: .constant(errorMessage != nil)) {
             Button("OK") {
@@ -250,64 +260,156 @@ struct InstagramShareView: View {
         }
     }
 
-    private var suggestedHashtags: [String] {
-        var hashtags = ["SnapChef", "HomeCooking", "FoodStagram", "RecipeOfTheDay"]
-
-        if case .recipe(let recipe) = content.type {
-            hashtags.append(contentsOf: [
-                "InstaFood",
-                "\(recipe.difficulty.rawValue.capitalized)Recipe",
-                "CookingReels",
-                "FoodLover",
-                "RecipeShare"
-            ])
+    // MARK: - Helper Methods
+    
+    private func getAutoTemplate() -> InstagramTemplate {
+        switch content.type {
+        case .recipe:
+            return .classic // Use recipe template
+        case .achievement, .challenge, .profile, .teamInvite, .leaderboard:
+            return .modern // Use achievement template
         }
-
-        if isStory {
-            hashtags.append("Stories")
-        } else {
-            hashtags.append("FoodPost")
+    }
+    
+    private func getBackgroundColor() -> Color {
+        switch storyBackgroundStyle {
+        case .photo:
+            return Color.clear
+        case .gradient:
+            return Color(hex: "#FF0050")
+        case .solid:
+            return Color(hex: "#00F2EA")
         }
-
-        return hashtags
+    }
+    
+    private func getStylePreview(_ style: StoryBackgroundStyle) -> some ShapeStyle {
+        switch style {
+        case .photo:
+            return LinearGradient(
+                colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.5)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .gradient:
+            return LinearGradient(
+                colors: [Color(hex: "#FF0050"), Color(hex: "#00F2EA")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .solid:
+            return LinearGradient(
+                colors: [Color(hex: "#00F2EA")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+    
+    private func getTopHashtags() -> [String] {
+        switch content.type {
+        case .recipe(let recipe):
+            // Use tags or difficulty instead of cuisine
+            let mainTag = recipe.tags.first ?? "Homemade"
+            return ["SnapChef", "FridgeToFeast", mainTag, "\(recipe.difficulty.rawValue)Recipe"]
+        case .achievement:
+            return ["SnapChef", "CookingWin", "Achievement"]
+        case .challenge:
+            return ["SnapChefChallenge", "CookingChallenge"]
+        default:
+            return ["SnapChef", "CookingApp"]
+        }
     }
 
     private func generateCaption() -> String {
         switch content.type {
         case .recipe(let recipe):
+            let totalTime = recipe.prepTime + recipe.cookTime
+            let emoji = getRecipeEmoji(for: recipe)
+            let primaryHashtag = (recipe.tags.first ?? "Homemade").replacingOccurrences(of: " ", with: "")
+            
             return """
-            🍳 \(recipe.name)
+Just turned my sad fridge into \(recipe.name) 🎉
 
-            ⏱ Ready in \(recipe.prepTime + recipe.cookTime) minutes
-            🔥 Difficulty: \(recipe.difficulty.rawValue.capitalized)
+\(emoji) \(totalTime) min magic
+📱 Get SnapChef on the App Store!
 
-            Made with @SnapChef - Turn your fridge into amazing recipes with AI!
+#\(primaryHashtag) #SnapChef #FridgeToFeast
+"""
+            
+        case .achievement(let achievementName):
+            return """
+🏆 \(achievementName) unlocked!
 
-            #SnapChef #HomeCooking #RecipeOfTheDay
-            """
+Level up your kitchen game 👨‍🍳
+📱 Download SnapChef on the App Store
+
+#SnapChef #CookingWin
+"""
+            
+        case .challenge(let challenge):
+            return """
+Challenge crushed: \(challenge.title) ✅
+
+Who's next? 💪
+📱 Join me on SnapChef (App Store)
+
+#SnapChefChallenge
+"""
+            
         default:
-            return "Made with @SnapChef 🍳✨"
+            return """
+Made with SnapChef 🍳
+📱 Get it on the App Store!
+
+#SnapChef
+"""
+        }
+    }
+    
+    private func getRecipeEmoji(for recipe: Recipe) -> String {
+        // Return emoji based on tags or recipe name
+        let lowerTags = recipe.tags.map { $0.lowercased() }.joined(separator: " ")
+        let lowerName = recipe.name.lowercased()
+        let combined = lowerTags + " " + lowerName
+        
+        switch combined {
+        case let c where c.contains("pasta") || c.contains("italian"):
+            return "🍝"
+        case let c where c.contains("taco") || c.contains("mexican"):
+            return "🌮"
+        case let c where c.contains("asian") || c.contains("chinese") || c.contains("stir-fry"):
+            return "🥢"
+        case let c where c.contains("curry") || c.contains("indian"):
+            return "🍛"
+        case let c where c.contains("burger") || c.contains("american"):
+            return "🍔"
+        case let c where c.contains("salad"):
+            return "🥗"
+        case let c where c.contains("soup"):
+            return "🍲"
+        default:
+            return "🍳"
         }
     }
 
     private func generateContent() {
         isGenerating = true
-
+        
         Task {
             do {
-                // Generate image based on template
+                // Generate image based on auto-selected template
                 let image = try await InstagramContentGenerator.shared.generateContent(
-                    template: selectedTemplate,
+                    template: getAutoTemplate(),
                     content: content,
-                    isStory: isStory,
-                    backgroundColor: backgroundColor,
-                    sticker: selectedSticker
+                    isStory: shareMode == .story,
+                    backgroundColor: getBackgroundColor(),
+                    sticker: showTextOverlay && shareMode == .story ? .location : nil
                 )
-
+                
                 await MainActor.run {
                     generatedImage = image
                     isGenerating = false
-                    showingShareOptions = true
+                    // Note: showingShareOptions was removed in the new design
                 }
             } catch {
                 await MainActor.run {
@@ -325,18 +427,18 @@ struct InstagramShareView: View {
         } else {
             // Generate image first, then share
             isGenerating = true
-
+            
             Task {
                 do {
-                    // Generate image based on template
+                    // Generate image based on auto-selected template
                     let image = try await InstagramContentGenerator.shared.generateContent(
-                        template: selectedTemplate,
+                        template: getAutoTemplate(),
                         content: content,
-                        isStory: isStory,
-                        backgroundColor: backgroundColor,
-                        sticker: selectedSticker
+                        isStory: shareMode == .story,
+                        backgroundColor: getBackgroundColor(),
+                        sticker: showTextOverlay && shareMode == .story ? .location : nil
                     )
-
+                    
                     await MainActor.run {
                         self.generatedImage = image
                         self.isGenerating = false
@@ -355,8 +457,23 @@ struct InstagramShareView: View {
 
     private func shareToInstagram() {
         guard let image = generatedImage else { return }
-
-        if isStory {
+        
+        // Show caption copied feedback for feed posts
+        if shareMode == .feed {
+            UIPasteboard.general.string = captionText
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                captionCopied = true
+            }
+            
+            // Hide after 2 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation {
+                    captionCopied = false
+                }
+            }
+        }
+        
+        if shareMode == .story {
             shareToInstagramStory(image: image)
         } else {
             shareToInstagramFeed(image: image)
@@ -400,14 +517,7 @@ struct InstagramShareView: View {
     }
 
     private func shareToInstagramFeed(image: UIImage) {
-        // Enhanced caption with call-to-action
-        var fullCaption = captionText
-        fullCaption += "\n\n📱 Try SnapChef: snapchef.app"
-        fullCaption += "\n#MadeWithSnapChef"
-
-        // Copy caption to clipboard
-        UIPasteboard.general.string = fullCaption
-
+        // Caption is already in clipboard from shareToInstagram()
         // Save image to photo library with proper permission handling
         saveImageAndOpenInstagram(image: image)
     }

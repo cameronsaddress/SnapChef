@@ -493,33 +493,11 @@ struct TikTokShareView: View {
     }
     
     private func generateAndShareIntelligently() async {
-        print("🎬 TikTok: Starting intelligent share flow")
+        print("🎬 TikTok: Starting ShareKit-only flow (no authentication)")
         
-        // Step 1: Check TikTok authentication
-        print("🎬 TikTok: Step 1 - Checking TikTok authentication status")
-        isCheckingAuth = true
-        let isAuthenticated = await checkTikTokAuthentication()
-        isCheckingAuth = false
-        print("🎬 TikTok: Authentication status: \(isAuthenticated ? "Authenticated" : "Not authenticated")")
-        
-        if !isAuthenticated {
-            // Step 2: Try to authenticate if not authenticated
-            print("🎬 TikTok: Step 2 - Attempting to authenticate with TikTok")
-            do {
-                try await authenticateWithTikTok()
-                print("🎬 TikTok: Authentication successful")
-            } catch {
-                print("🎬 TikTok: Authentication failed with error: \(error.localizedDescription)")
-                print("🎬 TikTok: Falling back to ShareKit method")
-                // Authentication failed, fallback to sharekit method
-                await performGeneration(useDirectPost: false)
-                return
-            }
-        }
-        
-        // Step 3: Generate and post directly
-        print("🎬 TikTok: Step 3 - Generating video and posting directly")
-        await performGeneration(useDirectPost: true)
+        // Skip authentication entirely - just use ShareKit
+        // This opens the TikTok app with the video
+        await performGeneration(useDirectPost: false)
     }
     
     private func checkTikTokAuthentication() async -> Bool {
