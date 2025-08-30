@@ -262,13 +262,13 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 3: "AI enters chat" (6-9s) - Slide in from RIGHT
+        // OVERLAY PHASE 3: "Take a Pic / AI enters chat" (6-9s) - Slide in from RIGHT
         overlays.append(.init(
             start: CMTime(seconds: 6, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "AI enters chat",
+                    text: "Take a Pic\nAI enters chat",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .right
@@ -805,16 +805,25 @@ public actor RenderPlanner {
         print("[RenderPlanner] Text layer string set to: '\(textLayer.string ?? "nil")'")
         print("[RenderPlanner] Font size: \(textLayer.fontSize)")
 
-        // FIXED: Calculate actual text dimensions using the font
+        // FIXED: Calculate actual text dimensions using the font (with multi-line support)
         let textAttributes: [NSAttributedString.Key: Any] = [
             .font: font
         ]
-        let textSize = (text as NSString).size(withAttributes: textAttributes)
+        
+        // Use boundingRect for multi-line text calculation
+        let maxWidth = config.size.width - 120 // Max width with margins
+        let textBounds = (text as NSString).boundingRect(
+            with: CGSize(width: maxWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: textAttributes,
+            context: nil
+        )
+        
         let padding: CGFloat = 50 // Increased padding to ensure full text visibility
-        let containerWidth = min(textSize.width + padding * 2, config.size.width - 60) // Ensure text fits
-        let containerHeight = max(textSize.height + padding * 2, 70) // Adequate height
+        let containerWidth = min(textBounds.width + padding * 2, config.size.width - 60) // Ensure text fits
+        let containerHeight = textBounds.height + padding * 2 // Auto-size height for multi-line
 
-        print("[RenderPlanner] Calculated text size: \(textSize)")
+        print("[RenderPlanner] Calculated text size: \(textBounds.size)")
         print("[RenderPlanner] Container size: \(CGSize(width: containerWidth, height: containerHeight))")
 
         // Position container in center of screen
@@ -832,9 +841,9 @@ public actor RenderPlanner {
         gradientLayer.opacity = 1.0
         textLayer.frame = CGRect(
             x: padding,
-            y: (containerFrame.height - textSize.height) / 2, // Center text vertically
+            y: (containerFrame.height - textBounds.height) / 2, // Center text vertically
             width: containerFrame.width - padding * 2,
-            height: textSize.height
+            height: textBounds.height
         )
         textLayer.opacity = 1.0
 

@@ -28,6 +28,9 @@ struct BrandedSharePopup: View {
     @State private var currentBeforeImage: UIImage?
     @State private var currentAfterImage: UIImage?
     
+    // Instagram share content with photos
+    @State private var instagramShareContent: ShareContent?
+    
     @Environment(\.dismiss) var dismiss
 
     let content: ShareContent
@@ -247,7 +250,25 @@ struct BrandedSharePopup: View {
                 }
                 
             case .instagram, .instagramStory:
-                // Show platform-specific view (works even if app not installed)
+                // Load photos for Instagram share
+                if case .recipe(let recipe) = content.type {
+                    let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+                    let beforeImage = photos?.fridgePhoto ?? photos?.pantryPhoto
+                    let afterImage = photos?.mealPhoto
+                    
+                    // Create new ShareContent with photos
+                    instagramShareContent = ShareContent(
+                        type: content.type,
+                        beforeImage: beforeImage,
+                        afterImage: afterImage,
+                        text: content.text
+                    )
+                } else {
+                    // For non-recipe content, use original content
+                    instagramShareContent = content
+                }
+                
+                // Show platform-specific view
                 showingPlatformView = true
 
             case .twitter:
@@ -320,9 +341,11 @@ struct BrandedSharePopup: View {
         case .tiktok:
             TikTokShareView(content: content)  // Use the template selection view
         case .instagram:
-            InstagramShareView(content: content, isStory: false)
+            // Use instagramShareContent which has photos loaded
+            InstagramShareView(content: instagramShareContent ?? content, isStory: false)
         case .instagramStory:
-            InstagramShareView(content: content, isStory: true)
+            // Use instagramShareContent which has photos loaded
+            InstagramShareView(content: instagramShareContent ?? content, isStory: true)
         case .twitter:
             XShareView(content: content)
         case .messages:
