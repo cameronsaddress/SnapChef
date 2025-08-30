@@ -248,13 +248,13 @@ public actor RenderPlanner {
             }
         ))
 
-        // OVERLAY PHASE 2: "Open your fridge" (3-6s) - Slide in from LEFT  
+        // OVERLAY PHASE 2: "You open your fridge" (3-6s) - Slide in from LEFT  
         overlays.append(.init(
             start: CMTime(seconds: 3, preferredTimescale: 600),
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "Open your fridge",
+                    text: "You open your fridge",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -282,7 +282,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createAlternatingSequenceOverlay(
-                    text: "Easy Dinner\nFrom What You Have!",
+                    text: "Easy Dinner\nFrom What I Had!",
                     config: cfg,
                     screenScale: cfg.contentsScale,
                     slideDirection: .left
@@ -296,7 +296,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createCTATextOverlay(
-                    text: "Get the SNAPCHEF App!\nFree on App Store!",
+                    text: "So Easy With SNAPCHEF!\nFree on App Store!",
                     config: cfg,
                     screenScale: cfg.contentsScale
                 )
