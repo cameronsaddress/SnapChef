@@ -114,10 +114,22 @@ struct RecipeResultsView: View {
                                 confettiTrigger = true
                             },
                             onShare: {
+                                print("🔍 RecipeResultsView: Share button tapped for recipe \(recipe.id)")
+                                
+                                // Load photos from PhotoStorageManager
+                                let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+                                print("🔍 RecipeResultsView: Photos from storage - fridge: \(photos?.fridgePhoto != nil), pantry: \(photos?.pantryPhoto != nil), meal: \(photos?.mealPhoto != nil)")
+                                
+                                // Use stored photos or fallback to capturedImage
+                                let beforeImage = photos?.fridgePhoto ?? photos?.pantryPhoto ?? capturedImage
+                                let afterImage = photos?.mealPhoto
+                                
+                                print("🔍 RecipeResultsView: Final ShareContent - beforeImage: \(beforeImage != nil), afterImage: \(afterImage != nil)")
+                                
                                 shareContent = ShareContent(
                                     type: .recipe(recipe),
-                                    beforeImage: capturedImage,
-                                    afterImage: nil
+                                    beforeImage: beforeImage,
+                                    afterImage: afterImage
                                 )
                                 showBrandedShare = true
                             },

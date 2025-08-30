@@ -296,7 +296,7 @@ public actor RenderPlanner {
             duration: CMTime(seconds: 3, preferredTimescale: 600),
             layerBuilder: { cfg in
                 self.createCTATextOverlay(
-                    text: "Get the SNAPCHEF App!",
+                    text: "Get the SNAPCHEF App!\nFree on App Store!",
                     config: cfg,
                     screenScale: cfg.contentsScale
                 )
@@ -1043,16 +1043,25 @@ public actor RenderPlanner {
         print("[RenderPlanner] CTA main text layer string set to: '\(mainTextLayer.string ?? "nil")'")
         print("[RenderPlanner] CTA font size: \(mainTextLayer.fontSize)")
 
-        // Calculate actual text dimensions using the font
+        // Calculate actual text dimensions using the font (with multi-line support)
         let textAttributes: [NSAttributedString.Key: Any] = [
             .font: font
         ]
-        let textSize = (text as NSString).size(withAttributes: textAttributes)
+        
+        // Use boundingRect for multi-line CTA text
+        let maxWidth = config.size.width - 120
+        let textBounds = (text as NSString).boundingRect(
+            with: CGSize(width: maxWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: textAttributes,
+            context: nil
+        )
+        
         let padding: CGFloat = 45 // Increased padding for larger CTA (50% larger)
-        let containerWidth = min(textSize.width + padding * 2, config.size.width - 60)
-        let containerHeight = max(textSize.height + padding * 2, 120) // Increased minimum height for larger CTA
+        let containerWidth = min(textBounds.width + padding * 2, config.size.width - 60)
+        let containerHeight = textBounds.height + padding * 2 // Auto-size for multi-line
 
-        print("[RenderPlanner] CTA calculated text size: \(textSize)")
+        print("[RenderPlanner] CTA calculated text size: \(textBounds.size)")
         print("[RenderPlanner] CTA container size: \(CGSize(width: containerWidth, height: containerHeight))")
 
         // FIXED: Position CTA BELOW the logo with proper spacing
@@ -1072,7 +1081,7 @@ public actor RenderPlanner {
             x: padding,
             y: padding,
             width: containerFrame.width - padding * 2,
-            height: textSize.height
+            height: textBounds.height
         )
         mainTextLayer.opacity = 1.0
 
@@ -1103,28 +1112,28 @@ public actor RenderPlanner {
         ctaSparkEmitter.emitterSize = CGSize(width: containerFrame.width, height: containerFrame.height)
         ctaSparkEmitter.zPosition = -1 // Behind text but in front of background
 
-        // FIXED: Use food emojis for CTA sparks too
-        let foodEmojis = ["🍕", "🍔", "🌮", "🥗", "🍜", "🍣", "🥘", "🍝"]
-        var foodCells: [CAEmitterCell] = []
+        // Use star emojis for CTA sparks to match other containers
+        let starEmojis = ["⭐", "✨", "🌟", "💫"]
+        var starCells: [CAEmitterCell] = []
 
-        for emoji in foodEmojis {
-            let foodCell = CAEmitterCell()
-            foodCell.contents = createFoodEmojiImage(emoji: emoji).cgImage
-            foodCell.birthRate = 2.5 // Slightly higher rate for CTA
-            foodCell.lifetime = 2.5
-            foodCell.velocity = 60
-            foodCell.velocityRange = 40
-            foodCell.emissionRange = .pi * 2
-            foodCell.yAcceleration = 100 // Strong gravity
-            foodCell.scale = 0.9
-            foodCell.scaleRange = 0.6
-            foodCell.alphaSpeed = -0.4
-            foodCell.spin = .pi * 1.5
-            foodCell.spinRange = .pi
-            foodCells.append(foodCell)
+        for emoji in starEmojis {
+            let starCell = CAEmitterCell()
+            starCell.contents = createFoodEmojiImage(emoji: emoji).cgImage
+            starCell.birthRate = 2.5 // Slightly higher rate for CTA
+            starCell.lifetime = 2.5
+            starCell.velocity = 60
+            starCell.velocityRange = 40
+            starCell.emissionRange = .pi * 2
+            starCell.yAcceleration = 100 // Strong gravity
+            starCell.scale = 0.9
+            starCell.scaleRange = 0.6
+            starCell.alphaSpeed = -0.4
+            starCell.spin = .pi * 1.5
+            starCell.spinRange = .pi
+            starCells.append(starCell)
         }
 
-        ctaSparkEmitter.emitterCells = foodCells
+        ctaSparkEmitter.emitterCells = starCells
 
         // ANIMATIONS: CTA fade in (logo removed)
         // Logo fade in animation removed

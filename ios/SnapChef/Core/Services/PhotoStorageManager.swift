@@ -287,9 +287,7 @@ public final class PhotoStorageManager: ObservableObject {
 
     /// Get photos for a recipe
     public func getPhotos(for recipeId: UUID) -> RecipePhotos? {
-        let photos = recipePhotos[recipeId]
-        // Removed excessive logging to reduce console spam
-        return photos
+        return recipePhotos[recipeId]
     }
 
     /// Check if we have both photos for a recipe
