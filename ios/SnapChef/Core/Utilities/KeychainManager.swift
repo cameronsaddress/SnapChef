@@ -93,9 +93,34 @@ class KeychainManager {
             // 1. Environment variables during build
             // 2. Server-side configuration fetch
             // 3. Manual configuration in app settings
-            print("⚠️ WARNING: No API key found in keychain. Configure API key through secure means.")
-            print("📋 Use storeAPIKey(_:) method to securely store your API key.")
+            print("⚠️ WARNING: No API key found in keychain.")
+            print("📋 Set SNAPCHEF_API_KEY environment variable in Xcode:")
+            print("   Edit Scheme → Run → Arguments → Environment Variables")
         }
+    }
+    
+    /// Rotates API key (useful if key is compromised)
+    func rotateAPIKey(_ newKey: String) {
+        deleteAPIKey()
+        storeAPIKey(newKey)
+        
+        // Clear any cached network sessions
+        URLSession.shared.configuration.urlCache?.removeAllCachedResponses()
+        
+        print("🔄 API key rotated successfully")
+    }
+    
+    /// Checks if API key appears to be valid format
+    func validateAPIKeyFormat() -> Bool {
+        guard let key = getAPIKey() else { return false }
+        
+        // Basic validation: not empty, reasonable length, no spaces
+        return !key.isEmpty &&
+               key.count >= 20 &&
+               key.count <= 100 &&
+               !key.contains(" ") &&
+               !key.contains("your-api-key-here") &&
+               !key.contains("YOUR_API_KEY")
     }
     
     // MARK: - Generic Secure Storage Methods

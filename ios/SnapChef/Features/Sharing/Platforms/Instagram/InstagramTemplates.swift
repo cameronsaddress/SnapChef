@@ -172,70 +172,24 @@ struct InstagramPreview: View {
 
     @ViewBuilder
     var previewContent: some View {
-        VStack(spacing: 12) {
-            if case .recipe(let recipe) = content.type {
-                // Header
-                HStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: 32, height: 32)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("@snapchef")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white)
-
-                        Text("My Kitchen")
-                            .font(.system(size: 10))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 14))
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-
-                // Content preview
-                VStack(spacing: 8) {
-                    Text(recipe.name)
-                        .font(.system(size: isStory ? 18 : 16, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-
-                    // Mini template preview
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(template.gradient.opacity(0.3))
-                        .frame(height: isStory ? 200 : 140)
-                        .overlay(
-                            Text(recipe.difficulty.emoji)
-                                .font(.system(size: 40))
-                        )
-                }
-                .padding(.horizontal, 12)
-
-                Spacer()
-
-                // Footer
-                if isStory {
-                    HStack(spacing: 16) {
-                        Image(systemName: "heart")
-                        Image(systemName: "message")
-                        Image(systemName: "paperplane")
-                        Spacer()
-                        Image(systemName: "bookmark")
-                    }
-                    .font(.system(size: 18))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 12)
-                }
-            }
-        }
+        // Use the actual InstagramContentView for preview
+        InstagramContentView(
+            template: template,
+            content: content,
+            size: CGSize(
+                width: isStory ? 180 : 280,
+                height: isStory ? 380 : 280
+            ),
+            backgroundColor: backgroundColor,
+            sticker: nil,
+            isStory: isStory
+        )
+        .scaleEffect(isStory ? 0.9 : 0.95) // Slightly scale down to fit in frame
+        .frame(
+            width: isStory ? 180 : 280,
+            height: isStory ? 380 : 280
+        )
+        .clipped()
     }
 }
 

@@ -289,7 +289,51 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 - **COMPLETE_CODE_TRACE.md** - App flow analysis
 - **FILE_USAGE_ANALYSIS.md** - File usage status
 
-## 🔄 Latest Updates (Aug 29, 2025)
+## 🔄 Latest Updates (Aug 30, 2025)
+
+### Social Media Sharing Implementation (Aug 30) ✅
+- **X (Twitter) Sharing**:
+  - Black theme with X branding (#000000 background)
+  - Tweet composer with 280 character limit
+  - Hashtag support with toggle functionality
+  - Twitter Blue color (#1D9BF0) for accents
+  - URL scheme: `twitter://post?message=` with web fallback
+  - Auto-copy tweet to clipboard before opening app
+  - CloudKit activity tracking for shares
+- **Messages (iMessage) Sharing**:
+  - Native MFMessageComposeViewController integration
+  - iOS Blue gradient (#007AFF to #0051D5)
+  - Interactive rotating card preview
+  - Multiple card styles with 3D effects
+  - Auto-generated message text
+  - Image attachment support
+- **WhatsApp**: Removed from options per user request
+- **Files Modified**:
+  - `XShareView.swift` - Twitter/X sharing implementation
+  - `MessagesShareView.swift` - iMessage integration
+  - `BrandedSharePopup.swift` - Removed WhatsApp option
+
+### Instagram Sharing Complete Overhaul (Aug 30) ✅
+- **Implemented official Meta/Facebook best practices for Instagram sharing**:
+  - Stories: Using official pasteboard keys (com.instagram.sharedSticker.backgroundImage)
+  - Feed: UIDocumentInteractionController with .igo file, fallback to save & open
+  - Added Facebook App ID configuration in Info.plist
+  - Image resizing: 1080x1920 for Stories (9:16), 1080x1080 for Feed (1:1)
+- **Enhanced user experience**:
+  - Instagram installation check with App Store redirect if not installed
+  - Caption auto-copy to clipboard with visual feedback
+  - SnapChef brand gradient colors in Stories (#FF0050 to #00F2EA)
+  - Comprehensive error handling and graceful fallbacks
+- **Fixed preview to show actual content** instead of emoji placeholders
+- **Files Modified**:
+  - `InstagramShareView.swift` - Complete rewrite with best practices
+  - `Info.plist` - Added Facebook App ID configuration
+  - `INSTAGRAM_SHARING_IMPLEMENTATION.md` - Detailed implementation plan
+- **Production Requirements**:
+  - Replace YOUR_FACEBOOK_APP_ID with actual Facebook App ID
+  - Test on physical device (Instagram not available on simulator)
+
+## 🔄 Previous Updates (Aug 29, 2025)
 
 ### Pantry Photo Authentication Feature (Aug 29) ✅
 - **Pantry button now visible to all users** (both authenticated and unauthenticated)

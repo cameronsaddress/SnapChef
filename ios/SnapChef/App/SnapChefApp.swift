@@ -490,25 +490,74 @@ struct SnapChefApp: App {
     // MARK: - API Key Configuration
     
     private func setupAPIKeyIfNeeded() {
-        // Force update the API key to ensure we have the correct one
-        // The storeAPIKey function now handles deletion internally
+        // Check if API key already exists in Keychain
+        if let existingKey = KeychainManager.shared.getAPIKey(), !existingKey.isEmpty {
+            print("🔑 API key already configured in Keychain")
+            return
+        }
         
-        // For production app, we need a secure API key that matches the server's APP_API_KEY
-        // This key should be coordinated with the server deployment
-        // Using the correct API key for the render server
-        let apiKey = "5380e4b60818cf237678fccfd4b8f767d1c94"
+        // Get API key from build configuration
+        var apiKey: String = ""
         
-        // Store the API key securely in Keychain
+        #if DEBUG
+        // For development: Try environment variable first, then Info.plist
+        if let envKey = ProcessInfo.processInfo.environment["SNAPCHEF_API_KEY"], !envKey.isEmpty {
+            apiKey = envKey
+            print("🔑 Using API key from environment variable")
+        } else if let plistKey = Bundle.main.object(forInfoDictionaryKey: "SNAPCHEF_API_KEY") as? String, !plistKey.isEmpty {
+            apiKey = plistKey
+            print("🔑 Using API key from Info.plist")
+        } else {
+            print("⚠️ WARNING: No API key found. Server calls will fail.")
+            print("📋 Set SNAPCHEF_API_KEY environment variable in Xcode scheme")
+            print("   1. Edit Scheme → Run → Arguments → Environment Variables")
+            print("   2. Add SNAPCHEF_API_KEY with your API key value")
+            return
+        }
+        #else
+        // For production: Must come from Info.plist (injected at build time)
+        if let plistKey = Bundle.main.object(forInfoDictionaryKey: "SNAPCHEF_API_KEY") as? String, !plistKey.isEmpty {
+            apiKey = plistKey
+            print("🔑 Using API key from build configuration")
+        } else {
+            print("❌ CRITICAL: No API key found in production build")
+            // In production, we should have a fallback or show maintenance mode
+            return
+        }
+        #endif
+        
+        // Validate API key format before storing
+        guard validateAPIKeyFormat(apiKey) else {
+            print("❌ Invalid API key format detected")
+            return
+        }
+        
+        // Store in Keychain for secure access
         KeychainManager.shared.storeAPIKey(apiKey)
-        print("🔑 API key configured and stored in Keychain: \(apiKey.prefix(10))...")
-        print("🔑 API key length: \(apiKey.count) characters")
+        print("🔑 API key stored in Keychain: \(apiKey.prefix(10))...")
         
-        // Verify it was stored successfully
+        // Verify storage
         if let storedKey = KeychainManager.shared.getAPIKey() {
-            print("✅ API key verification successful: \(storedKey.prefix(10))...")
+            print("✅ API key verification successful")
         } else {
             print("❌ Failed to verify API key storage")
         }
+    }
+    
+    private func validateAPIKeyFormat(_ key: String) -> Bool {
+        // Basic validation: not empty, reasonable length, no spaces, not a placeholder
+        let isValid = !key.isEmpty &&
+                     key.count >= 20 &&
+                     key.count <= 100 &&
+                     !key.contains(" ") &&
+                     !key.contains("your-api-key-here") &&
+                     !key.contains("YOUR_API_KEY")
+        
+        if !isValid {
+            print("⚠️ API key validation failed: Invalid format")
+        }
+        
+        return isValid
     }
 }
 

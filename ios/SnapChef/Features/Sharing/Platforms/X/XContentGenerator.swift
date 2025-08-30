@@ -8,6 +8,18 @@
 import SwiftUI
 import UIKit
 
+// MARK: - X Tweet Style
+enum XTweetStyle: String, CaseIterable {
+    case classic = "Classic"
+    case viral = "Viral"
+    case professional = "Professional"
+    case funny = "Funny"
+    
+    var name: String {
+        return rawValue
+    }
+}
+
 @MainActor
 class XContentGenerator: ObservableObject {
     static let shared = XContentGenerator()
@@ -128,8 +140,6 @@ struct XImageContent: View {
                 ProfessionalXContent(content: content)
             case .funny:
                 FunnyXContent(content: content)
-            case .thread:
-                ThreadStartContent(content: content)
             }
 
             // SnapChef branding
@@ -165,8 +175,6 @@ struct XImageContent: View {
             return [Color(hex: "#2C3E50"), Color(hex: "#34495E")]
         case .funny:
             return [Color(hex: "#F39C12"), Color(hex: "#E74C3C")]
-        case .thread:
-            return [Color(hex: "#8E44AD"), Color(hex: "#3498DB")]
         }
     }
 }

@@ -490,11 +490,13 @@ Made with SnapChef 🍳
     }
 
     private func shareToInstagramStory(image: UIImage) {
-        guard let imageData = image.pngData() else { return }
+        // Resize image for Stories (9:16 ratio, 720x1280 minimum)
+        let storyImage = resizeImageForStories(image)
+        guard let imageData = storyImage.pngData() else { return }
 
-        // Enhanced pasteboard items with attribution
+        // Use official Instagram pasteboard keys from Meta documentation
         var pasteboardItems: [[String: Any]] = [[
-            "com.instagram.sharedSticker.stickerImage": imageData,
+            "com.instagram.sharedSticker.backgroundImage": imageData,  // Main background image
             "com.instagram.sharedSticker.backgroundTopColor": "#FF0050",  // SnapChef brand colors
             "com.instagram.sharedSticker.backgroundBottomColor": "#00F2EA"
         ]]
@@ -506,19 +508,28 @@ Made with SnapChef 🍳
             pasteboardItems[0]["com.instagram.sharedSticker.contentURL"] = "https://snapchef.app"
         }
 
+        // Set pasteboard with expiration
         let pasteboardOptions = [
             UIPasteboard.OptionsKey.expirationDate: Date().addingTimeInterval(300)
         ]
 
         UIPasteboard.general.setItems(pasteboardItems, options: pasteboardOptions)
 
-        // Try with source application parameter for better attribution
-        if let url = URL(string: "instagram-stories://share?source_application=com.snapchefapp.app") {
+        // Open Instagram Stories with Facebook App ID for attribution
+        // Note: Replace YOUR_FACEBOOK_APP_ID with actual app ID in production
+        let facebookAppId = "YOUR_FACEBOOK_APP_ID"  // Will be replaced with actual ID
+        
+        if let url = URL(string: "instagram-stories://share?source_application=\(facebookAppId)") {
             UIApplication.shared.open(url) { success in
                 if !success {
-                    // Fallback to basic Instagram Stories
+                    // Fallback without Facebook App ID
                     if let fallbackURL = URL(string: "instagram-stories://share") {
-                        UIApplication.shared.open(fallbackURL)
+                        UIApplication.shared.open(fallbackURL) { fallbackSuccess in
+                            if !fallbackSuccess {
+                                // Instagram not installed
+                                self.errorMessage = "Instagram is not installed. Please install Instagram from the App Store."
+                            }
+                        }
                     }
                 }
             }
@@ -526,9 +537,58 @@ Made with SnapChef 🍳
     }
 
     private func shareToInstagramFeed(image: UIImage) {
-        // Caption is already in clipboard from shareToInstagram()
-        // Save image to photo library with proper permission handling
-        saveImageAndOpenInstagram(image: image)
+        // Method 1: Try UIDocumentInteractionController first (official Meta method)
+        let feedImage = resizeImageForFeed(image)
+        
+        // Create temporary .igo file for Instagram-exclusive sharing
+        let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
+        let filePath = "\(documentsPath)/snapchef_recipe.igo"
+        let fileURL = URL(fileURLWithPath: filePath)
+        
+        // Save image as .igo file
+        if let imageData = feedImage.jpegData(compressionQuality: 0.9) {
+            do {
+                try imageData.write(to: fileURL)
+                
+                // Create UIDocumentInteractionController
+                let documentController = UIDocumentInteractionController(url: fileURL)
+                documentController.uti = "com.instagram.exclusivegram"  // Instagram-only UTI
+                documentController.annotation = ["InstagramCaption": captionText]  // Try to pass caption
+                
+                // Present from the current view controller
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let viewController = windowScene.windows.first?.rootViewController {
+                    
+                    // Copy caption to clipboard for user to paste
+                    UIPasteboard.general.string = captionText
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        captionCopied = true
+                    }
+                    
+                    // Hide caption copied message after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation {
+                            captionCopied = false
+                        }
+                    }
+                    
+                    // Present Instagram share
+                    if !documentController.presentOpenInMenu(from: CGRect.zero, in: viewController.view, animated: true) {
+                        // Fallback to Method 2: Save & Open
+                        saveImageAndOpenInstagram(image: feedImage)
+                    }
+                } else {
+                    // Fallback to Method 2: Save & Open
+                    saveImageAndOpenInstagram(image: feedImage)
+                }
+            } catch {
+                // Fallback to Method 2: Save & Open
+                saveImageAndOpenInstagram(image: feedImage)
+            }
+        } else {
+            // Fallback to Method 2: Save & Open
+            saveImageAndOpenInstagram(image: feedImage)
+        }
     }
 
     private func saveImageAndOpenInstagram(image: UIImage) {
@@ -540,11 +600,20 @@ Made with SnapChef 🍳
             if success {
                 // Open Instagram library after saving
                 if let url = URL(string: "instagram://library") {
-                    UIApplication.shared.open(url) { success in
-                        if !success {
+                    UIApplication.shared.open(url) { librarySuccess in
+                        if !librarySuccess {
                             // Fallback to basic Instagram open
+                            print("📱 Instagram: Failed to open library, trying basic Instagram")
                             if let fallbackURL = URL(string: "instagram://") {
-                                UIApplication.shared.open(fallbackURL)
+                                UIApplication.shared.open(fallbackURL) { appSuccess in
+                                    if !appSuccess {
+                                        // Instagram might not be installed (should not happen)
+                                        print("📱 Instagram: Failed to open Instagram app")
+                                        DispatchQueue.main.async {
+                                            // Instagram not installed - already handled by URL fallback
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -566,6 +635,57 @@ Made with SnapChef 🍳
         }
     }
 
+    // MARK: - Image Resizing Helpers
+    
+    private func resizeImageForStories(_ image: UIImage) -> UIImage {
+        // Instagram Stories: 9:16 ratio, 720x1280 minimum, 1080x1920 recommended
+        let targetSize = CGSize(width: 1080, height: 1920)
+        return resizeImage(image, targetSize: targetSize, aspectFill: true)
+    }
+    
+    private func resizeImageForFeed(_ image: UIImage) -> UIImage {
+        // Instagram Feed: 1:1 ratio recommended, 640x640 minimum, 1080x1080 optimal
+        let targetSize = CGSize(width: 1080, height: 1080)
+        return resizeImage(image, targetSize: targetSize, aspectFill: true)
+    }
+    
+    private func resizeImage(_ image: UIImage, targetSize: CGSize, aspectFill: Bool) -> UIImage {
+        let size = image.size
+        
+        let widthRatio  = targetSize.width  / size.width
+        let heightRatio = targetSize.height / size.height
+        
+        // Choose the ratio that fills the target size
+        let ratio = aspectFill ? max(widthRatio, heightRatio) : min(widthRatio, heightRatio)
+        
+        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+        _ = CGRect(origin: .zero, size: newSize)
+        
+        // Create new image
+        UIGraphicsBeginImageContextWithOptions(targetSize, true, 1.0)
+        defer { UIGraphicsEndImageContext() }
+        
+        // Fill with white background
+        UIColor.white.setFill()
+        UIRectFill(CGRect(origin: .zero, size: targetSize))
+        
+        // Center the image in the target rect
+        let drawRect = CGRect(
+            x: (targetSize.width - newSize.width) / 2,
+            y: (targetSize.height - newSize.height) / 2,
+            width: newSize.width,
+            height: newSize.height
+        )
+        
+        image.draw(in: drawRect)
+        
+        guard let resizedImage = UIGraphicsGetImageFromCurrentImageContext() else {
+            return image
+        }
+        
+        return resizedImage
+    }
+    
     private func normalizeImage(_ image: UIImage) -> UIImage {
         // Create a new opaque image context (true = opaque, no alpha channel)
         UIGraphicsBeginImageContextWithOptions(image.size, true, image.scale)

@@ -7,443 +7,355 @@
 
 import SwiftUI
 import UIKit
-import Photos
 
 struct XShareView: View {
     let content: ShareContent
     @Environment(\.dismiss) var dismiss
     @State private var tweetText = ""
-    @State private var selectedStyle: XTweetStyle = .classic
-    @State private var includeImage = true
-    @State private var includeStats = true
-    @State private var includeHashtags = true
-    @State private var selectedHashtags: Set<String> = []
     @State private var isGenerating = false
     @State private var generatedImage: UIImage?
-    @State private var characterCount: Int = 0
-    @State private var showingShareConfirmation = false
-
+    @State private var errorMessage: String?
+    @State private var tweetCopied = false
+    @State private var includeHashtags = true
+    
     private let maxCharacters = 280
     private let imageCharacters = 24 // Characters used by image URL
-
-    private var headerView: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "x.square.fill")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(.white)
-                Text("Post to X")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-            }
-
-            Text("Craft the perfect post")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.gray)
-        }
-    }
-
-    private var tweetComposerSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Compose your post")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
-
-            // Tweet text editor
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.05))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    )
-
-                TextEditor(text: $tweetText)
-                    .frame(minHeight: 120)
-                    .padding(12)
-                    .foregroundColor(.white)
-                    .scrollContentBackground(.hidden)
-                    .onChange(of: tweetText) { _ in
-                        updateCharacterCount()
-                    }
-                    .onAppear {
-                        if tweetText.isEmpty {
-                            tweetText = generateTweetText()
-                            updateCharacterCount()
-                        }
-                    }
-
-                if tweetText.isEmpty {
-                    Text("What's happening?")
-                        .foregroundColor(.gray)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 20)
-                        .allowsHitTesting(false)
-                }
-            }
-        }
-    }
-
+    
     var body: some View {
         NavigationStack {
-            mainContent
-        }
-    }
-
-    private var mainContent: some View {
-        ZStack {
-            // X (Twitter) dark theme background
-            Color.black
-                .ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    headerView
-                    .padding(.top, 20)
-
-                        // Tweet Composer
-                        VStack(alignment: .leading, spacing: 16) {
-                            tweetComposerSection
-
-                            // Character count
-                            HStack {
-                                Spacer()
-                                CharacterCountView(
-                                    current: characterCount,
-                                    max: maxCharacters,
-                                    includeImage: includeImage
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 20)
-
-                        // Style Selection
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Post style")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(XTweetStyle.allCases, id: \.self) { style in
-                                        XStyleCard(
-                                            style: style,
-                                            isSelected: selectedStyle == style,
-                                            action: {
-                                                selectedStyle = style
-                                                tweetText = generateTweetText()
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-
-                        // Options
-                        VStack(spacing: 12) {
-                            ToggleOption(
-                                title: "Include image",
-                                subtitle: "Add a visual preview",
-                                isOn: $includeImage,
-                                icon: "photo"
-                            )
-
-                            ToggleOption(
-                                title: "Include stats",
-                                subtitle: "Show recipe details",
-                                isOn: $includeStats,
-                                icon: "chart.bar"
-                            )
-
-                            ToggleOption(
-                                title: "Include hashtags",
-                                subtitle: "Increase visibility",
-                                isOn: $includeHashtags,
-                                icon: "number"
-                            )
-                        }
-                        .padding(.horizontal, 20)
-
-                        // Hashtags
-                        if includeHashtags {
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("Hashtags")
-                                    .font(.system(size: 18, weight: .semibold))
+            ZStack {
+                // X (Twitter) black background
+                Color.black
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Header with X branding
+                    VStack(spacing: 16) {
+                        HStack {
+                            Button(action: { dismiss() }) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.white)
-
-                                WrappingHStack(suggestedHashtags, spacing: 8) { hashtag in
-                                    XHashtag(
-                                        hashtag: hashtag,
-                                        isSelected: selectedHashtags.contains(hashtag),
-                                        action: {
-                                            if selectedHashtags.contains(hashtag) {
-                                                selectedHashtags.remove(hashtag)
-                                            } else {
-                                                selectedHashtags.insert(hashtag)
-                                            }
-                                            tweetText = generateTweetText()
-                                        }
-                                    )
-                                }
+                                    .frame(width: 30, height: 30)
                             }
-                            .padding(.horizontal, 20)
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 8) {
+                                Image(systemName: "x.square.fill")
+                                    .font(.system(size: 20))
+                                Text("Post to X")
+                                    .font(.system(size: 20, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            
+                            Spacer()
+                            
+                            // Invisible spacer for balance
+                            Color.clear
+                                .frame(width: 30, height: 30)
                         }
-
-                        // Preview
-                        if includeImage {
-                            VStack(alignment: .leading, spacing: 16) {
+                        .padding(.horizontal)
+                    }
+                    .padding(.vertical)
+                    .background(Color.black)
+                    
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            // Large Preview
+                            VStack(spacing: 12) {
                                 Text("Preview")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.white)
-
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                // X Tweet Preview
                                 XTweetPreview(
-                                    text: tweetText,
+                                    text: tweetText.isEmpty ? generateTweetText() : tweetText,
                                     image: generatedImage,
-                                    style: selectedStyle
+                                    includeHashtags: includeHashtags
+                                )
+                                .frame(height: UIScreen.main.bounds.height * 0.4)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(hex: "#16181C")) // X dark gray
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                        )
                                 )
                             }
                             .padding(.horizontal, 20)
-                        }
-
-                        // Post Button
-                        Button(action: postToX) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 24)
-                                    .fill(Color(hex: "#1DA1F2"))
-                                    .frame(height: 48)
-
-                                if isGenerating {
-                                    HStack(spacing: 12) {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        Text("Preparing...")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(.white)
-                                    }
-                                } else {
-                                    Text("Post")
+                            
+                            // Tweet Composer Section
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("Compose Tweet")
                                         .font(.system(size: 16, weight: .semibold))
                                         .foregroundColor(.white)
+                                    
+                                    Spacer()
+                                    
+                                    // Character counter
+                                    CharacterCounter(
+                                        current: tweetText.count + (includeHashtags ? 40 : 0),
+                                        max: maxCharacters,
+                                        includeImage: true
+                                    )
+                                }
+                                
+                                TextEditor(text: $tweetText)
+                                    .frame(height: 120)
+                                    .padding(12)
+                                    .background(Color(hex: "#16181C"))
+                                    .cornerRadius(12)
+                                    .foregroundColor(.white)
+                                    .scrollContentBackground(.hidden)
+                                    .onAppear {
+                                        if tweetText.isEmpty {
+                                            tweetText = generateTweetText()
+                                        }
+                                    }
+                                
+                                // Hashtag toggle
+                                Toggle("Include hashtags", isOn: $includeHashtags)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .tint(Color(hex: "#1D9BF0")) // Twitter Blue
+                                
+                                // Hashtag preview
+                                if includeHashtags {
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 8) {
+                                            ForEach(getHashtags(), id: \.self) { hashtag in
+                                                Text("#\(hashtag)")
+                                                    .font(.system(size: 12, weight: .medium))
+                                                    .foregroundColor(Color(hex: "#1D9BF0"))
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 4)
+                                                    .background(
+                                                        Capsule()
+                                                            .fill(Color(hex: "#1D9BF0").opacity(0.1))
+                                                    )
+                                            }
+                                        }
+                                    }
                                 }
                             }
+                            .padding(.horizontal, 20)
+                            
+                            // Share Button
+                            VStack(spacing: 8) {
+                                Button(action: generateAndShare) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [
+                                                        Color(hex: "#1D9BF0"), // Twitter Blue
+                                                        Color(hex: "#1A8CD8")
+                                                    ],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(height: 56)
+                                        
+                                        if isGenerating {
+                                            HStack(spacing: 12) {
+                                                ProgressView()
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                Text("Creating...")
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundColor(.white)
+                                            }
+                                        } else {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: "square.and.arrow.up")
+                                                Text("Post to X")
+                                            }
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(.white)
+                                        }
+                                    }
+                                }
+                                .disabled(isGenerating || tweetText.count + (includeHashtags ? 40 : 0) > maxCharacters)
+                                
+                                if tweetCopied {
+                                    Text("Tweet copied to clipboard!")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .transition(.opacity.combined(with: .scale))
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 40)
                         }
-                        .disabled(isGenerating || characterCount > maxCharacters)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 40)
+                    }
                 }
             }
+            .navigationBarHidden(true)
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.white)
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if characterCount <= maxCharacters {
-                        Button("Post") {
-                            postToX()
-                        }
-                        .foregroundColor(Color(hex: "#1DA1F2"))
-                        .fontWeight(.semibold)
-                    }
-                }
-        }
-        .alert("Posted!", isPresented: $showingShareConfirmation) {
-            Button("View on X") {
-                openX()
-            }
-            Button("Done") {
-                dismiss()
+        .alert("Error", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") {
+                errorMessage = nil
             }
         } message: {
-            Text("Your post has been copied to clipboard. Open X to paste and share!")
-        }
-        .onAppear {
-            print("🔍 DEBUG: XShareView appeared")
-        }
-    }
-
-    private var suggestedHashtags: [String] {
-        var hashtags = ["SnapChef", "HomeCooking", "RecipeOfTheDay", "FoodTwitter", "CookingTime"]
-
-        if case .recipe(let recipe) = content.type {
-            hashtags.append(contentsOf: [
-                "FoodBlogger",
-                "\(recipe.difficulty.rawValue.capitalized)Recipe",
-                "Foodie",
-                "RecipeShare"
-            ])
-
-            // Add difficulty-specific hashtags
-            if recipe.difficulty == .easy {
-                hashtags.append("EasyRecipe")
-            } else if recipe.difficulty == .hard {
-                hashtags.append("ChallengingRecipe")
+            if let error = errorMessage {
+                Text(error)
             }
         }
-
-        return hashtags
     }
-
+    
+    // MARK: - Helper Methods
+    
     private func generateTweetText() -> String {
-        guard case .recipe(let recipe) = content.type else {
-            return "Check out what I made with @SnapChef! 🍳"
+        switch content.type {
+        case .recipe(let recipe):
+            let emoji = getRecipeEmoji(for: recipe)
+            return "Just turned my fridge into \(recipe.name) \(emoji)\n\nMade with @SnapChef - the app that turns your fridge photos into recipes!"
+            
+        case .achievement(let achievementName):
+            return "🏆 \(achievementName) unlocked!\n\nLevel up your cooking game with @SnapChef"
+            
+        case .challenge(let challenge):
+            return "Challenge crushed: \(challenge.title) ✅\n\nWho's next? Join me on @SnapChef"
+            
+        default:
+            return "Made with @SnapChef - turn your fridge into feast! 🍳"
         }
-
-        var text = ""
-
-        switch selectedStyle {
-        case .classic:
-            text = "Just made \(recipe.name) with @SnapChef! 🍳"
-
-        case .thread:
-            text = "🧵 How to make \(recipe.name) (a thread)\n\n1/"
-
-        case .viral:
-            text = "POV: You used AI to turn your sad fridge into \(recipe.name) ✨"
-
-        case .professional:
-            text = "New recipe: \(recipe.name)\n\nA \(recipe.difficulty.rawValue) dish that takes just \(recipe.prepTime + recipe.cookTime) minutes."
-
-        case .funny:
-            let funnyIntros = [
-                "My fridge: 😭\n@SnapChef: Hold my spatula",
-                "Nobody:\nAbsolutely nobody:\nMe at 2am:",
-                "Therapist: So what brings you joy?\nMe:",
-                "Breaking: Local person actually cooks instead of ordering takeout"
-            ]
-            text = "\(funnyIntros.randomElement()!) \n\n\(recipe.name) achieved 🎉"
-        }
-
-        // Add stats if enabled
-        if includeStats {
-            text += "\n\n⏱ \(recipe.prepTime + recipe.cookTime) min"
-            text += "\n🔥 \(recipe.nutrition.calories) cal"
-            text += "\n👥 Serves \(recipe.servings)"
-        }
-
-        // Add hashtags if enabled
-        if includeHashtags && !selectedHashtags.isEmpty {
-            let hashtagsText = selectedHashtags.map { "#\($0)" }.joined(separator: " ")
-            text += "\n\n\(hashtagsText)"
-        }
-
-        return text
     }
-
-    private func updateCharacterCount() {
-        var count = tweetText.count
-        if includeImage {
-            count += imageCharacters
+    
+    private func getHashtags() -> [String] {
+        switch content.type {
+        case .recipe(let recipe):
+            let mainTag = recipe.tags.first ?? "Cooking"
+            return ["SnapChef", "FridgeToFeast", mainTag.replacingOccurrences(of: " ", with: "")]
+        case .achievement:
+            return ["SnapChef", "CookingWin", "Achievement"]
+        case .challenge:
+            return ["SnapChefChallenge", "CookingChallenge"]
+        default:
+            return ["SnapChef", "CookingApp"]
         }
-        characterCount = count
     }
-
-    private func postToX() {
+    
+    private func getRecipeEmoji(for recipe: Recipe) -> String {
+        let lowerTags = recipe.tags.map { $0.lowercased() }.joined(separator: " ")
+        let lowerName = recipe.name.lowercased()
+        let combined = lowerTags + " " + lowerName
+        
+        switch combined {
+        case let c where c.contains("pasta") || c.contains("italian"):
+            return "🍝"
+        case let c where c.contains("taco") || c.contains("mexican"):
+            return "🌮"
+        case let c where c.contains("asian") || c.contains("chinese") || c.contains("stir-fry"):
+            return "🥢"
+        case let c where c.contains("curry") || c.contains("indian"):
+            return "🍛"
+        case let c where c.contains("burger") || c.contains("american"):
+            return "🍔"
+        case let c where c.contains("salad"):
+            return "🥗"
+        case let c where c.contains("soup"):
+            return "🍲"
+        default:
+            return "🍳"
+        }
+    }
+    
+    private func generateAndShare() {
         isGenerating = true
-
+        
         Task {
-            // Generate image if needed
-            if includeImage {
-                do {
-                    let image = try await XContentGenerator.shared.generateImage(
-                        for: content,
-                        style: selectedStyle
-                    )
-
-                    await MainActor.run {
-                        generatedImage = image
-
-                        // Save image to photos with proper permission handling
-                        saveImageToPhotoLibrary(image)
-                    }
-                } catch {
-                    print("Failed to generate image: \(error)")
+            do {
+                // Generate image using Instagram's content generator
+                // X/Twitter prefers modern, clean visuals
+                let image = try await InstagramContentGenerator.shared.generateContent(
+                    template: .modern,
+                    content: content,
+                    isStory: false,
+                    backgroundColor: Color.black,
+                    sticker: nil
+                )
+                
+                await MainActor.run {
+                    self.generatedImage = image
+                    self.isGenerating = false
+                    self.shareToX()
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.isGenerating = false
                 }
             }
-
-            await MainActor.run {
-                // Copy text to clipboard
-                UIPasteboard.general.string = tweetText
-
-                isGenerating = false
-                showingShareConfirmation = true
-            }
         }
     }
-
-    private func openX() {
-        // Try to open X app, fallback to web
-        if let url = URL(string: "twitter://post?message=\(tweetText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
-            UIApplication.shared.open(url) { success in
-                if !success {
-                    // Fallback to web
-                    if let webUrl = URL(string: "https://twitter.com/intent/tweet?text=\(tweetText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
-                        UIApplication.shared.open(webUrl)
+    
+    private func shareToX() {
+        guard let image = generatedImage else { return }
+        
+        // Prepare tweet text with hashtags
+        var fullTweet = tweetText
+        if includeHashtags {
+            let hashtags = getHashtags().map { "#\($0)" }.joined(separator: " ")
+            fullTweet += "\n\n\(hashtags)"
+        }
+        
+        // Copy tweet to clipboard
+        UIPasteboard.general.string = fullTweet
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            tweetCopied = true
+        }
+        
+        // Hide after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                tweetCopied = false
+            }
+        }
+        
+        // Save image to photo library
+        SafePhotoSaver.shared.saveImageToPhotoLibrary(image) { success, error in
+            if success {
+                // Open X app with pre-filled text
+                let encodedText = fullTweet.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                
+                // Try X app first
+                if let xURL = URL(string: "twitter://post?message=\(encodedText)") {
+                    UIApplication.shared.open(xURL) { success in
+                        if !success {
+                            // Fallback to web
+                            if let webURL = URL(string: "https://twitter.com/intent/tweet?text=\(encodedText)") {
+                                UIApplication.shared.open(webURL)
+                            }
+                        }
                     }
                 }
                 
-                // Create activity for X share (regardless of success since user intent is there)
+                // Create activity for successful X share
                 Task {
                     await createXShareActivity()
                 }
+                
+                self.dismiss()
+            } else {
+                self.errorMessage = error ?? "Failed to save image"
             }
-        }
-    }
-
-    private func saveImageToPhotoLibrary(_ image: UIImage) {
-        // Check current authorization status first
-        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-
-        switch status {
-        case .authorized, .limited:
-            // Already have permission, save the image
-            PHPhotoLibrary.shared().performChanges({
-                _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
-            }) { success, error in
-                if !success {
-                    print("Failed to save image to X share: \(error?.localizedDescription ?? "Unknown error")")
-                }
-            }
-
-        case .notDetermined:
-            // Need to request permission
-            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
-                if newStatus == .authorized || newStatus == .limited {
-                    PHPhotoLibrary.shared().performChanges({
-                        _ = PHAssetChangeRequest.creationRequestForAsset(from: image)
-                    }) { success, error in
-                        if !success {
-                            print("Failed to save image to X share: \(error?.localizedDescription ?? "Unknown error")")
-                        }
-                    }
-                }
-            }
-
-        case .denied, .restricted:
-            print("Photo library access denied for X share")
-
-        @unknown default:
-            print("Unknown photo library authorization status")
         }
     }
     
     // MARK: - Activity Creation
     private func createXShareActivity() async {
         guard UnifiedAuthManager.shared.isAuthenticated,
-              let userID = UnifiedAuthManager.shared.currentUser?.recordID,
-              let userName = UnifiedAuthManager.shared.currentUser?.displayName else {
+              let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
             return
         }
         
         var activityType = "xPostShared"
-        var metadata: [String: Any] = ["platform": "x", "includedHashtags": Array(selectedHashtags)]
+        var metadata: [String: Any] = ["platform": "x"]
         
         // Add content-specific metadata
         switch content.type {
@@ -458,14 +370,8 @@ struct XShareView: View {
             activityType = "challengeXPostShared"
             metadata["challengeId"] = challenge.id
             metadata["challengeName"] = challenge.title
-        case .profile:
-            activityType = "profileXPostShared"
-        case .teamInvite(let teamName, let joinCode):
-            activityType = "teamInviteXPostShared"
-            metadata["teamName"] = teamName
-            metadata["joinCode"] = joinCode
-        case .leaderboard:
-            activityType = "leaderboardXPostShared"
+        default:
+            break
         }
         
         do {
@@ -483,146 +389,44 @@ struct XShareView: View {
     }
 }
 
-// MARK: - Supporting Types
-enum XTweetStyle: String, CaseIterable {
-    case classic = "Classic"
-    case thread = "Thread"
-    case viral = "Viral"
-    case professional = "Professional"
-    case funny = "Funny"
-
-    var icon: String {
-        switch self {
-        case .classic: return "text.bubble"
-        case .thread: return "text.append"
-        case .viral: return "flame"
-        case .professional: return "briefcase"
-        case .funny: return "face.smiling"
-        }
-    }
-}
-
-// MARK: - Components
-struct XStyleCard: View {
-    let style: XTweetStyle
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: style.icon)
-                    .font(.system(size: 24))
-                    .foregroundColor(isSelected ? .black : .white)
-
-                Text(style.rawValue)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isSelected ? .black : .white)
-            }
-            .frame(width: 80, height: 80)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color(hex: "#1DA1F2") : Color.white.opacity(0.1))
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-struct ToggleOption: View {
-    let title: String
-    let subtitle: String
-    @Binding var isOn: Bool
-    let icon: String
-
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundColor(Color(hex: "#1DA1F2"))
-                .frame(width: 30)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-
-                Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundColor(.gray)
-            }
-
-            Spacer()
-
-            Toggle("", isOn: $isOn)
-                .toggleStyle(SwitchToggleStyle(tint: Color(hex: "#1DA1F2")))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(12)
-    }
-}
-
-struct XHashtag: View {
-    let hashtag: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text("#\(hashtag)")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(isSelected ? .black : Color(hex: "#1DA1F2"))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    isSelected
-                        ? Color(hex: "#1DA1F2")
-                        : Color(hex: "#1DA1F2").opacity(0.1)
-                )
-                .cornerRadius(16)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-struct CharacterCountView: View {
+// MARK: - Character Counter
+struct CharacterCounter: View {
     let current: Int
     let max: Int
     let includeImage: Bool
-
+    
     private var remaining: Int {
-        max - current
+        let total = current + (includeImage ? 24 : 0)
+        return max - total
     }
-
+    
     private var color: Color {
         if remaining < 0 {
             return .red
         } else if remaining < 20 {
             return .orange
         } else {
-            return .gray
+            return Color(hex: "#1D9BF0")
         }
     }
-
+    
     var body: some View {
         HStack(spacing: 8) {
             if includeImage {
                 Image(systemName: "photo")
                     .font(.system(size: 12))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.white.opacity(0.5))
             }
-
+            
             Text("\(remaining)")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(color)
-
+            
             // Progress circle
             ZStack {
                 Circle()
                     .stroke(Color.white.opacity(0.1), lineWidth: 2)
-
+                
                 Circle()
                     .trim(from: 0, to: min(CGFloat(current) / CGFloat(max), 1.0))
                     .stroke(color, lineWidth: 2)
@@ -633,11 +437,12 @@ struct CharacterCountView: View {
     }
 }
 
+// MARK: - Tweet Preview
 struct XTweetPreview: View {
     let text: String
     let image: UIImage?
-    let style: XTweetStyle
-
+    let includeHashtags: Bool
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Mock tweet header
@@ -654,113 +459,76 @@ struct XTweetPreview: View {
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.white)
                     )
-
+                
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text("SnapChef")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
-
+                        
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 14))
-                            .foregroundColor(Color(hex: "#1DA1F2"))
+                            .foregroundColor(Color(hex: "#1D9BF0"))
                     }
-
+                    
                     Text("@snapchef · now")
                         .font(.system(size: 14))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.white.opacity(0.5))
                 }
-
+                
                 Spacer()
-
+                
                 Image(systemName: "ellipsis")
-                    .foregroundColor(.gray)
+                    .foregroundColor(.white.opacity(0.5))
             }
-
+            
             // Tweet text
             Text(text)
                 .font(.system(size: 15))
                 .foregroundColor(.white)
                 .lineSpacing(4)
-
-            // Image preview placeholder
+            
+            // Hashtags
+            if includeHashtags {
+                Text("#SnapChef #FridgeToFeast #CookingApp")
+                    .font(.system(size: 15))
+                    .foregroundColor(Color(hex: "#1D9BF0"))
+            }
+            
+            // Image preview
             if image != nil {
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.1))
-                    .frame(height: 200)
+                    .fill(Color.white.opacity(0.05))
+                    .frame(height: 180)
                     .overlay(
                         Image(systemName: "photo")
                             .font(.system(size: 40))
-                            .foregroundColor(.gray)
+                            .foregroundColor(.white.opacity(0.3))
                     )
             }
-
+            
+            Spacer()
+            
             // Engagement bar
             HStack(spacing: 40) {
-                Image(systemName: "bubble.left")
-                Image(systemName: "arrow.2.squarepath")
-                Image(systemName: "heart")
-                Image(systemName: "chart.bar")
+                HStack(spacing: 4) {
+                    Image(systemName: "bubble.left")
+                    Text("12")
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.2.squarepath")
+                    Text("3")
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: "heart")
+                    Text("42")
+                }
                 Image(systemName: "square.and.arrow.up")
             }
-            .font(.system(size: 18))
-            .foregroundColor(.gray)
-            .padding(.top, 8)
+            .font(.system(size: 14))
+            .foregroundColor(.white.opacity(0.5))
         }
         .padding(16)
-        .background(Color.black)
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - WrappingHStack Layout Helper
-struct WrappingHStack<Data: RandomAccessCollection, Content: View>: View where Data.Element: Hashable {
-    var data: Data
-    var spacing: CGFloat
-    var content: (Data.Element) -> Content
-
-    init(_ data: Data, spacing: CGFloat = 8, @ViewBuilder content: @escaping (Data.Element) -> Content) {
-        self.data = data
-        self.spacing = spacing
-        self.content = content
-    }
-
-    var body: some View {
-        let dataArray = Array(data)
-        var width: CGFloat = 0
-        var height: CGFloat = 0
-
-        return GeometryReader { geo in
-            ZStack(alignment: .topLeading) {
-                ForEach(dataArray, id: \.self) { item in
-                    content(item)
-                        .alignmentGuide(.leading) { d in
-                            if abs(width - d.width) > geo.size.width {
-                                width = 0
-                                height -= d.height + spacing
-                            }
-                            let result = width
-                            if item == dataArray.last {
-                                width = 0
-                            }
-                            width -= d.width + spacing
-                            return result
-                        }
-                        .alignmentGuide(.top) { _ in
-                            let result = height
-                            if item == dataArray.last {
-                                height = 0
-                            }
-                            return result
-                        }
-                }
-            }
-        }
-        .frame(height: 100) // Adjust height as needed
     }
 }
 

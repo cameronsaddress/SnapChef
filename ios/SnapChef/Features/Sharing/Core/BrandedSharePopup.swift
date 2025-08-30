@@ -51,7 +51,6 @@ struct BrandedSharePopup: View {
             .instagram,
             .instagramStory,
             .twitter,
-            .whatsapp,
             .messages,
             .copy,
             .more

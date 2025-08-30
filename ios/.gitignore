@@ -48,6 +48,20 @@ playground.xcworkspace
 
 .build/
 
+# Environment and API Keys
+.env
+.env.local
+.env.*.local
+Config-Local.xcconfig
+apikeys.plist
+secrets.json
+*.secret
+
+# API Key files - NEVER commit these
+SNAPCHEF_API_KEY.txt
+api_keys.txt
+credentials.plist
+
 # CocoaPods
 #
 # We recommend against adding the Pods directory to your .gitignore. However

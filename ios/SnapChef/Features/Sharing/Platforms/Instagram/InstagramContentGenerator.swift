@@ -304,11 +304,12 @@ struct PhotoOverlayContent: View {
                         .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
                     }
                     
-                    // Title with background blur
-                    Text(recipe.name.uppercased())
-                        .font(.system(size: isStory ? 48 : 38, weight: .heavy, design: .rounded))
+                    // Share caption with larger font
+                    Text(recipe.shareCaption)
+                        .font(.system(size: isStory ? 52 : 42, weight: .heavy, design: .rounded))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
+                        .lineLimit(3)
                         .padding(.horizontal, 30)
                         .shadow(color: .black.opacity(0.8), radius: 10, x: 0, y: 5)
                     
