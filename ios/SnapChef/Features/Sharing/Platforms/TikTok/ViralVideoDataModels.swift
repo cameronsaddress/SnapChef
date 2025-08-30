@@ -109,11 +109,11 @@ public struct RenderProgress: Sendable {
 
 // OPTIMIZED Export controls with enhanced memory management
 public enum ExportSettings {
-    // CRITICAL SPEED FIX: Use optimized presets for different scenarios
+    // HIGH QUALITY: Use highest quality for all exports to prevent compression artifacts
     public static let videoPreset = AVAssetExportPresetHighestQuality
-    public static let draftPreset = AVAssetExportPresetMediumQuality // Faster for intermediate steps
+    public static let draftPreset = AVAssetExportPresetHighestQuality // Changed from Medium to Highest
     public static let finalPreset = AVAssetExportPresetHighestQuality
-    public static let emergencyPreset = AVAssetExportPresetLowQuality // Emergency fallback
+    public static let emergencyPreset = AVAssetExportPresetHighestQuality // Even emergency uses high quality
 
     // ENHANCED MEMORY LIMITS: More aggressive memory management
     public static let maxMemoryUsage: UInt64 = 300 * 1_024 * 1_024 // Reduced to 300MB
@@ -125,11 +125,11 @@ public enum ExportSettings {
     public static let maxFileSize: Int64 = 80 * 1_024 * 1_024  // 80MB max file size
     public static let targetFileSize: Int64 = 50 * 1_024 * 1_024  // Target 50MB
 
-    // OPTIMIZED BITRATES: Balanced quality and speed
-    public static let draftBitRate = 6_000_000 // 6 Mbps for drafts
-    public static let finalBitRate = 10_000_000 // 10 Mbps for final
-    public static let fastBitRate = 4_000_000 // 4 Mbps for ultra-fast processing
-    public static let emergencyBitRate = 2_000_000 // 2 Mbps for emergency mode
+    // HIGH QUALITY BITRATES: Prioritize quality over speed
+    public static let draftBitRate = 20_000_000 // 20 Mbps for drafts
+    public static let finalBitRate = 25_000_000 // 25 Mbps for final
+    public static let fastBitRate = 15_000_000 // 15 Mbps for fast processing
+    public static let emergencyBitRate = 12_000_000 // 12 Mbps for emergency mode
 
     // ENHANCED PROCESSING LIMITS: Memory-conscious settings
     public static let maxConcurrentSegments = 1 // Single segment to minimize memory

@@ -100,9 +100,10 @@ public final class StillWriter: Sendable {
             AVVideoWidthKey: Int(config.size.width),
             AVVideoHeightKey: Int(config.size.height),
             AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: 8_000_000, // 8 Mbps for high quality
+                AVVideoAverageBitRateKey: 20_000_000, // 20 Mbps for high quality
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-                AVVideoH264EntropyModeKey: AVVideoH264EntropyModeCABAC
+                AVVideoH264EntropyModeKey: AVVideoH264EntropyModeCABAC,
+                AVVideoMaxKeyFrameIntervalKey: 30
             ]
         ]
 
@@ -596,8 +597,10 @@ public final class StillWriter: Sendable {
             AVVideoWidthKey: Int(config.size.width),
             AVVideoHeightKey: Int(config.size.height),
             AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: 6_000_000, // Lower bitrate for speed
-                AVVideoProfileLevelKey: AVVideoProfileLevelH264MainAutoLevel
+                AVVideoAverageBitRateKey: 20_000_000, // 20 Mbps for high quality
+                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
+                AVVideoH264EntropyModeKey: AVVideoH264EntropyModeCABAC,
+                AVVideoMaxKeyFrameIntervalKey: 30
             ]
         ]
 
