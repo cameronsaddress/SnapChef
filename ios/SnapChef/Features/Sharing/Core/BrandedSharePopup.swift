@@ -328,8 +328,9 @@ struct BrandedSharePopup: View {
                 generateAndShareDirectly(platform: platform)
 
             case .twitter:
-                // Show X-specific view
-                showingPlatformView = true
+                print("🔍 BrandedSharePopup: X (Twitter) share for \(content.type)")
+                currentSharingPlatform = platform
+                generateAndShareDirectly(platform: platform)
 
             case .facebook, .whatsapp:
                 // Try direct share or fallback to web
@@ -388,10 +389,8 @@ struct BrandedSharePopup: View {
         switch platform {
         case .tiktok:
             TikTokShareView(content: content)  // Use the template selection view
-        case .twitter:
-            XShareView(content: content)
         default:
-            // Instagram and Messages now use direct sharing, no preview views
+            // Instagram, Messages, and X now use direct sharing, no preview views
             EmptyView()
         }
     }
@@ -413,6 +412,8 @@ struct BrandedSharePopup: View {
                     try await generateAndShareInstagram(content: shareContent, isStory: true)
                 case .messages:
                     try await generateAndShareMessages(content: shareContent)
+                case .twitter:
+                    try await generateAndShareX(content: shareContent)
                 default:
                     break
                 }
@@ -482,6 +483,20 @@ struct BrandedSharePopup: View {
         
         await shareToMessages(image: image, content: content)
         await createMessagesShareActivity(content: content)
+    }
+    
+    private func generateAndShareX(content: ShareContent) async throws {
+        // Generate image using Instagram content generator with X/Twitter styling
+        let image = try await InstagramContentGenerator.shared.generateContent(
+            template: getInstagramTemplate(for: content),
+            content: content,
+            isStory: false, // Use square format for X
+            backgroundColor: Color(hex: "#000000"), // X black theme
+            sticker: nil
+        )
+        
+        await shareToX(image: image, content: content)
+        await createXShareActivity(content: content)
     }
     
     private func getInstagramTemplate(for content: ShareContent) -> InstagramTemplate {
@@ -573,6 +588,46 @@ struct BrandedSharePopup: View {
                     print("📱 Messages: Image saved to Photos as fallback")
                 } else {
                     print("📱 Messages: Failed to save image: \(error ?? "Unknown error")")
+                }
+            }
+        }
+    }
+    
+    @MainActor
+    private func shareToX(image: UIImage, content: ShareContent) async {
+        // Generate tweet text
+        let tweetText = generateXTweetText(for: content)
+        
+        // Save image temporarily for sharing
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("x_share_\(UUID().uuidString).jpg")
+        
+        if let imageData = image.jpegData(compressionQuality: 0.9) {
+            try? imageData.write(to: tempURL)
+        }
+        
+        // Copy tweet to clipboard as backup
+        UIPasteboard.general.string = tweetText
+        
+        // Try to open X/Twitter app with the tweet
+        let encodedTweet = tweetText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        
+        // First try X app
+        if let xURL = URL(string: "twitter://post?message=\(encodedTweet)") {
+            UIApplication.shared.open(xURL) { success in
+                if success {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.dismiss()
+                    }
+                } else {
+                    // Fallback to web version
+                    if let webURL = URL(string: "https://twitter.com/intent/tweet?text=\(encodedTweet)") {
+                        UIApplication.shared.open(webURL) { _ in
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                self.dismiss()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -675,6 +730,20 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
 """
     }
     
+    private func generateXTweetText(for content: ShareContent) -> String {
+        switch content.type {
+        case .recipe(let recipe):
+            let totalTime = recipe.prepTime + recipe.cookTime
+            return "Just turned my sad fridge into \(recipe.name)! 🤖✨ Ready in \(totalTime) minutes. #SnapChef #AIRecipes #CookingHacks #FoodWaste"
+        case .achievement(let name):
+            return "🏆 Achievement unlocked: \(name)! Leveling up my cooking game with #SnapChef #CookingAchievement"
+        case .challenge(let challenge):
+            return "🎯 Joined the \(challenge.title) challenge on SnapChef! Who's with me? #SnapChefChallenge #CookingChallenge"
+        default:
+            return "Check out what I made with SnapChef! 🍳 #SnapChef #AIRecipes"
+        }
+    }
+    
     // MARK: - Image resizing helpers
     
     private func resizeImageForStories(_ image: UIImage) -> UIImage {
@@ -721,6 +790,58 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
     
     // MARK: - Activity creation methods
     
+    private func createXShareActivity(content: ShareContent) async {
+        guard UnifiedAuthManager.shared.isAuthenticated,
+              let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
+            return
+        }
+        
+        var activityType = "xShared"
+        
+        switch content.type {
+        case .recipe(let recipe):
+            activityType = "recipeXShared"
+            do {
+                try await CloudKitSyncService.shared.createActivity(
+                    type: activityType,
+                    actorID: userID,
+                    recipeID: recipe.id.uuidString,
+                    recipeName: recipe.name
+                )
+            } catch {
+                print("Failed to create X share activity: \(error)")
+            }
+        default:
+            break
+        }
+    }
+    
+    private func createMessagesShareActivity(content: ShareContent) async {
+        guard UnifiedAuthManager.shared.isAuthenticated,
+              let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
+            return
+        }
+        
+        var activityType = "messagesShared"
+        
+        switch content.type {
+        case .recipe(let recipe):
+            activityType = "recipeMessagesShared"
+            do {
+                try await CloudKitSyncService.shared.createActivity(
+                    type: activityType,
+                    actorID: userID,
+                    recipeID: recipe.id.uuidString,
+                    recipeName: recipe.name
+                )
+            } catch {
+                print("Failed to create Messages share activity: \(error)")
+            }
+        default:
+            break
+        }
+    }
+    
     private func createInstagramShareActivity(isStory: Bool, content: ShareContent) async {
         guard UnifiedAuthManager.shared.isAuthenticated,
               let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
@@ -741,29 +862,6 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
                 )
             } catch {
                 print("Failed to create Instagram share activity: \(error)")
-            }
-        default:
-            break
-        }
-    }
-    
-    private func createMessagesShareActivity(content: ShareContent) async {
-        guard UnifiedAuthManager.shared.isAuthenticated,
-              let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
-            return
-        }
-        
-        switch content.type {
-        case .recipe(let recipe):
-            do {
-                try await CloudKitSyncService.shared.createActivity(
-                    type: "recipeMessagesCardShared",
-                    actorID: userID,
-                    recipeID: recipe.id.uuidString,
-                    recipeName: recipe.name
-                )
-            } catch {
-                print("Failed to create Messages share activity: \(error)")
             }
         default:
             break
