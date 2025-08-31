@@ -41,6 +41,9 @@ struct BrandedSharePopup: View {
     @State private var showInstagramFeedAlert = false
     @State private var instagramFeedCaption = ""
     
+    // Messages delegate (needs to be retained)
+    @State private var messageComposeDelegate: MessageComposeDelegateWithDismiss?
+    
     @Environment(\.dismiss) var dismiss
 
     let content: ShareContent
@@ -589,8 +592,17 @@ struct BrandedSharePopup: View {
             topVC = presented
         }
         
+        // Create and retain the delegate
+        let delegate = MessageComposeDelegateWithDismiss {
+            // Dismiss the share popup after message composer closes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.dismiss()
+            }
+        }
+        self.messageComposeDelegate = delegate
+        
         let messageVC = MFMessageComposeViewController()
-        messageVC.messageComposeDelegate = MessageComposeDelegate()
+        messageVC.messageComposeDelegate = delegate
         messageVC.body = generateMessageText(for: content)
         
         if let imageData = image.pngData() {
@@ -1351,6 +1363,25 @@ struct VideoGenerationView: View {
 }
 
 // MARK: - Message Compose Delegate
+class MessageComposeDelegateWithDismiss: NSObject, MFMessageComposeViewControllerDelegate, @unchecked Sendable {
+    private let onDismiss: @Sendable () -> Void
+    
+    init(onDismiss: @escaping @Sendable () -> Void) {
+        self.onDismiss = onDismiss
+        super.init()
+    }
+    
+    func messageComposeViewController(_ controller: MFMessageComposeViewController, didFinishWith result: MessageComposeResult) {
+        let dismissCallback = self.onDismiss
+        Task { @MainActor in
+            controller.dismiss(animated: true) {
+                dismissCallback()
+            }
+        }
+    }
+}
+
+// Keep old delegate for backward compatibility if needed
 class MessageComposeDelegate: NSObject, MFMessageComposeViewControllerDelegate {
     func messageComposeViewController(_ controller: MFMessageComposeViewController, didFinishWith result: MessageComposeResult) {
         Task { @MainActor in
