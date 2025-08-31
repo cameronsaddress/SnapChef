@@ -13,218 +13,198 @@ import Photos
 struct MessagesShareView: View {
     let content: ShareContent
     @Environment(\.dismiss) var dismiss
-    @State private var selectedCardStyle: MessageCardStyle = .rotating
-    @State private var messageText = ""
-    @State private var isGenerating = false
-    @State private var generatedCard: UIImage?
-    @State private var rotationAngle: Double = 0
-    @State private var showingFront = true
-    @State private var autoRotateEnabled = true
+    @State private var isGenerating = true  // Start generating immediately
+    @State private var generatedImage: UIImage?
     @State private var showingMessageComposer = false
     @State private var errorMessage: String?
+    @State private var autoShare = true  // Auto-share on appear
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Messages app-inspired gradient
-                LinearGradient(
-                    colors: [
-                        Color(hex: "#007AFF"),
-                        Color(hex: "#0051D5")
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        VStack(spacing: 8) {
+                // Show loading overlay when auto-sharing
+                if autoShare && isGenerating {
+                    Color.black.opacity(0.8)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                        
+                        Text("Creating your message...")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                    }
+                    .padding(40)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.black.opacity(0.9))
+                    )
+                } else {
+                    // Clean white background like Instagram
+                    Color(UIColor.systemBackground)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 0) {
+                    // Header with X button
+                    VStack(spacing: 16) {
+                        HStack {
+                            Button(action: { dismiss() }) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(.primary)
+                                    .frame(width: 30, height: 30)
+                            }
+                            
+                            Spacer()
+                            
                             HStack(spacing: 8) {
                                 Image(systemName: "message.fill")
-                                    .font(.system(size: 24, weight: .bold))
-                                Text("Share via Messages")
-                                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                                    .font(.system(size: 20))
+                                    .foregroundColor(Color(hex: "#34C759"))
+                                Text("Share to Messages")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(.primary)
                             }
-                            .foregroundColor(.white)
-
-                            Text("Send an interactive recipe card")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.8))
+                            
+                            Spacer()
+                            
+                            // Invisible spacer for balance
+                            Color.clear
+                                .frame(width: 30, height: 30)
                         }
-                        .padding(.top, 20)
-
-                        // Rotating Card Preview
-                        VStack(alignment: .leading, spacing: 16) {
-                            HStack {
-                                Text("Interactive Card")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.white)
-
-                                Spacer()
-
-                                Toggle("Auto-rotate", isOn: $autoRotateEnabled)
-                                    .toggleStyle(SwitchToggleStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            }
-
-                            RotatingCardView(
-                                content: content,
-                                showingFront: $showingFront,
-                                autoRotate: autoRotateEnabled
-                            )
-                            .frame(height: 400)
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                                    showingFront.toggle()
-                                }
-                            }
-
-                            Text("Tap card to flip • Recipients can interact with it")
-                                .font(.system(size: 12))
-                                .foregroundColor(.white.opacity(0.6))
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .padding(.horizontal, 20)
-
-                        // Card Style Selection
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Card Style")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(MessageCardStyle.allCases, id: \.self) { style in
-                                        MessageStyleCard(
-                                            style: style,
-                                            isSelected: selectedCardStyle == style,
-                                            action: {
-                                                selectedCardStyle = style
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-
-                        // Message Text
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Message")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-
-                            TextEditor(text: $messageText)
-                                .frame(height: 100)
-                                .padding(12)
-                                .background(Color.white.opacity(0.1))
-                                .cornerRadius(12)
-                                .foregroundColor(.white)
-                                .scrollContentBackground(.hidden)
-                                .onAppear {
-                                    if messageText.isEmpty {
-                                        messageText = generateMessageText()
-                                    }
-                                }
-                        }
-                        .padding(.horizontal, 20)
-
-                        // Features List
-                        VStack(spacing: 12) {
-                            MessageFeatureRow(
-                                icon: "cube.transparent",
-                                title: "3D Effect",
-                                subtitle: "Interactive rotating card"
-                            )
-
-                            MessageFeatureRow(
-                                icon: "camera.on.rectangle",
-                                title: "Before & After",
-                                subtitle: "Shows ingredient transformation"
-                            )
-
-                            MessageFeatureRow(
-                                icon: "hand.tap",
-                                title: "Interactive",
-                                subtitle: "Recipients can tap to explore"
-                            )
-
-                            MessageFeatureRow(
-                                icon: "sparkles",
-                                title: "Animated",
-                                subtitle: "Smooth transitions and effects"
-                            )
-                        }
-                        .padding(.horizontal, 20)
-
-                        // Send Button
-                        Button(action: sendMessage) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.white)
-                                    .frame(height: 56)
-
-                                if isGenerating {
-                                    HStack(spacing: 12) {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "#007AFF")))
-                                        Text("Preparing...")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(Color(hex: "#007AFF"))
-                                    }
-                                } else {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "message.fill")
-                                        Text("Send Message")
-                                    }
+                        .padding(.horizontal)
+                    }
+                    .padding(.vertical)
+                    .background(Color(UIColor.systemBackground))
+                    
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            // Large Preview (matching Instagram style)
+                            VStack(spacing: 12) {
+                                Text("Preview")
                                     .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(Color(hex: "#007AFF"))
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                // Preview with shadow - show generated image or placeholder
+                                ZStack {
+                                    if let image = generatedImage {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                    } else {
+                                        // Loading state
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color(UIColor.secondarySystemBackground))
+                                            .overlay(
+                                                VStack(spacing: 12) {
+                                                    ProgressView()
+                                                        .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "#34C759")))
+                                                    Text("Generating preview...")
+                                                        .font(.system(size: 14))
+                                                        .foregroundColor(.secondary)
+                                                }
+                                            )
+                                    }
                                 }
+                                .frame(height: UIScreen.main.bounds.height * 0.5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(UIColor.systemBackground))
+                                        .shadow(color: .black.opacity(0.1), radius: 20, y: 10)
+                                )
                             }
+                            .padding(.horizontal, 20)
+
+
+                            // Send Button with green Messages theme
+                            VStack(spacing: 8) {
+                                Button(action: sendMessage) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [
+                                                        Color(hex: "#34C759"),
+                                                        Color(hex: "#30D158")
+                                                    ],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(height: 56)
+
+                                        if isGenerating {
+                                            HStack(spacing: 12) {
+                                                ProgressView()
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                Text("Generating...")
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundColor(.white)
+                                            }
+                                        } else {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: "message.fill")
+                                                Text("Send via Messages")
+                                            }
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(.white)
+                                        }
+                                    }
+                                }
+                                .disabled(isGenerating)
+                                
+                                Text("Will open Messages app with your card attached")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 40)
                         }
-                        .disabled(isGenerating)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 40)
+                    }
+                }
+                }  // Close the else block for loading overlay
+            }
+            .navigationBarHidden(true)
+            .sheet(isPresented: $showingMessageComposer) {
+                MessageComposerWrapper(
+                    messageText: generateMessageText(),
+                    image: generatedImage,
+                    content: content,
+                    onDismiss: {
+                        showingMessageComposer = false
+                    }
+                )
+            }
+            .alert("Error", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") {
+                    errorMessage = nil
+                }
+            } message: {
+                if let error = errorMessage {
+                    Text(error)
+                }
+            }
+            .onAppear {
+                print("🔍 DEBUG: MessagesShareView appeared")
+                
+                // Auto-generate and share when opened
+                if autoShare {
+                    generateImage()
+                    
+                    // After image is generated, automatically open Messages
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        if generatedImage != nil && !showingMessageComposer {
+                            sendMessage()
+                        }
                     }
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.white)
-                }
-            }
-        }
-        .sheet(isPresented: $showingMessageComposer) {
-            MessageComposerWrapper(
-                messageText: messageText,
-                image: generatedCard,
-                content: content,
-                onDismiss: {
-                    showingMessageComposer = false
-                }
-            )
-        }
-        .alert("Error", isPresented: .constant(errorMessage != nil)) {
-            Button("OK") {
-                errorMessage = nil
-            }
-        } message: {
-            if let error = errorMessage {
-                Text(error)
-            }
-        }
-        .onAppear {
-            print("🔍 DEBUG: MessagesShareView appeared")
         }
     }
-
+    
     private func generateMessageText() -> String {
         guard case .recipe(let recipe) = content.type else {
             return "Check out what I made with SnapChef! 🍳"
@@ -241,35 +221,44 @@ struct MessagesShareView: View {
         """
     }
 
-    private func sendMessage() {
+    private func generateImage() {
+        guard generatedImage == nil else { return } // Don't regenerate if already exists
+        
         isGenerating = true
-
+        
         Task {
             do {
-                // Generate the card image
-                let card = try await MessageCardGenerator.shared.generateCard(
-                    for: content,
-                    style: selectedCardStyle
+                // Generate image using Instagram's content generator (same as Stories)
+                let image = try await InstagramContentGenerator.shared.generateContent(
+                    template: .modern, // Use modern template
+                    content: content,
+                    isStory: true, // Use story format (9:16 ratio)
+                    backgroundColor: Color(hex: "#34C759"), // Messages green
+                    sticker: nil
                 )
-
+                
                 await MainActor.run {
-                    generatedCard = card
-                    isGenerating = false
-
-                    // Check if Messages is available
-                    if MFMessageComposeViewController.canSendText() {
-                        showingMessageComposer = true
-                    } else {
-                        // Fallback: Save to photos with permission handling
-                        saveImageToPhotoLibrary(card)
-                        errorMessage = "Messages not available. Card will be saved to Photos."
-                    }
+                    self.generatedImage = image
+                    self.isGenerating = false
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    isGenerating = false
+                    self.errorMessage = error.localizedDescription
+                    self.isGenerating = false
                 }
+            }
+        }
+    }
+    
+    private func sendMessage() {
+        // Check if Messages is available
+        if MFMessageComposeViewController.canSendText() {
+            showingMessageComposer = true
+        } else {
+            // Fallback: Save to photos
+            if let image = generatedImage {
+                saveImageToPhotoLibrary(image)
+                errorMessage = "Messages not available. Image will be saved to Photos."
             }
         }
     }
@@ -333,7 +322,7 @@ struct MessagesShareView: View {
         }
         
         var activityType = "messagesCardShared"
-        var metadata: [String: Any] = ["platform": "messages", "cardStyle": selectedCardStyle.rawValue]
+        var metadata: [String: Any] = ["platform": "messages"]
         
         // Add content-specific metadata
         switch content.type {

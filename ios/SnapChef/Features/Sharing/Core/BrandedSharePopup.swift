@@ -52,8 +52,7 @@ struct BrandedSharePopup: View {
             .instagramStory,
             .twitter,
             .messages,
-            .copy,
-            .more
+            .copy
         ]
     }
 
@@ -310,15 +309,6 @@ struct BrandedSharePopup: View {
                     await createShareActivity(platform: platform)
                     
                     dismiss()
-                }
-
-            case .more:
-                // Show system share sheet
-                Task {
-                    await shareService.share(to: platform)
-                    
-                    // Create activity for content sharing
-                    await createShareActivity(platform: platform)
                 }
             }
         } else {

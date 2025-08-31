@@ -149,7 +149,6 @@ enum SharePlatformType: String, CaseIterable {
     case whatsapp = "WhatsApp"
     case messages = "Messages"
     case copy = "Copy Link"
-    case more = "More"
 
     var icon: String {
         switch self {
@@ -161,7 +160,6 @@ enum SharePlatformType: String, CaseIterable {
         case .whatsapp: return "bubble.left.and.bubble.right.fill"
         case .messages: return "message.fill"
         case .copy: return "doc.on.doc.fill"
-        case .more: return "ellipsis.circle.fill"
         }
     }
 
@@ -174,7 +172,6 @@ enum SharePlatformType: String, CaseIterable {
         case .whatsapp: return Color(hex: "#25D366")
         case .messages: return Color(hex: "#43e97b")
         case .copy: return Color(hex: "#667eea")
-        case .more: return Color.gray
         }
     }
 
@@ -186,7 +183,7 @@ enum SharePlatformType: String, CaseIterable {
         case .twitter: return "twitter://"
         case .facebook: return "fb://"
         case .whatsapp: return "whatsapp://"
-        case .messages, .copy, .more: return nil
+        case .messages, .copy: return nil
         }
     }
 
@@ -275,8 +272,6 @@ class ShareService: ObservableObject {
                 try await shareToMessages(content)
             case .copy:
                 copyToClipboard(content)
-            case .more:
-                showSystemShareSheet(content)
             }
 
             // Award rewards
@@ -439,8 +434,8 @@ class ShareService: ObservableObject {
     private func showSystemShareSheet(_ content: ShareContent) {
         var items: [Any] = []
 
-        // Add text
-        items.append(formatTextForPlatform(content, platform: .more))
+        // Add text - use generic formatting
+        items.append(content.text + "\n\n" + content.hashtags.map { "#\($0)" }.joined(separator: " "))
 
         // Add images
         if let image = content.afterImage ?? content.beforeImage {

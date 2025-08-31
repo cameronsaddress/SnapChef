@@ -20,6 +20,9 @@ struct InstagramShareView: View {
     @State private var storyBackgroundStyle: StoryBackgroundStyle = .photo
     @State private var showTextOverlay = true
     @State private var captionCopied = false
+    @State private var showFeedSavedAlert = false
+    @State private var showInstagramNotInstalledAlert = false
+    @State private var autoShare = true  // Auto-generate and share on appear
     
     enum ShareMode: String, CaseIterable {
         case feed = "Feed"
@@ -45,11 +48,31 @@ struct InstagramShareView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Clean white background
-                Color(UIColor.systemBackground)
-                    .ignoresSafeArea()
-                
-                VStack(spacing: 0) {
+                // Show loading overlay when auto-sharing
+                if autoShare && isGenerating {
+                    Color.black.opacity(0.8)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                        
+                        Text("Creating your Instagram post...")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                    }
+                    .padding(40)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.black.opacity(0.9))
+                    )
+                } else {
+                    // Clean white background
+                    Color(UIColor.systemBackground)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 0) {
                     // Header with segmented control
                     VStack(spacing: 16) {
                         HStack {
@@ -226,7 +249,7 @@ struct InstagramShareView: View {
                                         } else {
                                             HStack(spacing: 8) {
                                                 Image(systemName: "square.and.arrow.up")
-                                                Text(shareMode == .story ? "Share to Story" : "Share to Instagram")
+                                                Text(shareMode == .story ? "Share to Story" : "Save & Share to Feed")
                                             }
                                             .font(.system(size: 16, weight: .semibold))
                                             .foregroundColor(.white)
@@ -234,6 +257,12 @@ struct InstagramShareView: View {
                                     }
                                 }
                                 .disabled(isGenerating)
+                                
+                                if shareMode == .feed {
+                                    Text("Instagram requires manual posting for Feed")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                }
                                 
                                 if captionCopied {
                                     Text("Caption copied to clipboard!")
@@ -247,6 +276,7 @@ struct InstagramShareView: View {
                         }
                     }
                 }
+                }  // Close the else block for loading overlay
             }
             .navigationBarHidden(true)
         }
@@ -261,6 +291,48 @@ struct InstagramShareView: View {
         }
         .onAppear {
             print("🔍 DEBUG: InstagramShareView appeared")
+            
+            // Auto-generate and share when opened from BrandedSharePopup
+            if autoShare {
+                // Set caption text
+                if captionText.isEmpty {
+                    captionText = generateCaption()
+                }
+                
+                // Start generating and sharing immediately
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    generateAndShare()
+                }
+            }
+        }
+        .alert("Instagram Not Installed", isPresented: $showInstagramNotInstalledAlert) {
+            Button("Open App Store") {
+                if let url = URL(string: "https://apps.apple.com/app/instagram/id389801252") {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Instagram is not installed on your device. Would you like to install it from the App Store?")
+        }
+        .alert("Ready to Share on Instagram", isPresented: $showFeedSavedAlert) {
+            Button("Open Instagram") {
+                // Open Instagram and then dismiss after a delay
+                if let url = URL(string: "instagram://") {
+                    UIApplication.shared.open(url) { _ in
+                        // Dismiss the share view after opening Instagram
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            Button("Done") {
+                // Just close the alert, stay in the share view
+                // User can manually dismiss with X button if they want
+            }
+        } message: {
+            Text("✅ Image saved to Photos\n📋 Caption copied to clipboard\n\nTo share:\n1. Tap \"Open Instagram\"\n2. Create a new post (+)\n3. Select the saved image\n4. Paste the caption")
         }
     }
 
@@ -331,6 +403,7 @@ struct InstagramShareView: View {
             let emoji = getRecipeEmoji(for: recipe)
             let primaryHashtag = (recipe.tags.first ?? "Homemade").replacingOccurrences(of: " ", with: "")
             
+            // Same caption that appears on the image
             return """
 Just turned my sad fridge into \(recipe.name) 🎉
 
@@ -537,58 +610,26 @@ Made with SnapChef 🍳
     }
 
     private func shareToInstagramFeed(image: UIImage) {
-        // Method 1: Try UIDocumentInteractionController first (official Meta method)
+        // Resize image for optimal Instagram Feed display
         let feedImage = resizeImageForFeed(image)
         
-        // Create temporary .igo file for Instagram-exclusive sharing
-        let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
-        let filePath = "\(documentsPath)/snapchef_recipe.igo"
-        let fileURL = URL(fileURLWithPath: filePath)
-        
-        // Save image as .igo file
-        if let imageData = feedImage.jpegData(compressionQuality: 0.9) {
-            do {
-                try imageData.write(to: fileURL)
-                
-                // Create UIDocumentInteractionController
-                let documentController = UIDocumentInteractionController(url: fileURL)
-                documentController.uti = "com.instagram.exclusivegram"  // Instagram-only UTI
-                documentController.annotation = ["InstagramCaption": captionText]  // Try to pass caption
-                
-                // Present from the current view controller
-                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let viewController = windowScene.windows.first?.rootViewController {
-                    
-                    // Copy caption to clipboard for user to paste
-                    UIPasteboard.general.string = captionText
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        captionCopied = true
-                    }
-                    
-                    // Hide caption copied message after 2 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        withAnimation {
-                            captionCopied = false
-                        }
-                    }
-                    
-                    // Present Instagram share
-                    if !documentController.presentOpenInMenu(from: CGRect.zero, in: viewController.view, animated: true) {
-                        // Fallback to Method 2: Save & Open
-                        saveImageAndOpenInstagram(image: feedImage)
-                    }
-                } else {
-                    // Fallback to Method 2: Save & Open
-                    saveImageAndOpenInstagram(image: feedImage)
-                }
-            } catch {
-                // Fallback to Method 2: Save & Open
-                saveImageAndOpenInstagram(image: feedImage)
-            }
-        } else {
-            // Fallback to Method 2: Save & Open
-            saveImageAndOpenInstagram(image: feedImage)
+        // Copy caption to clipboard for user to paste
+        UIPasteboard.general.string = captionText
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            captionCopied = true
         }
+        
+        // Hide caption copied message after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                captionCopied = false
+            }
+        }
+        
+        // Use save & open method for reliability with SwiftUI
+        // UIDocumentInteractionController has presentation conflicts in SwiftUI
+        print("📱 Instagram: Sharing to Feed via save & open method")
+        saveImageAndOpenInstagram(image: feedImage)
     }
 
     private func saveImageAndOpenInstagram(image: UIImage) {
@@ -598,29 +639,12 @@ Made with SnapChef 🍳
         // Use the SafePhotoSaver which doesn't import Photos framework
         SafePhotoSaver.shared.saveImageToPhotoLibrary(normalizedImage) { success, error in
             if success {
-                // Open Instagram library after saving
-                if let url = URL(string: "instagram://library") {
-                    UIApplication.shared.open(url) { librarySuccess in
-                        if !librarySuccess {
-                            // Fallback to basic Instagram open
-                            print("📱 Instagram: Failed to open library, trying basic Instagram")
-                            if let fallbackURL = URL(string: "instagram://") {
-                                UIApplication.shared.open(fallbackURL) { appSuccess in
-                                    if !appSuccess {
-                                        // Instagram might not be installed (should not happen)
-                                        print("📱 Instagram: Failed to open Instagram app")
-                                        DispatchQueue.main.async {
-                                            // Instagram not installed - already handled by URL fallback
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                // Create activity for successful Instagram share
-                Task {
-                    await createInstagramShareActivity(isStory: true)
+                print("📱 Instagram: Image saved successfully to Photos")
+                
+                // Show instructions alert for Feed sharing
+                // Instagram doesn't allow direct Feed sharing from third-party apps
+                DispatchQueue.main.async {
+                    self.showFeedSavedAlert = true
                 }
                 
                 // Create activity for successful Instagram share
@@ -628,9 +652,12 @@ Made with SnapChef 🍳
                     await createInstagramShareActivity(isStory: false)
                 }
                 
-                self.dismiss()
+                // Don't dismiss here - let the alert handle it
             } else {
-                self.errorMessage = error ?? "Failed to save image"
+                print("📱 Instagram: Failed to save image: \(error ?? "Unknown error")")
+                DispatchQueue.main.async {
+                    self.errorMessage = error ?? "Failed to save image to Photos"
+                }
             }
         }
     }

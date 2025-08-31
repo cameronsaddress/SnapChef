@@ -191,12 +191,12 @@ struct InstagramContentView: View {
                     }
                     .frame(width: size.width, height: size.height)
                     .overlay(
-                        // Dark overlay for text readability
+                        // Lighter overlay - reduced by 50% for better photo visibility
                         LinearGradient(
                             colors: [
-                                Color.black.opacity(0.7),
-                                Color.black.opacity(0.4),
-                                Color.black.opacity(0.7)
+                                Color.black.opacity(0.425),  // Was 0.85, now 0.425
+                                Color.black.opacity(0.3),     // Was 0.6, now 0.3
+                                Color.black.opacity(0.425)    // Was 0.85, now 0.425
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -210,12 +210,12 @@ struct InstagramContentView: View {
                         .frame(width: size.width, height: size.height)
                         .clipped()
                         .overlay(
-                            // Dark overlay for text readability
+                            // Lighter overlay - reduced by 50% for better photo visibility
                             LinearGradient(
                                 colors: [
-                                    Color.black.opacity(0.7),
-                                    Color.black.opacity(0.3),
-                                    Color.black.opacity(0.7)
+                                    Color.black.opacity(0.425),  // Was 0.85, now 0.425
+                                    Color.black.opacity(0.3),     // Was 0.6, now 0.3
+                                    Color.black.opacity(0.425)    // Was 0.85, now 0.425
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -244,25 +244,34 @@ struct InstagramContentView: View {
                 }
             }
 
-            // SnapChef branding
+            // SnapChef branding - 3x larger with blue background
             VStack {
                 Spacer()
-                HStack {
+                HStack(spacing: 12) {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 16, weight: .bold))
-                    Text("Made with SnapChef")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 48, weight: .bold))
+                    Text("Made on the free SnapChef App!")
+                        .font(.system(size: 48, weight: .bold))
                 }
                 .foregroundColor(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.5))
-                .cornerRadius(20)
+                .padding(.horizontal, 40)
+                .padding(.vertical, 24)
+                .background(
+                    Capsule()
+                        .fill(Color(hex: "#00F2EA").opacity(0.8))
+                )
+                .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
                 .padding(.bottom, isStory ? 100 : 30)
             }
         }
         .frame(width: size.width, height: size.height)
     }
+}
+
+// MARK: - Caption Generation Helper
+private func generateInstagramCaption(for recipe: Recipe) -> String {
+    // Just the main line without hashtags for the image overlay
+    return "Just turned my sad fridge into \(recipe.name) 🎉"
 }
 
 // MARK: - Photo Overlay Content
@@ -304,38 +313,19 @@ struct PhotoOverlayContent: View {
                         .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
                     }
                     
-                    // Share caption with larger font
-                    Text(recipe.shareCaption)
-                        .font(.system(size: isStory ? 52 : 42, weight: .heavy, design: .rounded))
+                    // Share caption with much larger font (doubled)
+                    // Generate the same caption that goes to clipboard
+                    Text(generateInstagramCaption(for: recipe))
+                        .font(.system(size: isStory ? 104 : 84, weight: .heavy, design: .rounded))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
-                        .lineLimit(3)
+                        .lineLimit(4)
+                        .minimumScaleFactor(0.7)
                         .padding(.horizontal, 30)
                         .shadow(color: .black.opacity(0.8), radius: 10, x: 0, y: 5)
                     
-                    // Subtitle
-                    Text(content.afterImage != nil ? "Fridge to Feast Transformation!" : "From Fridge to Feast!")
-                        .font(.system(size: isStory ? 22 : 18, weight: .medium))
-                        .foregroundColor(Color(hex: "#00F2EA"))
-                        .shadow(color: .black.opacity(0.8), radius: 5, x: 0, y: 2)
-
-                    // Stats bar with glass morphism
-                    HStack(spacing: 30) {
-                        InstagramStatBadge(icon: "clock", value: "\(recipe.prepTime + recipe.cookTime)m")
-                        InstagramStatBadge(icon: "flame", value: "\(recipe.nutrition.calories) cal")
-                        InstagramStatBadge(icon: "person.2", value: "\(recipe.servings) servings")
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 15)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.white.opacity(0.15))
-                            .background(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                            )
-                    )
-                    .padding(.horizontal, 30)
+                    // Remove subtitle and stats for cleaner look
+                    // Focus on the main caption text
                 }
             }
             
