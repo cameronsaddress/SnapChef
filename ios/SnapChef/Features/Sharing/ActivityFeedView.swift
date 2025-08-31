@@ -145,9 +145,10 @@ struct ActivityItem: Identifiable {
 
 // MARK: - Activity Feed View
 struct ActivityFeedView: View {
+    // Use shared singleton instance for preloaded data
     @StateObject private var feedManager = {
-        print("🔍 DEBUG: Creating ActivityFeedManager")
-        return ActivityFeedManager()
+        print("🔍 DEBUG: Using shared ActivityFeedManager singleton")
+        return ActivityFeedManager.shared
     }()
     @EnvironmentObject var appState: AppState
     @State private var selectedFilter: ActivityFilter = .all
@@ -292,11 +293,21 @@ struct ActivityFeedView: View {
         }
         .onAppear {
             print("🔍 DEBUG: ActivityFeedView appeared - Start")
-            DispatchQueue.main.async {
-                print("🔍 DEBUG: ActivityFeedView - Async block started")
-                // No state modifications here, just logging
-                print("🔍 DEBUG: ActivityFeedView - Async block completed")
+            
+            // Smart refresh: Only if data is stale or empty
+            Task {
+                // Check if we need to refresh (data older than 5 minutes or empty)
+                let shouldRefresh = feedManager.activities.isEmpty || 
+                                  feedManager.needsRefresh()
+                
+                if shouldRefresh {
+                    print("📱 ActivityFeedView: Data stale or empty, refreshing...")
+                    await feedManager.refresh()
+                } else {
+                    print("✅ ActivityFeedView: Using cached data (\(feedManager.activities.count) items)")
+                }
             }
+            
             print("🔍 DEBUG: ActivityFeedView appeared - End")
         }
         .task {
@@ -713,6 +724,9 @@ struct EmptyActivityView: View {
 // MARK: - Activity Feed Manager
 @MainActor
 class ActivityFeedManager: ObservableObject {
+    // SINGLETON: Shared instance for background preloading
+    static let shared = ActivityFeedManager()
+    
     @Published var activities: [ActivityItem] = []
     @Published var isLoading = false
     @Published var hasMore = true
@@ -843,27 +857,59 @@ class ActivityFeedManager: ObservableObject {
         await loadInitialActivities()
     }
     
+    // Helper to check if data needs refresh
+    func needsRefresh() -> Bool {
+        // Check if cache is older than 5 minutes
+        if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date {
+            let cacheAge = Date().timeIntervalSince(cacheTimestamp)
+            return cacheAge > 300 // 5 minutes
+        }
+        return true // No cache timestamp means we need to refresh
+    }
+    
     /// Preload feed data in background without blocking UI
     func preloadInBackground() async {
-        // Only preload if not already loading and no data exists
-        guard !isLoading && activities.isEmpty else { 
-            print("📱 Preload skipped - already loading or has data")
+        // Check if we already have fresh data
+        if !activities.isEmpty && !needsRefresh() {
+            print("📱 Preload skipped - already have fresh data (\(activities.count) items)")
+            return
+        }
+        
+        // Only preload if not already loading
+        guard !isLoading else { 
+            print("📱 Preload skipped - already loading")
             return 
         }
         
         print("📱 Starting background preload of social feed...")
+        print("   - Current activities: \(activities.count)")
+        print("   - Cache status: \(needsRefresh() ? "stale" : "fresh")")
         
         // Don't show loading indicators for background fetch
         let originalShowingSkeleton = showingSkeletonViews
+        let originalIsLoading = isLoading
+        
         showingSkeletonViews = false
+        // Don't set isLoading to prevent UI updates
         
-        // Fetch without updating loading state
-        await fetchActivitiesFromCloudKit()
+        // Try to load from cache first
+        await loadCachedActivities()
         
-        // Restore skeleton state
+        // If cache is empty or stale, fetch from CloudKit
+        if activities.isEmpty || needsRefresh() {
+            print("📱 Cache miss or stale - fetching from CloudKit...")
+            await fetchActivitiesFromCloudKit()
+        } else {
+            print("✅ Using cached data - \(activities.count) activities")
+        }
+        
+        // Restore original states
         showingSkeletonViews = originalShowingSkeleton
+        isLoading = originalIsLoading
         
-        print("✅ Background preload complete - \(activities.count) activities loaded")
+        print("✅ Background preload complete")
+        print("   - Activities loaded: \(activities.count)")
+        print("   - Memory usage: \(userCache.count) cached users")
     }
 
     func markActivityAsRead(_ activityID: String) async {
@@ -1056,7 +1102,8 @@ class ActivityFeedManager: ObservableObject {
                     print("🧹 PHASE 7: Trimmed \(overflow) old activities (keeping \(maxActivities) max)")
                 }
             } else {
-                activities = newActivities
+                // Sort new activities by timestamp (newest first)
+                activities = newActivities.sorted { $0.timestamp > $1.timestamp }
             }
 
             // Check if there are more activities to load
@@ -1295,6 +1342,35 @@ class ActivityFeedManager: ObservableObject {
         print("📊 PHASE 7: Memory cleanup complete - \(userCache.count) users, \(activities.count) activities")
     }
     
+    // MARK: - Singleton Lifecycle Management
+    
+    /// Clear old data when app goes to background
+    func clearStaleDataIfNeeded() {
+        let now = Date()
+        
+        // If data is older than 10 minutes, clear it to save memory
+        if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date,
+           now.timeIntervalSince(cacheTimestamp) > 600 {
+            print("🧹 Clearing stale activity data (>10 minutes old)")
+            activities.removeAll()
+            userCache.removeAll()
+        }
+    }
+    
+    /// Reset singleton for testing or logout
+    func reset() {
+        print("🔄 Resetting ActivityFeedManager singleton")
+        activities.removeAll()
+        userCache.removeAll()
+        lastFetchedRecord = nil
+        hasMore = true
+        isLoading = false
+        showingSkeletonViews = false
+        lastRefreshTime = nil
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+        UserDefaults.standard.removeObject(forKey: cacheTimestampKey)
+    }
+    
     /// Fetches user display name by userID, using cache when available
     private func fetchUserDisplayName(userID: String) async -> String {
         // print("🔍 DEBUG: fetchUserDisplayName for userID: \(userID)")
@@ -1493,10 +1569,11 @@ class ActivityFeedManager: ObservableObject {
             print("🔍 DEBUG: Successfully decoded \(cachedData.activities.count) activities")
             
             await MainActor.run {
-                activities = cachedData.activities
+                // Sort cached activities by timestamp (newest first)
+                activities = cachedData.activities.sorted { $0.timestamp > $1.timestamp }
             }
             
-            print("✅ Loaded \(activities.count) cached activities")
+            print("✅ Loaded \(activities.count) cached activities (sorted by newest first)")
         } catch {
             print("❌ Failed to load cached activities: \(error)")
             // Clear corrupt cache
@@ -1509,7 +1586,9 @@ class ActivityFeedManager: ObservableObject {
         do {
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
-            let cachedData = CachedActivityData(activities: activities)
+            // Ensure activities are sorted before caching (newest first)
+            let sortedActivities = activities.sorted { $0.timestamp > $1.timestamp }
+            let cachedData = CachedActivityData(activities: sortedActivities)
             let data = try encoder.encode(cachedData)
             UserDefaults.standard.set(data, forKey: cacheKey)
             UserDefaults.standard.set(Date(), forKey: cacheTimestampKey)

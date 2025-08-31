@@ -70,6 +70,20 @@ struct SnapChefApp: App {
                         await cloudKitDataManager.endAppSession()
                     }
                 }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                    // Clean up stale data when going to background
+                    ActivityFeedManager.shared.clearStaleDataIfNeeded()
+                    SimpleDiscoverUsersManager.shared.clearStaleDataIfNeeded()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                    Task { @MainActor in
+                        // Preload fresh data when coming to foreground
+                        if UnifiedAuthManager.shared.isAuthenticated {
+                            await ActivityFeedManager.shared.preloadInBackground()
+                            await SimpleDiscoverUsersManager.shared.loadUsers(for: .suggested)
+                        }
+                    }
+                }
         }
     }
 
@@ -89,22 +103,46 @@ struct SnapChefApp: App {
             UserDefaults.standard.set("gemini", forKey: "SelectedLLMProvider")
         }
         
-        // Preload social feed after 5 seconds if authenticated
-        Task {
-            try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+        // Preload social feed after 2 seconds if authenticated
+        // Using shared singleton to ensure data is available to views
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            
+            // Check authentication status
             if UnifiedAuthManager.shared.isAuthenticated {
                 print("🚀 Starting background social feed preload...")
-                await ActivityFeedManager().preloadInBackground()
+                print("   - User authenticated: ✓")
+                print("   - Preloading into shared singleton instance")
+                
+                // Use the shared singleton instance
+                await ActivityFeedManager.shared.preloadInBackground()
+                
+                print("✅ Social feed preload complete")
+                print("   - Activities loaded: \(ActivityFeedManager.shared.activities.count)")
+            } else {
+                print("⏸️ Skipping social feed preload - user not authenticated")
             }
         }
         
-        // Preload discover users after 3 seconds - commented out temporarily
-        // Task {
-        //     try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
-        //     print("🚀 Starting background discover users preload...")
-        //     let discoverManager = DiscoverUsersManager()
-        //     await discoverManager.loadUsers(for: .suggested)
-        // }
+        // Preload discover users after 3 seconds
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+            
+            // Check authentication status
+            if UnifiedAuthManager.shared.isAuthenticated {
+                print("🚀 Starting background discover users preload...")
+                print("   - User authenticated: ✓")
+                print("   - Preloading into shared singleton instance")
+                
+                // Use the shared singleton instance
+                await SimpleDiscoverUsersManager.shared.loadUsers(for: .suggested)
+                
+                print("✅ Discover users preload complete")
+                print("   - Users loaded: \(SimpleDiscoverUsersManager.shared.users.count)")
+            } else {
+                print("⏸️ Skipping discover users preload - user not authenticated")
+            }
+        }
 
         // Initialize social media SDKs
         SDKInitializer.initializeSDKs()

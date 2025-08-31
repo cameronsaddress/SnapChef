@@ -46,6 +46,9 @@ struct UserProfile: Identifiable, Codable {
 // MARK: - Simple Discover Users Manager
 @MainActor
 class SimpleDiscoverUsersManager: ObservableObject {
+    // SINGLETON: Shared instance for background preloading
+    static let shared = SimpleDiscoverUsersManager()
+    
     @Published var users: [UserProfile] = []
     @Published var searchResults: [UserProfile] = []
     @Published var isLoading = false
@@ -54,7 +57,32 @@ class SimpleDiscoverUsersManager: ObservableObject {
     @Published var selectedUser: UserProfile?
     @Published var showingSkeletonViews = false
     
+    // Cache configuration
+    private let cacheKey = "DiscoverUsersCache"
+    private let cacheTimestampKey = "DiscoverUsersCacheTimestamp"
+    private let cacheTTL: TimeInterval = 600 // 10 minutes
+    private var lastRefreshTime: Date?
+    private let minimumRefreshInterval: TimeInterval = 30 // 30 seconds
+    
     func loadUsers(for category: DiscoverUsersView.DiscoverCategory) async {
+        // Check if we have fresh cached data
+        if !users.isEmpty && !needsRefresh() {
+            print("📱 Using cached discover users (\(users.count) users)")
+            return
+        }
+        
+        // Try to load from cache first
+        if loadCachedUsers(for: category) {
+            print("✅ Loaded \(users.count) users from cache")
+            // Still refresh in background if cache is getting old
+            if needsRefresh() {
+                Task {
+                    await fetchUsersInBackground(for: category)
+                }
+            }
+            return
+        }
+        
         showingSkeletonViews = users.isEmpty
         isLoading = true
         
@@ -67,25 +95,65 @@ class SimpleDiscoverUsersManager: ObservableObject {
             case .trending:
                 fetchedUsers = try await UnifiedAuthManager.shared.getTrendingUsers(limit: 20)
             case .newChefs:
-                fetchedUsers = try await UnifiedAuthManager.shared.getNewUsers(limit: 100)
+                fetchedUsers = try await UnifiedAuthManager.shared.getNewUsers(limit: 20)
             case .verified:
                 fetchedUsers = try await UnifiedAuthManager.shared.getVerifiedUsers(limit: 20)
             }
             
-            // Convert to UserProfile
+            // Convert to UserProfile with parallel follow state checking
             var convertedUsers: [UserProfile] = []
-            for cloudKitUser in fetchedUsers {
-                var userProfile = convertToUserProfile(cloudKitUser)
-                
-                // Check actual follow status if authenticated
-                if UnifiedAuthManager.shared.isAuthenticated {
-                    userProfile.isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: userProfile.id)
+            
+            if UnifiedAuthManager.shared.isAuthenticated {
+                // Parallel follow state checking for better performance
+                await withTaskGroup(of: UserProfile.self) { group in
+                    for cloudKitUser in fetchedUsers {
+                        // Capture the values we need before the task
+                        let userID = cloudKitUser.recordID ?? ""
+                        let username = cloudKitUser.username
+                        let displayName = cloudKitUser.displayName
+                        let followerCount = cloudKitUser.followerCount
+                        let followingCount = cloudKitUser.followingCount
+                        let recipesCreated = cloudKitUser.recipesCreated
+                        let profileImageURL = cloudKitUser.profileImageURL
+                        let isVerified = cloudKitUser.isVerified
+                        
+                        group.addTask {
+                            var userProfile = UserProfile(
+                                id: userID,
+                                username: username ?? displayName.lowercased().replacingOccurrences(of: " ", with: ""),
+                                displayName: displayName,
+                                profileImageURL: profileImageURL,
+                                followerCount: followerCount,
+                                followingCount: followingCount,
+                                recipesCreated: recipesCreated,
+                                isVerified: isVerified,
+                                isFollowing: false,
+                                bio: nil
+                            )
+                            let isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: userProfile.id)
+                            userProfile.isFollowing = isFollowing
+                            return userProfile
+                        }
+                    }
+                    
+                    // Collect results in order
+                    for await userProfile in group {
+                        convertedUsers.append(userProfile)
+                    }
                 }
-                
-                convertedUsers.append(userProfile)
+            } else {
+                // No authentication, just convert without follow status
+                for cloudKitUser in fetchedUsers {
+                    let userProfile = convertToUserProfile(cloudKitUser)
+                    convertedUsers.append(userProfile)
+                }
             }
             
             users = convertedUsers
+            
+            // Save to cache
+            saveCachedUsers(convertedUsers, for: category)
+            lastRefreshTime = Date()
             
         } catch {
             print("❌ Failed to load users: \(error)")
@@ -94,6 +162,130 @@ class SimpleDiscoverUsersManager: ObservableObject {
         
         showingSkeletonViews = false
         isLoading = false
+    }
+    
+    // MARK: - Cache Methods
+    
+    func needsRefresh() -> Bool {
+        // Check if cache is older than TTL
+        if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date {
+            let cacheAge = Date().timeIntervalSince(cacheTimestamp)
+            return cacheAge > cacheTTL
+        }
+        return true // No cache timestamp means we need to refresh
+    }
+    
+    private func loadCachedUsers(for category: DiscoverUsersView.DiscoverCategory) -> Bool {
+        let key = "\(cacheKey)_\(category.rawValue)"
+        
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let timestamp = UserDefaults.standard.object(forKey: "\(key)_timestamp") as? Date else {
+            return false
+        }
+        
+        // Check if cache is still valid
+        if Date().timeIntervalSince(timestamp) > cacheTTL {
+            return false
+        }
+        
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            users = try decoder.decode([UserProfile].self, from: data)
+            return true
+        } catch {
+            print("❌ Failed to decode cached users: \(error)")
+            return false
+        }
+    }
+    
+    private func saveCachedUsers(_ users: [UserProfile], for category: DiscoverUsersView.DiscoverCategory) {
+        let key = "\(cacheKey)_\(category.rawValue)"
+        
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(users)
+            UserDefaults.standard.set(data, forKey: key)
+            UserDefaults.standard.set(Date(), forKey: "\(key)_timestamp")
+            UserDefaults.standard.set(Date(), forKey: cacheTimestampKey)
+        } catch {
+            print("❌ Failed to cache users: \(error)")
+        }
+    }
+    
+    private func fetchUsersInBackground(for category: DiscoverUsersView.DiscoverCategory) async {
+        print("🔄 Background refresh of discover users...")
+        
+        do {
+            var fetchedUsers: [CloudKitUser] = []
+            
+            switch category {
+            case .suggested:
+                fetchedUsers = try await UnifiedAuthManager.shared.getSuggestedUsers(limit: 20)
+            case .trending:
+                fetchedUsers = try await UnifiedAuthManager.shared.getTrendingUsers(limit: 20)
+            case .newChefs:
+                fetchedUsers = try await UnifiedAuthManager.shared.getNewUsers(limit: 20)
+            case .verified:
+                fetchedUsers = try await UnifiedAuthManager.shared.getVerifiedUsers(limit: 20)
+            }
+            
+            // Convert to UserProfile with parallel follow state checking
+            var convertedUsers: [UserProfile] = []
+            
+            if UnifiedAuthManager.shared.isAuthenticated {
+                // Parallel follow state checking for better performance
+                await withTaskGroup(of: UserProfile.self) { group in
+                    for cloudKitUser in fetchedUsers {
+                        // Capture the values we need before the task
+                        let userID = cloudKitUser.recordID ?? ""
+                        let username = cloudKitUser.username
+                        let displayName = cloudKitUser.displayName
+                        let followerCount = cloudKitUser.followerCount
+                        let followingCount = cloudKitUser.followingCount
+                        let recipesCreated = cloudKitUser.recipesCreated
+                        let profileImageURL = cloudKitUser.profileImageURL
+                        let isVerified = cloudKitUser.isVerified
+                        
+                        group.addTask {
+                            var userProfile = UserProfile(
+                                id: userID,
+                                username: username ?? displayName.lowercased().replacingOccurrences(of: " ", with: ""),
+                                displayName: displayName,
+                                profileImageURL: profileImageURL,
+                                followerCount: followerCount,
+                                followingCount: followingCount,
+                                recipesCreated: recipesCreated,
+                                isVerified: isVerified,
+                                isFollowing: false,
+                                bio: nil
+                            )
+                            let isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: userProfile.id)
+                            userProfile.isFollowing = isFollowing
+                            return userProfile
+                        }
+                    }
+                    
+                    // Collect results in order
+                    for await userProfile in group {
+                        convertedUsers.append(userProfile)
+                    }
+                }
+            } else {
+                // No authentication, just convert without follow status
+                for cloudKitUser in fetchedUsers {
+                    let userProfile = convertToUserProfile(cloudKitUser)
+                    convertedUsers.append(userProfile)
+                }
+            }
+            
+            users = convertedUsers
+            saveCachedUsers(convertedUsers, for: category)
+            
+        } catch {
+            print("❌ Background refresh failed: \(error)")
+        }
     }
     
     func searchUsers(_ query: String) {
@@ -174,6 +366,38 @@ class SimpleDiscoverUsersManager: ObservableObject {
         hasMore = false
     }
     
+    // MARK: - Lifecycle Management
+    
+    /// Clear cached data when app goes to background
+    func clearStaleDataIfNeeded() {
+        if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date,
+           Date().timeIntervalSince(cacheTimestamp) > 1200 { // 20 minutes
+            print("🧹 Clearing stale discover users data")
+            users.removeAll()
+            searchResults.removeAll()
+        }
+    }
+    
+    /// Reset singleton for logout
+    func reset() {
+        print("🔄 Resetting SimpleDiscoverUsersManager singleton")
+        users.removeAll()
+        searchResults.removeAll()
+        hasMore = false
+        isLoading = false
+        showingSkeletonViews = false
+        lastRefreshTime = nil
+        
+        // Clear all category caches
+        let categories = DiscoverUsersView.DiscoverCategory.allCases
+        for category in categories {
+            let key = "\(cacheKey)_\(category.rawValue)"
+            UserDefaults.standard.removeObject(forKey: key)
+            UserDefaults.standard.removeObject(forKey: "\(key)_timestamp")
+        }
+        UserDefaults.standard.removeObject(forKey: cacheTimestampKey)
+    }
+    
     private func convertToUserProfile(_ cloudKitUser: CloudKitUser) -> UserProfile {
         let finalUsername = cloudKitUser.username ?? cloudKitUser.displayName.lowercased().replacingOccurrences(of: " ", with: "")
         
@@ -199,7 +423,8 @@ class SimpleDiscoverUsersManager: ObservableObject {
 
 // MARK: - Discover Users View
 struct DiscoverUsersView: View {
-    @StateObject private var manager = SimpleDiscoverUsersManager()
+    // Use shared singleton instance for preloaded data
+    @StateObject private var manager = SimpleDiscoverUsersManager.shared
     @EnvironmentObject var appState: AppState
     @State private var searchText = ""
     @State private var selectedCategory: DiscoverCategory = .suggested
