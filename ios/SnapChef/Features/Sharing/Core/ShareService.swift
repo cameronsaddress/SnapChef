@@ -21,7 +21,7 @@ import TikTokOpenShareSDK
 #endif
 
 // MARK: - Share Type
-public enum ShareType {
+public enum ShareType: Sendable {
     case recipe(Recipe)
     case challenge(Challenge)
     case achievement(String)
@@ -31,7 +31,7 @@ public enum ShareType {
 }
 
 // MARK: - Share Content
-public struct ShareContent {
+public struct ShareContent: Sendable {
     let type: ShareType
     let beforeImage: UIImage?
     let afterImage: UIImage?

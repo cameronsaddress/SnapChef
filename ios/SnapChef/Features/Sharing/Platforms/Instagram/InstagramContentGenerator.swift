@@ -249,9 +249,9 @@ struct InstagramContentView: View {
                 Spacer()
                 HStack(spacing: 18) {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 72, weight: .bold))  // 3x larger: 24 * 3 = 72
+                        .font(.system(size: 54, weight: .bold))  // 25% smaller: 72 * 0.75 = 54
                     Text("Made on the free SnapChef App!")
-                        .font(.system(size: 72, weight: .bold))  // 3x larger: 24 * 3 = 72
+                        .font(.system(size: 54, weight: .bold))  // 25% smaller: 72 * 0.75 = 54
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 60)

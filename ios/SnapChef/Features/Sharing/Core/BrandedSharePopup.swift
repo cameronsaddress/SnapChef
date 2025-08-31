@@ -9,6 +9,8 @@ import SwiftUI
 import Combine
 import CloudKit
 import TikTokOpenShareSDK
+import MessageUI
+import UIKit
 
 struct BrandedSharePopup: View {
     @StateObject private var shareService = ShareService.shared
@@ -18,6 +20,12 @@ struct BrandedSharePopup: View {
     @State private var animationScale: CGFloat = 0.8
     @State private var animationOpacity: Double = 0
     @State private var hasSharedToFeed = false
+    
+    // Direct sharing states for Instagram/Messages
+    @State private var showingGenerationOverlay = false
+    @State private var generationProgress = 0.0
+    @State private var generationStatus = "Preparing..."
+    @State private var currentSharingPlatform: SharePlatformType?
     
     // TikTok direct share states
     @State private var showAfterPhotoPrompt = false
@@ -30,6 +38,8 @@ struct BrandedSharePopup: View {
     
     // Instagram share content with photos
     @State private var instagramShareContent: ShareContent?
+    @State private var showInstagramFeedAlert = false
+    @State private var instagramFeedCaption = ""
     
     @Environment(\.dismiss) var dismiss
 
@@ -145,7 +155,51 @@ struct BrandedSharePopup: View {
         }
         .sheet(isPresented: $showingPlatformView) {
             if let platform = selectedPlatform {
+                // Only show sheets for platforms that still need previews (Twitter)
                 platformSpecificView(for: platform)
+            }
+        }
+        .overlay {
+            if showingGenerationOverlay {
+                // Loading overlay for direct sharing
+                ZStack {
+                    Color.black.opacity(0.8)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 20) {
+                        // Platform-specific icon and color
+                        if let platform = currentSharingPlatform {
+                            ZStack {
+                                Circle()
+                                    .fill(platform.brandColor)
+                                    .frame(width: 60, height: 60)
+                                
+                                Image(systemName: platform.icon)
+                                    .font(.system(size: 24, weight: .semibold))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        
+                        ProgressView(value: generationProgress)
+                            .progressViewStyle(LinearProgressViewStyle())
+                            .scaleEffect(y: 2)
+                            .frame(width: 200)
+                        
+                        Text("\(Int(generationProgress * 100))%")
+                            .font(.largeTitle.bold())
+                            .foregroundColor(.white)
+                        
+                        Text(generationStatus)
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(40)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.black.opacity(0.9))
+                    )
+                }
             }
         }
         .sheet(isPresented: $showAfterPhotoPrompt) {
@@ -218,6 +272,24 @@ struct BrandedSharePopup: View {
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("DismissSharePopup"))) { _ in
             dismiss()
         }
+        .alert("Ready to Share on Instagram", isPresented: $showInstagramFeedAlert) {
+            Button("Open Instagram") {
+                // Open Instagram and then dismiss after a delay
+                if let url = URL(string: "instagram://") {
+                    UIApplication.shared.open(url) { _ in
+                        // Dismiss the share popup after opening Instagram
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            Button("Done") {
+                dismiss()
+            }
+        } message: {
+            Text("✅ Image saved to Photos\n📋 Caption copied to clipboard\n\nTo share:\n1. Tap \"Open Instagram\"\n2. Create a new post (+)\n3. Select the saved image\n4. Paste the caption")
+        }
     }
 
     private func handlePlatformSelection(_ platform: SharePlatformType) {
@@ -249,36 +321,8 @@ struct BrandedSharePopup: View {
                 
             case .instagram, .instagramStory:
                 print("🔍 BrandedSharePopup: Instagram share for \(content.type)")
-                print("🔍 BrandedSharePopup: Input content has beforeImage: \(content.beforeImage != nil), afterImage: \(content.afterImage != nil)")
-                
-                // Load photos for Instagram share
-                if case .recipe(let recipe) = content.type {
-                    print("🔍 BrandedSharePopup: Loading photos for recipe \(recipe.id)")
-                    let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
-                    print("🔍 BrandedSharePopup: PhotoStorage returned - fridge: \(photos?.fridgePhoto != nil), pantry: \(photos?.pantryPhoto != nil), meal: \(photos?.mealPhoto != nil)")
-                    
-                    let beforeImage = photos?.fridgePhoto ?? photos?.pantryPhoto ?? content.beforeImage
-                    let afterImage = photos?.mealPhoto ?? content.afterImage
-                    
-                    print("🔍 BrandedSharePopup: Final images - before: \(beforeImage != nil), after: \(afterImage != nil)")
-                    if let before = beforeImage {
-                        print("🔍 BrandedSharePopup: beforeImage size: \(before.size)")
-                    }
-                    
-                    // Create new ShareContent with photos
-                    instagramShareContent = ShareContent(
-                        type: content.type,
-                        beforeImage: beforeImage,
-                        afterImage: afterImage,
-                        text: content.text
-                    )
-                } else {
-                    // For non-recipe content, use original content
-                    instagramShareContent = content
-                }
-                
-                // Show platform-specific view
-                showingPlatformView = true
+                currentSharingPlatform = platform
+                generateAndShareDirectly(platform: platform)
 
             case .twitter:
                 // Show X-specific view
@@ -297,8 +341,9 @@ struct BrandedSharePopup: View {
                 }
 
             case .messages:
-                // Show message composer
-                showingPlatformView = true
+                print("🔍 BrandedSharePopup: Messages share for \(content.type)")
+                currentSharingPlatform = platform
+                generateAndShareDirectly(platform: platform)
 
             case .copy:
                 // Direct copy to clipboard
@@ -340,18 +385,376 @@ struct BrandedSharePopup: View {
         switch platform {
         case .tiktok:
             TikTokShareView(content: content)  // Use the template selection view
-        case .instagram:
-            // Use instagramShareContent which has photos loaded
-            InstagramShareView(content: instagramShareContent ?? content, isStory: false)
-        case .instagramStory:
-            // Use instagramShareContent which has photos loaded
-            InstagramShareView(content: instagramShareContent ?? content, isStory: true)
         case .twitter:
             XShareView(content: content)
-        case .messages:
-            MessagesShareView(content: content)
         default:
+            // Instagram and Messages now use direct sharing, no preview views
             EmptyView()
+        }
+    }
+    
+    // MARK: - Direct Sharing Methods
+    
+    private func generateAndShareDirectly(platform: SharePlatformType) {
+        // Don't show overlay - generate silently in background
+        
+        Task {
+            do {
+                // Prepare content with photos for the specific platform
+                let shareContent = await prepareShareContent()
+                
+                switch platform {
+                case .instagram:
+                    try await generateAndShareInstagram(content: shareContent, isStory: false)
+                case .instagramStory:
+                    try await generateAndShareInstagram(content: shareContent, isStory: true)
+                case .messages:
+                    try await generateAndShareMessages(content: shareContent)
+                default:
+                    break
+                }
+                
+            } catch {
+                print("❌ Direct sharing failed: \(error)")
+            }
+        }
+    }
+    
+    private func prepareShareContent() async -> ShareContent {
+        return await withCheckedContinuation { continuation in
+            // Load photos for content if it's a recipe
+            if case .recipe(let recipe) = content.type {
+                let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+                let beforeImage = photos?.fridgePhoto ?? photos?.pantryPhoto ?? content.beforeImage
+                let afterImage = photos?.mealPhoto ?? content.afterImage
+                
+                let enhancedContent = ShareContent(
+                    type: content.type,
+                    beforeImage: beforeImage,
+                    afterImage: afterImage,
+                    text: content.text
+                )
+                continuation.resume(returning: enhancedContent)
+            } else {
+                continuation.resume(returning: content)
+            }
+        }
+    }
+    
+    private func updateProgress(_ progress: Double, _ status: String) async {
+        await MainActor.run {
+            generationProgress = progress
+            generationStatus = status
+        }
+    }
+    
+    private func generateAndShareInstagram(content: ShareContent, isStory: Bool) async throws {
+        // Generate image using Instagram content generator
+        let image = try await InstagramContentGenerator.shared.generateContent(
+            template: getInstagramTemplate(for: content),
+            content: content,
+            isStory: isStory,
+            backgroundColor: isStory ? Color(hex: "#FF0050") : Color.clear,
+            sticker: isStory ? .location : nil
+        )
+        
+        if isStory {
+            await shareToInstagramStory(image: image, content: content)
+        } else {
+            await shareToInstagramFeed(image: image, content: content)
+        }
+        
+        await createInstagramShareActivity(isStory: isStory, content: content)
+    }
+    
+    private func generateAndShareMessages(content: ShareContent) async throws {
+        // Generate image using Instagram content generator (similar to Messages view)
+        let image = try await InstagramContentGenerator.shared.generateContent(
+            template: .modern,
+            content: content,
+            isStory: true, // Use story format (9:16 ratio)
+            backgroundColor: Color(hex: "#34C759"), // Messages green
+            sticker: nil
+        )
+        
+        await shareToMessages(image: image, content: content)
+        await createMessagesShareActivity(content: content)
+    }
+    
+    private func getInstagramTemplate(for content: ShareContent) -> InstagramTemplate {
+        switch content.type {
+        case .recipe:
+            return .classic
+        case .achievement, .challenge, .profile, .teamInvite, .leaderboard:
+            return .modern
+        }
+    }
+    
+    // MARK: - Platform-specific sharing methods
+    
+    @MainActor
+    private func shareToInstagramStory(image: UIImage, content: ShareContent) async {
+        let storyImage = resizeImageForStories(image)
+        guard let imageData = storyImage.pngData() else { return }
+        
+        var pasteboardItems: [[String: Any]] = [[
+            "com.instagram.sharedSticker.backgroundImage": imageData,
+            "com.instagram.sharedSticker.backgroundTopColor": "#FF0050",
+            "com.instagram.sharedSticker.backgroundBottomColor": "#00F2EA"
+        ]]
+        
+        if let deepLink = content.deepLink {
+            pasteboardItems[0]["com.instagram.sharedSticker.contentURL"] = deepLink.absoluteString
+        } else {
+            pasteboardItems[0]["com.instagram.sharedSticker.contentURL"] = "https://snapchef.app"
+        }
+        
+        let pasteboardOptions = [
+            UIPasteboard.OptionsKey.expirationDate: Date().addingTimeInterval(300)
+        ]
+        
+        UIPasteboard.general.setItems(pasteboardItems, options: pasteboardOptions)
+        
+        // Include Facebook App ID in URL scheme for proper attribution
+        let facebookAppId = "YOUR_FACEBOOK_APP_ID"  // Will be replaced with actual ID
+        
+        if let url = URL(string: "instagram-stories://share?source_application=\(facebookAppId)") {
+            UIApplication.shared.open(url) { success in
+                if !success {
+                    // Try without Facebook App ID as fallback
+                    if let fallbackURL = URL(string: "instagram-stories://share") {
+                        UIApplication.shared.open(fallbackURL) { fallbackSuccess in
+                            if !fallbackSuccess {
+                                print("❌ Instagram not installed")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    @MainActor
+    private func shareToInstagramFeed(image: UIImage, content: ShareContent) async {
+        let feedImage = resizeImageForFeed(image)
+        let caption = generateInstagramCaption(for: content)
+        
+        // Copy caption to clipboard
+        UIPasteboard.general.string = caption
+        instagramFeedCaption = caption
+        
+        // Save image to Photos
+        SafePhotoSaver.shared.saveImageToPhotoLibrary(feedImage) { success, error in
+            if success {
+                print("📱 Instagram: Image saved successfully to Photos")
+                // Show alert with instructions
+                DispatchQueue.main.async {
+                    self.showInstagramFeedAlert = true
+                }
+            } else {
+                print("📱 Instagram: Failed to save image: \(error ?? "Unknown error")")
+            }
+        }
+    }
+    
+    @MainActor
+    private func shareToMessages(image: UIImage, content: ShareContent) async {
+        // Check if Messages is available
+        if MFMessageComposeViewController.canSendText() {
+            // Present message composer
+            presentMessageComposer(image: image, content: content)
+        } else {
+            // Fallback: Save to photos
+            SafePhotoSaver.shared.saveImageToPhotoLibrary(image) { success, error in
+                if success {
+                    print("📱 Messages: Image saved to Photos as fallback")
+                } else {
+                    print("📱 Messages: Failed to save image: \(error ?? "Unknown error")")
+                }
+            }
+        }
+    }
+    
+    @MainActor
+    private func presentMessageComposer(image: UIImage, content: ShareContent) {
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+              let window = windowScene.windows.first(where: { $0.isKeyWindow }),
+              let rootVC = window.rootViewController else {
+            return
+        }
+        
+        var topVC = rootVC
+        while let presented = topVC.presentedViewController {
+            topVC = presented
+        }
+        
+        let messageVC = MFMessageComposeViewController()
+        messageVC.messageComposeDelegate = MessageComposeDelegate()
+        messageVC.body = generateMessageText(for: content)
+        
+        if let imageData = image.pngData() {
+            messageVC.addAttachmentData(imageData, typeIdentifier: "public.png", filename: "recipe_card.png")
+        }
+        
+        topVC.present(messageVC, animated: true)
+    }
+    
+    // MARK: - Helper methods for content generation
+    
+    private func generateInstagramCaption(for content: ShareContent) -> String {
+        switch content.type {
+        case .recipe(let recipe):
+            let totalTime = recipe.prepTime + recipe.cookTime
+            let primaryHashtag = (recipe.tags.first ?? "Homemade").replacingOccurrences(of: " ", with: "")
+            
+            return """
+Just turned my sad fridge into \(recipe.name) 🎉
+
+⏱ \(totalTime) min magic
+📱 Get SnapChef on the App Store!
+
+#\(primaryHashtag) #SnapChef #FridgeToFeast
+"""
+            
+        case .achievement(let achievementName):
+            return """
+🏆 \(achievementName) unlocked!
+
+Level up your kitchen game 👨‍🍳
+📱 Download SnapChef on the App Store
+
+#SnapChef #CookingWin
+"""
+            
+        case .challenge(let challenge):
+            return """
+Challenge crushed: \(challenge.title) ✅
+
+Who's next? 💪
+📱 Join me on SnapChef (App Store)
+
+#SnapChefChallenge
+"""
+            
+        default:
+            return """
+Made with SnapChef 🍳
+📱 Get it on the App Store!
+
+#SnapChef
+"""
+        }
+    }
+    
+    private func generateMessageText(for content: ShareContent) -> String {
+        guard case .recipe(let recipe) = content.type else {
+            return "Check out what I made with SnapChef! 🍳"
+        }
+        
+        return """
+Look what I made! 🎉
+
+\(recipe.name)
+
+Tap the card to see the before & after transformation!
+
+Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
+"""
+    }
+    
+    // MARK: - Image resizing helpers
+    
+    private func resizeImageForStories(_ image: UIImage) -> UIImage {
+        let targetSize = CGSize(width: 1080, height: 1920)
+        return resizeImage(image, targetSize: targetSize, aspectFill: true)
+    }
+    
+    private func resizeImageForFeed(_ image: UIImage) -> UIImage {
+        let targetSize = CGSize(width: 1080, height: 1080)
+        return resizeImage(image, targetSize: targetSize, aspectFill: true)
+    }
+    
+    private func resizeImage(_ image: UIImage, targetSize: CGSize, aspectFill: Bool) -> UIImage {
+        let size = image.size
+        
+        let widthRatio  = targetSize.width  / size.width
+        let heightRatio = targetSize.height / size.height
+        
+        let ratio = aspectFill ? max(widthRatio, heightRatio) : min(widthRatio, heightRatio)
+        
+        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+        
+        UIGraphicsBeginImageContextWithOptions(targetSize, true, 1.0)
+        defer { UIGraphicsEndImageContext() }
+        
+        UIColor.white.setFill()
+        UIRectFill(CGRect(origin: .zero, size: targetSize))
+        
+        let drawRect = CGRect(
+            x: (targetSize.width - newSize.width) / 2,
+            y: (targetSize.height - newSize.height) / 2,
+            width: newSize.width,
+            height: newSize.height
+        )
+        
+        image.draw(in: drawRect)
+        
+        guard let resizedImage = UIGraphicsGetImageFromCurrentImageContext() else {
+            return image
+        }
+        
+        return resizedImage
+    }
+    
+    // MARK: - Activity creation methods
+    
+    private func createInstagramShareActivity(isStory: Bool, content: ShareContent) async {
+        guard UnifiedAuthManager.shared.isAuthenticated,
+              let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
+            return
+        }
+        
+        var activityType = isStory ? "instagramStoryShared" : "instagramFeedShared"
+        
+        switch content.type {
+        case .recipe(let recipe):
+            activityType = isStory ? "recipeInstagramStoryShared" : "recipeInstagramFeedShared"
+            do {
+                try await CloudKitSyncService.shared.createActivity(
+                    type: activityType,
+                    actorID: userID,
+                    recipeID: recipe.id.uuidString,
+                    recipeName: recipe.name
+                )
+            } catch {
+                print("Failed to create Instagram share activity: \(error)")
+            }
+        default:
+            break
+        }
+    }
+    
+    private func createMessagesShareActivity(content: ShareContent) async {
+        guard UnifiedAuthManager.shared.isAuthenticated,
+              let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
+            return
+        }
+        
+        switch content.type {
+        case .recipe(let recipe):
+            do {
+                try await CloudKitSyncService.shared.createActivity(
+                    type: "recipeMessagesCardShared",
+                    actorID: userID,
+                    recipeID: recipe.id.uuidString,
+                    recipeName: recipe.name
+                )
+            } catch {
+                print("Failed to create Messages share activity: \(error)")
+            }
+        default:
+            break
         }
     }
     
@@ -945,4 +1348,13 @@ struct VideoGenerationView: View {
             type: .recipe(MockDataProvider.shared.mockRecipe())
         )
     )
+}
+
+// MARK: - Message Compose Delegate
+class MessageComposeDelegate: NSObject, MFMessageComposeViewControllerDelegate {
+    func messageComposeViewController(_ controller: MFMessageComposeViewController, didFinishWith result: MessageComposeResult) {
+        Task { @MainActor in
+            controller.dismiss(animated: true)
+        }
+    }
 }

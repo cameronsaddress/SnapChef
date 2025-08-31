@@ -3,7 +3,7 @@ import SwiftUI
 import CloudKit
 
 // MARK: - Challenge Types
-public enum ChallengeType: String, CaseIterable {
+public enum ChallengeType: String, CaseIterable, Sendable {
     case daily = "Daily Challenge"
     case weekly = "Weekly Challenge"
     case special = "Special Event"
@@ -29,7 +29,7 @@ public enum ChallengeType: String, CaseIterable {
 }
 
 // MARK: - Difficulty Level
-public enum DifficultyLevel: Int, CaseIterable {
+public enum DifficultyLevel: Int, CaseIterable, Sendable {
     case easy = 1
     case medium = 2
     case hard = 3
@@ -58,7 +58,7 @@ public enum DifficultyLevel: Int, CaseIterable {
 }
 
 // MARK: - Challenge Model
-public struct Challenge: Identifiable, Hashable {
+public struct Challenge: Identifiable, Hashable, Sendable {
     public let id: String
     let type: ChallengeType
     let title: String
