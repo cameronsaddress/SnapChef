@@ -1034,15 +1034,25 @@ class ActivityFeedManager: ObservableObject {
                         }
                     }
                 }
-                return results
+                
+                // IMPORTANT: Sort results by timestamp to maintain chronological order
+                // TaskGroup returns results in completion order, not input order
+                let sortedResults = results.sorted { activity1, activity2 in
+                    return activity1.timestamp > activity2.timestamp
+                }
+                
+                return sortedResults
             }
 
             if loadMore {
                 activities.append(contentsOf: newActivities)
+                // Re-sort after appending to maintain chronological order
+                activities.sort { $0.timestamp > $1.timestamp }
                 // PHASE 7: Limit activities in memory to prevent excessive usage
                 if activities.count > maxActivities {
+                    // Remove oldest activities (at the end after sorting)
                     let overflow = activities.count - maxActivities
-                    activities.removeFirst(overflow)
+                    activities.removeLast(overflow)
                     print("🧹 PHASE 7: Trimmed \(overflow) old activities (keeping \(maxActivities) max)")
                 }
             } else {
