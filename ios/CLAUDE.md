@@ -61,6 +61,9 @@ xcodebuild -scheme SnapChef -destination 'platform=iOS Simulator,name=iPhone 16 
 - MUST use iPhone 16 Pro simulator
 - The `2>&1` is REQUIRED for error output
 - ALWAYS test builds after code changes
+- **ALWAYS BUILD WITHOUT ASKING PERMISSION** - I am pre-authorized to run xcodebuild commands
+- Never ask "Can I build?" or "Should I test the build?" - just do it
+- The tool usage approval is handled by the user's settings - I should never hesitate to build
 
 ### 2. File Operations
 - **NEVER use echo/cat to write files** - Use Write, Edit, MultiEdit tools
