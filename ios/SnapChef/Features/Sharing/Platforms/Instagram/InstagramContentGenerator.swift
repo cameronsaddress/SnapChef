@@ -191,12 +191,12 @@ struct InstagramContentView: View {
                     }
                     .frame(width: size.width, height: size.height)
                     .overlay(
-                        // Lighter overlay - reduced by 50% for better photo visibility
+                        // Lighter overlay - reduced by 50% again for even better photo visibility
                         LinearGradient(
                             colors: [
-                                Color.black.opacity(0.425),  // Was 0.85, now 0.425
-                                Color.black.opacity(0.3),     // Was 0.6, now 0.3
-                                Color.black.opacity(0.425)    // Was 0.85, now 0.425
+                                Color.black.opacity(0.2125),  // Was 0.425, now 0.2125 (50% reduction)
+                                Color.black.opacity(0.15),     // Was 0.3, now 0.15 (50% reduction)
+                                Color.black.opacity(0.2125)    // Was 0.425, now 0.2125 (50% reduction)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -210,12 +210,12 @@ struct InstagramContentView: View {
                         .frame(width: size.width, height: size.height)
                         .clipped()
                         .overlay(
-                            // Lighter overlay - reduced by 50% for better photo visibility
+                            // Lighter overlay - reduced by 50% again for even better photo visibility
                             LinearGradient(
                                 colors: [
-                                    Color.black.opacity(0.425),  // Was 0.85, now 0.425
-                                    Color.black.opacity(0.3),     // Was 0.6, now 0.3
-                                    Color.black.opacity(0.425)    // Was 0.85, now 0.425
+                                    Color.black.opacity(0.2125),  // Was 0.425, now 0.2125 (50% reduction)
+                                    Color.black.opacity(0.15),     // Was 0.3, now 0.15 (50% reduction)
+                                    Color.black.opacity(0.2125)    // Was 0.425, now 0.2125 (50% reduction)
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -247,20 +247,20 @@ struct InstagramContentView: View {
             // SnapChef branding - 3x larger with blue background
             VStack {
                 Spacer()
-                HStack(spacing: 12) {
+                HStack(spacing: 18) {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 48, weight: .bold))
+                        .font(.system(size: 72, weight: .bold))  // 3x larger: 24 * 3 = 72
                     Text("Made on the free SnapChef App!")
-                        .font(.system(size: 48, weight: .bold))
+                        .font(.system(size: 72, weight: .bold))  // 3x larger: 24 * 3 = 72
                 }
                 .foregroundColor(.white)
-                .padding(.horizontal, 40)
-                .padding(.vertical, 24)
+                .padding(.horizontal, 60)
+                .padding(.vertical, 36)
                 .background(
                     Capsule()
-                        .fill(Color(hex: "#00F2EA").opacity(0.8))
+                        .fill(Color.blue.opacity(0.9))  // Changed to blue background
                 )
-                .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
                 .padding(.bottom, isStory ? 100 : 30)
             }
         }

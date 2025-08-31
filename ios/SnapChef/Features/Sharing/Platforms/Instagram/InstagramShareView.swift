@@ -299,9 +299,16 @@ struct InstagramShareView: View {
                     captionText = generateCaption()
                 }
                 
-                // Start generating and sharing immediately
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    generateAndShare()
+                // Start generating and sharing immediately for Stories
+                if shareMode == .story {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        generateAndShare()
+                    }
+                } else {
+                    // For Feed posts, just generate but let user choose when to share
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        generateContent()
+                    }
                 }
             }
         }

@@ -195,7 +195,7 @@ struct MessagesShareView: View {
                     generateImage()
                     
                     // After image is generated, automatically open Messages
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                         if generatedImage != nil && !showingMessageComposer {
                             sendMessage()
                         }
