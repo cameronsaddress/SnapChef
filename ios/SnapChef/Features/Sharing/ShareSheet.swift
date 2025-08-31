@@ -310,9 +310,9 @@ enum SharePlatform {
         if !message.isEmpty {
             text += "\(message)\n\n"
         }
-        text += "🍳 Just made \(recipe.name) with @SnapChef!\n"
+        text += "🍳 Just made \(recipe.name) with SnapChef!\n"
         text += "⏱ Only \(recipe.cookTime + recipe.prepTime) minutes\n"
-        text += "📱 AI-powered recipes from what you already have\n\n"
+        text += "📱 Download SnapChef on the App Store - AI recipes from what you already have\n\n"
         text += "#SnapChef #AIRecipes #HomeCooking"
         return text
     }

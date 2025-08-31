@@ -150,7 +150,7 @@ struct XImageContent: View {
                         .font(.system(size: 14, weight: .bold))
                     Text("Made with SnapChef")
                         .font(.system(size: 14, weight: .semibold))
-                    Text("@snapchef")
+                    Text("Download on App Store")
                         .font(.system(size: 14))
                         .opacity(0.8)
                 }

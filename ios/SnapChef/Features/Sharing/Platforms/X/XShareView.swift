@@ -213,16 +213,16 @@ struct XShareView: View {
         switch content.type {
         case .recipe(let recipe):
             let emoji = getRecipeEmoji(for: recipe)
-            return "Just turned my fridge into \(recipe.name) \(emoji)\n\nMade with @SnapChef - the app that turns your fridge photos into recipes!"
+            return "Just turned my fridge into \(recipe.name) \(emoji)\n\nMade with SnapChef - download on the App Store!"
             
         case .achievement(let achievementName):
-            return "🏆 \(achievementName) unlocked!\n\nLevel up your cooking game with @SnapChef"
+            return "🏆 \(achievementName) unlocked!\n\nLevel up your cooking game with SnapChef - download on the App Store"
             
         case .challenge(let challenge):
-            return "Challenge crushed: \(challenge.title) ✅\n\nWho's next? Join me on @SnapChef"
+            return "Challenge crushed: \(challenge.title) ✅\n\nWho's next? Get SnapChef on the App Store"
             
         default:
-            return "Made with @SnapChef - turn your fridge into feast! 🍳"
+            return "Made with SnapChef - turn your fridge into feast! 🍳\nDownload on the App Store"
         }
     }
     
@@ -471,7 +471,7 @@ struct XTweetPreview: View {
                             .foregroundColor(Color(hex: "#1D9BF0"))
                     }
                     
-                    Text("@snapchef · now")
+                    Text("SnapChef App · now")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.5))
                 }

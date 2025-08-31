@@ -1039,9 +1039,9 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
     private func generateTikTokCaption() -> String {
         switch content.type {
         case .recipe(let recipe):
-            return "From fridge chaos to \(recipe.name)! 🤖✨ Made with @SnapChefApp #SnapChef #AIRecipes #CookingHacks #FoodWaste #SmartCooking"
+            return "From fridge chaos to \(recipe.name)! 🤖✨ Made with SnapChef - Download on App Store! #SnapChef #AIRecipes #CookingHacks #FoodWaste #SmartCooking"
         default:
-            return "Made with @SnapChefApp 🤖✨ #SnapChef #AIRecipes #CookingHacks"
+            return "Made with SnapChef - Download on App Store! 🤖✨ #SnapChef #AIRecipes #CookingHacks"
         }
     }
     

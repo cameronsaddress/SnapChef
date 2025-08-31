@@ -100,7 +100,7 @@ enum StickerType: String, CaseIterable {
         case .poll: return "Vote Now!"
         case .question: return "Ask me!"
         case .location: return "My Kitchen"
-        case .mention: return "@snapchef"
+        case .mention: return "SnapChef App"
         case .hashtag: return "#SnapChef"
         case .emoji: return "Yummy!"
         case .custom: return ""
