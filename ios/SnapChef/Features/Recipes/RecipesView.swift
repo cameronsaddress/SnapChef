@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RecipesView: View {
+    @Binding var selectedTab: Int
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitRecipeCache = CloudKitRecipeCache.shared
     @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
@@ -95,7 +96,7 @@ struct RecipesView: View {
 
                         // Empty State
                         if filteredRecipes.isEmpty && !cloudKitRecipeCache.isLoading {
-                            EmptyRecipesView()
+                            EmptyRecipesView(selectedTab: $selectedTab)
                                 .padding(.top, 50)
                                 .staggeredFade(index: 5, isShowing: contentVisible)
                         }
@@ -967,6 +968,7 @@ struct RecipeGridCard: View {
 
 // MARK: - Empty Recipes View
 struct EmptyRecipesView: View {
+    @Binding var selectedTab: Int
     @State private var bounceAnimation = false
 
     var body: some View {
@@ -1007,7 +1009,10 @@ struct EmptyRecipesView: View {
             MagneticButton(
                 title: "Start Cooking",
                 icon: "camera.fill",
-                action: {}
+                action: {
+                    // Switch to Camera tab (tab index 1)
+                    selectedTab = 1
+                }
             )
             .padding(.top, 10)
         }
@@ -1226,7 +1231,7 @@ struct RestrictionPill: View {
         MagicalBackground()
             .ignoresSafeArea()
 
-        RecipesView()
+        RecipesView(selectedTab: .constant(3))
             .environmentObject(AppState())
     }
 }

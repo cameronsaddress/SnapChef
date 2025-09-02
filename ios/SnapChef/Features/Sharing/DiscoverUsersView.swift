@@ -419,6 +419,15 @@ class SimpleDiscoverUsersManager: ObservableObject {
             profileImage: nil
         )
     }
+    
+    /// Clear all cached data (for account deletion)
+    func clearCache() {
+        users.removeAll()
+        searchResults.removeAll()
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+        UserDefaults.standard.removeObject(forKey: cacheTimestampKey)
+        lastRefreshTime = nil
+    }
 }
 
 // MARK: - Discover Users View

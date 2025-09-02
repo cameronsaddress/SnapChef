@@ -72,7 +72,7 @@ struct MainTabView: View {
                                 removal: .opacity.combined(with: .scale(scale: 1.02))
                             ))
                     case 3:
-                        RecipesView()
+                        RecipesView(selectedTab: $selectedTab)
                             .transition(.asymmetric(
                                 insertion: .opacity.combined(with: .scale(scale: 0.98)),
                                 removal: .opacity.combined(with: .scale(scale: 1.02))

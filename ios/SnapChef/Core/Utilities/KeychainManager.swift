@@ -256,4 +256,15 @@ class KeychainManager {
         _ = deleteValue(forKey: googleClientIdIdentifier)
         _ = deleteAuthToken()
     }
+    
+    /// Clear all keychain data (for account deletion)
+    func clearAll() {
+        clearAllSecrets()
+        // Clear any additional keychain items
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.snapchef.app"
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
 }

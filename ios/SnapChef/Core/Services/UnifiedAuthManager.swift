@@ -1027,6 +1027,93 @@ final class UnifiedAuthManager: ObservableObject {
         }
     }
     
+    // MARK: - Account Deletion
+    
+    /// Permanently delete user account and all associated data
+    func deleteAccount() async throws {
+        guard let user = currentUser,
+              let recordID = user.recordID else {
+            throw UnifiedAuthError.notAuthenticated
+        }
+        
+        print("🗑️ Starting account deletion for user: \(recordID)")
+        
+        // 1. Delete all user's recipes
+        let recipePredicate = NSPredicate(format: "creatorUserRecordID == %@", recordID)
+        let recipeQuery = CKQuery(recordType: "Recipe", predicate: recipePredicate)
+        
+        do {
+            let recipeResults = try await cloudKitDatabase.records(matching: recipeQuery)
+            for (recordID, _) in recipeResults.matchResults {
+                try await cloudKitDatabase.deleteRecord(withID: recordID)
+                print("   ✓ Deleted recipe: \(recordID)")
+            }
+        } catch {
+            print("   ⚠️ Error deleting recipes: \(error)")
+        }
+        
+        // 2. Delete all follow relationships
+        let followerPredicate = NSPredicate(format: "followerID == %@ OR followingID == %@", recordID, recordID)
+        let followQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
+        
+        do {
+            let followResults = try await cloudKitDatabase.records(matching: followQuery)
+            for (recordID, _) in followResults.matchResults {
+                try await cloudKitDatabase.deleteRecord(withID: recordID)
+                print("   ✓ Deleted follow relationship: \(recordID)")
+            }
+        } catch {
+            print("   ⚠️ Error deleting follow relationships: \(error)")
+        }
+        
+        // 3. Delete all activities
+        let activityPredicate = NSPredicate(format: "actorID == %@", recordID)
+        let activityQuery = CKQuery(recordType: "Activity", predicate: activityPredicate)
+        
+        do {
+            let activityResults = try await cloudKitDatabase.records(matching: activityQuery)
+            for (recordID, _) in activityResults.matchResults {
+                try await cloudKitDatabase.deleteRecord(withID: recordID)
+                print("   ✓ Deleted activity: \(recordID)")
+            }
+        } catch {
+            print("   ⚠️ Error deleting activities: \(error)")
+        }
+        
+        // 4. Delete all challenges
+        let challengePredicate = NSPredicate(format: "userID == %@", recordID)
+        let challengeQuery = CKQuery(recordType: "UserChallenge", predicate: challengePredicate)
+        
+        do {
+            let challengeResults = try await cloudKitDatabase.records(matching: challengeQuery)
+            for (recordID, _) in challengeResults.matchResults {
+                try await cloudKitDatabase.deleteRecord(withID: recordID)
+                print("   ✓ Deleted challenge: \(recordID)")
+            }
+        } catch {
+            print("   ⚠️ Error deleting challenges: \(error)")
+        }
+        
+        // 5. Delete user record itself
+        let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
+        do {
+            try await cloudKitDatabase.deleteRecord(withID: userRecordID)
+            print("   ✓ Deleted user record")
+        } catch {
+            print("   ⚠️ Error deleting user record: \(error)")
+            // Try without user_ prefix
+            let altRecordID = CKRecord.ID(recordName: recordID)
+            try await cloudKitDatabase.deleteRecord(withID: altRecordID)
+        }
+        
+        print("✅ Account deletion complete")
+        
+        // Clear local auth state
+        currentUser = nil
+        isAuthenticated = false
+        UserDefaults.standard.removeObject(forKey: "currentUserRecordID")
+    }
+    
     // MARK: - Private Helpers
     
     private func loadCloudKitUser(recordID: String, silent: Bool = false) async {

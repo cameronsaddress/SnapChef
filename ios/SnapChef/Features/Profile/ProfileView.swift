@@ -91,6 +91,12 @@ struct ProfileView: View {
                         .staggeredFade(index: 6, isShowing: contentVisible)
                         .padding(.top, 10)
                     }
+                    
+                    // Delete Account Button (shown for all users, including anonymous)
+                    // Anonymous users may have local data to delete
+                    DeleteAccountButton(authManager: authManager)
+                        .staggeredFade(index: 7, isShowing: contentVisible)
+                        .padding(.top, authManager.isAuthenticated ? 8 : 10)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 100)
@@ -134,7 +140,7 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showingRecipes) {
             NavigationStack {
-                RecipesView()
+                RecipesView(selectedTab: .constant(3))
                     .navigationTitle("Your Recipes")
                     .navigationBarTitleDisplayMode(.inline)
                     .navigationBarItems(trailing: Button("Done") {
@@ -1131,6 +1137,136 @@ struct EnhancedSignOutButton: View {
         } message: {
             Text("You'll need to sign in again to access your recipes and progress.")
         }
+    }
+}
+
+// MARK: - Delete Account Button
+struct DeleteAccountButton: View {
+    let authManager: UnifiedAuthManager
+    @State private var showDeleteAlert = false
+    @State private var showFinalConfirmation = false
+    @State private var isDeleting = false
+    @State private var isPressed = false
+    @State private var showError = false
+    @State private var errorMessage = ""
+    
+    var body: some View {
+        Button(action: {
+            showDeleteAlert = true
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: "trash.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(Color(hex: "#FF3B30"))
+                
+                Text("Delete Account")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                if isDeleting {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.8)
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.red.opacity(0.15))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                    )
+            )
+            .scaleEffect(isPressed ? 0.98 : 1.0)
+        }
+        .disabled(isDeleting)
+        .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = pressing
+            }
+        }, perform: {})
+        .alert("Delete Account?", isPresented: $showDeleteAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Continue", role: .destructive) {
+                showFinalConfirmation = true
+            }
+        } message: {
+            Text(authManager.isAuthenticated ? 
+                "This action cannot be undone. All your data including recipes, challenges, and progress will be permanently deleted." :
+                "This will delete all locally stored data including saved recipes and photos.")
+        }
+        .alert("Are you absolutely sure?", isPresented: $showFinalConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete My Data", role: .destructive) {
+                Task {
+                    await deleteAccount()
+                }
+            }
+        } message: {
+            Text(authManager.isAuthenticated ?
+                "This will permanently delete:\n• All your recipes\n• Your profile and followers\n• Challenge progress\n• All app data\n\nThis cannot be reversed." :
+                "This will permanently delete:\n• All locally saved recipes\n• Cached photos\n• App preferences\n\nThis cannot be reversed.")
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage)
+        }
+    }
+    
+    private func deleteAccount() async {
+        isDeleting = true
+        
+        // For authenticated users, delete from CloudKit
+        if authManager.isAuthenticated {
+            do {
+                // Delete user account through UnifiedAuthManager
+                try await authManager.deleteAccount()
+            } catch {
+                errorMessage = "Failed to delete account: \(error.localizedDescription)"
+                showError = true
+                isDeleting = false
+                return
+            }
+        }
+        
+        // Clear all local data (for both authenticated and anonymous users)
+        clearAllLocalData()
+        
+        // Sign out if authenticated
+        if authManager.isAuthenticated {
+            authManager.signOut()
+        }
+        
+        isDeleting = false
+    }
+    
+    private func clearAllLocalData() {
+        // Clear UserDefaults
+        if let bundleID = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleID)
+        }
+        
+        // Clear Keychain
+        KeychainManager.shared.clearAll()
+        
+        // Clear local photo storage
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let recipePhotosDirectory = documentsDirectory.appendingPathComponent("RecipePhotos")
+        let profilePhotosDirectory = documentsDirectory.appendingPathComponent("ProfilePhotos")
+        
+        try? FileManager.default.removeItem(at: recipePhotosDirectory)
+        try? FileManager.default.removeItem(at: profilePhotosDirectory)
+        
+        // Clear caches
+        URLCache.shared.removeAllCachedResponses()
+        
+        // Reset singleton instances
+        ActivityFeedManager.shared.reset()
+        SimpleDiscoverUsersManager.shared.clearCache()
     }
 }
 
