@@ -257,7 +257,23 @@ class KeychainManager {
         _ = deleteAuthToken()
     }
     
-    /// Clear all keychain data (for account deletion)
+    /// Clear ONLY user-specific data (for account deletion)
+    /// IMPORTANT: Preserves system API keys and OAuth client secrets
+    func clearUserData() {
+        // Only delete user authentication tokens, NOT system keys
+        _ = deleteAuthToken()
+        
+        // Do NOT delete:
+        // - apiKeyIdentifier (system API key for recipe generation)
+        // - tiktokClientSecretIdentifier (OAuth client secret)
+        // - googleClientIdIdentifier (OAuth client ID)
+        
+        print("✅ Cleared user data from keychain (system API keys preserved)")
+    }
+    
+    /// Clear all keychain data including API keys
+    /// WARNING: This will break the app until API keys are re-added
+    @available(*, deprecated, message: "Use clearUserData() for account deletion")
     func clearAll() {
         clearAllSecrets()
         // Clear any additional keychain items

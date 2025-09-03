@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import CloudKit
+import UIKit
 
 struct UsernameSetupView: View {
     @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
@@ -13,6 +14,9 @@ struct UsernameSetupView: View {
     @State private var selectedImage: UIImage?
     @State private var showImagePicker = false
     @State private var selectedItem: PhotosPickerItem?
+    @State private var showingPhotoOptions = false
+    @State private var photoSourceType: UIImagePickerController.SourceType = .photoLibrary
+    @StateObject private var profilePhotoManager = ProfilePhotoManager.shared
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -21,6 +25,33 @@ struct UsernameSetupView: View {
     @State private var contentVisible = false
     @State private var buttonScale: CGFloat = 1.0
 
+    // Profile image overlay computed property
+    @ViewBuilder
+    private var profileImageOverlay: some View {
+        if let profilePhoto = profilePhotoManager.currentUserPhoto {
+            Image(uiImage: profilePhoto)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 120, height: 120)
+                .clipShape(Circle())
+        } else if let selectedImage = selectedImage {
+            Image(uiImage: selectedImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 120, height: 120)
+                .clipShape(Circle())
+        } else {
+            VStack(spacing: 8) {
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 32))
+                    .foregroundColor(.white)
+                Text("Add Photo")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+            }
+        }
+    }
+    
     enum UsernameStatus {
         case unchecked
         case checking
@@ -87,56 +118,43 @@ struct UsernameSetupView: View {
                     .opacity(contentVisible ? 1 : 0)
                     .offset(y: contentVisible ? 0 : 20)
 
-                    // Profile Photo Section
+                    // Profile Photo Section - EXACT copy from ProfileView
                     VStack(spacing: 20) {
-                        // Photo picker
-                        Button(action: { showImagePicker = true }) {
+                        Button(action: { 
+                            showingPhotoOptions = true  // Show action sheet
+                        }) {
                             ZStack {
-                                Circle()
-                                    .fill(Color.white.opacity(0.2))
-                                    .frame(width: 150, height: 150)
-
-                                if let selectedImage = selectedImage {
-                                    Image(uiImage: selectedImage)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 150, height: 150)
-                                        .clipShape(Circle())
-                                        .overlay(
-                                            Circle()
-                                                .stroke(Color.white, lineWidth: 3)
-                                        )
-                                } else {
-                                    VStack(spacing: 8) {
-                                        Image(systemName: "camera.fill")
-                                            .font(.system(size: 40))
-                                            .foregroundColor(.white)
-                                        Text("Add Photo")
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white)
-                                    }
-                                }
-
-                                // Edit overlay for existing photo
-                                if selectedImage != nil {
+                                // Glassmorphic card (from ProfileView)
+                                GlassmorphicCard(content: {
                                     Circle()
-                                        .fill(Color.black.opacity(0.5))
-                                        .frame(width: 40, height: 40)
-                                        .overlay(
-                                            Image(systemName: "camera.fill")
-                                                .font(.system(size: 18))
-                                                .foregroundColor(.white)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color(hex: "#667eea"),
+                                                    Color(hex: "#764ba2")
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
                                         )
-                                        .offset(x: 55, y: 55)
-                                }
+                                        .frame(width: 120, height: 120)
+                                        .overlay(profileImageOverlay)
+                                }, cornerRadius: 60)
+                                .frame(width: 120, height: 120)
+                                
+                                // Camera icon overlay
+                                Circle()
+                                    .fill(Color.black.opacity(0.6))
+                                    .frame(width: 35, height: 35)
+                                    .overlay(
+                                        Image(systemName: "camera.fill")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(.white)
+                                    )
+                                    .offset(x: 40, y: 40)
                             }
                         }
-                        .scaleEffect(buttonScale)
-                        .onHover { hovering in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                buttonScale = hovering ? 1.05 : 1.0
-                            }
-                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                     .opacity(contentVisible ? 1 : 0)
                     .offset(y: contentVisible ? 0 : 20)
@@ -249,14 +267,34 @@ struct UsernameSetupView: View {
                 .padding(.horizontal)
             }
         }
-        .photosPicker(isPresented: $showImagePicker, selection: $selectedItem, matching: .images)
-        .onChange(of: selectedItem) { newItem in
-            Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    selectedImage = image
+        .confirmationDialog("Choose Photo", isPresented: $showingPhotoOptions) {
+            Button("Take Photo") {
+                photoSourceType = .camera
+                showImagePicker = true
+            }
+            Button("Choose from Library") {
+                photoSourceType = .photoLibrary
+                showImagePicker = true
+            }
+            if profilePhotoManager.currentUserPhoto != nil || selectedImage != nil {
+                Button("Remove Photo", role: .destructive) {
+                    Task {
+                        await profilePhotoManager.deleteProfilePhoto()
+                        selectedImage = nil
+                    }
                 }
             }
+            Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(image: $selectedImage, sourceType: photoSourceType)
+                .onDisappear {
+                    if let image = selectedImage {
+                        Task {
+                            await profilePhotoManager.saveProfilePhoto(image)
+                        }
+                    }
+                }
         }
         .alert("Error", isPresented: $showError) {
             Button("OK") { }
@@ -343,10 +381,8 @@ struct UsernameSetupView: View {
                 // Save username using CloudKitAuthManager
                 try await cloudKitAuth.setUsername(username)
 
-                // Save profile image locally and sync to CloudKit if provided
-                if let image = selectedImage {
-                    await ProfilePhotoManager.shared.saveProfilePhoto(image)
-                }
+                // Photo is already saved via ProfilePhotoManager when selected
+                // No need to save again here
 
                 await MainActor.run {
                     cloudKitAuth.showUsernameSelection = false
@@ -387,3 +423,4 @@ struct UsernameSetupView: View {
 #Preview {
     UsernameSetupView()
 }
+

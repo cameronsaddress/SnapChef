@@ -2,7 +2,9 @@
 //  LocalRecipeStore.swift
 //  SnapChef
 //
-//  Local-first recipe storage with CloudKit sync capabilities
+//  DEPRECATED: Use LocalRecipeManager instead
+//  This file is kept for backward compatibility during migration
+//  Will be removed in a future update
 //
 
 import Foundation

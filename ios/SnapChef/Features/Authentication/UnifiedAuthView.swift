@@ -20,6 +20,7 @@ struct UnifiedAuthView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var loadingMessage = "Signing in..."
+    @State private var showUsernameSetup = false
     
     init(requiredFor: AuthRequiredFeature? = nil, showAsSheet: Bool = true) {
         self.requiredFor = requiredFor
@@ -27,6 +28,20 @@ struct UnifiedAuthView: View {
     }
     
     var body: some View {
+        if showUsernameSetup {
+            UsernameSetupView()
+                .onDisappear {
+                    showUsernameSetup = false
+                    if authManager.isAuthenticated {
+                        dismiss()
+                    }
+                }
+        } else {
+            authContent
+        }
+    }
+    
+    var authContent: some View {
         ZStack {
             MagicalBackground()
                 .ignoresSafeArea()
@@ -89,7 +104,8 @@ struct UnifiedAuthView: View {
                     .cornerRadius(25)
                     .disabled(isLoading)
                     
-                    // TikTok Sign In
+                    // TikTok Sign In - Temporarily disabled
+                    /*
                     Button(action: {
                         handleTikTokSignIn()
                     }) {
@@ -120,6 +136,7 @@ struct UnifiedAuthView: View {
                         .cornerRadius(25)
                     }
                     .disabled(isLoading)
+                    */
                 }
                 .padding(.horizontal, 24)
                 
@@ -152,16 +169,18 @@ struct UnifiedAuthView: View {
         } message: {
             Text(errorMessage.isEmpty ? "An error occurred. Please try again." : errorMessage)
         }
-        .sheet(isPresented: $authManager.showUsernameSetup) {
-            UsernameSetupView()
-                .interactiveDismissDisabled()
-        }
         .onAppear {
             print("🔍 DEBUG: [UnifiedAuthView] appeared")
             // Don't reset error states on appear - this causes infinite loop with sheet presentations
         }
+        .onChange(of: authManager.showUsernameSetup) { needsSetup in
+            if needsSetup {
+                showUsernameSetup = true
+                authManager.showUsernameSetup = false // Reset the manager state
+            }
+        }
         .onChange(of: authManager.isAuthenticated) { isAuth in
-            if isAuth {
+            if isAuth && !showUsernameSetup {
                 dismiss()
             }
         }

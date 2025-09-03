@@ -178,6 +178,19 @@ public final class PhotoStorageManager: ObservableObject {
         let fileURL = photoFileURL(recipeId: recipeId, photoType: photoType)
         try? FileManager.default.removeItem(at: fileURL)
     }
+    
+    /// Clear all cached photos (for account deletion)
+    public func clearCache() {
+        recipePhotos.removeAll()
+        
+        // Clear disk cache
+        if let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let photosPath = documentsPath.appendingPathComponent("RecipePhotos")
+            try? FileManager.default.removeItem(at: photosPath)
+        }
+        
+        logger.info("📸 PhotoStorageManager: All cache cleared")
+    }
 
     /// Store fridge photo for multiple recipes (called after recipe generation)
     public func storeFridgePhoto(_ photo: UIImage, for recipeIds: [UUID]) {

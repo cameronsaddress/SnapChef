@@ -706,7 +706,6 @@ class CloudKitRecipeManager: ObservableObject {
     /// Fetch recipes for a specific user (for viewing other users' profiles)
     func fetchRecipesForUser(_ userID: String, limit: Int = 50) async throws -> [Recipe] {
         let logger = CloudKitDebugLogger.shared
-        let _ = Date()
         
         // Handle different userID formats
         var queryUserID = userID
@@ -871,7 +870,7 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Add recipe reference to user profile
     func addRecipeToUserProfile(_ recipeID: String, type: RecipeListType) async throws {
-        guard let userID = getCurrentUserID() else { return }
+        guard let _ = getCurrentUserID() else { return }
 
         // Track locally for instant UI update
         switch type {
@@ -910,7 +909,7 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Remove recipe reference from user profile
     func removeRecipeFromUserProfile(_ recipeID: String, type: RecipeListType) async throws {
-        guard let userID = getCurrentUserID() else { return }
+        guard let _ = getCurrentUserID() else { return }
 
         // For now, just remove the recipe ID locally since CloudKit User record doesn't have list fields
         switch type {
@@ -1029,7 +1028,7 @@ class CloudKitRecipeManager: ObservableObject {
             return []
         }
         
-        guard let currentUserID = getCurrentUserID() else {
+        guard getCurrentUserID() != nil else {
             return []
         }
 
@@ -1054,7 +1053,7 @@ class CloudKitRecipeManager: ObservableObject {
             return []
         }
         
-        guard let currentUserID = getCurrentUserID() else {
+        guard getCurrentUserID() != nil else {
             return []
         }
         
@@ -1237,8 +1236,6 @@ class CloudKitRecipeManager: ObservableObject {
 
     /// Search for recipes by query - FILTERED BY CURRENT USER AND PUBLIC RECIPES
     func searchRecipes(query: String, limit: Int = 20) async throws -> [Recipe] {
-        let _ = CloudKitDebugLogger.shared
-        let _ = Date()
         print("🔍 DEBUG CloudKitRecipeManager: Starting searchRecipes with query: '\(query)', limit: \(limit)")
         // CRITICAL PRIVACY FIX: Only search user's own recipes and explicitly public recipes
         guard let currentUserID = getCurrentUserID() else {
@@ -2013,7 +2010,7 @@ class CloudKitRecipeManager: ObservableObject {
         
         do {
             // Use CloudKitActor for safe deletion
-            try await CloudKitSyncService.shared.cloudKitActor.deleteRecord(with: recordID)
+            try await CloudKitSyncService.shared.cloudKitActor.deleteRecordByID(recordID)
             
             // Update the recipe's like count
             await updateRecipeLikeCount(recipeID: recipeID, increment: false)
@@ -2049,14 +2046,10 @@ class CloudKitRecipeManager: ObservableObject {
     func getLikeCount(for recipeID: String) async -> Int {
         // First try to get the cached count from the Recipe record itself
         let recordID = CKRecord.ID(recordName: recipeID)
-        do {
-            if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
-                if let likeCount = record["likeCount"] as? Int64 {
-                    return Int(likeCount)
-                }
+        if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
+            if let likeCount = record["likeCount"] as? Int64 {
+                return Int(likeCount)
             }
-        } catch {
-            print("Could not fetch recipe record for like count: \(error)")
         }
         
         // Fallback: Count the actual RecipeLike records
@@ -2126,14 +2119,10 @@ class CloudKitRecipeManager: ObservableObject {
             for recipeID in recipeIDs {
                 group.addTask {
                     let recordID = CKRecord.ID(recordName: recipeID)
-                    do {
-                        if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
-                            if let likeCount = record["likeCount"] as? Int64 {
-                                return (recipeID, Int(likeCount))
-                            }
+                    if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
+                        if let likeCount = record["likeCount"] as? Int64 {
+                            return (recipeID, Int(likeCount))
                         }
-                    } catch {
-                        // Silently handle errors, will return 0
                     }
                     return (recipeID, 0)
                 }

@@ -94,7 +94,7 @@ struct ProfileView: View {
                     
                     // Delete Account Button (shown for all users, including anonymous)
                     // Anonymous users may have local data to delete
-                    DeleteAccountButton(authManager: authManager)
+                    DeleteAccountButton(authManager: authManager, appState: appState)
                         .staggeredFade(index: 7, isShowing: contentVisible)
                         .padding(.top, authManager.isAuthenticated ? 8 : 10)
                 }
@@ -209,6 +209,9 @@ struct EnhancedProfileHeader: View {
     @StateObject private var profilePhotoManager = ProfilePhotoManager.shared
     @State private var showingImagePicker = false
     @State private var selectedItem: PhotosPickerItem?
+    @State private var showingPhotoOptions = false
+    @State private var photoSourceType: UIImagePickerController.SourceType = .photoLibrary
+    @State private var selectedImage: UIImage?
     // Using UnifiedAuthManager from environment
     @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
     @EnvironmentObject var appState: AppState
@@ -370,9 +373,9 @@ struct EnhancedProfileHeader: View {
     
     private var profileButton: some View {
         Button(action: {
-            // Show image picker for authenticated users
+            // Show photo options for authenticated users
             if authManager.isAuthenticated {
-                showingImagePicker = true
+                showingPhotoOptions = true
             } else {
                 authManager.showAuthSheet = true
             }
@@ -590,16 +593,36 @@ struct EnhancedProfileHeader: View {
                     }
                 }
         }
-        .photosPicker(isPresented: $showingImagePicker, selection: $selectedItem, matching: .images)
-        .onChange(of: selectedItem) { newItem in
-            Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    await profilePhotoManager.saveProfilePhoto(image)
-                    // Force UI refresh
-                    refreshTrigger += 1
+        .confirmationDialog("Choose Photo", isPresented: $showingPhotoOptions) {
+            Button("Take Photo") {
+                photoSourceType = .camera
+                showingImagePicker = true
+            }
+            Button("Choose from Library") {
+                photoSourceType = .photoLibrary
+                showingImagePicker = true
+            }
+            if profilePhotoManager.currentUserPhoto != nil {
+                Button("Remove Photo", role: .destructive) {
+                    Task {
+                        await profilePhotoManager.deleteProfilePhoto()
+                        refreshTrigger += 1
+                    }
                 }
             }
+            Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showingImagePicker) {
+            ImagePicker(image: $selectedImage, sourceType: photoSourceType)
+                .onDisappear {
+                    if let image = selectedImage {
+                        Task {
+                            await profilePhotoManager.saveProfilePhoto(image)
+                            refreshTrigger += 1
+                            selectedImage = nil
+                        }
+                    }
+                }
         }
         .task {
             // Load profile photo on appear
@@ -1143,12 +1166,16 @@ struct EnhancedSignOutButton: View {
 // MARK: - Delete Account Button
 struct DeleteAccountButton: View {
     let authManager: UnifiedAuthManager
+    let appState: AppState
+    @StateObject private var deletionService = AccountDeletionService.shared
     @State private var showDeleteAlert = false
     @State private var showFinalConfirmation = false
     @State private var isDeleting = false
     @State private var isPressed = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var deletionReport: AccountDeletionService.DeletionReport?
+    @State private var showDeletionReport = false
     
     var body: some View {
         Button(action: {
@@ -1215,58 +1242,188 @@ struct DeleteAccountButton: View {
         } message: {
             Text(errorMessage)
         }
+        .sheet(isPresented: $showDeletionReport) {
+            DeletionReportView(report: deletionReport)
+        }
+        .overlay {
+            if isDeleting {
+                DeletionProgressOverlay(progress: deletionService.deletionProgress)
+            }
+        }
     }
     
     private func deleteAccount() async {
+        // Use the new centralized deletion service
+        await performDeletion()
+    }
+    
+    private func performDeletion() async {
         isDeleting = true
         
-        // For authenticated users, delete from CloudKit
-        if authManager.isAuthenticated {
-            do {
-                // Delete user account through UnifiedAuthManager
-                try await authManager.deleteAccount()
-            } catch {
-                errorMessage = "Failed to delete account: \(error.localizedDescription)"
-                showError = true
-                isDeleting = false
-                return
-            }
+        // Clear AppState's in-memory recipes first
+        await MainActor.run {
+            appState.clearAllRecipes()
         }
         
-        // Clear all local data (for both authenticated and anonymous users)
-        clearAllLocalData()
-        
-        // Sign out if authenticated
-        if authManager.isAuthenticated {
-            authManager.signOut()
-        }
+        // Perform complete deletion using the centralized service
+        let report = await deletionService.deleteAccount()
         
         isDeleting = false
+        deletionReport = report
+        
+        // Show report if there were errors
+        if !report.errors.isEmpty {
+            showDeletionReport = true
+        }
     }
     
     private func clearAllLocalData() {
-        // Clear UserDefaults
-        if let bundleID = Bundle.main.bundleIdentifier {
-            UserDefaults.standard.removePersistentDomain(forName: bundleID)
+        // This is now handled by AccountDeletionService
+        // Keeping empty for backward compatibility
+    }
+}
+
+// MARK: - Deletion Progress Overlay
+struct DeletionProgressOverlay: View {
+    let progress: AccountDeletionService.DeletionProgress
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.8)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(1.5)
+                
+                Text(progressMessage)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                
+                if case .deletingCloudKitData(let recordType, let progress) = progress {
+                    VStack(spacing: 8) {
+                        Text("Deleting \(recordType)")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                        
+                        ProgressView(value: progress)
+                            .progressViewStyle(LinearProgressViewStyle(tint: .white))
+                            .frame(width: 200)
+                    }
+                }
+            }
+            .padding(40)
+            .background(Color.black.opacity(0.9))
+            .cornerRadius(20)
         }
-        
-        // Clear Keychain
-        KeychainManager.shared.clearAll()
-        
-        // Clear local photo storage
-        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let recipePhotosDirectory = documentsDirectory.appendingPathComponent("RecipePhotos")
-        let profilePhotosDirectory = documentsDirectory.appendingPathComponent("ProfilePhotos")
-        
-        try? FileManager.default.removeItem(at: recipePhotosDirectory)
-        try? FileManager.default.removeItem(at: profilePhotosDirectory)
-        
-        // Clear caches
-        URLCache.shared.removeAllCachedResponses()
-        
-        // Reset singleton instances
-        ActivityFeedManager.shared.reset()
-        SimpleDiscoverUsersManager.shared.clearCache()
+    }
+    
+    var progressMessage: String {
+        switch progress {
+        case .idle:
+            return "Preparing..."
+        case .preparingDeletion:
+            return "Preparing account deletion..."
+        case .deletingCloudKitData(_, _):
+            return "Deleting cloud data..."
+        case .deletingLocalData(let category):
+            return "Clearing \(category)..."
+        case .verifyingDeletion:
+            return "Verifying deletion..."
+        case .completed:
+            return "Deletion complete!"
+        case .failed(let error):
+            return "Deletion failed: \(error)"
+        }
+    }
+}
+
+// MARK: - Deletion Report View
+struct DeletionReportView: View {
+    let report: AccountDeletionService.DeletionReport?
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Summary
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Deletion Report")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        
+                        HStack {
+                            Label("\(report?.totalRecordsDeleted ?? 0) records deleted", 
+                                  systemImage: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        }
+                        
+                        if let duration = report?.duration {
+                            Text("Completed in \(String(format: "%.1f", duration)) seconds")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    // Records by type
+                    if let recordsByType = report?.recordsByType, !recordsByType.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Deleted Records")
+                                .font(.headline)
+                            
+                            ForEach(recordsByType.sorted(by: { $0.value > $1.value }), id: \.key) { type, count in
+                                HStack {
+                                    Text(type)
+                                        .font(.system(.body, design: .monospaced))
+                                    Spacer()
+                                    Text("\(count)")
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(12)
+                    }
+                    
+                    // Errors
+                    if let errors = report?.errors, !errors.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label("Errors (\(errors.count))", systemImage: "exclamationmark.triangle.fill")
+                                .font(.headline)
+                                .foregroundColor(.red)
+                            
+                            ForEach(Array(errors.enumerated()), id: \.offset) { _, error in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(error.category): \(error.recordType ?? "Unknown")")
+                                        .font(.system(.body, design: .monospaced))
+                                    Text(error.error.localizedDescription)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(12)
+                    }
+                }
+                .padding()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -3038,4 +3195,45 @@ private func cloudKitUserToUser(_ cloudKitUser: CloudKitUser?) -> User? {
         isProfilePublic: true,
         showOnLeaderboard: true
     )
+}
+
+// MARK: - ImagePicker for Camera/Library
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    let sourceType: UIImagePickerController.SourceType
+    @Environment(\.dismiss) var dismiss
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = sourceType
+        picker.delegate = context.coordinator
+        picker.allowsEditing = true  // Allow cropping to square
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
+        
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, 
+                                  didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage {
+                parent.image = image
+            }
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
+    }
 }

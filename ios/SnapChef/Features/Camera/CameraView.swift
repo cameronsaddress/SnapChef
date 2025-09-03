@@ -520,24 +520,21 @@ struct CameraView: View {
             let startTime = Date()
 
             // Get existing recipe names to avoid duplicates
-            // Use LOCAL-FIRST approach with LocalRecipeStorage for instant access
+            // Use LOCAL-FIRST approach with LocalRecipeManager for instant access
             var existingRecipeNames = Set<String>()
             
-            // 1. Get recipes from LocalRecipeStorage (instant, reliable)
-            let localStorage = LocalRecipeStorage.shared
-            let localSavedIds = localStorage.getAllSavedRecipeIds()
+            // 1. Get recipes from LocalRecipeManager (instant, reliable)
+            let localSavedRecipes = LocalRecipeManager.shared.getSavedRecipes()
             
             // Load recipe names from local storage
-            for recipeId in localSavedIds {
-                if let recipe = localStorage.loadRecipeFromFile(recipeId) {
-                    existingRecipeNames.insert(recipe.name)
-                    // Also add variations of the name to prevent similar recipes
-                    existingRecipeNames.insert(recipe.name.lowercased())
-                    existingRecipeNames.insert(recipe.name.replacingOccurrences(of: " and ", with: " & "))
-                    existingRecipeNames.insert(recipe.name.replacingOccurrences(of: " & ", with: " and "))
-                }
+            for recipe in localSavedRecipes {
+                existingRecipeNames.insert(recipe.name)
+                // Also add variations of the name to prevent similar recipes
+                existingRecipeNames.insert(recipe.name.lowercased())
+                existingRecipeNames.insert(recipe.name.replacingOccurrences(of: " and ", with: " & "))
+                existingRecipeNames.insert(recipe.name.replacingOccurrences(of: " & ", with: " and "))
             }
-            print("📱 Found \(localSavedIds.count) saved recipes in LocalRecipeStorage")
+            print("📱 Found \(localSavedRecipes.count) saved recipes in LocalRecipeManager")
             
             // 2. Also include recipes from AppState (for backwards compatibility)
             for recipe in appState.allRecipes {
@@ -901,21 +898,18 @@ struct CameraView: View {
             // Get existing recipe names to avoid duplicates
             var existingRecipeNames = Set<String>()
             
-            // Use LocalRecipeStorage for faster access to saved recipes
-            let localStorage = LocalRecipeStorage.shared
-            let localSavedIds = localStorage.getAllSavedRecipeIds()
+            // Use LocalRecipeManager for faster access to saved recipes
+            let localSavedRecipes = LocalRecipeManager.shared.getSavedRecipes()
             
-            for recipeId in localSavedIds {
-                if let recipe = localStorage.loadRecipeFromFile(recipeId) {
-                    existingRecipeNames.insert(recipe.name)
-                    existingRecipeNames.insert(recipe.name.lowercased())
-                    
-                    // Add variations with "and" vs "&"
-                    let nameWithAnd = recipe.name.replacingOccurrences(of: "&", with: "and")
-                    let nameWithAmpersand = recipe.name.replacingOccurrences(of: "and", with: "&")
-                    existingRecipeNames.insert(nameWithAnd.lowercased())
-                    existingRecipeNames.insert(nameWithAmpersand.lowercased())
-                }
+            for recipe in localSavedRecipes {
+                existingRecipeNames.insert(recipe.name)
+                existingRecipeNames.insert(recipe.name.lowercased())
+                
+                // Add variations with "and" vs "&"
+                let nameWithAnd = recipe.name.replacingOccurrences(of: "&", with: "and")
+                let nameWithAmpersand = recipe.name.replacingOccurrences(of: "and", with: "&")
+                existingRecipeNames.insert(nameWithAnd.lowercased())
+                existingRecipeNames.insert(nameWithAmpersand.lowercased())
             }
             
             // Also add recipes from current app state

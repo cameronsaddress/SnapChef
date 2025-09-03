@@ -1,8 +1,13 @@
 import Foundation
 import SwiftUI
 
+/// DEPRECATED: Use LocalRecipeManager instead
+/// This class is kept for backward compatibility during migration
+/// Will be removed in a future update
+///
 /// Local-first storage for recipe save states
 /// Provides instant UI updates with background CloudKit sync
+@available(*, deprecated, message: "Use LocalRecipeManager instead")
 @MainActor
 class LocalRecipeStorage: ObservableObject {
     static let shared = LocalRecipeStorage()
@@ -168,5 +173,25 @@ class LocalRecipeStorage: ObservableObject {
     /// Get all saved recipe IDs
     func getAllSavedRecipeIds() -> [String] {
         return Array(savedRecipeIds)
+    }
+    
+    /// Clear all recipes (for account deletion)
+    func clearAllRecipes() {
+        // Clear in-memory sets
+        savedRecipeIds.removeAll()
+        createdRecipeIds.removeAll()
+        
+        // Clear from UserDefaults
+        UserDefaults.standard.removeObject(forKey: savedRecipeIdsKey)
+        UserDefaults.standard.removeObject(forKey: createdRecipeIdsKey)
+        UserDefaults.standard.synchronize()
+        
+        // Clear JSON files from documents directory
+        if let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let recipesPath = documentsPath.appendingPathComponent("recipes")
+            try? FileManager.default.removeItem(at: recipesPath)
+        }
+        
+        print("🗑️ LocalRecipeStorage: All recipes cleared")
     }
 }

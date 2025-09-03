@@ -660,7 +660,7 @@ DEFINE SCHEMA
         "___modifiedBy" REFERENCE,
         "___recordID"   REFERENCE,
         message         STRING,
-        senderID        STRING,
+        senderID        STRING QUERYABLE,
         senderName      STRING,
         teamID          STRING QUERYABLE,
         timestamp       TIMESTAMP QUERYABLE SORTABLE,

@@ -102,6 +102,9 @@ struct SnapChefApp: App {
             UserDefaults.standard.set("gemini", forKey: "SelectedLLMProvider")
         }
         
+        // ONE-TIME API KEY RESTORATION - Run this once to restore the key, then comment it out
+        // restoreAPIKeyToKeychain() // ✅ API key restored - commented out after successful restoration
+        
         // Preload social feed after 2 seconds if authenticated
         // Using shared singleton to ensure data is available to views
         Task { @MainActor in
@@ -504,20 +507,27 @@ struct SnapChefApp: App {
         
         print("🔄 Starting migration to local-first storage...")
         
-        // Migrate existing saved recipes to local storage
+        // Perform comprehensive data migration
+        await DataMigrator.shared.performMigrationIfNeeded()
+        
+        // Sync AppState with LocalRecipeManager
         await MainActor.run {
-            let localStorage = LocalRecipeStorage.shared
-            let savedCount = appState.savedRecipes.count
-            
-            if savedCount > 0 {
-                localStorage.migrateFromAppState(appState.savedRecipes)
-                print("✅ Migrated \(savedCount) recipes to local-first storage")
-            } else {
-                print("ℹ️ No saved recipes to migrate")
-            }
-            
-            // Sync AppState with local storage
             appState.syncWithLocalStorage()
+            
+            let savedCount = appState.savedRecipes.count
+            if savedCount > 0 {
+                print("✅ Found \(savedCount) recipes in LocalRecipeManager")
+            } else {
+                print("ℹ️ No saved recipes found")
+            }
+        }
+        
+        // Verify migration
+        let (success, report) = DataMigrator.shared.verifyMigration()
+        print(report)
+        
+        if !success {
+            print("⚠️ Migration verification failed - please check the report")
         }
         
         UserDefaults.standard.set(true, forKey: migrationKey)
@@ -558,7 +568,8 @@ struct SnapChefApp: App {
             print("🔑 Using API key from build configuration")
         } else {
             print("❌ CRITICAL: No API key found in production build")
-            // In production, we should have a fallback or show maintenance mode
+            // One-time restoration of API key (remove after first run)
+            restoreAPIKeyToKeychain()
             return
         }
         #endif
@@ -595,6 +606,31 @@ struct SnapChefApp: App {
         }
         
         return isValid
+    }
+    
+    // MARK: - ONE-TIME API KEY RESTORATION
+    // This function restores the API key to the keychain
+    // Run the app once with this function called, then comment out the call in setupApp()
+    private func restoreAPIKeyToKeychain() {
+        // Check if API key already exists
+        if let existingKey = KeychainManager.shared.getAPIKey(), !existingKey.isEmpty {
+            print("✅ API key already exists in keychain")
+            return
+        }
+        
+        // Store the API key in keychain
+        // This is a one-time restoration after the deletion issue
+        // The key will be stored securely in the keychain
+        let apiKey = "5380e4b60818cf237678fccfd4b8f767d1c94"
+        KeychainManager.shared.storeAPIKey(apiKey)
+        print("✅ API key has been restored to keychain")
+        
+        // Verify it was stored correctly
+        if let storedKey = KeychainManager.shared.getAPIKey() {
+            print("✅ Verification: API key successfully stored (length: \(storedKey.count))")
+        } else {
+            print("❌ Error: API key storage verification failed")
+        }
     }
 }
 

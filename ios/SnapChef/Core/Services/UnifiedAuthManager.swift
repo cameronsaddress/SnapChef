@@ -259,7 +259,30 @@ final class UnifiedAuthManager: ObservableObject {
                 print("❌ CloudKit save error code: \(saveError.code)")
                 print("❌ CloudKit save error: \(saveError.localizedDescription)")
                 
-                if saveError.code == .invalidArguments {
+                // Check if record already exists (error code 14)
+                if saveError.code == .serverRecordChanged || 
+                   saveError.localizedDescription.contains("record to insert already exists") {
+                    print("📥 User record already exists, fetching existing record...")
+                    
+                    // Fetch the existing record
+                    do {
+                        let existingRecord = try await cloudKitDatabase.record(for: newRecord.recordID)
+                        print("✅ Successfully fetched existing user record")
+                        
+                        // Update state with existing record
+                        self.currentUser = CloudKitUser(from: existingRecord)
+                        self.isAuthenticated = true
+                        
+                        // Store the CloudKit user ID
+                        UserDefaults.standard.set(cloudKitUserID, forKey: "currentUserRecordID")
+                        
+                        print("✅ Existing CloudKit user loaded: \(cloudKitUserID)")
+                        return // Exit early - we successfully handled the existing record
+                    } catch {
+                        print("❌ Failed to fetch existing record: \(error)")
+                        throw error
+                    }
+                } else if saveError.code == .invalidArguments {
                     print("❌ Invalid record save attempt: \(saveError.localizedDescription)")
                     errorMessage = "Unable to create user profile. Please try again."
                     showError = true
@@ -1031,6 +1054,26 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Permanently delete user account and all associated data
     func deleteAccount() async throws {
+        // Use the centralized deletion service
+        let report = await AccountDeletionService.shared.deleteAccount()
+        
+        // Check if deletion was successful
+        if !report.errors.isEmpty {
+            throw NSError(
+                domain: "AccountDeletion",
+                code: -1,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Account deletion completed with \(report.errors.count) errors",
+                    "errors": report.errors
+                ]
+            )
+        }
+        
+        print("✅ Account deletion completed: \(report.totalRecordsDeleted) records deleted")
+        return
+    }
+    
+    func deleteAccountLegacy() async throws {
         guard let user = currentUser,
               let recordID = user.recordID else {
             throw UnifiedAuthError.notAuthenticated
@@ -1325,9 +1368,8 @@ final class UnifiedAuthManager: ObservableObject {
         // Save using CloudKitActor with error boundary
         print("💾 Saving updated user record to CloudKit...")
         
-        let savedRecord: CKRecord
         do {
-            savedRecord = try await cloudKitActor.saveRecord(record)
+            _ = try await cloudKitActor.saveRecord(record)
             print("✅ User record saved successfully")
         } catch {
             print("❌ Failed to save user record: \(error)")
@@ -1781,7 +1823,7 @@ public struct CloudKitUser: Identifiable {
         
         // CRITICAL FIX: Extract username and displayName properly
         let rawUsername = record[CKField.User.username] as? String
-        let rawDisplayName = record[CKField.User.displayName] as? String
+        let _ = record[CKField.User.displayName] as? String
         
         // print("🔍 DEBUG CloudKitUser init: Processing user record \(fullRecordID)")
         // print("    └─ Raw username field: '\(rawUsername ?? "nil")'")

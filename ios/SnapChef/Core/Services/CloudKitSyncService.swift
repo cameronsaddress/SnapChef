@@ -337,7 +337,7 @@ final class CloudKitSyncService: ObservableObject {
                     logger.logDeleteStart(recordType: CloudKitConfig.recipeLikeRecordType, recordID: recordID.recordName, database: publicDatabase.debugName)
                     
                     do {
-                        try await cloudKitActor.deleteRecord(with: recordID)
+                        try await cloudKitActor.deleteRecordByID(recordID)
                         let deleteDuration = Date().timeIntervalSince(deleteStartTime)
                         logger.logDeleteSuccess(recordType: CloudKitConfig.recipeLikeRecordType, recordID: recordID.recordName, database: publicDatabase.debugName, duration: deleteDuration)
                     } catch {

@@ -28,12 +28,15 @@ class ProfilePhotoManager: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Save profile photo locally and queue CloudKit upload
+    /// Save profile photo locally and queue CloudKit upload (overwrites existing)
     func saveProfilePhoto(_ image: UIImage, for userID: String? = nil) async {
         let currentUser = await UnifiedAuthManager.shared.currentUser
         let targetUserID = userID ?? (currentUser?.recordID ?? "anonymous")
         
-        // Save locally first (immediate)
+        // Delete old photo first to ensure overwrite
+        deletePhotoLocally(for: targetUserID)
+        
+        // Save new photo locally (immediate)
         savePhotoLocally(image, for: targetUserID)
         
         // Update current user photo if it's for the current user
@@ -41,12 +44,15 @@ class ProfilePhotoManager: ObservableObject {
             currentUserPhoto = image
         }
         
-        // Cache in memory
+        // Update cache in memory
         cachedUserPhotos[targetUserID] = image
         
-        // Queue CloudKit upload (background)
+        // Notify all observers that photo has changed
+        objectWillChange.send()
+        
+        // Queue CloudKit upload (background) - will overwrite existing
         Task.detached(priority: .background) {
-            await self.uploadPhotoToCloudKit(image, for: targetUserID)
+            await self.uploadPhotoToCloudKit(image, for: targetUserID, overwrite: true)
         }
     }
     
@@ -96,9 +102,11 @@ class ProfilePhotoManager: ObservableObject {
             currentUserPhoto = nil
         }
         
-        // Delete from CloudKit
-        Task.detached(priority: .background) {
-            await self.deletePhotoFromCloudKit(for: targetUserID)
+        // Delete from CloudKit (only for authenticated users)
+        if targetUserID != "anonymous" {
+            Task.detached(priority: .background) {
+                await self.deletePhotoFromCloudKit(for: targetUserID)
+            }
         }
     }
     
@@ -139,8 +147,9 @@ class ProfilePhotoManager: ObservableObject {
     
     // MARK: - CloudKit Sync
     
-    private func uploadPhotoToCloudKit(_ image: UIImage, for userID: String) async {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
+    private func uploadPhotoToCloudKit(_ image: UIImage, for userID: String, overwrite: Bool = false) async {
+        // Compress image to reasonable size (max 2MB for CloudKit)
+        guard let imageData = compressImage(image, maxSizeMB: 2.0) else { return }
         
         // Create CKAsset from image data
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
@@ -148,16 +157,42 @@ class ProfilePhotoManager: ObservableObject {
             try imageData.write(to: tempURL)
             let asset = CKAsset(fileURL: tempURL)
             
-            // Update user record with profile photo
+            // Update user record with profile photo (overwrites existing)
             await UnifiedAuthManager.shared.updateProfilePhoto(asset, for: userID)
             
             // Clean up temp file
             try? FileManager.default.removeItem(at: tempURL)
             
-            print("📸 ProfilePhotoManager: Uploaded photo to CloudKit for user \(userID)")
+            print("📸 ProfilePhotoManager: Uploaded photo to CloudKit for user \(userID) (overwrite: \(overwrite))")
+            
+            // Notify followers of photo update
+            await notifyFollowersOfPhotoUpdate(userID)
         } catch {
             print("⚠️ ProfilePhotoManager: Failed to upload photo to CloudKit: \(error)")
         }
+    }
+    
+    private func compressImage(_ image: UIImage, maxSizeMB: Double) -> Data? {
+        let maxSizeBytes = maxSizeMB * 1024 * 1024
+        var compressionQuality: CGFloat = 0.8
+        var imageData = image.jpegData(compressionQuality: compressionQuality)
+        
+        // Reduce quality until under size limit
+        while let data = imageData, Double(data.count) > maxSizeBytes && compressionQuality > 0.1 {
+            compressionQuality -= 0.1
+            imageData = image.jpegData(compressionQuality: compressionQuality)
+        }
+        
+        return imageData
+    }
+    
+    private func notifyFollowersOfPhotoUpdate(_ userID: String) async {
+        // Invalidate cached photos for this user across all followers
+        // This will trigger re-fetch when they next view the profile
+        print("📸 ProfilePhotoManager: Notifying followers of photo update for user \(userID)")
+        
+        // The actual notification happens through CloudKit subscriptions
+        // Followers will see the update when they refresh their feeds
     }
     
     private func fetchPhotoFromCloudKit(for userID: String) async -> UIImage? {

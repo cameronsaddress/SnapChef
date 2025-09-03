@@ -294,17 +294,14 @@ struct ActivityFeedView: View {
         .onAppear {
             print("🔍 DEBUG: ActivityFeedView appeared - Start")
             
-            // Smart refresh: Only if data is stale or empty
+            // Load activities if empty, otherwise fetch newest
             Task {
-                // Check if we need to refresh (data older than 5 minutes or empty)
-                let shouldRefresh = feedManager.activities.isEmpty || 
-                                  feedManager.needsRefresh()
-                
-                if shouldRefresh {
-                    print("📱 ActivityFeedView: Data stale or empty, refreshing...")
-                    await feedManager.refresh()
+                if feedManager.activities.isEmpty {
+                    print("📱 ActivityFeedView: No activities, loading...")
+                    await feedManager.loadInitialActivities()
                 } else {
-                    print("✅ ActivityFeedView: Using cached data (\(feedManager.activities.count) items)")
+                    print("✅ ActivityFeedView: Have \(feedManager.activities.count) cached activities, checking for new...")
+                    await feedManager.fetchNewestActivitiesOnly()
                 }
             }
             
@@ -760,14 +757,15 @@ class ActivityFeedManager: ObservableObject {
         CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
     }
     
-    // Cache configuration
+    // Cache configuration for persistent storage
     private let cacheKey = "ActivityFeedCache"
     private let cacheTimestampKey = "ActivityFeedCacheTimestamp"
-    private let cacheExpirationTime: TimeInterval = 600 // 10 minutes for activities
     
-    // PHASE 4: Smart refresh tracking
-    private var lastRefreshTime: Date?
-    private let minimumRefreshInterval: TimeInterval = 30 // Don't refresh more than once per 30 seconds
+    // File storage for activities
+    private let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+    private var activitiesDirectory: URL { 
+        documentsDirectory.appendingPathComponent("activities")
+    }
 
     func loadInitialActivities() async {
         print("🔍 DEBUG: loadInitialActivities started")
@@ -781,48 +779,20 @@ class ActivityFeedManager: ObservableObject {
             return
         }
         
-        // PHASE 4: Smart loading - check if we have valid cached data
-        if !activities.isEmpty {
-            // Check if cache is still fresh (under 5 minutes old)
-            if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date {
-                let cacheAge = Date().timeIntervalSince(cacheTimestamp)
-                if cacheAge < 300 { // 5 minutes
-                    print("⚡ PHASE 4: Using fresh cached data (\(Int(cacheAge))s old), skipping fetch")
-                    return
-                }
-            }
-        }
-        
         await MainActor.run {
             print("🔍 DEBUG: Setting showingSkeletonViews = true")
             showingSkeletonViews = activities.isEmpty // Only show skeleton if no existing data
             print("🔍 DEBUG: Setting isLoading = true")
             isLoading = true
-            if activities.isEmpty {
-                print("🔍 DEBUG: Clearing activities")
-                activities = []
-                lastFetchedRecord = nil
-            }
         }
 
-        print("🔍 DEBUG: Loading cached activities")
-        // Try loading from cache first
+        print("🔍 DEBUG: Loading cached activities from disk")
+        // Load from persistent storage first
         await loadCachedActivities()
         
-        if activities.isEmpty {
-            print("🔍 DEBUG: No cached activities, fetching from CloudKit")
-            await fetchActivitiesFromCloudKit()
-        } else {
-            print("🔍 DEBUG: Found \(activities.count) cached activities")
-            // PHASE 4: Background refresh if cache is stale but usable
-            if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date,
-               Date().timeIntervalSince(cacheTimestamp) > 300 {
-                print("🔄 PHASE 4: Cache is stale, refreshing in background")
-                Task {
-                    await fetchActivitiesFromCloudKit()
-                }
-            }
-        }
+        // Always fetch newest activities to check for updates
+        print("🔍 DEBUG: Fetching newest activities from CloudKit")
+        await fetchNewestActivitiesOnly()
         
         await MainActor.run {
             print("🔍 DEBUG: Setting showingSkeletonViews = false")
@@ -831,7 +801,7 @@ class ActivityFeedManager: ObservableObject {
             isLoading = false
         }
         
-        print("🔍 DEBUG: loadInitialActivities completed")
+        print("🔍 DEBUG: loadInitialActivities completed with \(activities.count) activities")
     }
 
     func loadMore() async {
@@ -848,52 +818,142 @@ class ActivityFeedManager: ObservableObject {
         // Cancel any existing refresh task
         currentRefreshTask?.cancel()
         
-        // PHASE 4: Smart refresh - prevent too frequent refreshes
-        if let lastRefresh = lastRefreshTime {
-            let timeSinceLastRefresh = Date().timeIntervalSince(lastRefresh)
-            if timeSinceLastRefresh < minimumRefreshInterval {
-                print("⚡ PHASE 4: Smart refresh - skipping (last refresh was \(Int(timeSinceLastRefresh))s ago)")
-                return
-            }
-        }
-        
         // Prevent concurrent refreshes
         guard !isRefreshing else { 
             print("⚠️ Refresh already in progress, skipping")
             return 
         }
         
-        // Smart refresh: Only fetch items newer than our newest cached item
-        if !activities.isEmpty {
-            await refreshNewestOnly()
-            return
-        }
-        
         isRefreshing = true
         defer { 
             isRefreshing = false
-            lastRefreshTime = Date()
         }
         
-        print("🔄 PHASE 4: Smart refresh - executing refresh")
-        await loadInitialActivities()
+        // Always fetch only newest activities
+        print("🔄 Refresh: fetching newest activities only")
+        await fetchNewestActivitiesOnly()
     }
     
-    // Helper to check if data needs refresh
+    // Check if we need to fetch new activities
     func needsRefresh() -> Bool {
-        // Check if cache is older than 5 minutes
-        if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date {
-            let cacheAge = Date().timeIntervalSince(cacheTimestamp)
-            return cacheAge > 300 // 5 minutes
+        // Always return false - we fetch newest on each load, no timer-based refresh
+        return false
+    }
+    
+    // Fetch only activities newer than what we have locally
+    func fetchNewestActivitiesOnly() async {
+        guard let currentUser = UnifiedAuthManager.shared.currentUser,
+              let userID = currentUser.recordID else {
+            print("❌ No authenticated user for activity fetch")
+            return
         }
-        return true // No cache timestamp means we need to refresh
+        
+        // Get the timestamp of our newest local activity
+        let newestTimestamp = activities.first?.timestamp ?? Date.distantPast
+        print("🔍 Fetching activities newer than: \(newestTimestamp)")
+        
+        do {
+            // Fetch followed users
+            let followedUsers = await fetchFollowedUsers(for: userID)
+            var allUserIDs = followedUsers
+            allUserIDs.append(userID) // Include own activities
+            
+            // Create predicate for activities newer than our newest
+            let predicate = NSPredicate(
+                format: "%K IN %@ AND %K > %@",
+                CKField.Activity.actorID,
+                allUserIDs,
+                CKField.Activity.timestamp,
+                newestTimestamp as NSDate
+            )
+            
+            let query = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: predicate)
+            query.sortDescriptors = [NSSortDescriptor(key: CKField.Activity.timestamp, ascending: false)]
+            
+            // Use CloudKitActor for safe fetch
+            let records = try await cloudKitSync.cloudKitActor.executeQuery(query, desiredKeys: nil, resultsLimit: 50)
+            
+            var newActivities: [ActivityItem] = []
+            for record in records {
+                if let activity = await mapCloudKitRecordToActivityItem(record) {
+                    newActivities.append(activity)
+                }
+            }
+            
+            if !newActivities.isEmpty {
+                await mergeNewActivities(newActivities)
+                print("✅ Fetched \(newActivities.count) new activities from CloudKit")
+            } else {
+                print("✅ No new activities since last sync")
+            }
+            
+        } catch {
+            print("❌ Failed to fetch newest activities: \(error)")
+        }
+    }
+    
+    // Merge new activities with existing ones
+    private func mergeNewActivities(_ newActivities: [ActivityItem]) async {
+        await MainActor.run {
+            // Get existing activity IDs to prevent duplicates
+            let existingIds = Set(activities.map { $0.id })
+            
+            // Filter out duplicates
+            let uniqueNew = newActivities.filter { !existingIds.contains($0.id) }
+            
+            if !uniqueNew.isEmpty {
+                // Prepend new activities and re-sort
+                activities = (uniqueNew + activities).sorted { $0.timestamp > $1.timestamp }
+                
+                // Limit to max activities
+                if activities.count > maxActivities {
+                    activities = Array(activities.prefix(maxActivities))
+                }
+                
+                print("✅ Merged \(uniqueNew.count) new activities (filtered \(newActivities.count - uniqueNew.count) duplicates)")
+                
+                // Save to disk
+                Task {
+                    await saveCachedActivities()
+                }
+            }
+        }
+    }
+    
+    // Fetch users that the current user is following
+    private func fetchFollowedUsers(for userID: String) async -> [String] {
+        do {
+            let predicate = NSPredicate(
+                format: "%K == %@ AND %K == %d",
+                CKField.Follow.followerID,
+                userID,
+                CKField.Follow.isActive,
+                1
+            )
+            
+            let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
+            let records = try await cloudKitSync.cloudKitActor.executeQuery(query, desiredKeys: nil, resultsLimit: 100)
+            
+            let followedUsers = records.compactMap { record in
+                record[CKField.Follow.followingID] as? String
+            }
+            
+            print("📱 Found \(followedUsers.count) followed users")
+            return followedUsers
+            
+        } catch {
+            print("❌ Failed to fetch followed users: \(error)")
+            return []
+        }
     }
     
     /// Preload feed data in background without blocking UI
     func preloadInBackground() async {
-        // Check if we already have fresh data
-        if !activities.isEmpty && !needsRefresh() {
-            print("📱 Preload skipped - already have fresh data (\(activities.count) items)")
+        // Always load from disk first, then fetch newest
+        if !activities.isEmpty {
+            print("📱 Activities already loaded: \(activities.count) items")
+            // Still fetch newest to check for updates
+            await fetchNewestActivitiesOnly()
             return
         }
         
@@ -904,34 +964,8 @@ class ActivityFeedManager: ObservableObject {
         }
         
         print("📱 Starting background preload of social feed...")
-        print("   - Current activities: \(activities.count)")
-        print("   - Cache status: \(needsRefresh() ? "stale" : "fresh")")
-        
-        // Don't show loading indicators for background fetch
-        let originalShowingSkeleton = showingSkeletonViews
-        let originalIsLoading = isLoading
-        
-        showingSkeletonViews = false
-        // Don't set isLoading to prevent UI updates
-        
-        // Try to load from cache first
-        await loadCachedActivities()
-        
-        // If cache is empty or stale, fetch from CloudKit
-        if activities.isEmpty || needsRefresh() {
-            print("📱 Cache miss or stale - fetching from CloudKit...")
-            await fetchActivitiesFromCloudKit()
-        } else {
-            print("✅ Using cached data - \(activities.count) activities")
-        }
-        
-        // Restore original states
-        showingSkeletonViews = originalShowingSkeleton
-        isLoading = originalIsLoading
-        
-        print("✅ Background preload complete")
-        print("   - Activities loaded: \(activities.count)")
-        print("   - Memory usage: \(userCache.count) cached users")
+        await loadInitialActivities()
+        print("📱 Preload complete: \(activities.count) activities ready")
     }
 
     func markActivityAsRead(_ activityID: String) async {
@@ -1116,9 +1150,18 @@ class ActivityFeedManager: ObservableObject {
             }
 
             if loadMore {
-                activities.append(contentsOf: newActivities)
-                // Re-sort after appending to maintain chronological order
-                activities.sort { $0.timestamp > $1.timestamp }
+                // Filter out duplicates before appending
+                let existingIds = Set(activities.map { $0.id })
+                let uniqueNewActivities = newActivities.filter { !existingIds.contains($0.id) }
+                
+                if !uniqueNewActivities.isEmpty {
+                    activities.append(contentsOf: uniqueNewActivities)
+                    // Re-sort after appending to maintain chronological order
+                    activities.sort { $0.timestamp > $1.timestamp }
+                    print("✅ Added \(uniqueNewActivities.count) unique activities (\(newActivities.count - uniqueNewActivities.count) duplicates filtered)")
+                } else {
+                    print("⚠️ All \(newActivities.count) activities were duplicates, none added")
+                }
                 // Always maintain memory limits
                 maintainMemoryLimits()
             } else {
@@ -1265,9 +1308,9 @@ class ActivityFeedManager: ObservableObject {
         
         // PHASE 5: Filter out already cached users with TTL check
         let uncachedUserIDs = userIDsToFetch.filter { userID in
-            if let cached = userCache[userID] {
-                // Check if cache is still valid
-                return false // Never expire - was: Date().timeIntervalSince(cached.timestamp) > userCacheTTL
+            if userCache[userID] != nil {
+                // User is cached, don't fetch again (cache never expires)
+                return false
             }
             return true
         }
@@ -1396,7 +1439,7 @@ class ActivityFeedManager: ObservableObject {
         
         print("🔄 Smart refresh: Fetching only activities newer than \(newestTimestamp)")
         
-        guard let currentUser = await UnifiedAuthManager.shared.currentUser,
+        guard let currentUser = UnifiedAuthManager.shared.currentUser,
               let userID = currentUser.recordID else {
             print("⚠️ No authenticated user for refresh")
             return
@@ -1405,7 +1448,6 @@ class ActivityFeedManager: ObservableObject {
         isRefreshing = true
         defer { 
             isRefreshing = false
-            lastRefreshTime = Date()
         }
         
         do {
@@ -1415,8 +1457,9 @@ class ActivityFeedManager: ObservableObject {
             allUserIDs.append(userID)
             
             // Query for activities newer than our newest
+            // Note: Use 'actorID' not 'userID' - CloudKit field name
             let newerPredicate = NSPredicate(
-                format: "userID IN %@ AND timestamp > %@",
+                format: "actorID IN %@ AND timestamp > %@",
                 allUserIDs,
                 newestTimestamp as NSDate
             )
@@ -1443,12 +1486,19 @@ class ActivityFeedManager: ObservableObject {
                 }
                 
                 if !newActivities.isEmpty {
-                    // Insert new activities at the front
-                    activities.insert(contentsOf: newActivities, at: 0)
-                    // Maintain memory limits
-                    maintainMemoryLimits()
-                    print("✅ Smart refresh: Added \(newActivities.count) new activities")
-                    await saveCachedActivities()
+                    // Insert new activities at the front, avoiding duplicates
+                    let existingIds = Set(activities.map { $0.id })
+                    let uniqueNewActivities = newActivities.filter { !existingIds.contains($0.id) }
+                    
+                    if !uniqueNewActivities.isEmpty {
+                        activities.insert(contentsOf: uniqueNewActivities, at: 0)
+                        // Maintain memory limits
+                        maintainMemoryLimits()
+                        print("✅ Smart refresh: Added \(uniqueNewActivities.count) new activities (\(newActivities.count - uniqueNewActivities.count) duplicates filtered)")
+                        await saveCachedActivities()
+                    } else {
+                        print("⚡ Smart refresh: No new unique activities (all \(newActivities.count) were duplicates)")
+                    }
                 } else {
                     print("⚡ Smart refresh: No new activities")
                 }
@@ -1496,7 +1546,6 @@ class ActivityFeedManager: ObservableObject {
         hasMore = true
         isLoading = false
         showingSkeletonViews = false
-        lastRefreshTime = nil
         UserDefaults.standard.removeObject(forKey: cacheKey)
         UserDefaults.standard.removeObject(forKey: cacheTimestampKey)
     }
@@ -1671,60 +1720,66 @@ class ActivityFeedManager: ObservableObject {
     // MARK: - Caching Methods
     
     private func loadCachedActivities() async {
-        print("🔍 DEBUG: loadCachedActivities - checking for cache")
+        print("🔍 DEBUG: loadCachedActivities - checking for persistent storage")
         
-        // Check if we have valid cached data
-        guard let data = UserDefaults.standard.data(forKey: cacheKey) else {
-            print("🔍 DEBUG: No cached data found")
-            return
+        // Create activities directory if needed
+        do {
+            try FileManager.default.createDirectory(at: activitiesDirectory, withIntermediateDirectories: true)
+        } catch {
+            print("❌ Failed to create activities directory: \(error)")
         }
         
-        guard let timestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date else {
-            print("🔍 DEBUG: No cache timestamp found")
+        // Load from file storage
+        let fileURL = activitiesDirectory.appendingPathComponent("activities.json")
+        
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            print("🔍 DEBUG: No stored activities found")
             return
         }
-        
-        let cacheAge = Date().timeIntervalSince(timestamp)
-        if cacheAge >= cacheExpirationTime {
-            print("🔍 DEBUG: Cache expired (age: \(cacheAge)s)")
-            return
-        }
-        
-        print("🔍 DEBUG: Cache is valid, attempting to decode")
         
         do {
+            let data = try Data(contentsOf: fileURL)
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            print("🔍 DEBUG: Decoding cached data of size: \(data.count) bytes")
             let cachedData = try decoder.decode(CachedActivityData.self, from: data)
-            print("🔍 DEBUG: Successfully decoded \(cachedData.activities.count) activities")
             
             await MainActor.run {
-                // Sort cached activities by timestamp (newest first)
+                // Load activities sorted by timestamp (newest first)
                 activities = cachedData.activities.sorted { $0.timestamp > $1.timestamp }
             }
             
-            print("✅ Loaded \(activities.count) cached activities (sorted by newest first)")
+            print("📱 LocalActivityStorage: Loaded \(activities.count) activities from disk")
         } catch {
-            print("❌ Failed to load cached activities: \(error)")
-            // Clear corrupt cache
-            UserDefaults.standard.removeObject(forKey: cacheKey)
-            UserDefaults.standard.removeObject(forKey: cacheTimestampKey)
+            print("❌ Failed to load activities from disk: \(error)")
+            // Remove corrupt file
+            try? FileManager.default.removeItem(at: fileURL)
         }
     }
     
     private func saveCachedActivities() async {
+        // Create activities directory if needed
         do {
+            try FileManager.default.createDirectory(at: activitiesDirectory, withIntermediateDirectories: true)
+        } catch {
+            print("❌ Failed to create activities directory: \(error)")
+        }
+        
+        let fileURL = activitiesDirectory.appendingPathComponent("activities.json")
+        
+        do {
+            // Keep only the most recent activities
+            let activitiesToSave = Array(activities.prefix(maxActivities))
+            
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
-            // Ensure activities are sorted before caching (newest first)
-            let sortedActivities = activities.sorted { $0.timestamp > $1.timestamp }
-            let cachedData = CachedActivityData(activities: sortedActivities)
+            encoder.outputFormatting = .prettyPrinted
+            let cachedData = CachedActivityData(activities: activitiesToSave)
             let data = try encoder.encode(cachedData)
-            UserDefaults.standard.set(data, forKey: cacheKey)
-            UserDefaults.standard.set(Date(), forKey: cacheTimestampKey)
+            
+            try data.write(to: fileURL)
+            print("💾 LocalActivityStorage: Saved \(activitiesToSave.count) activities to disk")
         } catch {
-            print("❌ Failed to save cached activities: \(error)")
+            print("❌ Failed to save activities to disk: \(error)")
         }
     }
 

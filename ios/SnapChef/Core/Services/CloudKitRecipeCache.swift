@@ -2,6 +2,10 @@
 //  CloudKitRecipeCache.swift
 //  SnapChef
 //
+//  DEPRECATED: Use LocalRecipeManager instead
+//  This file is kept for backward compatibility during migration
+//  Will be removed in a future update
+//
 //  Created on 1/13/2025
 //  Manages local caching of CloudKit recipes to prevent redundant downloads
 //

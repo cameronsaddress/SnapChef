@@ -17,12 +17,13 @@ struct RecipeResultsView: View {
     @State private var confettiTrigger = false
     @State private var contentVisible = false
     @State private var activeSheet: ActiveSheet?
-    @StateObject private var localStorage = LocalRecipeStorage.shared
+    // Use LocalRecipeManager instead of LocalRecipeStorage
+    @StateObject private var localManager = LocalRecipeManager.shared
     
-    // Computed property that directly reflects localStorage state
+    // Computed property that directly reflects LocalRecipeManager state
     private var savedRecipeIds: Set<UUID> {
         Set(recipes.compactMap { recipe in
-            localStorage.isRecipeSaved(recipe.id) ? recipe.id : nil
+            localManager.isRecipeSaved(recipe.id) ? recipe.id : nil
         })
     }
     @State private var showingExitConfirmation = false
@@ -317,7 +318,7 @@ struct RecipeResultsView: View {
         }
         
         // LOCAL-FIRST: Instant update, no waiting for network
-        let currentlySaved = localStorage.isRecipeSaved(recipe.id)
+        let currentlySaved = localManager.isRecipeSaved(recipe.id)
         
         // 1. Haptic feedback (instant)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -327,7 +328,7 @@ struct RecipeResultsView: View {
             if currentlySaved {
                 // UNSAVE
                 print("🗑 Unsaving recipe '\(recipe.name)' locally")
-                localStorage.unsaveRecipe(recipe.id)
+                localManager.unsaveRecipe(recipe.id)
             
                 // Update AppState for other views
                 appState.savedRecipes.removeAll { $0.id == recipe.id }
@@ -337,7 +338,7 @@ struct RecipeResultsView: View {
             } else {
                 // SAVE
                 print("💾 Saving recipe '\(recipe.name)' locally")
-                localStorage.saveRecipe(recipe, capturedImage: capturedImage)
+                localManager.saveRecipe(recipe, capturedImage: capturedImage)
                 
                 // Update AppState for other views
                 if !appState.savedRecipes.contains(where: { $0.id == recipe.id }) {

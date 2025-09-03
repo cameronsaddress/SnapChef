@@ -439,6 +439,8 @@ class SimpleDiscoverUsersManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: cacheKey)
         UserDefaults.standard.removeObject(forKey: cacheTimestampKey)
         lastRefreshTime = nil
+        selectedUser = nil
+        print("✅ SimpleDiscoverUsersManager: Cache cleared")
     }
 }
 

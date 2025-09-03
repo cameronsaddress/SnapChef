@@ -207,22 +207,18 @@ final class AppState: ObservableObject {
     
     // MARK: - Local-First Storage Methods
     
-    /// Sync AppState with LocalRecipeStorage
+    /// Sync AppState with LocalRecipeManager
     func syncWithLocalStorage() {
-        let localStorage = LocalRecipeStorage.shared
+        // Sync with LocalRecipeManager
+        recipesViewModel.syncWithLocalRecipeManager()
         
-        // Update savedRecipes to match local storage
-        savedRecipes = savedRecipes.filter { recipe in
-            localStorage.isRecipeSaved(recipe.id)
-        }
-        
-        print("📱 AppState synced with LocalRecipeStorage: \(savedRecipes.count) saved recipes")
+        print("📱 AppState synced with LocalRecipeManager: \(savedRecipes.count) saved recipes")
     }
     
     /// Add recipe to saved (local-first)
     func addToSaved(_ recipe: Recipe, beforePhoto: UIImage? = nil) {
-        // Add to local storage first
-        LocalRecipeStorage.shared.saveRecipe(recipe, capturedImage: beforePhoto)
+        // Add to LocalRecipeManager first
+        LocalRecipeManager.shared.saveRecipe(recipe, capturedImage: beforePhoto)
         
         // Update AppState
         if !savedRecipes.contains(where: { $0.id == recipe.id }) {
@@ -232,8 +228,8 @@ final class AppState: ObservableObject {
     
     /// Remove recipe from saved (local-first)
     func removeFromSaved(_ recipe: Recipe) {
-        // Remove from local storage first
-        LocalRecipeStorage.shared.unsaveRecipe(recipe.id)
+        // Remove from LocalRecipeManager first
+        LocalRecipeManager.shared.unsaveRecipe(recipe.id)
         
         // Update AppState
         savedRecipes.removeAll { $0.id == recipe.id }
@@ -326,7 +322,13 @@ final class RecipesViewModel: ObservableObject {
     private let usageTracker = UsageTracker.shared
     
     init() {
-        loadSavedRecipes()
+        // Migrate from old storage to LocalRecipeManager on first run
+        migrateToLocalRecipeManager()
+        
+        // Load recipes from LocalRecipeManager
+        syncWithLocalRecipeManager()
+        
+        // Still load favorited IDs from UserDefaults for now
         loadFavoritedRecipes()
     }
     
@@ -356,10 +358,17 @@ final class RecipesViewModel: ObservableObject {
     }
     
     func toggleRecipeSave(_ recipe: Recipe) {
-        if let index = savedRecipes.firstIndex(where: { $0.id == recipe.id }) {
-            savedRecipes.remove(at: index)
+        if LocalRecipeManager.shared.isRecipeSaved(recipe.id) {
+            // Unsave the recipe
+            LocalRecipeManager.shared.unsaveRecipe(recipe.id)
+            savedRecipes.removeAll { $0.id == recipe.id }
+            savedRecipesWithPhotos.removeAll { $0.recipe.id == recipe.id }
         } else {
-            savedRecipes.append(recipe)
+            // Save the recipe
+            LocalRecipeManager.shared.saveRecipe(recipe)
+            if !savedRecipes.contains(where: { $0.id == recipe.id }) {
+                savedRecipes.append(recipe)
+            }
         }
     }
     
@@ -367,9 +376,8 @@ final class RecipesViewModel: ObservableObject {
         print("🔍 DEBUG: saveRecipeWithPhotos called for '\(recipe.name)'")
         print("🔍   - savedRecipes count before: \(savedRecipes.count)")
         
-        // Save locally first (local-first approach)
-        // In production, this would save to LocalRecipeStore
-        // For now, just save to our existing storage
+        // Save to LocalRecipeManager (single source of truth)
+        LocalRecipeManager.shared.saveRecipe(recipe, capturedImage: beforePhoto)
         
         // Store photos locally
         if beforePhoto != nil || afterPhoto != nil {
@@ -382,8 +390,9 @@ final class RecipesViewModel: ObservableObject {
         
         // Update in-memory state for UI
         let savedRecipe = SavedRecipe(recipe: recipe, beforePhoto: beforePhoto, afterPhoto: afterPhoto)
-        savedRecipesWithPhotos.append(savedRecipe)
-        saveToDisk()
+        if !savedRecipesWithPhotos.contains(where: { $0.recipe.id == recipe.id }) {
+            savedRecipesWithPhotos.append(savedRecipe)
+        }
         
         // Also update the simple lists
         if !savedRecipes.contains(where: { $0.id == recipe.id }) {
@@ -487,21 +496,28 @@ final class RecipesViewModel: ObservableObject {
     }
     
     func deleteRecipe(_ recipe: Recipe) {
+        // Remove from LocalRecipeManager
+        LocalRecipeManager.shared.unsaveRecipe(recipe.id)
+        
+        // Update in-memory state
         recentRecipes.removeAll { $0.id == recipe.id }
         savedRecipes.removeAll { $0.id == recipe.id }
         allRecipes.removeAll { $0.id == recipe.id }
         savedRecipesWithPhotos.removeAll { $0.recipe.id == recipe.id }
-        saveToDisk()
     }
     
     func clearAllRecipes() {
+        // Clear from LocalRecipeManager
+        LocalRecipeManager.shared.clearAllRecipes()
+        
+        // Clear in-memory state
         recentRecipes.removeAll()
         savedRecipes.removeAll()
         allRecipes.removeAll()
         savedRecipesWithPhotos.removeAll()
         favoritedRecipeIds.removeAll()
         
-        // Clear from disk
+        // Clear old storage for migration
         guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
         let filePath = documentsPath.appendingPathComponent("savedRecipes.json")
         try? FileManager.default.removeItem(at: filePath)
@@ -586,13 +602,55 @@ final class RecipesViewModel: ObservableObject {
     }
     
     private func saveToDisk() {
+        // NO LONGER USED - LocalRecipeManager handles persistence
+        // Kept for backward compatibility during migration
+    }
+    
+    // MARK: - LocalRecipeManager Migration & Sync
+    
+    private func migrateToLocalRecipeManager() {
+        // Check if we've already migrated
+        let migrationKey = "migratedToLocalRecipeManager"
+        guard !userDefaults.bool(forKey: migrationKey) else { return }
+        
+        print("🔄 Migrating recipes to LocalRecipeManager...")
+        
+        // Load old saved recipes from disk
         guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
         let filePath = documentsPath.appendingPathComponent("savedRecipes.json")
         
-        if let encoded = try? JSONEncoder().encode(savedRecipesWithPhotos) {
-            try? encoded.write(to: filePath)
-            userDefaults.set(true, forKey: "hasSavedRecipes")
+        if let data = try? Data(contentsOf: filePath),
+           let decoded = try? JSONDecoder().decode([SavedRecipe].self, from: data) {
+            
+            // Migrate each recipe to LocalRecipeManager
+            for savedRecipe in decoded {
+                LocalRecipeManager.shared.saveRecipe(savedRecipe.recipe, capturedImage: savedRecipe.beforePhoto)
+                print("🔄 Migrated recipe: \(savedRecipe.recipe.name)")
+            }
+            
+            print("✅ Migration complete: \(decoded.count) recipes migrated")
+            
+            // Mark migration as complete
+            userDefaults.set(true, forKey: migrationKey)
         }
+    }
+    
+    func syncWithLocalRecipeManager() {
+        // Load all recipes from LocalRecipeManager
+        let localRecipes = LocalRecipeManager.shared.allRecipes
+        let localSavedRecipes = LocalRecipeManager.shared.getSavedRecipes()
+        
+        // Update our in-memory state
+        allRecipes = localRecipes
+        savedRecipes = localSavedRecipes
+        
+        // Rebuild savedRecipesWithPhotos from LocalRecipeManager and PhotoStorageManager
+        savedRecipesWithPhotos = localSavedRecipes.compactMap { recipe in
+            let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+            return SavedRecipe(recipe: recipe, beforePhoto: photos?.fridgePhoto, afterPhoto: photos?.mealPhoto)
+        }
+        
+        print("📦 Synced with LocalRecipeManager: \(allRecipes.count) total, \(savedRecipes.count) saved")
     }
 }
 

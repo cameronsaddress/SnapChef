@@ -493,8 +493,8 @@ struct DetectiveResultsView: View {
             shareCaption: detectedRecipe.reconstructedRecipe.shareCaption
         )
         
-        // Save to LocalRecipeStorage with the detective photo as the before photo
-        LocalRecipeStorage.shared.saveRecipe(recipeWithBadge, capturedImage: detectedRecipe.originalImage)
+        // Save to LocalRecipeManager with the detective photo as the before photo
+        LocalRecipeManager.shared.saveRecipe(recipeWithBadge, capturedImage: detectedRecipe.originalImage)
         
         // Also update AppState
         appState.savedRecipes.append(recipeWithBadge)

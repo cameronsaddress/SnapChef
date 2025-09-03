@@ -1,6 +1,11 @@
 import Foundation
 
+/// DEPRECATED: Use CloudKitSyncEngine instead
+/// This file is kept for backward compatibility during migration
+/// Will be removed in a future update
+///
 /// Stores failed sync operations for retry on next app launch
+@available(*, deprecated, message: "Use CloudKitSyncEngine instead")
 @MainActor
 class PersistentSyncQueue {
     static let shared = PersistentSyncQueue()

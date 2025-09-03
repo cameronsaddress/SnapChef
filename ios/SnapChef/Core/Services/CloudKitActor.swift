@@ -87,7 +87,7 @@ actor CloudKitActor {
     }
     
     /// Delete a record by ID
-    func deleteRecord(with id: CKRecord.ID) async throws {
+    func deleteRecordByID(_ id: CKRecord.ID) async throws {
         try await database.deleteRecord(withID: id)
     }
     
