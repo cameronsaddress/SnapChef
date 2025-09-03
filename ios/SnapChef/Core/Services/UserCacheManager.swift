@@ -204,10 +204,13 @@ class UserCacheManager: ObservableObject {
             return cached
         }
         
-        // Cache expired, remove it
-        cache.removeValue(forKey: userID)
-        print("⏰ Cache expired for user: \(userID)")
-        return nil
+        // DISABLED: Never expire cache - always return cached data
+        return cached
+        
+        // Original expiration code disabled:
+        // cache.removeValue(forKey: userID)
+        // print("⏰ Cache expired for user: \(userID)")
+        // return nil
     }
     
     /// Fetch user from CloudKit
@@ -257,16 +260,9 @@ class UserCacheManager: ObservableObject {
         cache[userID] = info
         // print("💾 Cached user: \(userID) (username: \(info.username))")
         
-        // Optional: Implement cache size limit
-        if cache.count > 100 {
-            // Remove oldest entries
-            let sortedByTime = cache.sorted { $0.value.fetchTime < $1.value.fetchTime }
-            let toRemove = sortedByTime.prefix(20)
-            for (key, _) in toRemove {
-                cache.removeValue(forKey: key)
-            }
-            print("🧹 Pruned cache to 80 entries")
-        }
+        // DISABLED: Never prune cache - keep all user data forever
+        // Was: if cache.count > 100 { remove oldest 20 entries }
+        // We want to keep all user data permanently
     }
 }
 

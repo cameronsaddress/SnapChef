@@ -392,11 +392,9 @@ public final class PhotoStorageManager: ObservableObject {
 
     /// Start periodic cleanup of old/unused photos
     private func startPeriodicCleanup() {
-        Timer.scheduledTimer(withTimeInterval: cleanupInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.performCleanupIfNeeded()
-            }
-        }
+        // DISABLED: No automatic cleanup timer - photos stay forever
+        // Photos only deleted when user explicitly deletes recipe
+        // Was: Timer.scheduledTimer(withTimeInterval: cleanupInterval...)
     }
 
     /// Perform cleanup if memory usage is high or too much time has passed

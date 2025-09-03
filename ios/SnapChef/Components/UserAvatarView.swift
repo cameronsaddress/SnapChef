@@ -8,7 +8,6 @@ struct UserAvatarView: View {
     let size: CGFloat
     
     @StateObject private var profilePhotoManager = ProfilePhotoManager.shared
-    @State private var userPhoto: UIImage?
     
     init(userID: String? = nil, username: String? = nil, displayName: String? = nil, size: CGFloat = 40) {
         self.userID = userID
@@ -38,7 +37,7 @@ struct UserAvatarView: View {
             .frame(width: size, height: size)
             .overlay(
                 Group {
-                    if let photo = userPhoto {
+                    if let photo = computedUserPhoto {
                         Image(uiImage: photo)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -51,18 +50,23 @@ struct UserAvatarView: View {
                     }
                 }
             )
-            .task {
-                await loadUserPhoto()
+            .task(id: userID) {
+                // Load photo when userID changes
+                if let userID = userID {
+                    _ = await profilePhotoManager.getProfilePhoto(for: userID)
+                }
             }
     }
     
-    private func loadUserPhoto() async {
-        // Try to load from ProfilePhotoManager
-        if let userID = userID {
-            userPhoto = await profilePhotoManager.getProfilePhoto(for: userID)
-        } else if userID == nil {
-            // If no userID provided, try to load current user's photo
-            userPhoto = profilePhotoManager.currentUserPhoto
+    private var computedUserPhoto: UIImage? {
+        // For current user, always use the reactive currentUserPhoto
+        if userID == nil || userID == UnifiedAuthManager.shared.currentUser?.recordID {
+            return profilePhotoManager.currentUserPhoto
         }
+        // For other users, check the cached photos (now @Published)
+        if let userID = userID {
+            return profilePhotoManager.cachedUserPhotos[userID]
+        }
+        return nil
     }
 }

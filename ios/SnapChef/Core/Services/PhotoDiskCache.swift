@@ -18,7 +18,7 @@ public final class PhotoDiskCache {
     
     // Disk storage directories
     private let photoCacheDirectory: URL
-    private let maxDiskSizeMB: Double = 500 // Maximum disk cache size in MB
+    private let maxDiskSizeMB: Double = Double.greatestFiniteMagnitude // Never delete photos - keep everything local
     private let compressionQuality: CGFloat = 0.7 // JPEG compression quality
     
     // Cache metadata
@@ -135,12 +135,13 @@ public final class PhotoDiskCache {
                     
                     self.saveMetadata()
                     
-                    // Check if cleanup needed
-                    if Double(self.cacheMetadata.totalSizeBytes) > self.maxDiskSizeMB * 1_048_576 {
-                        Task {
-                            await self.performCleanup()
-                        }
-                    }
+                    // DISABLED: Never automatically cleanup photos
+                    // Photos should only be deleted when user explicitly deletes the recipe
+                    // if Double(self.cacheMetadata.totalSizeBytes) > self.maxDiskSizeMB * 1_048_576 {
+                    //     Task {
+                    //         await self.performCleanup()
+                    //     }
+                    // }
                 }
                 
                 continuation.resume()
@@ -251,6 +252,10 @@ public final class PhotoDiskCache {
     }
     
     private func performCleanup() async {
+        // DISABLED: Never delete photos automatically - they stay forever
+        return
+        
+        /* Original cleanup code disabled:
         logger.info("📸 Starting cache cleanup (current size: \(Double(self.cacheMetadata.totalSizeBytes) / 1_048_576, format: .fixed(precision: 1)) MB)")
         
         // Sort entries by last accessed date (oldest first)
@@ -284,6 +289,7 @@ public final class PhotoDiskCache {
         saveMetadata()
         
         logger.info("📸 Cleanup complete: removed \(entriesToRemove.count) recipes, new size: \(Double(self.cacheMetadata.totalSizeBytes) / 1_048_576, format: .fixed(precision: 1)) MB")
+        */
     }
     
     /// Clear all cached photos (for debugging/testing)

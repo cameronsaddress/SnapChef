@@ -51,6 +51,10 @@ class SimpleDiscoverUsersManager: ObservableObject {
     
     @Published var users: [UserProfile] = []
     @Published var searchResults: [UserProfile] = []
+    
+    // Memory management limits
+    private let maxUsers = 100
+    private let maxSearchResults = 50
     @Published var isLoading = false
     @Published var isSearching = false
     @Published var hasMore = false
@@ -60,7 +64,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
     // Cache configuration
     private let cacheKey = "DiscoverUsersCache"
     private let cacheTimestampKey = "DiscoverUsersCacheTimestamp"
-    private let cacheTTL: TimeInterval = 600 // 10 minutes
+    private let cacheTTL: TimeInterval = Double.greatestFiniteMagnitude // Never expire - keep data forever
     private var lastRefreshTime: Date?
     private let minimumRefreshInterval: TimeInterval = 30 // 30 seconds
     
@@ -150,9 +154,11 @@ class SimpleDiscoverUsersManager: ObservableObject {
             }
             
             users = convertedUsers
+            // Maintain memory limits after setting users
+            maintainMemoryLimits()
             
             // Save to cache
-            saveCachedUsers(convertedUsers, for: category)
+            saveCachedUsers(users, for: category)
             lastRefreshTime = Date()
             
         } catch {
@@ -170,7 +176,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
         // Check if cache is older than TTL
         if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date {
             let cacheAge = Date().timeIntervalSince(cacheTimestamp)
-            return cacheAge > cacheTTL
+            return false // Never expire - was: cacheAge > cacheTTL
         }
         return true // No cache timestamp means we need to refresh
     }
@@ -184,9 +190,8 @@ class SimpleDiscoverUsersManager: ObservableObject {
         }
         
         // Check if cache is still valid
-        if Date().timeIntervalSince(timestamp) > cacheTTL {
-            return false
-        }
+        // Never expire cache - always valid
+        // Was: if Date().timeIntervalSince(timestamp) > cacheTTL { return false }
         
         do {
             let decoder = JSONDecoder()
@@ -281,7 +286,9 @@ class SimpleDiscoverUsersManager: ObservableObject {
             }
             
             users = convertedUsers
-            saveCachedUsers(convertedUsers, for: category)
+            // Maintain memory limits after setting users
+            maintainMemoryLimits()
+            saveCachedUsers(users, for: category)
             
         } catch {
             print("❌ Background refresh failed: \(error)")
@@ -366,15 +373,20 @@ class SimpleDiscoverUsersManager: ObservableObject {
         hasMore = false
     }
     
-    // MARK: - Lifecycle Management
+    // MARK: - Memory Management
     
-    /// Clear cached data when app goes to background
-    func clearStaleDataIfNeeded() {
-        if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date,
-           Date().timeIntervalSince(cacheTimestamp) > 1200 { // 20 minutes
-            print("🧹 Clearing stale discover users data")
-            users.removeAll()
-            searchResults.removeAll()
+    /// Maintain memory limits by keeping only the newest items
+    private func maintainMemoryLimits() {
+        // Keep only the maxUsers newest users
+        if users.count > maxUsers {
+            users = Array(users.prefix(maxUsers))
+            print("📊 Trimmed users to \(maxUsers) newest items")
+        }
+        
+        // Keep only the maxSearchResults newest search results
+        if searchResults.count > maxSearchResults {
+            searchResults = Array(searchResults.prefix(maxSearchResults))
+            print("📊 Trimmed search results to \(maxSearchResults) items")
         }
     }
     

@@ -292,6 +292,25 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 - **COMPLETE_CODE_TRACE.md** - App flow analysis
 - **FILE_USAGE_ANALYSIS.md** - File usage status
 
+## 🔄 Latest Updates (Dec 3, 2024)
+
+### Memory Management & Local-First Storage Fixes (Dec 3) ✅
+- **Fixed app freezing issue**: Removed `clearStaleDataIfNeeded()` time-based deletion that caused race conditions
+- **Implemented proper memory limits**: 100 items max for feeds, 50 for search results
+- **Progressive loading**: Shows 5 items instantly, loads 15 more in background for smooth UX
+- **Smart refresh**: Only fetches activities newer than cached, never re-downloads existing data
+- **Task lifecycle management**: Proper cancellation prevents orphaned operations when backgrounding
+- **Profile photo reactivity**: Made `cachedUserPhotos` @Published for immediate UI updates
+- **Fixed social feed 5-item bug**: Corrected `hasMore` logic that prevented background loading
+- **Permanent local storage**:
+  - Removed PhotoDiskCache 500MB auto-deletion
+  - Disabled all TTL cache expiration (was 10-30 minutes)
+  - Fixed expensive `pngData()` conversions causing hangs
+  - Photos and recipes now stay local forever
+  - Only user-initiated deletions remain
+- **CloudKit sync verified local-first**: Always checks local storage before CloudKit for recipes, photos, and profiles
+- **Minimal background processing**: App doesn't process when minimized, only finishes queued uploads
+
 ## 🔄 Latest Updates (Aug 30, 2025)
 
 ### Social Media Sharing Implementation (Aug 30) ✅

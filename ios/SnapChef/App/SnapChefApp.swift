@@ -71,9 +71,8 @@ struct SnapChefApp: App {
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-                    // Clean up stale data when going to background
-                    ActivityFeedManager.shared.clearStaleDataIfNeeded()
-                    SimpleDiscoverUsersManager.shared.clearStaleDataIfNeeded()
+                    // Memory management will be handled by item count limits, not time-based clearing
+                    // Tasks will be properly cancelled in managers
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     Task { @MainActor in

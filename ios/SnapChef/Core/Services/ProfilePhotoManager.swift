@@ -7,7 +7,7 @@ class ProfilePhotoManager: ObservableObject {
     static let shared = ProfilePhotoManager()
     
     @Published var currentUserPhoto: UIImage?
-    private var cachedUserPhotos: [String: UIImage] = [:]
+    @Published private(set) var cachedUserPhotos: [String: UIImage] = [:]
     
     private let documentsDirectory: URL
     private let profilePhotosDirectory: URL

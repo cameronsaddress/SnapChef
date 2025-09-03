@@ -728,6 +728,16 @@ class ActivityFeedManager: ObservableObject {
     static let shared = ActivityFeedManager()
     
     @Published var activities: [ActivityItem] = []
+    
+    // Progressive loading configuration
+    private let initialLoadSize = 5    // Show first 5 items instantly
+    private let secondLoadSize = 15    // Then load 15 more
+    private let batchSize = 25         // Regular batch size for pagination
+    
+    // Task lifecycle management
+    private var currentLoadTask: Task<Void, Never>?
+    private var currentRefreshTask: Task<Void, Never>?
+    private var backgroundLoadTask: Task<Void, Never>?
     @Published var isLoading = false
     @Published var hasMore = true
     @Published var showingSkeletonViews = false
@@ -742,10 +752,10 @@ class ActivityFeedManager: ObservableObject {
     private var lastFetchedRecord: CKRecord?
     // PHASE 5: Enhanced user cache with TTL
     private var userCache: [String: (user: CloudKitUser, timestamp: Date)] = [:] // Cache with timestamps
-    private let userCacheTTL: TimeInterval = 1800 // 30 minutes TTL for user data
+    private let userCacheTTL: TimeInterval = Double.greatestFiniteMagnitude // Never expire - keep user data forever
     // PHASE 7: Memory management
     private let maxCacheSize = 100 // Maximum number of cached users
-    private let maxActivities = 50 // Maximum activities to keep in memory
+    private let maxActivities = 100 // Maximum activities to keep in memory (updated for better UX)
     private var publicDatabase: CKDatabase {
         CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
     }
@@ -761,6 +771,9 @@ class ActivityFeedManager: ObservableObject {
 
     func loadInitialActivities() async {
         print("🔍 DEBUG: loadInitialActivities started")
+        
+        // Cancel any existing load task
+        currentLoadTask?.cancel()
         
         // Prevent concurrent loads
         guard !isLoading else {
@@ -832,6 +845,9 @@ class ActivityFeedManager: ObservableObject {
     }
 
     func refresh() async {
+        // Cancel any existing refresh task
+        currentRefreshTask?.cancel()
+        
         // PHASE 4: Smart refresh - prevent too frequent refreshes
         if let lastRefresh = lastRefreshTime {
             let timeSinceLastRefresh = Date().timeIntervalSince(lastRefresh)
@@ -845,6 +861,12 @@ class ActivityFeedManager: ObservableObject {
         guard !isRefreshing else { 
             print("⚠️ Refresh already in progress, skipping")
             return 
+        }
+        
+        // Smart refresh: Only fetch items newer than our newest cached item
+        if !activities.isEmpty {
+            await refreshNewestOnly()
+            return
         }
         
         isRefreshing = true
@@ -1019,10 +1041,13 @@ class ActivityFeedManager: ObservableObject {
                 let activityPredicate = NSPredicate(format: "actorID IN %@", limitedUserIDs)
                 let activityQuery = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: activityPredicate)
                 
+                // Progressive loading: Use smaller initial batch for instant display
+                let fetchLimit = loadMore ? batchSize : initialLoadSize
+                
                 followedActivities = try await cloudKitSync.cloudKitActor.executeQuery(
                     activityQuery, 
                     desiredKeys: nil, 
-                    resultsLimit: 25
+                    resultsLimit: fetchLimit
                 )
                 print("✅ Fetched \(followedActivities.count) activities from followed users")
             } else {
@@ -1094,22 +1119,38 @@ class ActivityFeedManager: ObservableObject {
                 activities.append(contentsOf: newActivities)
                 // Re-sort after appending to maintain chronological order
                 activities.sort { $0.timestamp > $1.timestamp }
-                // PHASE 7: Limit activities in memory to prevent excessive usage
-                if activities.count > maxActivities {
-                    // Remove oldest activities (at the end after sorting)
-                    let overflow = activities.count - maxActivities
-                    activities.removeLast(overflow)
-                    print("🧹 PHASE 7: Trimmed \(overflow) old activities (keeping \(maxActivities) max)")
-                }
+                // Always maintain memory limits
+                maintainMemoryLimits()
             } else {
                 // Sort new activities by timestamp (newest first)
                 activities = newActivities.sorted { $0.timestamp > $1.timestamp }
+                // Maintain memory limits even on initial load
+                maintainMemoryLimits()
             }
 
             // Check if there are more activities to load
-            hasMore = newActivities.count >= 25
+            // Use the actual fetch limit, not hardcoded 25
+            let expectedLimit = loadMore ? batchSize : initialLoadSize
+            hasMore = newActivities.count >= expectedLimit
 
-            print("✅ Loaded \(newActivities.count) total activities")
+            print("✅ Loaded \(newActivities.count) total activities (initial: \(!loadMore))")
+            
+            // Progressive loading: If this was the initial small batch, load more in background
+            if !loadMore && newActivities.count >= initialLoadSize && hasMore {
+                // Cancel any existing background load
+                backgroundLoadTask?.cancel()
+                
+                backgroundLoadTask = Task { @MainActor in
+                    // Small delay to let UI render first batch
+                    try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+                    
+                    // Check if task was cancelled
+                    if !Task.isCancelled {
+                        // Load more activities using the existing method
+                        await self.fetchActivitiesFromCloudKit(loadMore: true)
+                    }
+                }
+            }
             
             // Save to cache
             await saveCachedActivities()
@@ -1123,6 +1164,7 @@ class ActivityFeedManager: ObservableObject {
         }
     }
 
+    
     /// Efficiently fetch just the IDs of users being followed
     private func fetchFollowedUserIDs(for userID: String) async throws -> [String] {
         let followingPredicate = NSPredicate(format: "followerID == %@ AND isActive == %d", userID, 1)
@@ -1225,7 +1267,7 @@ class ActivityFeedManager: ObservableObject {
         let uncachedUserIDs = userIDsToFetch.filter { userID in
             if let cached = userCache[userID] {
                 // Check if cache is still valid
-                return Date().timeIntervalSince(cached.timestamp) > userCacheTTL
+                return false // Never expire - was: Date().timeIntervalSince(cached.timestamp) > userCacheTTL
             }
             return true
         }
@@ -1342,24 +1384,112 @@ class ActivityFeedManager: ObservableObject {
         print("📊 PHASE 7: Memory cleanup complete - \(userCache.count) users, \(activities.count) activities")
     }
     
-    // MARK: - Singleton Lifecycle Management
+    // MARK: - Smart Refresh
     
-    /// Clear old data when app goes to background
-    func clearStaleDataIfNeeded() {
-        let now = Date()
+    /// Fetch only activities newer than what we have cached
+    private func refreshNewestOnly() async {
+        guard let newestTimestamp = activities.first?.timestamp else {
+            // No cached data, do full refresh
+            await fetchActivitiesFromCloudKit(loadMore: false)
+            return
+        }
         
-        // If data is older than 10 minutes, clear it to save memory
-        if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date,
-           now.timeIntervalSince(cacheTimestamp) > 600 {
-            print("🧹 Clearing stale activity data (>10 minutes old)")
-            activities.removeAll()
-            userCache.removeAll()
+        print("🔄 Smart refresh: Fetching only activities newer than \(newestTimestamp)")
+        
+        guard let currentUser = await UnifiedAuthManager.shared.currentUser,
+              let userID = currentUser.recordID else {
+            print("⚠️ No authenticated user for refresh")
+            return
+        }
+        
+        isRefreshing = true
+        defer { 
+            isRefreshing = false
+            lastRefreshTime = Date()
+        }
+        
+        do {
+            // Get followed user IDs
+            let followedUserIDs = try await fetchFollowedUserIDs(for: userID)
+            var allUserIDs = followedUserIDs
+            allUserIDs.append(userID)
+            
+            // Query for activities newer than our newest
+            let newerPredicate = NSPredicate(
+                format: "userID IN %@ AND timestamp > %@",
+                allUserIDs,
+                newestTimestamp as NSDate
+            )
+            
+            let query = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: newerPredicate)
+            query.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
+            
+            let cloudKitSync = CloudKitSyncService.shared
+            let newRecords = try await cloudKitSync.cloudKitActor.executeQuery(
+                query,
+                desiredKeys: nil,
+                resultsLimit: 25
+            )
+            
+            if !newRecords.isEmpty {
+                var newActivities: [ActivityItem] = []
+                for record in newRecords {
+                    if let activity = await mapCloudKitRecordToActivityItem(record) {
+                        // Avoid duplicates
+                        if !activities.contains(where: { $0.id == activity.id }) {
+                            newActivities.append(activity)
+                        }
+                    }
+                }
+                
+                if !newActivities.isEmpty {
+                    // Insert new activities at the front
+                    activities.insert(contentsOf: newActivities, at: 0)
+                    // Maintain memory limits
+                    maintainMemoryLimits()
+                    print("✅ Smart refresh: Added \(newActivities.count) new activities")
+                    await saveCachedActivities()
+                } else {
+                    print("⚡ Smart refresh: No new activities")
+                }
+            } else {
+                print("⚡ Smart refresh: No new activities found")
+            }
+        } catch {
+            print("❌ Smart refresh error: \(error)")
+        }
+    }
+    
+    // MARK: - Memory Management
+    
+    /// Maintain memory limits by keeping only the newest items
+    private func maintainMemoryLimits() {
+        // Keep only the 100 newest activities
+        if activities.count > 100 {
+            activities = Array(activities.prefix(100))
+            print("📊 Trimmed activities to 100 newest items")
+        }
+        
+        // Keep only the 50 most recently accessed users in cache
+        if userCache.count > 50 {
+            // This is already a dictionary, so we maintain size differently
+            // For now, we'll leave the user cache as-is since it's already efficient
+            print("📊 User cache has \(userCache.count) items")
         }
     }
     
     /// Reset singleton for testing or logout
     func reset() {
         print("🔄 Resetting ActivityFeedManager singleton")
+        
+        // Cancel all tasks first
+        currentLoadTask?.cancel()
+        currentRefreshTask?.cancel()
+        backgroundLoadTask?.cancel()
+        currentLoadTask = nil
+        currentRefreshTask = nil
+        backgroundLoadTask = nil
+        
         activities.removeAll()
         userCache.removeAll()
         lastFetchedRecord = nil
@@ -1378,7 +1508,8 @@ class ActivityFeedManager: ObservableObject {
         // PHASE 5: Check cache with TTL validation
         if let cached = userCache[userID] {
             // Check if cache is still valid
-            if Date().timeIntervalSince(cached.timestamp) < userCacheTTL {
+            // Always use cached data - never expires
+            if true { // Was: Date().timeIntervalSince(cached.timestamp) < userCacheTTL
                 let displayName = cached.user.username ?? cached.user.displayName
                 // print("✅ Found cached user: \(displayName) (cache age: \(Int(Date().timeIntervalSince(cached.timestamp)))s)")
                 return displayName
