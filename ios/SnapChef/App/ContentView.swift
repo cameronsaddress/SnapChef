@@ -43,8 +43,9 @@ struct ContentView: View {
 struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var pendingTabSelection: Int?
+    @State private var showingCameraPermissionAlert = false
+    @State private var showRecipeLimitAlert = false
     @EnvironmentObject var authManager: UnifiedAuthManager
-        @State private var showingCameraPermissionAlert = false
 
     var body: some View {
         // Single NavigationStack at the root level
@@ -131,12 +132,26 @@ struct MainTabView: View {
         } message: {
             Text("SnapChef needs camera access to capture photos of your ingredients. Please enable camera access in Settings.")
         }
+        .sheet(isPresented: $showRecipeLimitAlert) {
+            RecipeLimitReachedView(isPresented: $showRecipeLimitAlert)
+        }
     }
     
-    // Handle tab selection with camera permission checking
+    // Handle tab selection with camera permission and recipe limit checking
     private func handleTabSelection(_ newTab: Int) {
-        // Check if user is trying to switch to camera tab (index 1) or detective tab (index 2)
-        if newTab == 1 || newTab == 2 {
+        // Check if user is trying to switch to camera tab (index 1)
+        if newTab == 1 {
+            // Check recipe limit first
+            let usageTracker = UsageTracker.shared
+            let subscriptionManager = SubscriptionManager.shared
+            
+            if !subscriptionManager.isPremium && usageTracker.hasReachedRecipeLimit() {
+                // Show limit reached UI instead of camera
+                showRecipeLimitAlert = true
+                return
+            }
+            
+            // If limit not reached, check camera permission
             Task {
                 let granted = await requestCameraPermission()
                 if granted {
@@ -147,6 +162,18 @@ struct MainTabView: View {
                     }
                 }
                 // If permission denied, stay on current tab
+            }
+        } else if newTab == 2 {
+            // Detective tab - just check camera permission
+            Task {
+                let granted = await requestCameraPermission()
+                if granted {
+                    await MainActor.run {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedTab = newTab
+                        }
+                    }
+                }
             }
         } else {
             // For non-camera tabs, switch immediately

@@ -150,10 +150,12 @@ struct CameraView: View {
             // Overlays component (CameraOverlays temporarily commented out)
             // TODO: Implement CameraOverlays
             if isProcessing {
+                let _ = print("🔍 DEBUG: Showing MagicalProcessingOverlay - isProcessing: true")
                 MagicalBackground()
                     .ignoresSafeArea()
                     .overlay(
                         MagicalProcessingOverlay(capturedImage: capturedImage, onClose: {
+                            print("🔍 DEBUG: MagicalProcessingOverlay onClose called")
                             // Stop processing and go back
                             isProcessing = false
                             capturedImage = nil
@@ -478,13 +480,18 @@ struct CameraView: View {
     }
 
     private func processImage(_ image: UIImage) {
+        print("🔍 DEBUG: processImage called for single image")
+        print("🔍 DEBUG: Setting isProcessing = true for single image")
         isProcessing = true
         capturedImage = image // Store the captured image
+        print("🔍 DEBUG: isProcessing is now: \(isProcessing)")
 
         // Stop camera session to save resources while processing
+        print("🔍 DEBUG: Stopping camera session for single image processing")
         cameraModel.stopSession()
 
         Task {
+            print("🔍 DEBUG: processImage Task started")
             // Check subscription status and usage limits
             if !subscriptionManager.isPremium {
                 if usageTracker.hasReachedRecipeLimit() {
@@ -827,6 +834,8 @@ struct CameraView: View {
                         }
 
                     case .failure(let error):
+                        print("🔍 DEBUG: API FAILURE: \(error)")
+                        print("🔍 DEBUG: Setting isProcessing = false due to error")
                         self.isProcessing = false
 
                         // Convert API errors to user-friendly SnapChef errors with appropriate recovery strategies
@@ -857,16 +866,26 @@ struct CameraView: View {
     }
 
     private func processBothImages(fridgeImage: UIImage, pantryImage: UIImage) {
+        print("🔍 DEBUG: processBothImages called")
+        print("🔍 DEBUG: Setting isProcessing = true")
         isProcessing = true
         capturedImage = fridgeImage // Store the fridge image as the primary image
+        print("🔍 DEBUG: isProcessing is now: \(isProcessing)")
+        print("🔍 DEBUG: capturedImage set: \(capturedImage != nil)")
 
         // Stop camera session to save resources while processing
+        print("🔍 DEBUG: Stopping camera session for processing")
         cameraModel.stopSession()
 
         Task {
+            print("🔍 DEBUG: processBothImages Task started")
             // Check subscription status and usage limits for dual images
+            print("🔍 DEBUG: Checking subscription - isPremium: \(subscriptionManager.isPremium)")
             if !subscriptionManager.isPremium {
-                if usageTracker.hasReachedRecipeLimit() {
+                let hasReachedLimit = usageTracker.hasReachedRecipeLimit()
+                print("🔍 DEBUG: Has reached recipe limit: \(hasReachedLimit)")
+                if hasReachedLimit {
+                    print("🔍 DEBUG: Recipe limit reached, stopping processing")
                     isProcessing = false
 
                     // Record paywall shown and trigger it
@@ -880,6 +899,7 @@ struct CameraView: View {
                     return
                 }
             }
+            print("🔍 DEBUG: Subscription check passed, continuing with API call")
 
             // Generate session ID
             let sessionId = UUID().uuidString
@@ -939,6 +959,11 @@ struct CameraView: View {
             let llmProvider = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini"
 
             // Call the new API function for both images
+            print("🔍 DEBUG: About to call API with both images")
+            print("🔍 DEBUG: Fridge image size: \(fridgeImage.size)")
+            print("🔍 DEBUG: Pantry image size: \(pantryImage.size)")
+            print("🔍 DEBUG: Number of recipes: \(numberOfRecipes)")
+            print("🔍 DEBUG: LLM Provider: \(llmProvider)")
             SnapChefAPIManager.shared.sendBothImagesForRecipeGeneration(
                 fridgeImage: fridgeImage,
                 pantryImage: pantryImage,
@@ -954,9 +979,12 @@ struct CameraView: View {
                 foodPreferences: foodPreferences,
                 llmProvider: llmProvider
             ) { result in
+                print("🔍 DEBUG: API callback received for dual images")
                 Task { @MainActor in
+                    print("🔍 DEBUG: In MainActor task for dual images")
                     switch result {
                     case .success(let apiResponse):
+                        print("🔍 DEBUG: API SUCCESS - Got \(apiResponse.data.recipes.count) recipes from dual images")
                         // Convert API recipes to app recipes
                         let recipes = apiResponse.data.recipes.map { apiRecipe in
                             SnapChefAPIManager.shared.convertAPIRecipeToAppRecipe(apiRecipe)
@@ -1186,6 +1214,8 @@ struct CameraView: View {
                         }
 
                     case .failure(let error):
+                        print("🔍 DEBUG: API FAILURE: \(error)")
+                        print("🔍 DEBUG: Setting isProcessing = false due to error")
                         self.isProcessing = false
 
                         // Convert API errors to user-friendly SnapChef errors with appropriate recovery strategies
