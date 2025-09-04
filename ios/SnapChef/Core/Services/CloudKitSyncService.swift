@@ -659,28 +659,37 @@ final class CloudKitSyncService: ObservableObject {
             recipeOwnerID = recipeRecord[CKField.Recipe.ownerID] as? String
         }
 
-        // Create activity for recipe owner (if it's not their own recipe)
-        if let ownerID = recipeOwnerID, ownerID != userID {
+        // Create a single activity that works for both notification and public feed
+        // Include targetUserID (recipe owner) for proper notification display
+        // The activity will show up correctly in both contexts:
+        // - For the recipe owner: "X commented on your recipe"
+        // - For followers: "X commented on Y's recipe" (if owner != commenter)
+        // - For public feed: "X commented on a recipe: [recipe name]" (if no owner info)
+        if let ownerID = recipeOwnerID {
+            // Only create activity if it's not the owner commenting on their own recipe
+            if ownerID != userID {
+                try await createActivity(
+                    type: "recipeComment",
+                    actorID: userID,
+                    targetUserID: ownerID,  // Recipe owner for proper notification
+                    recipeID: recipeID,
+                    recipeName: recipeName
+                )
+                print("✅ Created comment activity for recipe owner and followers' feeds")
+            } else {
+                print("ℹ️ User commenting on their own recipe - no activity created")
+            }
+        } else {
+            // Recipe has no owner (shouldn't happen, but handle gracefully)
             try await createActivity(
                 type: "recipeComment",
                 actorID: userID,
-                targetUserID: ownerID,
+                targetUserID: nil,
                 recipeID: recipeID,
                 recipeName: recipeName
             )
+            print("✅ Created comment activity for followers' feeds (recipe has no owner)")
         }
-        
-        // Create activity for user's followers' feeds (public activity)
-        // This will appear in all followers' feeds
-        try await createActivity(
-            type: "recipeCommented",  // Different type to distinguish from notification to owner
-            actorID: userID,
-            targetUserID: nil,  // No specific target - this is a public activity
-            recipeID: recipeID,
-            recipeName: recipeName
-        )
-        
-        print("✅ Created comment activities for followers' feeds")
     }
 
     func fetchComments(for recipeID: String, limit: Int = 50) async throws -> [CKRecord] {

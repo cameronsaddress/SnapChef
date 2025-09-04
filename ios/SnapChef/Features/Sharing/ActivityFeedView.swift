@@ -42,6 +42,7 @@ struct ActivityItem: Identifiable {
         case recipeLiked
         case recipeComment
         case challengeCompleted
+        case challengeShared  // When user shares a challenge
         case badgeEarned
 
         var icon: String {
@@ -51,6 +52,7 @@ struct ActivityItem: Identifiable {
             case .recipeLiked: return "heart.fill"
             case .recipeComment: return "bubble.left.fill"
             case .challengeCompleted: return "checkmark.circle.fill"
+            case .challengeShared: return "square.and.arrow.up.circle.fill"
             case .badgeEarned: return "medal.fill"
             }
         }
@@ -62,6 +64,7 @@ struct ActivityItem: Identifiable {
             case .recipeLiked: return Color(hex: "#ff6b6b")
             case .recipeComment: return Color(hex: "#4ecdc4")
             case .challengeCompleted: return Color(hex: "#ffd93d")
+            case .challengeShared: return Color(hex: "#9b59b6")
             case .badgeEarned: return Color(hex: "#ff6b6b")
             }
         }
@@ -130,6 +133,13 @@ struct ActivityItem: Identifiable {
             }
         case .challengeCompleted:
             text += AttributedString(" completed the challenge: ")
+            if let recipeName = recipeName { // Using recipeName for challenge name
+                var challenge = AttributedString(recipeName)
+                challenge.font = .system(size: 16, weight: .medium)
+                text += challenge
+            }
+        case .challengeShared:
+            text += AttributedString(" shared a completed challenge: ")
             if let recipeName = recipeName { // Using recipeName for challenge name
                 var challenge = AttributedString(recipeName)
                 challenge.font = .system(size: 16, weight: .medium)
@@ -373,7 +383,7 @@ struct ActivityFeedView: View {
             }
         case .challenges:
             return feedManager.activities.filter {
-                $0.type == .challengeCompleted || $0.type == .badgeEarned
+                $0.type == .challengeCompleted || $0.type == .challengeShared || $0.type == .badgeEarned
             }
         }
     }
@@ -408,9 +418,10 @@ struct ActivityFeedView: View {
             )
             sheetUserProfile = userProfile
             print("✅ User profile sheet set for follower: \(activity.userName)")
-        case .challengeCompleted:
+        case .challengeCompleted, .challengeShared:
             // Show challenge detail popup
-            print("🏆 Challenge activity tapped - showing challenge detail")
+            let actionType = activity.type == .challengeCompleted ? "completed" : "shared"
+            print("🏆 Challenge \(actionType) activity tapped - showing challenge detail")
             if let challengeID = activity.challengeID ?? activity.recipeID {
                 // Some activities might store challenge ID in recipeID field
                 print("🎯 CHALLENGE ACTIVITY - Challenge ID: \(challengeID)")
@@ -1619,6 +1630,8 @@ class ActivityFeedManager: ObservableObject {
             activityType = .recipeComment
         case "challengecompleted":
             activityType = .challengeCompleted
+        case "challengeshared":
+            activityType = .challengeShared
         case "badgeearned":
             activityType = .badgeEarned
         default:
@@ -1709,7 +1722,7 @@ class ActivityFeedManager: ObservableObject {
             targetUserID: targetUserID,
             targetUserName: targetUserName,
             recipeID: recipeID,
-            recipeName: activityType == .challengeCompleted ? challengeName : recipeName,
+            recipeName: (activityType == .challengeCompleted || activityType == .challengeShared) ? challengeName : recipeName,
             recipeImage: nil, // TODO: Implement recipe image loading
             challengeID: challengeID,
             timestamp: timestamp,
@@ -1875,6 +1888,7 @@ extension ActivityItem: Codable {
         case "recipeLiked": type = .recipeLiked
         case "recipeComment": type = .recipeComment
         case "challengeCompleted": type = .challengeCompleted
+        case "challengeShared": type = .challengeShared
         case "badgeEarned": type = .badgeEarned
         default: type = .recipeShared
         }
@@ -1902,6 +1916,7 @@ extension ActivityItem: Codable {
         case .recipeLiked: typeString = "recipeLiked"
         case .recipeComment: typeString = "recipeComment"
         case .challengeCompleted: typeString = "challengeCompleted"
+        case .challengeShared: typeString = "challengeShared"
         case .badgeEarned: typeString = "badgeEarned"
         }
         try container.encode(typeString, forKey: .type)

@@ -292,7 +292,26 @@ await UnifiedAuthManager.shared.refreshCurrentUser()
 - **COMPLETE_CODE_TRACE.md** - App flow analysis
 - **FILE_USAGE_ANALYSIS.md** - File usage status
 
-## 🔄 Latest Updates (Dec 3, 2024)
+## 🔄 Latest Updates (Jan 4, 2025)
+
+### Challenge Sharing & Activity Feed Fixes (Jan 4, 2025) ✅
+- **Fixed challenge sharing display**: 
+  - Shared challenges no longer appear as blank recipes in activity feed
+  - Now displays as "[User] shared a completed challenge: [Challenge Name]" 
+  - Shows challenge icon with purple color theme
+  - Challenges are clickable - opens challenge details so other users can join
+- **Added `challengeShared` activity type**:
+  - Properly parsed from CloudKit records
+  - Included in "Challenges" filter in activity feed
+  - Full Codable support for persistence
+- **Fixed duplicate comment activities**:
+  - Removed duplicate "recipeCommented" activity creation
+  - Now creates single activity that serves both notification and public feed purposes
+  - Properly references recipe owner when commenting on shared recipes
+  - No activity created when users comment on their own recipes
+- **Build verified**: All changes compile successfully
+
+## 🔄 Previous Updates (Dec 3, 2024)
 
 ### Account Deletion & API Key Protection (Dec 3) ✅
 - **Fixed critical API key deletion bug**: Account deletion was incorrectly deleting system API keys

@@ -794,7 +794,6 @@ struct DetectiveView: View {
     
     private func isSaved(_ recipe: DetectiveRecipe) -> Bool {
         let saved = savedRecipeIds.contains(recipe.id)
-        print("🔍 Checking if recipe is saved: \(recipe.name) - Result: \(saved)")
         return saved
     }
     

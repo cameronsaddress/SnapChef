@@ -358,15 +358,10 @@ struct RecipeResultsView: View {
         
         // 4. Background activities (fire and forget)
         Task {
-            // Track activity if saving (not unsaving)
-            if !currentlySaved, let userID = UnifiedAuthManager.shared.currentUser?.recordID {
-                try? await CloudKitSyncService.shared.createActivity(
-                    type: "recipeSaved",
-                    actorID: userID,
-                    recipeID: recipe.id.uuidString,
-                    recipeName: recipe.name
-                )
-                
+            // Track streak activity if saving (not unsaving)
+            // NOTE: We don't create a social feed activity for saving - that's private
+            // Only sharing creates social activities
+            if !currentlySaved {
                 await StreakManager.shared.recordActivity(for: .recipeCreation)
                 
                 if recipe.nutrition.calories < 500 {

@@ -113,16 +113,16 @@ class ChallengeDatabase: ObservableObject {
 
     private func createDailyChallenge(for dayOfYear: Int, baseDate: Date) -> Challenge {
         let templates = [
-            ("🍳", "Morning Magic", "Create your ultimate breakfast dish in under 15 minutes", "breakfast", 100, "Create 1 breakfast dish"),
-            ("🥗", "Salad Spectacular", "Make one creative salad with 5+ ingredients", "healthy", 120, "Create 1 salad masterpiece"),
-            ("🍝", "Pasta Perfect", "Create your signature pasta dish from pantry staples", "italian", 130, "Create 1 pasta dish"),
-            ("🌮", "Taco Tuesday", "Transform leftovers into your ultimate taco creation", "mexican", 110, "Create 1 amazing taco"),
-            ("🍜", "Soup & Comfort", "Make one warming soup or stew from scratch", "comfort", 140, "Create 1 comfort dish"),
-            ("🥘", "One-Pot Wonder", "Create a complete meal in a single pot", "efficient", 100, "0/1 meal"),
-            ("🍕", "Pizza Party", "Make pizza with unconventional toppings", "creative", 150, "0/1 pizza"),
-            ("🍱", "Bento Box Beauty", "Create an Instagram-worthy lunch box", "aesthetic", 130, "0/1 bento"),
-            ("🥙", "Wrap It Up", "Make your signature wrap or sandwich creation", "lunch", 90, "Create 1 wrap masterpiece"),
-            ("🍛", "Curry Night", "Create your perfect curry dish from scratch", "indian", 160, "Create 1 curry dish")
+            ("🍳", "15-Minute Gourmet Breakfast", "Create a restaurant-quality breakfast using exactly 5 ingredients, including one protein cooked two ways", "breakfast", 100, "1 breakfast with dual-protein technique"),
+            ("🥗", "Rainbow Salad Architecture", "Build a salad with 7 different colors using 3 different cutting techniques (julienne, chiffonade, brunoise)", "healthy", 120, "1 salad with 7 colors, 3 cuts shown"),
+            ("🍝", "Fresh Pasta Mastery", "Make pasta from scratch with homemade sauce using only 6 pantry staples - photo document each step", "italian", 130, "1 scratch pasta with 6-ingredient sauce"),
+            ("🌮", "Zero-Waste Fusion Tacos", "Use 3 different leftovers to create fusion tacos with homemade salsa from vegetable scraps", "mexican", 110, "3 leftover tacos + scrap salsa"),
+            ("🍜", "Layered Soup Science", "Create a soup with 3 visible layers before stirring - protein, starch, and vegetable layers", "comfort", 140, "1 three-layer soup with photo proof"),
+            ("🥘", "One-Pot Time-Lapse", "Build a one-pot meal adding ingredients at 5-minute intervals - document each addition stage", "efficient", 100, "1 meal with 5 timed stages documented"),
+            ("🍕", "Fusion Pizza Laboratory", "Create pizza combining 2 cuisines with homemade sauces representing each culture", "creative", 150, "1 dual-culture pizza with 2 sauces"),
+            ("🍱", "Color Theory Bento", "Design a bento with 5 colors from natural ingredients, each using different cooking method", "aesthetic", 130, "5 colors, 5 cooking methods in one box"),
+            ("🥙", "Texture Master Wrap", "Create a wrap featuring 5 distinct textures: crunchy, creamy, chewy, crispy, and tender", "lunch", 90, "1 wrap showcasing 5 textures"),
+            ("🍛", "Spice Gradient Curry", "Build a curry with 3 spice levels in one dish - mild, medium, and hot sections", "indian", 160, "1 curry with 3 visible spice zones")
         ]
 
         let template = templates[dayOfYear % templates.count]
@@ -156,16 +156,16 @@ class ChallengeDatabase: ObservableObject {
 
     private func createSecondDailyChallenge(for dayOfYear: Int, baseDate: Date) -> Challenge {
         let templates = [
-            ("🍳", "Morning Magic", "Create your ultimate breakfast dish in under 15 minutes", "breakfast", 100, "Create 1 breakfast dish"),
-            ("🥗", "Salad Spectacular", "Make one creative salad with 5+ ingredients", "healthy", 120, "Create 1 salad masterpiece"),
-            ("🍝", "Pasta Perfect", "Create your signature pasta dish from pantry staples", "italian", 130, "Create 1 pasta dish"),
-            ("🌮", "Taco Tuesday", "Transform leftovers into your ultimate taco creation", "mexican", 110, "Create 1 amazing taco"),
-            ("🍜", "Soup & Comfort", "Make one warming soup or stew from scratch", "comfort", 140, "Create 1 comfort dish"),
-            ("🥘", "One-Pot Wonder", "Create a complete meal in a single pot", "efficient", 100, "0/1 meal"),
-            ("🍕", "Pizza Party", "Make pizza with unconventional toppings", "creative", 150, "0/1 pizza"),
-            ("🍱", "Bento Box Beauty", "Create an Instagram-worthy lunch box", "aesthetic", 130, "0/1 bento"),
-            ("🥙", "Wrap It Up", "Make your signature wrap or sandwich creation", "lunch", 90, "Create 1 wrap masterpiece"),
-            ("🍛", "Curry Night", "Create your perfect curry dish from scratch", "indian", 160, "Create 1 curry dish")
+            ("🥚", "Egg Excellence Challenge", "Master 3 different egg techniques in one dish - poached, scrambled, and crispy fried edges", "breakfast", 100, "1 dish with 3 egg techniques shown"),
+            ("🥬", "Greens Transformation", "Take one type of leafy green and prepare it 3 ways - raw, sautéed, and crispy chips", "healthy", 120, "1 green prepared 3 ways with photos"),
+            ("🍜", "Noodle Architecture", "Create homemade noodles in 2 different widths and build a structured presentation", "italian", 130, "2 noodle widths, architectural plating"),
+            ("🌯", "Burrito Engineering", "Build a perfectly wrapped burrito with 4 distinct flavor quadrants - no mixing allowed", "mexican", 110, "1 burrito with 4 flavor zones mapped"),
+            ("🥣", "Stock From Scratch", "Make stock from vegetable scraps and use it for a complete soup in under 2 hours", "comfort", 140, "1 scrap stock soup with time proof"),
+            ("🍳", "Cast Iron Mastery", "Cook an entire meal in one cast iron pan - appetizer, main, and dessert", "efficient", 100, "3 courses in 1 pan documented"),
+            ("🥖", "Bread & Spread Duo", "Make quick bread and 2 complementary spreads using same base ingredient differently", "creative", 150, "1 bread + 2 spreads from same ingredient"),
+            ("🍙", "Rice Ball Revolution", "Create 3 different onigiri with visible filling cross-sections when cut", "aesthetic", 130, "3 onigiri with cross-section photos"),
+            ("🥪", "Sandwich Architecture", "Build a sandwich with perfect ingredient ratios - measure and document each layer", "lunch", 90, "1 sandwich with measured layer ratios"),
+            ("🍲", "Tempering Technique", "Demonstrate proper spice tempering with before/after aroma photos in your curry", "indian", 160, "1 curry with tempering process shown")
         ]
 
         let templateIndex = (dayOfYear + 100) % templates.count
@@ -201,14 +201,14 @@ class ChallengeDatabase: ObservableObject {
     private func createWeeklyChallenge(for dayOfYear: Int, baseDate: Date) -> Challenge {
         let weekNumber = dayOfYear / 7
         let templates = [
-            ("🌱", "Plant-Based Power", "Create your ultimate vegetarian or vegan masterpiece", "vegetarian", 500, "Create 1 plant-based dish"),
-            ("💪", "Protein Power", "Make one recipe with 30g+ protein", "fitness", 600, "Create 1 protein-rich meal"),
-            ("🌍", "World Tour", "Cook one authentic dish from another country", "international", 700, "Create 1 international dish"),
-            ("⏱", "Speed Champion", "Create one amazing recipe in under 20 minutes", "quick", 550, "Create 1 quick meal"),
-            ("❤️", "Heart Healthy", "Make one delicious low-sodium, low-fat recipe", "healthy", 580, "Create 1 healthy dish"),
-            ("🎨", "Recipe Makeover", "Transform one classic recipe with your unique twist", "creative", 620, "Create 1 makeover dish"),
-            ("🥦", "Veggie Victory", "Create a dish showcasing multiple vegetables", "vegetables", 650, "Create 1 veggie showcase"),
-            ("🍞", "Bread & Bakes", "Bake one perfect bread or pastry from scratch", "baking", 700, "Create 1 baked good")
+            ("🌱", "Meat Illusion Mastery", "Create a plant-based dish that mimics meat in texture AND appearance using 3 techniques", "vegetarian", 500, "1 convincing meat substitute, 3 techniques shown"),
+            ("💪", "Protein Architecture", "Build a 40g protein meal with visible protein sources in 5 different forms", "fitness", 600, "1 meal with 5 protein forms documented"),
+            ("🌍", "Fusion Passport Challenge", "Combine techniques from 3 different cuisines in one cohesive dish with origin map", "international", 700, "1 dish fusing 3 cuisines with technique map"),
+            ("⏱", "Mise en Place Master", "Show 10-min prep setup, then execute complex dish in 10 mins using only your prep", "quick", 550, "Prep grid photo + 20-min total execution"),
+            ("❤️", "Flavor Without Guilt", "Create a dish with max flavor using herbs/spices instead of salt/fat - list all seasonings", "healthy", 580, "1 dish with seasoning blueprint documented"),
+            ("🎨", "Deconstructed Classic", "Take a traditional dish and rebuild it with modern techniques and presentation", "creative", 620, "1 classic reimagined with technique notes"),
+            ("🥦", "Root-to-Leaf Challenge", "Use every part of 3 vegetables including stems, leaves, and peels creatively", "vegetables", 650, "3 whole vegetables utilized, zero waste"),
+            ("🍞", "Fermentation Station", "Create bread using homemade starter and document 3 fermentation stages", "baking", 700, "1 fermented bread with 3-stage photos")
         ]
 
         let template = templates[weekNumber % templates.count]
@@ -254,12 +254,12 @@ class ChallengeDatabase: ObservableObject {
     private func createWeekendChallenge(for dayOfYear: Int, baseDate: Date) -> Challenge {
         let weekendNumber = dayOfYear / 7
         let templates = [
-            ("🍖", "BBQ Master", "Grill your ultimate BBQ masterpiece", "grilling", 300, "Create 1 grilled dish"),
-            ("🧁", "Baking Bonanza", "Bake one show-stopping dessert from scratch", "dessert", 350, "Create 1 dessert"),
-            ("🍸", "Cocktail Hour", "Create your signature mocktail with fresh ingredients", "drinks", 280, "Create 1 mocktail"),
-            ("🥞", "Brunch Bliss", "Make your ultimate brunch dish", "brunch", 320, "Create 1 brunch dish"),
-            ("🍿", "Movie Night Snacks", "Create the perfect cinema-worthy snack", "snacks", 290, "Create 1 amazing snack"),
-            ("🎉", "Party Platter", "Make one incredible party appetizer", "entertaining", 400, "Create 1 appetizer")
+            ("🍖", "Smoke & Char Science", "Master 2 grilling techniques - direct heat sear and indirect smoke - on same dish", "grilling", 300, "1 dish with sear + smoke techniques shown"),
+            ("🧁", "Texture Trinity Dessert", "Create a dessert with 3 textures in every bite - crunchy, creamy, and chewy elements", "dessert", 350, "1 dessert with 3 textures mapped"),
+            ("🍸", "Mocktail Mixology Lab", "Build a layered mocktail with 3 density levels that don't mix - photo each layer", "drinks", 280, "1 tri-layer mocktail with density science"),
+            ("🥞", "Brunch Board Balance", "Create a complete brunch board with sweet, savory, protein, and fresh elements in golden ratio", "brunch", 320, "1 board with 4 elements in 1:1:2:2 ratio"),
+            ("🍿", "Gourmet Cinema Trilogy", "Transform movie snacks into gourmet with 3 flavor profiles - umami, sweet, spicy", "snacks", 290, "1 snack in 3 gourmet variations shown"),
+            ("🎉", "Canape Construction", "Build 5 identical appetizers with precise measurements - document consistency", "entertaining", 400, "5 identical canapes with measurement proof")
         ]
 
         let template = templates[weekendNumber % templates.count]
@@ -293,16 +293,16 @@ class ChallengeDatabase: ObservableObject {
 
     private func createViralChallenge(for dayOfYear: Int, baseDate: Date) -> Challenge {
         let viralTemplates = [
-            ("🔥", "#FoodHack", "Share your best kitchen hack that went viral", "viral", 200, "0/1 hack"),
-            ("📸", "#FoodPorn", "Create the most photogenic meal", "aesthetic", 250, "0/1 photo"),
-            ("🎬", "#30SecondMeal", "Film a recipe in 30 seconds or less", "video", 300, "0/1 video"),
-            ("🔥", "#SpiceChallenge", "Create the spiciest dish you can handle", "spicy", 280, "0/1 dish"),
-            ("🎭", "#FoodFail", "Turn a cooking fail into a win", "funny", 220, "0/1 transformation"),
-            ("🏃", "#QuickBite", "Make a meal in under 5 minutes", "speed", 260, "0/1 meal"),
-            ("🌟", "#GlowUp", "Transform basic ingredients into gourmet", "transformation", 340, "0/1 glow-up"),
-            ("🎪", "#FoodCircus", "Create an outrageously creative dish", "creative", 380, "0/1 creation"),
-            ("💃", "#DancingChef", "Cook while dancing to trending music", "entertainment", 200, "0/1 dance"),
-            ("🍜", "#NoodleMania", "Create your unique noodle dish from scratch", "noodles", 320, "Create 1 noodle dish")
+            ("🔥", "#KitchenHackGenius", "Demonstrate a game-changing kitchen hack with before/after comparison photos", "viral", 200, "1 hack with before/after proof"),
+            ("📸", "#PlatingPerfection", "Create a restaurant-worthy plate using the rule of thirds and height variation", "aesthetic", 250, "1 dish with plating breakdown photo"),
+            ("⚡", "#SpeedrunChef", "Document a complete meal in 10 photos showing each 1-minute interval", "speed", 300, "10 timed progress photos"),
+            ("🌶️", "#SpiceGradient", "Build a dish with 5 heat levels on one plate - mild to extreme with labels", "spicy", 280, "1 dish with 5 spice zones labeled"),
+            ("🎭", "#UglyDelicious", "Transform an ugly ingredient into a beautiful dish - document the journey", "funny", 220, "Before/during/after transformation photos"),
+            ("🏃", "#5MinuteMiracle", "Create a complete meal in 5 minutes with photo proof of timer at start/finish", "speed", 260, "1 meal with timer evidence"),
+            ("🌟", "#PantryGlowUp", "Transform 5 basic pantry items into restaurant-quality dish with technique notes", "transformation", 340, "5 ingredients to 1 dish journey"),
+            ("🎪", "#FoodIllusion", "Create a dish that looks like something else entirely - reveal the surprise", "creative", 380, "1 illusion dish with reveal photo"),
+            ("🎨", "#ColorBlockCooking", "Create a dish with 6 distinct color blocks that don't blend", "aesthetic", 200, "1 dish with 6 separated colors"),
+            ("🍜", "#NoodlePull", "Make hand-pulled noodles and capture the stretching technique in photos", "noodles", 320, "Noodle pulling sequence photos")
         ]
 
         let template = viralTemplates[dayOfYear % viralTemplates.count]
@@ -343,47 +343,47 @@ class ChallengeDatabase: ObservableObject {
         // Special holiday challenges
         let specialDates: [(month: Int, day: Int, template: (String, String, String, String, Int, String))] = [
             // January
-            (1, 1, ("🎊", "New Year Fresh Start", "Create your ultimate healthy recipe to start the year", "healthy", 1_000, "Create 1 healthy dish")),
-            (1, 15, ("🥶", "Winter Warmers", "Make your coziest comfort food", "comfort", 400, "Create 1 comfort dish")),
+            (1, 1, ("🎊", "New Year Detox Bowl", "Build a rainbow detox bowl with 7 colors and fermented element for gut health", "healthy", 1_000, "1 bowl with 7 colors + fermented item")),
+            (1, 15, ("🥶", "Layered Winter Stew", "Create a stew with 4 distinct layers cooked separately then combined - photo each layer", "comfort", 400, "1 stew with 4 layers documented")),
 
             // February
-            (2, 14, ("❤️", "Valentine's Special", "Create one romantic dish for your loved one", "romantic", 800, "Create 1 romantic dish")),
-            (2, 28, ("🥞", "Pancake Day", "Make your most creative pancake creation", "breakfast", 500, "Create 1 pancake dish")),
+            (2, 14, ("❤️", "Heart-Shaped Mastery", "Create a dish with 3 heart-shaped elements using different techniques", "romantic", 800, "1 dish with 3 heart techniques shown")),
+            (2, 28, ("🥞", "Pancake Stack Engineering", "Build a 5-layer pancake tower with different flavors/colors per layer - no mixing", "breakfast", 500, "5-layer stack with each layer detailed")),
 
             // March
-            (3, 17, ("☘️", "St. Patrick's Day", "Create one amazing green-themed dish", "irish", 600, "Create 1 green dish")),
-            (3, 20, ("🌸", "Spring Awakening", "Create a dish featuring spring vegetables", "seasonal", 550, "Create 1 spring dish")),
+            (3, 17, ("☘️", "Green Gradient Feast", "Create a dish with 5 shades of green from light to dark using natural ingredients", "irish", 600, "1 dish with 5 green gradients shown")),
+            (3, 20, ("🌸", "Edible Garden Plate", "Design a dish that looks like a garden with 5 different spring vegetables as 'plants'", "seasonal", 550, "1 garden plate with 5 veggie 'plants'")),
 
             // April
-            (4, 1, ("🃏", "April Fools Food", "Create one trick food that surprises", "fun", 400, "Create 1 trick dish")),
-            (4, 22, ("🌿", "Fresh Herbs Festival", "Create one recipe featuring fresh herbs", "herbs", 700, "Create 1 herb dish")),
+            (4, 1, ("🃏", "Food Disguise Master", "Create a dessert that looks like a main dish or vice versa - document the reveal", "fun", 400, "1 disguised dish with reveal photos")),
+            (4, 22, ("🌿", "Herb Symphony", "Use 7 different fresh herbs in one dish with each herb's role documented", "herbs", 700, "1 dish with 7 herbs and their purposes")),
 
             // May
-            (5, 5, ("🌮", "Cinco de Mayo", "Create one authentic Mexican dish", "mexican", 650, "Create 1 Mexican dish")),
-            (5, 28, ("🍔", "Memorial Day BBQ", "Grill one summer favorite", "grilling", 700, "Create 1 grilled dish")),
+            (5, 5, ("🌮", "Three-Salsa Fiesta", "Make 3 different salsas (red, green, white) from scratch for one Mexican dish", "mexican", 650, "1 dish with 3 homemade salsas shown")),
+            (5, 28, ("🍔", "Grill Mark Mastery", "Create perfect crosshatch grill marks on 3 different items - document technique", "grilling", 700, "3 items with perfect grill marks shown")),
 
             // June
-            (6, 21, ("☀️", "Summer Solstice", "Create one refreshing summer dish", "summer", 600, "Create 1 summer dish")),
+            (6, 21, ("☀️", "No-Cook Summer Magic", "Create a complete meal with 5 components without using any heat", "summer", 600, "1 no-heat meal with 5 components")),
 
             // July
-            (7, 4, ("🇺🇸", "Independence Day", "Make one American classic", "american", 750, "Create 1 American dish")),
-            (7, 25, ("🍦", "Ice Cream Day", "Create one frozen dessert", "dessert", 500, "Create 1 frozen dessert")),
+            (7, 4, ("🇺🇸", "Red White Blue Layers", "Create a dish with distinct red, white, and blue layers using natural colors", "american", 750, "1 patriotic dish with 3 color layers")),
+            (7, 25, ("🍦", "Three-Texture Frozen Treat", "Make frozen dessert with soft, crunchy, and chewy elements in each bite", "dessert", 500, "1 frozen dessert with 3 textures shown")),
 
             // August
-            (8, 15, ("🏖", "Beach Picnic", "Make one portable beach food", "outdoor", 550, "Create 1 portable dish")),
+            (8, 15, ("🏖", "Stackable Picnic Tower", "Create a portable meal that stacks in 4 layers for transport - show assembly", "outdoor", 550, "1 4-layer stackable meal documented")),
 
             // September
-            (9, 22, ("🍂", "Fall Harvest", "Create one dish using autumn ingredients", "seasonal", 600, "Create 1 autumn dish")),
+            (9, 22, ("🍂", "Autumn Texture Map", "Use 5 fall ingredients prepared 5 different ways (roasted, raw, pickled, pureed, fried)", "seasonal", 600, "5 fall ingredients, 5 preparations shown")),
 
             // October
-            (10, 31, ("🎃", "Halloween Spooktacular", "Create one spooky-themed recipe", "halloween", 1_000, "Create 1 spooky dish")),
+            (10, 31, ("🎃", "Spooky Food Illusion", "Create an edible 'scary' dish with 3 surprise elements revealed when cut/broken", "halloween", 1_000, "1 scary dish with 3 hidden surprises")),
 
             // November
-            (11, 24, ("🦃", "Thanksgiving Feast", "Make one traditional dish with a twist", "thanksgiving", 1_200, "Create 1 Thanksgiving dish")),
+            (11, 24, ("🦃", "Deconstructed Thanksgiving", "Reimagine a classic Thanksgiving dish with all elements separated and elevated", "thanksgiving", 1_200, "1 classic deconstructed with technique notes")),
 
             // December
-            (12, 24, ("🎄", "Holiday Magic", "Create one festive recipe", "christmas", 1_500, "Create 1 festive dish")),
-            (12, 31, ("🥂", "New Year's Eve", "Make one party appetizer", "party", 800, "Create 1 appetizer"))
+            (12, 24, ("🎄", "Edible Gift Masterpiece", "Create a dish that can be packaged as 5 individual gifts - show packaging", "christmas", 1_500, "1 dish portioned into 5 gift packages")),
+            (12, 31, ("🥂", "Countdown Canapes", "Create 12 bite-sized appetizers representing each month - document each", "party", 800, "12 themed bites with month connections"))
         ]
 
         for special in specialDates {
@@ -422,10 +422,10 @@ class ChallengeDatabase: ObservableObject {
 
         // Seasonal challenges (4 per year)
         let seasonalChallenges: [(range: ClosedRange<Int>, template: (String, String, String, String, Int, String))] = [
-            (80...89, ("🌸", "Spring Feast", "Create one fresh spring-inspired dish", "seasonal", 800, "Create 1 spring dish")),
-            (172...181, ("☀️", "Summer Sizzle", "Create one no-cook summer meal", "summer", 900, "Create 1 no-cook meal")),
-            (264...273, ("🍁", "Autumn Comfort", "Make one cozy fall recipe", "autumn", 850, "Create 1 fall dish")),
-            (355...364, ("❄️", "Winter Feast", "Create one warming winter dish", "winter", 950, "Create 1 winter dish"))
+            (80...89, ("🌸", "Spring Color Spectrum", "Create a dish using 6 spring vegetables in rainbow order with technique for each", "seasonal", 800, "6 spring veggies in spectrum with techniques")),
+            (172...181, ("☀️", "Temperature Play", "Create a dish with hot, cold, and room temperature elements served together", "summer", 900, "1 dish with 3 temperatures documented")),
+            (264...273, ("🍁", "Harvest Layer Cake", "Build a savory 'cake' with 4 autumn vegetable layers - slice to show layers", "autumn", 850, "1 savory cake with 4 visible layers")),
+            (355...364, ("❄️", "Braising Masterclass", "Braise 3 different proteins/vegetables using 3 different liquids - document each", "winter", 950, "3 items braised in 3 liquids shown"))
         ]
 
         for seasonal in seasonalChallenges {
