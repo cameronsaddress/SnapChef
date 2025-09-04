@@ -44,7 +44,8 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var pendingTabSelection: Int?
     @State private var showingCameraPermissionAlert = false
-    @State private var showRecipeLimitAlert = false
+    @State private var showPremiumPrompt = false
+    @State private var premiumPromptReason: PremiumUpgradePrompt.UpgradeReason = .dailyLimitReached
     @EnvironmentObject var authManager: UnifiedAuthManager
 
     var body: some View {
@@ -132,8 +133,11 @@ struct MainTabView: View {
         } message: {
             Text("SnapChef needs camera access to capture photos of your ingredients. Please enable camera access in Settings.")
         }
-        .sheet(isPresented: $showRecipeLimitAlert) {
-            RecipeLimitReachedView(isPresented: $showRecipeLimitAlert)
+        .sheet(isPresented: $showPremiumPrompt) {
+            PremiumUpgradePrompt(
+                isPresented: $showPremiumPrompt,
+                reason: premiumPromptReason
+            )
         }
     }
     
@@ -147,7 +151,8 @@ struct MainTabView: View {
             
             if !subscriptionManager.isPremium && usageTracker.hasReachedRecipeLimit() {
                 // Show limit reached UI instead of camera
-                showRecipeLimitAlert = true
+                premiumPromptReason = .dailyLimitReached
+                showPremiumPrompt = true
                 return
             }
             
