@@ -622,13 +622,14 @@ struct CameraView: View {
                             for: recipes.map { $0.id }
                         )
 
-                        // Dismiss processing overlay first
-                        self.isProcessing = false
-
-                        // Navigate to results immediately - user sees recipes right away!
+                        // Navigate to results - keep processing overlay visible until results show
+                        // This prevents the camera from restarting
                         Task { @MainActor in
                             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
                             self.showingResults = true
+                            // Dismiss processing overlay after results are showing
+                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                            self.isProcessing = false
                         }
 
                         // Capture values before entering detached task (these are @MainActor properties)
@@ -990,13 +991,14 @@ struct CameraView: View {
                             for: recipes.map { $0.id }
                         )
 
-                        // Dismiss processing overlay first
-                        self.isProcessing = false
-
-                        // Navigate to results immediately - user sees recipes right away!
+                        // Navigate to results - keep processing overlay visible until results show
+                        // This prevents the camera from restarting
                         Task { @MainActor in
                             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
                             self.showingResults = true
+                            // Dismiss processing overlay after results are showing
+                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                            self.isProcessing = false
                         }
 
                         // Capture values before entering detached task (these are @MainActor properties)
