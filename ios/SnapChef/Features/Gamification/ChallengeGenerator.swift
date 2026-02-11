@@ -355,9 +355,6 @@ class ChallengeGenerator {
         let description = String(format: template.descriptionFormat, arguments: adjustedVariables.map { $0 as CVarArg })
         let requirement = String(format: template.requirementFormat, arguments: adjustedVariables.map { $0 as CVarArg })
 
-        let badge = generateBadgeName(for: type, title: title)
-        let unlockable = generateUnlockable(for: type, points: adjustedPoints)
-
         return Challenge(
             title: title,
             description: description,

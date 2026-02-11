@@ -4,7 +4,7 @@ import Combine
 
 // MARK: - Chef Coins Transaction
 struct ChefCoinsTransaction: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let amount: Int
     let type: TransactionType
     let reason: String

@@ -137,11 +137,11 @@ struct AfterPhotoCaptureView: View {
                     print("📷 AfterPhotoCapture: Attempting CloudKit upload...")
                     
                     // First check if the recipe exists in CloudKit
-                    let recipeExists = await CloudKitRecipeManager.shared.checkRecipeExists(recipeID)
+                    let recipeExists = await CloudKitService.shared.recipeExists(with: recipeID)
                     
                     if recipeExists {
                         // Recipe exists, update it with the after photo
-                        try await CloudKitRecipeManager.shared.updateAfterPhoto(for: recipeID, afterPhoto: photo)
+                        try await CloudKitService.shared.updateAfterPhoto(for: recipeID, afterPhoto: photo)
                         print("📷 AfterPhotoCapture: CloudKit upload successful")
                     } else {
                         print("📷 AfterPhotoCapture: Recipe not in CloudKit yet (likely due to earlier permission issues), skipping CloudKit upload")

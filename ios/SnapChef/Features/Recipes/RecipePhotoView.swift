@@ -22,7 +22,7 @@ struct RecipePhotoView: View {
     @State private var showingAfterPhotoCapture = false
     @State private var isFetchingFromCloudKit = false
     @State private var hasAppeared = false
-    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitService.shared
     @EnvironmentObject var appState: AppState
     
     // OPTIMIZATION: Cache photos locally to prevent repeated PhotoStorageManager queries
@@ -520,7 +520,7 @@ struct CompactRecipePhotoView: View {
     let recipe: Recipe
     @State private var beforePhoto: UIImage?
     @State private var afterPhoto: UIImage?
-    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitService.shared
     @EnvironmentObject var appState: AppState
 
     var body: some View {

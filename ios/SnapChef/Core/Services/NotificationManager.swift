@@ -2,7 +2,7 @@
 @preconcurrency import UserNotifications
 import SwiftUI
 
-/// Global notification manager that handles all notification scheduling with comprehensive limits and controls
+/// Global notification manager that handles all notification scheduling with strict monthly limits and controls.
 @MainActor
 final class NotificationManager: ObservableObject {
     static let shared = NotificationManager()
@@ -14,27 +14,38 @@ final class NotificationManager: ObservableObject {
     @Published var pendingNotifications: [UNNotificationRequest] = []
     
     // MARK: - Constants
-    private let maxWeeklyNotifications = 1  // Only 1 notification per week
+    private let maxMonthlyNotifications = 1  // Hard cap: 1 notification per month
+    private let monthlyScheduleDay = 1       // First day of month
+    private let monthlyScheduleHour = 10     // 10 AM local time
+    private let monthlyScheduleMinute = 30
+    private let preferredWindowStartHour = 9
+    private let preferredWindowEndHour = 18
     private let quietHoursStart = 22 // 10 PM
     private let quietHoursEnd = 8    // 8 AM
     
     // MARK: - Private Properties
     private let notificationCenter = UNUserNotificationCenter.current()
     private let userDefaults = UserDefaults.standard
-    private var weeklyResetTimer: Timer?
+    private var monthlyResetTimer: Timer?
     private var midnightTimer: Timer?
     
     // UserDefaults Keys
-    private let weeklyNotificationDateKey = "last_weekly_notification_date"
-    private let weeklyNotificationCountKey = "weekly_notification_count"
+    private let monthlyNotificationDateKey = "last_monthly_notification_date"
+    private let monthlyNotificationCountKey = "monthly_notification_count"
     private let preferencesKey = "notification_preferences"
     private let pendingNotificationsKey = "pending_notifications_queue"
+    private let deliveryPolicyUserInfoKey = "snapchef_delivery_policy"
     
     private init() {
         loadPreferences()
         checkNotificationAuthorization()
-        setupWeeklyResetTimer()
-        resetWeeklyCountIfNeeded()
+        setupMonthlyResetTimer()
+        resetMonthlyCountIfNeeded()
+        setupMidnightTimer()
+        Task { @MainActor in
+            await updatePendingNotifications()
+            await purgeLegacyNotificationSchedules()
+        }
     }
     
     // MARK: - Authorization
@@ -62,10 +73,21 @@ final class NotificationManager: ObservableObject {
             isEnabled = settings.authorizationStatus == .authorized
         }
     }
+
+    /// App-launch bootstrap that does not prompt. Schedules monthly notifications only if already authorized.
+    func bootstrapMonthlyScheduleIfAuthorized() async {
+        let settings = await notificationCenter.notificationSettings()
+        let isAuthorized = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+        isEnabled = isAuthorized
+        guard isAuthorized else { return }
+
+        await setupNotificationCategories()
+        scheduleMonthlyEngagementNotification()
+    }
     
     // MARK: - Core Notification Scheduling
     
-    /// Schedule a notification with weekly limit and smart selection
+    /// Schedule a notification with policy-aware delivery controls.
     func scheduleNotification(
         identifier: String,
         title: String,
@@ -74,7 +96,8 @@ final class NotificationManager: ObservableObject {
         category: NotificationCategory,
         userInfo: [String: Any] = [:],
         trigger: UNNotificationTrigger?,
-        priority: NotificationPriority = .medium
+        priority: NotificationPriority = .medium,
+        deliveryPolicy: NotificationDeliveryPolicy = .transactional
     ) -> Bool {
         guard isEnabled else {
             print("🔕 Notifications disabled - skipping: \(title)")
@@ -87,71 +110,68 @@ final class NotificationManager: ObservableObject {
             return false
         }
         
-        // Check weekly limit - ONLY 1 notification per week
-        if !canSendWeeklyNotification() {
-            print("📅 Weekly notification already sent this week - queuing: \(title)")
-            // Queue this notification for smart selection later
-            queueNotificationForSmartSelection(
-                identifier: identifier,
-                title: title,
-                body: body,
-                category: category,
-                priority: priority,
-                trigger: trigger
-            )
-            return false
-        }
-        
-        // Check quiet hours for scheduled notifications
-        if let calendarTrigger = trigger as? UNCalendarNotificationTrigger,
-           isInQuietHours(dateComponents: calendarTrigger.dateComponents) {
-            print("🌙 Notification scheduled during quiet hours - rescheduling to optimal time")
-            // Reschedule to next optimal time (tomorrow at 10 AM)
-            if let rescheduledTrigger = rescheduleToOptimalTime(originalTrigger: calendarTrigger) {
-                return scheduleNotification(
+        let resolvedTrigger: UNNotificationTrigger?
+        var monthlyReservationDate: Date?
+
+        switch deliveryPolicy {
+        case .monthlyEngagement:
+            let monthlyTrigger = resolveTriggerForMonthlyPolicy(trigger: trigger, category: category)
+            resolvedTrigger = monthlyTrigger
+            let targetDate = notificationTargetDate(for: monthlyTrigger)
+
+            // Reserve the monthly slot up front to prevent duplicate scheduling from concurrent calls.
+            guard reserveMonthlySlot(for: targetDate) else {
+                print("📅 Monthly notification already reserved for \(targetDate) - queuing: \(title)")
+                queueNotificationForSmartSelection(
                     identifier: identifier,
                     title: title,
                     body: body,
-                    subtitle: subtitle,
                     category: category,
-                    userInfo: userInfo,
-                    trigger: rescheduledTrigger,
-                    priority: priority
+                    priority: priority,
+                    trigger: trigger
                 )
+                return false
             }
-            return false
+            monthlyReservationDate = targetDate
+        case .transactional:
+            resolvedTrigger = resolveTriggerForTransactionalPolicy(trigger: trigger)
         }
-        
-        // This is our ONE weekly notification - make it count!
+
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.subtitle = subtitle ?? ""
         content.sound = .default
         content.categoryIdentifier = category.rawValue
-        content.userInfo = userInfo
+        var mergedUserInfo = userInfo
+        mergedUserInfo[deliveryPolicyUserInfoKey] = deliveryPolicy.rawValue
+        content.userInfo = mergedUserInfo
         
         let request = UNNotificationRequest(
             identifier: identifier,
             content: content,
-            trigger: trigger
+            trigger: resolvedTrigger
         )
         
-        Task { @MainActor in
-            do {
-                try await notificationCenter.add(request)
-                markWeeklyNotificationSent()
-                await updatePendingNotifications()
-                print("✅ Sent weekly notification: \(title)")
-            } catch {
-                print("❌ Failed to schedule notification: \(error)")
+        notificationCenter.add(request) { [weak self] error in
+            Task { @MainActor in
+                guard let self else { return }
+                if let error {
+                    if let monthlyReservationDate {
+                        self.releaseMonthlyReservation(for: monthlyReservationDate)
+                    }
+                    print("❌ Failed to schedule notification: \(error)")
+                } else {
+                    await self.updatePendingNotifications()
+                    print("✅ Scheduled \(deliveryPolicy.rawValue) notification: \(title)")
+                }
             }
         }
         
         return true
     }
     
-    /// Schedule immediate notification (respects daily limits but bypasses quiet hours)
+    /// Convenience API that routes through transactional delivery.
     func scheduleImmediateNotification(
         identifier: String,
         title: String,
@@ -168,67 +188,88 @@ final class NotificationManager: ObservableObject {
             category: category,
             userInfo: userInfo,
             trigger: nil,
-            priority: .high
+            priority: .high,
+            deliveryPolicy: .transactional
         )
     }
     
     // MARK: - Challenge Notifications
     
-    func scheduleJoinedChallengeReminders() {
-        guard preferences.challengeReminders else { return }
+    @discardableResult
+    func scheduleJoinedChallengeReminders() -> Bool {
+        guard preferences.challengeReminders else { return false }
         
         let joinedChallenges = GamificationManager.shared.activeChallenges
             .filter { $0.isJoined }
-            .prefix(3) // Limit to 3 max
-        
-        // Clear existing challenge notifications first
-        cancelChallengeNotifications()
-        
-        for challenge in joinedChallenges {
-            let reminderTime = challenge.endDate.addingTimeInterval(-7_200) // 2 hours before
-            guard reminderTime > Date() else { continue }
-            
-            let dateComponents = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: reminderTime)
-            let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: false)
-            
-            _ = scheduleNotification(
-                identifier: "challenge_reminder_\(challenge.id)",
-                title: "🏆 Challenge Ending Soon!",
-                body: "\"\(challenge.title)\" ends in 2 hours. Complete it now to earn \(challenge.points) points!",
-                category: .challengeReminder,
-                userInfo: [
-                    "challengeId": challenge.id,
-                    "challengeType": challenge.type.rawValue
-                ],
-                trigger: trigger
-            )
+            .sorted { $0.endDate < $1.endDate }
+
+        guard let topChallenge = joinedChallenges.first else {
+            return false
         }
-        
-        print("📱 Scheduled reminders for \(joinedChallenges.count) joined challenges (max 3)")
+
+        return scheduleNotification(
+            identifier: "challenge_monthly_checkin",
+            title: "🏆 Monthly Challenge Check-In",
+            body: "Keep momentum on \"\(topChallenge.title)\" and lock in your points this month.",
+            category: .challengeReminder,
+            userInfo: [
+                "challengeId": topChallenge.id,
+                "challengeType": topChallenge.type.rawValue
+            ],
+            trigger: nil,
+            priority: .medium,
+            deliveryPolicy: .monthlyEngagement
+        )
     }
     
     // MARK: - Streak Notifications
     
     func scheduleDailyStreakReminder() {
+        scheduleMonthlyStreakReminder()
+    }
+
+    func scheduleMonthlyStreakReminder() {
         guard preferences.streakReminders else { return }
-        
-        // Cancel existing streak notifications first
-        cancelNotification(identifier: "daily_streak_reminder")
-        
-        var dateComponents = DateComponents()
-        dateComponents.hour = preferences.streakReminderTime.hour
-        dateComponents.minute = preferences.streakReminderTime.minute
-        
-        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-        
+
         _ = scheduleNotification(
-            identifier: "daily_streak_reminder",
-            title: "🔥 Keep Your Streak Alive!",
-            body: "Don't forget to complete today's activities to maintain your streak!",
+            identifier: "monthly_streak_reminder",
+            title: "🔥 Monthly Streak Check-In",
+            body: "Quick check-in: keep your cooking streak alive this month.",
             category: .streakReminder,
             userInfo: [:],
-            trigger: trigger
+            trigger: nil,
+            priority: .medium,
+            deliveryPolicy: .monthlyEngagement
         )
+    }
+
+    func scheduleMonthlyEngagementNotification() {
+        let challengeEnabled = preferences.challengeReminders
+        let streakEnabled = preferences.streakReminders
+
+        guard challengeEnabled || streakEnabled else { return }
+        
+        let preferredDate = nextMonthlyScheduleDate(
+            preferredHour: preferences.streakReminderTime.hour,
+            preferredMinute: preferences.streakReminderTime.minute
+        )
+        
+        // Keep the current month schedule intact; don't replace it with a next-month candidate.
+        guard canSendMonthlyNotification(for: preferredDate) else {
+            print("📅 Monthly slot already reserved for \(preferredDate); preserving existing notification.")
+            return
+        }
+
+        if challengeEnabled {
+            let didScheduleChallenge = scheduleJoinedChallengeReminders()
+            if didScheduleChallenge {
+                return
+            }
+        }
+
+        if streakEnabled {
+            scheduleMonthlyStreakReminder()
+        }
     }
     
     // MARK: - Notification Bundling
@@ -237,7 +278,8 @@ final class NotificationManager: ObservableObject {
         bundleId: String,
         notifications: [(title: String, body: String)],
         category: NotificationCategory,
-        trigger: UNNotificationTrigger?
+        trigger: UNNotificationTrigger?,
+        deliveryPolicy: NotificationDeliveryPolicy = .transactional
     ) -> Bool {
         guard !notifications.isEmpty else { return false }
         
@@ -261,7 +303,8 @@ final class NotificationManager: ObservableObject {
             body: bundledBody,
             category: category,
             userInfo: ["bundled_count": notifications.count],
-            trigger: trigger
+            trigger: trigger,
+            deliveryPolicy: deliveryPolicy
         )
     }
     
@@ -295,10 +338,109 @@ final class NotificationManager: ObservableObject {
         dailyNotificationCount = 0
         userDefaults.set(0, forKey: "daily_notification_count")
         userDefaults.set(0, forKey: "challenge_notification_count")
+        userDefaults.set(0, forKey: monthlyNotificationCountKey)
+        userDefaults.removeObject(forKey: monthlyNotificationDateKey)
         
         Task { @MainActor in
             await updatePendingNotifications()
         }
+    }
+    
+    /// Public refresh hook used by settings/audit screens.
+    func refreshPendingNotifications() async {
+        await updatePendingNotifications()
+    }
+    
+    /// Runtime validation report for monthly notification policy.
+    func generateAuditReport() async -> NotificationAuditReport {
+        let settings = await notificationCenter.notificationSettings()
+        let pending = await notificationCenter.pendingNotificationRequests()
+        let calendar = Calendar.current
+        
+        let reservedDate = userDefaults.object(forKey: monthlyNotificationDateKey) as? Date
+        let monthlyCount = userDefaults.integer(forKey: monthlyNotificationCountKey)
+        let queueCount = getNotificationQueue().count
+        
+        let items: [NotificationAuditItem] = pending.map { request in
+            let deliveryPolicy: NotificationDeliveryPolicy = {
+                if let rawValue = request.content.userInfo[deliveryPolicyUserInfoKey] as? String,
+                   let parsed = NotificationDeliveryPolicy(rawValue: rawValue) {
+                    return parsed
+                }
+                return .monthlyEngagement
+            }()
+            let nextDate: Date? = {
+                if let calendarTrigger = request.trigger as? UNCalendarNotificationTrigger {
+                    return calendarTrigger.nextTriggerDate()
+                }
+                if let intervalTrigger = request.trigger as? UNTimeIntervalNotificationTrigger {
+                    return Date().addingTimeInterval(intervalTrigger.timeInterval)
+                }
+                return nil
+            }()
+            let repeats: Bool = {
+                if let calendarTrigger = request.trigger as? UNCalendarNotificationTrigger {
+                    return calendarTrigger.repeats
+                }
+                if let intervalTrigger = request.trigger as? UNTimeIntervalNotificationTrigger {
+                    return intervalTrigger.repeats
+                }
+                return false
+            }()
+            
+            let appearsMonthlyCompliant: Bool = {
+                guard deliveryPolicy == .monthlyEngagement else { return true }
+                guard let nextDate else { return false }
+                let day = calendar.component(.day, from: nextDate)
+                let hour = calendar.component(.hour, from: nextDate)
+                return day == monthlyScheduleDay && !repeats && (preferredWindowStartHour...preferredWindowEndHour).contains(hour)
+            }()
+            
+            return NotificationAuditItem(
+                identifier: request.identifier,
+                title: request.content.title,
+                categoryIdentifier: request.content.categoryIdentifier,
+                deliveryPolicy: deliveryPolicy,
+                nextTriggerDate: nextDate,
+                repeats: repeats,
+                appearsMonthlyCompliant: appearsMonthlyCompliant
+            )
+        }
+        .sorted {
+            let lhs = $0.nextTriggerDate ?? .distantFuture
+            let rhs = $1.nextTriggerDate ?? .distantFuture
+            return lhs < rhs
+        }
+        
+        var violations: [String] = []
+        if items.contains(where: { $0.deliveryPolicy == .monthlyEngagement && $0.repeats }) {
+            violations.append("Found repeating pending notification(s); monthly policy requires one-shot delivery.")
+        }
+        if items.contains(where: { $0.deliveryPolicy == .monthlyEngagement && $0.nextTriggerDate == nil }) {
+            violations.append("Found pending request(s) with no next trigger date.")
+        }
+        let scheduledDates = items.compactMap(\.nextTriggerDate)
+        if let overloaded = NotificationPolicyDebug.firstMonthlyOverload(
+            for: scheduledDates,
+            maxPerMonth: maxMonthlyNotifications,
+            calendar: calendar
+        ) {
+            violations.append("Monthly cap exceeded for \(overloaded.key): \(overloaded.count) notifications scheduled.")
+        }
+        if let reservedDate, monthlyCount > maxMonthlyNotifications {
+            violations.append("Monthly reservation count exceeds cap for \(reservedDate).")
+        }
+        
+        return NotificationAuditReport(
+            generatedAt: Date(),
+            authorizationStatus: settings.authorizationStatus,
+            pendingCount: items.count,
+            monthlyReservationDate: reservedDate,
+            monthlyReservationCount: monthlyCount,
+            queueCount: queueCount,
+            items: items,
+            violations: violations
+        )
     }
     
     // MARK: - Helper Methods
@@ -318,14 +460,11 @@ final class NotificationManager: ObservableObject {
     
     private func isInQuietHours(dateComponents: DateComponents) -> Bool {
         guard let hour = dateComponents.hour else { return false }
-        
-        if quietHoursStart < quietHoursEnd {
-            // Same day quiet hours (not typical)
-            return hour >= quietHoursStart && hour < quietHoursEnd
-        } else {
-            // Overnight quiet hours (10 PM to 8 AM)
-            return hour >= quietHoursStart || hour < quietHoursEnd
-        }
+        return NotificationPolicyDebug.isInQuietHours(
+            hour: hour,
+            quietHoursStart: quietHoursStart,
+            quietHoursEnd: quietHoursEnd
+        )
     }
     
     private func incrementDailyCount() {
@@ -375,6 +514,53 @@ final class NotificationManager: ObservableObject {
         pendingNotifications = pending
         print("📱 \(pending.count) pending notifications")
     }
+
+    private func purgeLegacyNotificationSchedules() async {
+        let pending = await notificationCenter.pendingNotificationRequests()
+        let calendar = Calendar.current
+        let legacyIDs = pending.compactMap { request -> String? in
+            let identifier = request.identifier
+            let hasLegacyIdentifier =
+                identifier == "daily_streak_reminder" ||
+                identifier == "weekly_leaderboard_update" ||
+                identifier.hasPrefix("challenge_reminder_") ||
+                (identifier.hasPrefix("challenge_") && identifier != "challenge_monthly_checkin")
+
+            let hasPolicyTag = request.content.userInfo[deliveryPolicyUserInfoKey] as? String != nil
+            let isPolicyManaged = hasPolicyTag || isManagedMonthlyRequest(request)
+            let repeats = {
+                if let calendarTrigger = request.trigger as? UNCalendarNotificationTrigger {
+                    return calendarTrigger.repeats
+                }
+                if let intervalTrigger = request.trigger as? UNTimeIntervalNotificationTrigger {
+                    return intervalTrigger.repeats
+                }
+                return false
+            }()
+            let isLegacy8PM: Bool = {
+                guard let calendarTrigger = request.trigger as? UNCalendarNotificationTrigger,
+                      let nextDate = calendarTrigger.nextTriggerDate() else {
+                    return false
+                }
+                return calendar.component(.hour, from: nextDate) == 20
+            }()
+            let nextDate = nextTriggerDate(for: request.trigger)
+            let violatesMonthlyWindow: Bool = {
+                guard isPolicyManaged, let nextDate else { return false }
+                let day = calendar.component(.day, from: nextDate)
+                let hour = calendar.component(.hour, from: nextDate)
+                return day != monthlyScheduleDay || !(preferredWindowStartHour...preferredWindowEndHour).contains(hour)
+            }()
+
+            if hasLegacyIdentifier || repeats || (!hasPolicyTag && isLegacy8PM) || violatesMonthlyWindow {
+                return identifier
+            }
+            return nil
+        }
+        guard !legacyIDs.isEmpty else { return }
+        notificationCenter.removePendingNotificationRequests(withIdentifiers: legacyIDs)
+        await updatePendingNotifications()
+    }
     
     private func setupNotificationCategories() async {
         let categories = NotificationCategory.allCases.map { category in
@@ -400,18 +586,21 @@ final class NotificationManager: ObservableObject {
     }
     
     private func updateScheduledNotifications() {
-        // Re-schedule streak reminders if preferences changed
-        if preferences.streakReminders {
-            scheduleDailyStreakReminder()
-        } else {
-            cancelNotification(identifier: "daily_streak_reminder")
-        }
-        
-        // Update challenge reminders
-        if preferences.challengeReminders {
-            scheduleJoinedChallengeReminders()
-        } else {
-            cancelChallengeNotifications()
+        Task { @MainActor in
+            let pending = await notificationCenter.pendingNotificationRequests()
+            let managedMonthlyIdentifiers = pending.compactMap { request -> String? in
+                guard isManagedMonthlyRequest(request) else { return nil }
+                return request.identifier
+            }
+
+            if !managedMonthlyIdentifiers.isEmpty {
+                notificationCenter.removePendingNotificationRequests(withIdentifiers: managedMonthlyIdentifiers)
+            }
+
+            userDefaults.set(0, forKey: monthlyNotificationCountKey)
+            userDefaults.removeObject(forKey: monthlyNotificationDateKey)
+            await updatePendingNotifications()
+            scheduleMonthlyEngagementNotification()
         }
     }
     
@@ -429,48 +618,86 @@ final class NotificationManager: ObservableObject {
     }
 }
 
-// MARK: - Weekly Notification Management
+// MARK: - Monthly Notification Management
 
 extension NotificationManager {
     
-    /// Check if we can send a notification this week
-    private func canSendWeeklyNotification() -> Bool {
-        if let lastNotificationDate = userDefaults.object(forKey: weeklyNotificationDateKey) as? Date {
-            let calendar = Calendar.current
-            let weeksSince = calendar.dateComponents([.weekOfYear], from: lastNotificationDate, to: Date()).weekOfYear ?? 0
-            return weeksSince >= 1
+    /// Reserve a monthly slot before async scheduling begins.
+    private func reserveMonthlySlot(for targetDate: Date) -> Bool {
+        guard canSendMonthlyNotification(for: targetDate) else { return false }
+        markMonthlyNotificationSent(for: targetDate)
+        return true
+    }
+
+    /// Release reservation when adding request fails.
+    private func releaseMonthlyReservation(for targetDate: Date) {
+        guard let reservedDate = userDefaults.object(forKey: monthlyNotificationDateKey) as? Date else {
+            return
         }
-        return true // No notification sent yet
-    }
-    
-    /// Mark that we've sent our weekly notification
-    private func markWeeklyNotificationSent() {
-        userDefaults.set(Date(), forKey: weeklyNotificationDateKey)
-        userDefaults.set(1, forKey: weeklyNotificationCountKey)
-    }
-    
-    /// Reset weekly count if a week has passed
-    private func resetWeeklyCountIfNeeded() {
-        if let lastNotificationDate = userDefaults.object(forKey: weeklyNotificationDateKey) as? Date {
-            let calendar = Calendar.current
-            let weeksSince = calendar.dateComponents([.weekOfYear], from: lastNotificationDate, to: Date()).weekOfYear ?? 0
-            if weeksSince >= 1 {
-                userDefaults.set(0, forKey: weeklyNotificationCountKey)
-                print("📅 Weekly notification count reset")
-            }
-        }
-    }
-    
-    /// Setup timer to reset weekly count
-    private func setupWeeklyResetTimer() {
+
         let calendar = Calendar.current
-        let nextMonday = calendar.nextDate(after: Date(), matching: DateComponents(hour: 0, minute: 0, weekday: 2), matchingPolicy: .nextTime) ?? Date()
-        let timeInterval = nextMonday.timeIntervalSince(Date())
+        guard calendar.isDate(reservedDate, equalTo: targetDate, toGranularity: .month) else {
+            return
+        }
+
+        if pendingNotificationCount(forMonthOf: targetDate) >= maxMonthlyNotifications {
+            userDefaults.set(targetDate, forKey: monthlyNotificationDateKey)
+            userDefaults.set(maxMonthlyNotifications, forKey: monthlyNotificationCountKey)
+            return
+        }
+
+        userDefaults.set(0, forKey: monthlyNotificationCountKey)
+        userDefaults.removeObject(forKey: monthlyNotificationDateKey)
+    }
+
+    /// Check if we can schedule a notification for the target month.
+    private func canSendMonthlyNotification(for targetDate: Date) -> Bool {
+        let reservedDate = userDefaults.object(forKey: monthlyNotificationDateKey) as? Date
+        let pendingDates: [Date] = pendingNotifications.compactMap { request in
+            nextTriggerDate(for: request.trigger)
+        }
+        return NotificationPolicyDebug.canScheduleMonthlyNotification(
+            targetDate: targetDate,
+            reservedDate: reservedDate,
+            pendingDates: pendingDates,
+            maxPerMonth: maxMonthlyNotifications,
+            calendar: Calendar.current
+        )
+    }
+    
+    /// Mark that we've consumed the slot for this target month.
+    private func markMonthlyNotificationSent(for targetDate: Date) {
+        userDefaults.set(targetDate, forKey: monthlyNotificationDateKey)
+        userDefaults.set(maxMonthlyNotifications, forKey: monthlyNotificationCountKey)
+    }
+    
+    /// Reset monthly count if we've crossed into a new month.
+    private func resetMonthlyCountIfNeeded() {
+        guard let lastNotificationDate = userDefaults.object(forKey: monthlyNotificationDateKey) as? Date else {
+            return
+        }
+
+        let calendar = Calendar.current
+        let now = Date()
+        if !calendar.isDate(lastNotificationDate, equalTo: now, toGranularity: .month) {
+            userDefaults.set(0, forKey: monthlyNotificationCountKey)
+            print("📅 Monthly notification count reset")
+        }
+    }
+    
+    /// Setup timer to reset monthly count exactly at the next month boundary.
+    private func setupMonthlyResetTimer() {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfCurrentMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? now
+        let nextMonth = calendar.date(byAdding: .month, value: 1, to: startOfCurrentMonth) ?? now
+        let timeInterval = nextMonth.timeIntervalSince(now)
         
-        weeklyResetTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: false) { _ in
+        monthlyResetTimer = Timer.scheduledTimer(withTimeInterval: max(1, timeInterval), repeats: false) { _ in
             Task { @MainActor in
-                self.resetWeeklyCountIfNeeded()
-                self.setupWeeklyResetTimer() // Reschedule for next week
+                self.resetMonthlyCountIfNeeded()
+                self.scheduleMonthlyEngagementNotification()
+                self.setupMonthlyResetTimer()
             }
         }
     }
@@ -494,10 +721,17 @@ extension NotificationManager {
             trigger: trigger,
             queuedAt: Date()
         )
-        queue.append(queueItem)
+        if let existingIndex = queue.firstIndex(where: { $0.identifier == identifier }) {
+            queue[existingIndex] = queueItem
+        } else {
+            queue.append(queueItem)
+        }
+        if queue.count > 25 {
+            queue = Array(queue.suffix(25))
+        }
         saveNotificationQueue(queue)
         
-        // Run smart selection at the start of next week
+        // Keep exactly one queued notification for next month's slot.
         scheduleSmartSelection()
     }
     
@@ -517,23 +751,60 @@ extension NotificationManager {
         }
     }
     
-    /// Smart selection of best notification for the week
+    /// Smart selection of best queued notification for next month.
     private func scheduleSmartSelection() {
-        // Run smart selection on Monday morning
-        let calendar = Calendar.current
-        let nextMonday = calendar.nextDate(after: Date(), matching: DateComponents(hour: 10, minute: 0, weekday: 2), matchingPolicy: .nextTime) ?? Date()
-        
-        Task {
-            try? await Task.sleep(until: .now + .seconds(nextMonday.timeIntervalSinceNow))
-            await selectAndSendBestNotification()
+        Task { @MainActor in
+            let queue = getNotificationQueue()
+            guard let best = selectBestNotification(from: queue) else { return }
+
+            let content = UNMutableNotificationContent()
+            content.title = best.title
+            content.body = best.body
+            content.sound = .default
+            content.categoryIdentifier = best.category.rawValue
+            content.userInfo = [deliveryPolicyUserInfoKey: NotificationDeliveryPolicy.monthlyEngagement.rawValue]
+
+            let nextDate = nextMonthlyScheduleDate(
+                preferredHour: preferences.streakReminderTime.hour,
+                preferredMinute: preferences.streakReminderTime.minute
+            )
+            let targetDate: Date
+            if canSendMonthlyNotification(for: nextDate) {
+                targetDate = nextDate
+            } else {
+                targetDate = Calendar.current.date(byAdding: .month, value: 1, to: nextDate) ?? nextDate
+            }
+
+            guard reserveMonthlySlot(for: targetDate) else { return }
+            let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: targetDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+
+            let request = UNNotificationRequest(
+                identifier: "monthly_smart_selection",
+                content: content,
+                trigger: trigger
+            )
+
+            do {
+                notificationCenter.removePendingNotificationRequests(
+                    withIdentifiers: [
+                        "monthly_smart_selection"
+                    ]
+                )
+                try await notificationCenter.add(request)
+                saveNotificationQueue([])
+                await updatePendingNotifications()
+            } catch {
+                releaseMonthlyReservation(for: targetDate)
+                print("❌ Failed to schedule queued monthly notification: \(error)")
+            }
         }
     }
     
-    /// Select the best notification from the queue
-    @MainActor
-    private func selectAndSendBestNotification() async {
-        var queue = getNotificationQueue()
-        guard !queue.isEmpty else { return }
+    /// Select the best notification from the queue.
+    private func selectBestNotification(from queue: [NotificationQueueItem]) -> NotificationQueueItem? {
+        var queue = queue
+        guard !queue.isEmpty else { return nil }
         
         // Sort by priority and relevance
         queue.sort(by: { item1, item2 in
@@ -555,37 +826,254 @@ extension NotificationManager {
             return index1 < index2
         })
         
-        // Send the best notification
-        if let best = queue.first {
-            _ = scheduleNotification(
-                identifier: best.identifier,
-                title: best.title,
-                body: best.body,
-                category: best.category,
-                userInfo: [:],
-                trigger: nil, // Send immediately
-                priority: best.priority
-            )
-            
-            // Clear the queue after sending
-            saveNotificationQueue([])
-        }
+        return queue.first
     }
     
-    /// Reschedule to optimal time (next day at 10 AM)
-    private func rescheduleToOptimalTime(originalTrigger: UNCalendarNotificationTrigger) -> UNCalendarNotificationTrigger? {
-        let calendar = Calendar.current
-        let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()) ?? Date()
-        
-        var components = calendar.dateComponents([.year, .month, .day], from: tomorrow)
-        components.hour = 10
-        components.minute = 0
-        
+    /// Build a one-shot monthly trigger; repeating triggers are normalized to this policy.
+    private func resolveTriggerForMonthlyPolicy(trigger: UNNotificationTrigger?, category: NotificationCategory) -> UNNotificationTrigger {
+        if let calendarTrigger = trigger as? UNCalendarNotificationTrigger {
+            let preferredHour = calendarTrigger.dateComponents.hour ?? preferences.streakReminderTime.hour
+            let preferredMinute = calendarTrigger.dateComponents.minute ?? preferences.streakReminderTime.minute
+            let nextDate = nextMonthlyScheduleDate(preferredHour: preferredHour, preferredMinute: preferredMinute)
+            let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: nextDate)
+            return UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        }
+
+        if trigger is UNTimeIntervalNotificationTrigger {
+            let nextDate = nextMonthlyScheduleDate(
+                preferredHour: preferences.streakReminderTime.hour,
+                preferredMinute: preferences.streakReminderTime.minute
+            )
+            let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: nextDate)
+            return UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        }
+
+        let _ = category // Explicitly ignore category: all notifications use monthly normalization.
+        let nextDate = nextMonthlyScheduleDate(
+            preferredHour: preferences.streakReminderTime.hour,
+            preferredMinute: preferences.streakReminderTime.minute
+        )
+        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: nextDate)
         return UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+    }
+
+    /// Transactional notifications keep immediate/custom timing and are not monthly-normalized.
+    private func resolveTriggerForTransactionalPolicy(trigger: UNNotificationTrigger?) -> UNNotificationTrigger? {
+        if let calendarTrigger = trigger as? UNCalendarNotificationTrigger {
+            // Normalize repeating calendar requests into one-shot transactional reminders.
+            if calendarTrigger.repeats, let nextDate = calendarTrigger.nextTriggerDate() {
+                let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: nextDate)
+                return UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            }
+            return calendarTrigger
+        }
+
+        if let intervalTrigger = trigger as? UNTimeIntervalNotificationTrigger {
+            let clampedInterval = max(1, intervalTrigger.timeInterval)
+            if intervalTrigger.repeats || clampedInterval != intervalTrigger.timeInterval {
+                return UNTimeIntervalNotificationTrigger(timeInterval: clampedInterval, repeats: false)
+            }
+            return intervalTrigger
+        }
+
+        // nil trigger means immediate delivery.
+        return nil
+    }
+
+    private func nextMonthlyScheduleDate(preferredHour: Int, preferredMinute: Int) -> Date {
+        NotificationPolicyDebug.nextMonthlyScheduleDate(
+            now: Date(),
+            calendar: Calendar.current,
+            preferredHour: preferredHour,
+            preferredMinute: preferredMinute,
+            monthlyScheduleDay: monthlyScheduleDay,
+            monthlyScheduleHour: monthlyScheduleHour,
+            monthlyScheduleMinute: monthlyScheduleMinute,
+            preferredWindowStartHour: preferredWindowStartHour,
+            preferredWindowEndHour: preferredWindowEndHour,
+            quietHoursEnabled: preferences.quietHoursEnabled,
+            quietHoursStart: quietHoursStart,
+            quietHoursEnd: quietHoursEnd
+        )
+    }
+
+    private func normalizedMonthlyTime(preferredHour: Int, preferredMinute: Int) -> (hour: Int, minute: Int) {
+        NotificationPolicyDebug.normalizedMonthlyTime(
+            preferredHour: preferredHour,
+            preferredMinute: preferredMinute,
+            preferredWindowStartHour: preferredWindowStartHour,
+            preferredWindowEndHour: preferredWindowEndHour,
+            fallbackHour: monthlyScheduleHour,
+            fallbackMinute: monthlyScheduleMinute
+        )
+    }
+
+    private func notificationTargetDate(for trigger: UNNotificationTrigger?) -> Date {
+        return nextTriggerDate(for: trigger) ?? Date()
+    }
+
+    private func nextTriggerDate(for trigger: UNNotificationTrigger?) -> Date? {
+        if let calendarTrigger = trigger as? UNCalendarNotificationTrigger {
+            return calendarTrigger.nextTriggerDate()
+        }
+
+        if let intervalTrigger = trigger as? UNTimeIntervalNotificationTrigger {
+            return Date().addingTimeInterval(intervalTrigger.timeInterval)
+        }
+
+        return nil
+    }
+
+    private func pendingNotificationCount(forMonthOf targetDate: Date) -> Int {
+        let calendar = Calendar.current
+        return pendingNotifications.reduce(into: 0) { count, request in
+            guard let nextDate = nextTriggerDate(for: request.trigger) else { return }
+            guard calendar.isDate(nextDate, equalTo: targetDate, toGranularity: .month) else { return }
+            count += 1
+        }
+    }
+
+    private func isManagedMonthlyRequest(_ request: UNNotificationRequest) -> Bool {
+        if request.content.userInfo[deliveryPolicyUserInfoKey] as? String != nil {
+            return true
+        }
+
+        let identifier = request.identifier
+        if identifier == "monthly_streak_reminder" ||
+            identifier == "monthly_smart_selection" ||
+            identifier == "challenge_monthly_checkin" {
+            return true
+        }
+
+        return false
     }
 }
 
 // MARK: - Notification Priority
+
+enum NotificationDeliveryPolicy: String, Codable {
+    case monthlyEngagement = "monthly_engagement"
+    case transactional = "transactional"
+}
+
+enum NotificationPolicyDebug {
+    static func monthBucketKey(for date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.year, .month], from: date)
+        return "\(components.year ?? 0)-\(components.month ?? 0)"
+    }
+
+    static func firstMonthlyOverload(
+        for dates: [Date],
+        maxPerMonth: Int,
+        calendar: Calendar
+    ) -> (key: String, count: Int)? {
+        var buckets: [String: Int] = [:]
+        for date in dates {
+            let key = monthBucketKey(for: date, calendar: calendar)
+            buckets[key, default: 0] += 1
+        }
+        return buckets.first(where: { $0.value > maxPerMonth }).map { ($0.key, $0.value) }
+    }
+
+    static func canScheduleMonthlyNotification(
+        targetDate: Date,
+        reservedDate: Date?,
+        pendingDates: [Date],
+        maxPerMonth: Int,
+        calendar: Calendar
+    ) -> Bool {
+        let pendingInMonth = pendingDates.filter {
+            calendar.isDate($0, equalTo: targetDate, toGranularity: .month)
+        }.count
+
+        guard pendingInMonth < maxPerMonth else {
+            return false
+        }
+
+        guard let reservedDate else {
+            return true
+        }
+
+        return !calendar.isDate(reservedDate, equalTo: targetDate, toGranularity: .month)
+    }
+
+    static func isInQuietHours(hour: Int, quietHoursStart: Int, quietHoursEnd: Int) -> Bool {
+        if quietHoursStart < quietHoursEnd {
+            return hour >= quietHoursStart && hour < quietHoursEnd
+        }
+        return hour >= quietHoursStart || hour < quietHoursEnd
+    }
+
+    static func normalizedMonthlyTime(
+        preferredHour: Int,
+        preferredMinute: Int,
+        preferredWindowStartHour: Int,
+        preferredWindowEndHour: Int,
+        fallbackHour: Int,
+        fallbackMinute: Int
+    ) -> (hour: Int, minute: Int) {
+        let minute = min(max(preferredMinute, 0), 59)
+        guard preferredWindowStartHour...preferredWindowEndHour ~= preferredHour else {
+            return (fallbackHour, fallbackMinute)
+        }
+        return (preferredHour, minute)
+    }
+
+    static func nextMonthlyScheduleDate(
+        now: Date,
+        calendar: Calendar,
+        preferredHour: Int,
+        preferredMinute: Int,
+        monthlyScheduleDay: Int,
+        monthlyScheduleHour: Int,
+        monthlyScheduleMinute: Int,
+        preferredWindowStartHour: Int,
+        preferredWindowEndHour: Int,
+        quietHoursEnabled: Bool,
+        quietHoursStart: Int,
+        quietHoursEnd: Int
+    ) -> Date {
+        let normalizedTime = normalizedMonthlyTime(
+            preferredHour: preferredHour,
+            preferredMinute: preferredMinute,
+            preferredWindowStartHour: preferredWindowStartHour,
+            preferredWindowEndHour: preferredWindowEndHour,
+            fallbackHour: monthlyScheduleHour,
+            fallbackMinute: monthlyScheduleMinute
+        )
+
+        var components = calendar.dateComponents([.year, .month], from: now)
+        components.day = monthlyScheduleDay
+        components.hour = normalizedTime.hour
+        components.minute = normalizedTime.minute
+
+        guard let thisMonthDate = calendar.date(from: components) else {
+            return now
+        }
+
+        var candidate = thisMonthDate
+        if candidate <= now {
+            let nextMonth = calendar.date(byAdding: .month, value: 1, to: now) ?? now
+            var nextComponents = calendar.dateComponents([.year, .month], from: nextMonth)
+            nextComponents.day = monthlyScheduleDay
+            nextComponents.hour = normalizedTime.hour
+            nextComponents.minute = normalizedTime.minute
+            candidate = calendar.date(from: nextComponents) ?? now
+        }
+
+        if quietHoursEnabled {
+            let hour = calendar.component(.hour, from: candidate)
+            if isInQuietHours(hour: hour, quietHoursStart: quietHoursStart, quietHoursEnd: quietHoursEnd) {
+                var adjusted = calendar.dateComponents([.year, .month, .day], from: candidate)
+                adjusted.hour = monthlyScheduleHour
+                adjusted.minute = monthlyScheduleMinute
+                return calendar.date(from: adjusted) ?? candidate
+            }
+        }
+
+        return candidate
+    }
+}
 
 enum NotificationPriority: Int, Codable {
     case low = 1
@@ -616,6 +1104,32 @@ struct NotificationQueueItem: Codable {
     }
 }
 
+struct NotificationAuditItem: Identifiable {
+    var id: String { identifier }
+    let identifier: String
+    let title: String
+    let categoryIdentifier: String
+    let deliveryPolicy: NotificationDeliveryPolicy
+    let nextTriggerDate: Date?
+    let repeats: Bool
+    let appearsMonthlyCompliant: Bool
+}
+
+struct NotificationAuditReport {
+    let generatedAt: Date
+    let authorizationStatus: UNAuthorizationStatus
+    let pendingCount: Int
+    let monthlyReservationDate: Date?
+    let monthlyReservationCount: Int
+    let queueCount: Int
+    let items: [NotificationAuditItem]
+    let violations: [String]
+    
+    var isHealthy: Bool {
+        violations.isEmpty
+    }
+}
+
 // MARK: - Notification Preferences
 
 struct NotificationPreferences: Codable {
@@ -624,7 +1138,7 @@ struct NotificationPreferences: Codable {
     var leaderboardUpdates = true
     var teamInvites = true
     var quietHoursEnabled = true
-    var streakReminderTime = NotificationTime(hour: 20, minute: 0) // 8 PM
+    var streakReminderTime = NotificationTime(hour: 10, minute: 30) // 10:30 AM
     
     struct NotificationTime: Codable {
         var hour: Int

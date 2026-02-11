@@ -104,10 +104,6 @@ struct RecipesView: View {
                     .padding(.bottom, 100)
             }
                 .scrollContentBackground(.hidden)
-                .refreshable {
-                    // User-initiated pull to refresh
-                    await cloudKitRecipeCache.forceRefreshFromCloudKit()
-                }
 
                 // Floating Filter Button
                 VStack {
@@ -346,7 +342,7 @@ struct RecipesView: View {
 
         if !recipesNeedingPhotos.isEmpty {
             print("📸 RecipesView: \(recipesNeedingPhotos.count) recipes need photos")
-            await CloudKitRecipeManager.shared.fetchPhotosForRecipes(recipesNeedingPhotos, appState: appState)
+            await CloudKitService.shared.fetchPhotosForRecipes(recipesNeedingPhotos, appState: appState)
         } else {
             print("✅ RecipesView: All recipes already have photos cached locally")
         }
@@ -640,7 +636,7 @@ struct RecipeGridCard: View {
     @State private var isLikeAnimating = false
     @EnvironmentObject var appState: AppState
     @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
-    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitService.shared
     @StateObject private var cloudKitUserManager = CloudKitUserManager.shared
     @StateObject private var cloudKitRecipeCache = CloudKitRecipeCache.shared
     @StateObject private var likeManager = RecipeLikeManager.shared

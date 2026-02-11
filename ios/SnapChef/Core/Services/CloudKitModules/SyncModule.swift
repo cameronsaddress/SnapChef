@@ -24,8 +24,7 @@ final class SyncModule: ObservableObject {
     
     // MARK: - Recipe Upload Methods
     func uploadRecipe(_ recipe: Recipe, imageData: Data? = nil) async throws -> String {
-        guard let userID = parent?.currentUser?.recordID,
-              let userName = parent?.currentUser?.displayName else {
+        guard let userID = parent?.currentUser?.recordID else {
             throw UnifiedAuthError.notAuthenticated
         }
         
@@ -124,6 +123,7 @@ final class SyncModule: ObservableObject {
         // Create recipe
         return Recipe(
             id: UUID(uuidString: id) ?? UUID(),
+            ownerID: record[CKField.Recipe.ownerID] as? String,
             name: title,
             description: description,
             ingredients: ingredients,
@@ -171,8 +171,7 @@ final class SyncModule: ObservableObject {
     
     // MARK: - Recipe Like Methods
     func likeRecipe(_ recipeID: String, recipeOwnerID: String) async throws {
-        guard let userID = parent?.currentUser?.recordID,
-              let userName = parent?.currentUser?.displayName else {
+        guard let userID = parent?.currentUser?.recordID else {
             throw UnifiedAuthError.notAuthenticated
         }
         
@@ -215,6 +214,13 @@ final class SyncModule: ObservableObject {
         }
     }
     
+    func likeRecipe(_ recipeID: String) async throws {
+        // Resolve owner directly from recipe record so callers don't need to provide it.
+        let recipeRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
+        let recipeOwnerID = recipeRecord[CKField.Recipe.ownerID] as? String ?? ""
+        try await likeRecipe(recipeID, recipeOwnerID: recipeOwnerID)
+    }
+    
     func unlikeRecipe(_ recipeID: String) async throws {
         guard let userID = parent?.currentUser?.recordID else {
             throw UnifiedAuthError.notAuthenticated
@@ -237,6 +243,27 @@ final class SyncModule: ObservableObject {
         
         // Update recipe like count
         await updateRecipeLikeCount(recipeID, increment: false)
+    }
+    
+    func fetchUserLikedRecipeIDs() async throws -> [String] {
+        guard let userID = parent?.currentUser?.recordID else {
+            return []
+        }
+        
+        let predicate = NSPredicate(format: "%K == %@", CKField.RecipeLike.userID, userID)
+        let query = CKQuery(recordType: CloudKitConfig.recipeLikeRecordType, predicate: predicate)
+        
+        let results = try await publicDatabase.records(matching: query)
+        var likedRecipeIDs: [String] = []
+        
+        for (_, result) in results.matchResults {
+            if case .success(let record) = result,
+               let recipeID = record[CKField.RecipeLike.recipeID] as? String {
+                likedRecipeIDs.append(recipeID)
+            }
+        }
+        
+        return likedRecipeIDs
     }
     
     func isRecipeLiked(_ recipeID: String) async throws -> Bool {
@@ -348,7 +375,18 @@ final class SyncModule: ObservableObject {
             }
         }
         
-        try await publicDatabase.add(operation)
+        try await withCheckedThrowingContinuation { continuation in
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume()
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            publicDatabase.add(operation)
+        }
         
         // Sort by timestamp in code since it may not be sortable in CloudKit
         // Use sorted to create a new array instead of mutating in-place
@@ -370,8 +408,7 @@ final class SyncModule: ObservableObject {
     
     // MARK: - Comment Methods
     func addComment(recipeID: String, content: String, parentCommentID: String? = nil) async throws {
-        guard let userID = parent?.currentUser?.recordID,
-              let userName = parent?.currentUser?.displayName else {
+        guard let userID = parent?.currentUser?.recordID else {
             throw UnifiedAuthError.notAuthenticated
         }
         
@@ -421,7 +458,18 @@ final class SyncModule: ObservableObject {
             }
         }
         
-        try await publicDatabase.add(operation)
+        try await withCheckedThrowingContinuation { continuation in
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume()
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            publicDatabase.add(operation)
+        }
         return comments
     }
     
@@ -438,6 +486,38 @@ final class SyncModule: ObservableObject {
             await updateRecipeCommentCount(recipeID, increment: false)
         }
     }
+
+    // MARK: - Comment Like Methods
+    func likeComment(_ commentID: String) async throws {
+        guard let userID = parent?.currentUser?.recordID else {
+            throw UnifiedAuthError.notAuthenticated
+        }
+
+        var likedCommentIDs = locallyLikedCommentIDs(for: userID)
+        guard !likedCommentIDs.contains(commentID) else { return }
+
+        try await updateCommentLikeCount(commentID, increment: true)
+        likedCommentIDs.insert(commentID)
+        setLocallyLikedCommentIDs(likedCommentIDs, for: userID)
+    }
+
+    func unlikeComment(_ commentID: String) async throws {
+        guard let userID = parent?.currentUser?.recordID else {
+            throw UnifiedAuthError.notAuthenticated
+        }
+
+        var likedCommentIDs = locallyLikedCommentIDs(for: userID)
+        guard likedCommentIDs.contains(commentID) else { return }
+
+        try await updateCommentLikeCount(commentID, increment: false)
+        likedCommentIDs.remove(commentID)
+        setLocallyLikedCommentIDs(likedCommentIDs, for: userID)
+    }
+
+    func isCommentLiked(_ commentID: String) async throws -> Bool {
+        guard let userID = parent?.currentUser?.recordID else { return false }
+        return locallyLikedCommentIDs(for: userID).contains(commentID)
+    }
     
     private func updateRecipeCommentCount(_ recipeID: String, increment: Bool) async {
         do {
@@ -450,6 +530,191 @@ final class SyncModule: ObservableObject {
             print("Failed to update comment count for recipe \(recipeID): \(error)")
         }
     }
+
+    private func updateCommentLikeCount(_ commentID: String, increment: Bool) async throws {
+        let recordID = CKRecord.ID(recordName: commentID)
+        let record = try await publicDatabase.record(for: recordID)
+
+        let currentCount = record[CKField.RecipeComment.likeCount] as? Int64 ?? 0
+        let newCount = increment ? currentCount + 1 : max(0, currentCount - 1)
+        record[CKField.RecipeComment.likeCount] = newCount
+
+        try await publicDatabase.save(record)
+    }
+
+    private func likedCommentsStorageKey(for userID: String) -> String {
+        "likedCommentIDs.\(userID)"
+    }
+
+    private func locallyLikedCommentIDs(for userID: String) -> Set<String> {
+        let key = likedCommentsStorageKey(for: userID)
+        let ids = UserDefaults.standard.array(forKey: key) as? [String] ?? []
+        return Set(ids)
+    }
+
+    private func setLocallyLikedCommentIDs(_ ids: Set<String>, for userID: String) {
+        let key = likedCommentsStorageKey(for: userID)
+        UserDefaults.standard.set(Array(ids), forKey: key)
+    }
+
+    // MARK: - Social Recipe Feed Methods
+    func fetchSocialRecipeFeed(lastDate: Date? = nil, limit: Int = 20) async throws -> [SocialRecipeCard] {
+        guard let currentUserID = parent?.currentUser?.recordID else {
+            throw UnifiedAuthError.notAuthenticated
+        }
+
+        let followingUserIDs = try await getFollowingUserIDs(for: currentUserID)
+        if followingUserIDs.isEmpty {
+            return []
+        }
+
+        var basePredicate: NSPredicate
+        if followingUserIDs.count == 1 {
+            basePredicate = NSPredicate(
+                format: "%K == %@ AND %K == %d",
+                CKField.Recipe.ownerID, followingUserIDs[0],
+                CKField.Recipe.isPublic, 1
+            )
+        } else {
+            basePredicate = NSPredicate(
+                format: "%K IN %@ AND %K == %d",
+                CKField.Recipe.ownerID, followingUserIDs,
+                CKField.Recipe.isPublic, 1
+            )
+        }
+
+        if let lastDate = lastDate {
+            let datePredicate = NSPredicate(
+                format: "%K < %@",
+                CKField.Recipe.createdAt,
+                lastDate as NSDate
+            )
+            basePredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [basePredicate, datePredicate])
+        }
+
+        let query = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: basePredicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.Recipe.createdAt, ascending: false)]
+
+        let results = try await publicDatabase.records(matching: query)
+
+        var recipeRecords: [CKRecord] = []
+        for (_, result) in results.matchResults {
+            if case .success(let record) = result {
+                recipeRecords.append(record)
+            }
+        }
+
+        recipeRecords.sort {
+            let date0 = $0[CKField.Recipe.createdAt] as? Date ?? .distantPast
+            let date1 = $1[CKField.Recipe.createdAt] as? Date ?? .distantPast
+            return date0 > date1
+        }
+
+        if recipeRecords.count > limit {
+            recipeRecords = Array(recipeRecords.prefix(limit))
+        }
+
+        return await mapRecordsToSocialRecipeCards(recipeRecords)
+    }
+
+    private func getFollowingUserIDs(for userID: String) async throws -> [String] {
+        let predicate = NSPredicate(
+            format: "%K == %@ AND %K == %d",
+            CKField.Follow.followerID, userID,
+            CKField.Follow.isActive, 1
+        )
+
+        let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
+        let results = try await publicDatabase.records(matching: query)
+
+        var followingIDs: [String] = []
+        for (_, result) in results.matchResults {
+            if case .success(let record) = result,
+               let followingID = record[CKField.Follow.followingID] as? String {
+                followingIDs.append(followingID)
+            }
+        }
+
+        return followingIDs
+    }
+
+    private func mapRecordsToSocialRecipeCards(_ records: [CKRecord]) async -> [SocialRecipeCard] {
+        var socialRecipes: [SocialRecipeCard] = []
+        var userCache: [String: CloudKitUser] = [:]
+
+        for record in records {
+            guard let ownerID = record[CKField.Recipe.ownerID] as? String else {
+                continue
+            }
+
+            let creatorInfo: CloudKitUser
+            if let cachedUser = userCache[ownerID] {
+                creatorInfo = cachedUser
+            } else {
+                do {
+                    let userRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: ownerID))
+                    let parsedUser = CloudKitUser(from: userRecord)
+                    creatorInfo = parsedUser
+                    userCache[ownerID] = parsedUser
+                } catch {
+                    let fallbackUser = CloudKitUser(from: makeFallbackUserRecord(for: ownerID))
+                    creatorInfo = fallbackUser
+                    userCache[ownerID] = fallbackUser
+                }
+            }
+
+            var socialRecipe = SocialRecipeCard(from: record, creatorInfo: creatorInfo)
+            let isLiked = (try? await isRecipeLiked(socialRecipe.id)) ?? false
+            socialRecipe = SocialRecipeCard(
+                id: socialRecipe.id,
+                title: socialRecipe.title,
+                description: socialRecipe.description,
+                imageURL: socialRecipe.imageURL,
+                createdAt: socialRecipe.createdAt,
+                likeCount: socialRecipe.likeCount,
+                commentCount: socialRecipe.commentCount,
+                viewCount: socialRecipe.viewCount,
+                difficulty: socialRecipe.difficulty,
+                cookingTime: socialRecipe.cookingTime,
+                isLiked: isLiked,
+                creatorID: socialRecipe.creatorID,
+                creatorName: socialRecipe.creatorName,
+                creatorImageURL: socialRecipe.creatorImageURL,
+                creatorIsVerified: socialRecipe.creatorIsVerified
+            )
+
+            socialRecipes.append(socialRecipe)
+        }
+
+        return socialRecipes
+    }
+
+    private func makeFallbackUserRecord(for ownerID: String) -> CKRecord {
+        let fallbackRecord = CKRecord(
+            recordType: CloudKitConfig.userRecordType,
+            recordID: CKRecord.ID(recordName: ownerID)
+        )
+        fallbackRecord[CKField.User.displayName] = "Unknown Chef"
+        fallbackRecord[CKField.User.email] = ""
+        fallbackRecord[CKField.User.authProvider] = "unknown"
+        fallbackRecord[CKField.User.totalPoints] = Int64(0)
+        fallbackRecord[CKField.User.currentStreak] = Int64(0)
+        fallbackRecord[CKField.User.longestStreak] = Int64(0)
+        fallbackRecord[CKField.User.challengesCompleted] = Int64(0)
+        fallbackRecord[CKField.User.recipesShared] = Int64(0)
+        fallbackRecord[CKField.User.recipesCreated] = Int64(0)
+        fallbackRecord[CKField.User.coinBalance] = Int64(0)
+        fallbackRecord[CKField.User.followerCount] = Int64(0)
+        fallbackRecord[CKField.User.followingCount] = Int64(0)
+        fallbackRecord[CKField.User.isVerified] = Int64(0)
+        fallbackRecord[CKField.User.isProfilePublic] = Int64(1)
+        fallbackRecord[CKField.User.showOnLeaderboard] = Int64(0)
+        fallbackRecord[CKField.User.subscriptionTier] = "free"
+        fallbackRecord[CKField.User.createdAt] = Date()
+        fallbackRecord[CKField.User.lastLoginAt] = Date()
+        fallbackRecord[CKField.User.lastActiveAt] = Date()
+        return fallbackRecord
+    }
     
     // MARK: - Challenge Sync Methods
     func triggerChallengeSync() async {
@@ -458,7 +723,7 @@ final class SyncModule: ObservableObject {
         await syncLeaderboard()
     }
     
-    private func syncChallenges() async {
+    func syncChallenges() async {
         parent?.isSyncing = true
         
         do {
@@ -494,7 +759,10 @@ final class SyncModule: ObservableObject {
                 }
             }
             
-            // Update local storage - would integrate with GamificationManager
+            // Update local storage
+            await MainActor.run {
+                GamificationManager.shared.updateChallenges(challenges)
+            }
             parent?.lastSyncDate = Date()
             parent?.isSyncing = false
             
@@ -506,33 +774,55 @@ final class SyncModule: ObservableObject {
         }
     }
     
-    private func syncUserProgress() async {
-        // Implementation would integrate with user challenge progress
-        print("✅ Synced user progress")
-    }
-    
-    private func syncLeaderboard() async {
+    func syncUserProgress() async {
+        guard let userID = UnifiedAuthManager.shared.currentUser?.recordID else { return }
+
         do {
             let predicate = NSPredicate(value: true)
-            let query = CKQuery(recordType: CloudKitConfig.leaderboardRecordType, predicate: predicate)
-            query.sortDescriptors = [NSSortDescriptor(key: CKField.Leaderboard.totalPoints, ascending: false)]
-            
-            let operation = CKQueryOperation(query: query)
-            operation.resultsLimit = 100
-            
-            operation.queryResultBlock = { result in
-                Task { @MainActor in
-                    switch result {
-                    case .success:
-                        print("✅ Synced leaderboard entries")
-                    case .failure(let error):
-                        print("❌ Failed to sync leaderboard: \(error)")
+            let query = CKQuery(recordType: CloudKitConfig.userChallengeRecordType, predicate: predicate)
+
+            let results = try await privateDatabase.records(matching: query)
+
+            var userChallenges: [UserChallenge] = []
+            for (_, result) in results.matchResults {
+                if case .success(let record) = result {
+                    if let recordUserID = record[CKField.UserChallenge.userID] as? String,
+                       recordUserID == userID {
+                        userChallenges.append(UserChallenge(from: record))
                     }
                 }
             }
-            
-            publicDatabase.add(operation)
+
+            await MainActor.run {
+                GamificationManager.shared.syncUserChallenges(userChallenges)
+            }
+
+            print("✅ Synced \(userChallenges.count) user challenges")
+        } catch {
+            print("❌ Failed to sync user progress: \(error)")
         }
+    }
+    
+    private func syncLeaderboard() async {
+        let predicate = NSPredicate(value: true)
+        let query = CKQuery(recordType: CloudKitConfig.leaderboardRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.Leaderboard.totalPoints, ascending: false)]
+
+        let operation = CKQueryOperation(query: query)
+        operation.resultsLimit = 100
+
+        operation.queryResultBlock = { result in
+            Task { @MainActor in
+                switch result {
+                case .success:
+                    print("✅ Synced leaderboard entries")
+                case .failure(let error):
+                    print("❌ Failed to sync leaderboard: \(error)")
+                }
+            }
+        }
+
+        publicDatabase.add(operation)
     }
     
     // MARK: - Challenge Proof Submission
@@ -638,24 +928,43 @@ final class SyncModule: ObservableObject {
     
     // MARK: - Subscriptions
     func setupSubscriptions() {
-        // Subscribe to challenge updates
-        let challengePredicate = NSPredicate(value: true)
-        let challengeSubscription = CKQuerySubscription(
-            recordType: CloudKitConfig.challengeRecordType,
-            predicate: challengePredicate,
-            subscriptionID: CloudKitConfig.challengeUpdatesSubscription,
-            options: [.firesOnRecordCreation, .firesOnRecordUpdate]
-        )
-        
-        let notificationInfo = CKSubscription.NotificationInfo()
-        notificationInfo.shouldSendContentAvailable = true
-        challengeSubscription.notificationInfo = notificationInfo
-        
-        publicDatabase.save(challengeSubscription) { _, error in
-            if let error = error {
-                print("❌ Failed to create challenge subscription: \(error)")
-            } else {
-                print("✅ Challenge subscription created")
+        container.accountStatus { [weak self] status, statusError in
+            guard let self else { return }
+
+            if let statusError {
+                print("⚠️ Skipping challenge subscription setup (account status error): \(statusError.localizedDescription)")
+                return
+            }
+
+            guard status == .available else {
+                print("⏭️ Skipping challenge subscription setup - CloudKit account unavailable (\(status.rawValue))")
+                return
+            }
+
+            // Subscribe to challenge updates
+            let challengePredicate = NSPredicate(value: true)
+            let challengeSubscription = CKQuerySubscription(
+                recordType: CloudKitConfig.challengeRecordType,
+                predicate: challengePredicate,
+                subscriptionID: CloudKitConfig.challengeUpdatesSubscription,
+                options: [.firesOnRecordCreation, .firesOnRecordUpdate]
+            )
+
+            let notificationInfo = CKSubscription.NotificationInfo()
+            notificationInfo.shouldSendContentAvailable = true
+            challengeSubscription.notificationInfo = notificationInfo
+
+            self.publicDatabase.save(challengeSubscription) { _, error in
+                if let ckError = error as? CKError, ckError.code == .notAuthenticated {
+                    print("⏭️ Challenge subscription deferred - user not authenticated with iCloud yet")
+                    return
+                }
+
+                if let error {
+                    print("❌ Failed to create challenge subscription: \(error)")
+                } else {
+                    print("✅ Challenge subscription created")
+                }
             }
         }
     }

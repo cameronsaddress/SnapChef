@@ -552,7 +552,7 @@ struct TikTokShareViewEnhanced: View {
                 Task {
                     do {
                         print("🎬 TikTok: Fetching photos from CloudKit for recipe '\(recipe.name)' (ID: \(recipe.id.uuidString))")
-                        let photos = try await CloudKitRecipeManager.shared.fetchRecipePhotos(for: recipe.id.uuidString)
+                        let photos = try await CloudKitService.shared.fetchRecipePhotos(for: recipe.id.uuidString)
 
                         // Update before photo if we don't have it
                         if content.beforeImage == nil, let cloudBeforePhoto = photos.before {

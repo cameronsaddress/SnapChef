@@ -19,9 +19,8 @@ struct RecipeDetailView: View {
     @State private var selectedUserName = ""
     @State private var showingDeleteAlert = false
     @FocusState private var isCommentFieldFocused: Bool
-    @StateObject private var cloudKitSync = CloudKitSyncService.shared
     @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
-    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitService.shared
     @StateObject private var commentsViewModel = RecipeCommentsViewModel()
 
     // New states for branded share
@@ -34,7 +33,6 @@ struct RecipeDetailView: View {
     
     enum AuthAction {
         case like
-        case save
     }
     
     // MARK: - ViewBuilder Helper Functions
@@ -779,24 +777,10 @@ struct RecipeDetailView: View {
             }
             // Authentication prompt sheet
             .sheet(isPresented: $showAuthPrompt) {
-                RecipeAuthPromptSheet(
-                    action: pendingAuthAction == .like ? "like" : "save",
-                    recipeName: recipe.name,
-                    isPresented: $showAuthPrompt,
-                    onAuthenticated: {
-                        // Complete the pending action after authentication
-                        if let action = pendingAuthAction {
-                            switch action {
-                            case .like:
-                                toggleLike()
-                            case .save:
-                                // Handle save action if needed
-                                break
-                            }
-                        }
-                        pendingAuthAction = nil
+                ProgressiveAuthPrompt(overrideContext: .featureUnlock)
+                    .onDisappear {
+                        completePendingAuthAction()
                     }
-                )
             }
             .alert("Delete Recipe?", isPresented: $showingDeleteAlert) {
                 Button("Cancel", role: .cancel) { }
@@ -840,7 +824,7 @@ struct RecipeDetailView: View {
                 print("🔍   - proTips: \(recipe.proTips.isEmpty ? "EMPTY" : "\(recipe.proTips)")")
                 print("🔍   - visualClues: \(recipe.visualClues.isEmpty ? "EMPTY" : "\(recipe.visualClues)")")
                 print("🔍   - shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : String(describing: recipe.shareCaption))")
-                print("🔍   - isDetectiveRecipe: \(recipe.isDetectiveRecipe)")
+                print("🔍   - isDetectiveRecipe: \(recipe.isDetectiveRecipe ?? false)")
                 
                 print("🔍 DIETARY INFO:")
                 print("🔍   - isVegetarian: \(recipe.dietaryInfo.isVegetarian)")
@@ -933,6 +917,16 @@ struct RecipeDetailView: View {
         // Use like manager for centralized state management
         Task {
             await likeManager.toggleLike(for: recipe.id.uuidString)
+        }
+    }
+
+    private func completePendingAuthAction() {
+        defer { pendingAuthAction = nil }
+        guard cloudKitAuth.isAuthenticated, let action = pendingAuthAction else { return }
+
+        switch action {
+        case .like:
+            toggleLike()
         }
     }
 

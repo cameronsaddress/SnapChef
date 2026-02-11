@@ -17,16 +17,46 @@ struct HomeView: View {
     @State private var particleTrigger = false
     @State private var mysteryMealAnimation = false
     @State private var showingUpgrade = false
+    @State private var showingGrowthHub = false
     @StateObject private var fallingFoodManager = FallingFoodManager()
     @State private var buttonShake = false
     @State private var showingDetective = false
     @State private var showingCameraPermissionAlert = false
+    @State private var homeEntranceActive = false
+    @State private var snapButtonPulse = false
+    @State private var ambientDrift = false
 
     var body: some View {
         ZStack {
             // Full screen animated background
-                MagicalBackground()
-                    .ignoresSafeArea()
+            MagicalBackground()
+                .ignoresSafeArea()
+
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color(hex: "#38f9d7").opacity(0.35), .clear],
+                        center: .center,
+                        startRadius: 10,
+                        endRadius: 220
+                    )
+                )
+                .frame(width: 340, height: 340)
+                .blur(radius: 12)
+                .offset(x: ambientDrift ? -140 : -70, y: ambientDrift ? -260 : -210)
+
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color(hex: "#f093fb").opacity(0.3), .clear],
+                        center: .center,
+                        startRadius: 5,
+                        endRadius: 240
+                    )
+                )
+                .frame(width: 360, height: 360)
+                .blur(radius: 16)
+                .offset(x: ambientDrift ? 140 : 80, y: ambientDrift ? 210 : 150)
 
                 // Falling food emojis (behind all elements except background)
                 if deviceManager.shouldShowParticles {
@@ -49,7 +79,27 @@ struct HomeView: View {
                                 .foregroundColor(.white.opacity(0.9))
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 40)
+
+                            HStack(spacing: 8) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Simple flow, premium results")
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            }
+                            .foregroundColor(.white.opacity(0.85))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.14))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                            )
                         }
+                        .opacity(homeEntranceActive ? 1 : 0)
+                        .offset(y: homeEntranceActive ? 0 : 18)
                         .padding(.top, 30)
 
                         // Main CTA Section with prominent spacing
@@ -63,6 +113,7 @@ struct HomeView: View {
                                 icon: "camera.fill",
                                 action: {
                                     Task {
+                                        pulseSnapButton()
                                         let granted = await requestCameraPermission()
                                         if granted {
                                             showingCamera = true
@@ -73,6 +124,13 @@ struct HomeView: View {
                             )
                             .padding(.horizontal, 30)
                             .modifier(ShakeEffect(shakeNumber: buttonShake ? 2 : 0))
+                            .scaleEffect(snapButtonPulse ? 1.04 : 1.0)
+                            .shadow(
+                                color: Color.white.opacity(snapButtonPulse ? 0.35 : 0.18),
+                                radius: snapButtonPulse ? 24 : 12,
+                                y: 8
+                            )
+                            .animation(.spring(response: 0.42, dampingFraction: 0.72), value: snapButtonPulse)
                             .background(
                                 GeometryReader { geometry in
                                     Color.clear
@@ -134,7 +192,7 @@ struct HomeView: View {
                     HStack {
                         Spacer()
                         FloatingActionButton(icon: "sparkles") {
-                            // AI suggestions
+                            showingGrowthHub = true
                         }
                         .padding(30)
                     }
@@ -157,13 +215,21 @@ struct HomeView: View {
                 
                 // Simple fade in for mystery meal animation (only if animations enabled)
                 if deviceManager.animationsEnabled {
-                    // print("🔍 DEBUG: HomeView - Setting mysteryMealAnimation")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    withAnimation(.easeInOut(duration: deviceManager.recommendedAnimationDuration * 2)) {
-                        mysteryMealAnimation = true
+                    withAnimation(.easeInOut(duration: 6).repeatForever(autoreverses: true)) {
+                        ambientDrift = true
                     }
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        homeEntranceActive = true
+                    }
+                    // print("🔍 DEBUG: HomeView - Setting mysteryMealAnimation")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        withAnimation(.easeInOut(duration: deviceManager.recommendedAnimationDuration * 2)) {
+                            mysteryMealAnimation = true
+                        }
                     }
                 } else {
+                    ambientDrift = true
+                    homeEntranceActive = true
                     mysteryMealAnimation = true
                 }
                 
@@ -186,10 +252,6 @@ struct HomeView: View {
             
             // print("🔍 DEBUG: HomeView appeared - End")
             
-            // Additional delayed check
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                print("🔍 DEBUG: HomeView - 0.5s after appear")
-            }
         }
         .onDisappear {
             fallingFoodManager.cleanup()
@@ -203,6 +265,9 @@ struct HomeView: View {
         .fullScreenCover(isPresented: $showingUpgrade) {
             SubscriptionView()
                 .environmentObject(deviceManager)
+        }
+        .sheet(isPresented: $showingGrowthHub) {
+            GrowthHubView()
         }
         .fullScreenCover(isPresented: $showingDetective) {
             DetectiveView()
@@ -261,6 +326,14 @@ struct HomeView: View {
                     startButtonShake()
                 }
             }
+        }
+    }
+
+    private func pulseSnapButton() {
+        guard deviceManager.animationsEnabled else { return }
+        snapButtonPulse = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            snapButtonPulse = false
         }
     }
 

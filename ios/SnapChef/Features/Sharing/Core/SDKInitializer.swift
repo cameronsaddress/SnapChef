@@ -23,7 +23,7 @@ final class SDKInitializer {
         // Instagram, Facebook, X (Twitter), and Snapchat use deep linking
 
         // Log available platforms
-        let availablePlatforms = SocialSDKManager.shared.getAvailablePlatforms()
+        _ = SocialSDKManager.shared.getAvailablePlatforms()
         // print("📱 Available social platforms: \(availablePlatforms.map { $0.rawValue }.joined(separator: ", "))")
     }
 

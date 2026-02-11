@@ -41,7 +41,16 @@ class CloudKitAnalytics {
             "challenge_joined",
             "recipe_shared",
             "achievement_earned",
-            "premium_feature_used"
+            "premium_feature_used",
+            "waiting_game_shown",
+            "waiting_game_manual_start",
+            "waiting_game_auto_start",
+            "waiting_game_dismissed",
+            "viral_prompt_shown",
+            "viral_cta_tapped",
+            "viral_share_started",
+            "referral_attributed_open",
+            "referral_attributed_conversion"
         ]
 
         guard importantFeatures.contains(feature) else { return }
@@ -221,3 +230,5 @@ extension Dictionary where Key == String, Value == Any {
         return string
     }
 }
+
+// GrowthLoopManager is defined in AnalyticsManager.swift.

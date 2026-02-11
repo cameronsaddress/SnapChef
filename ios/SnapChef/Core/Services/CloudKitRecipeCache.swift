@@ -58,7 +58,7 @@ class CloudKitRecipeCache: ObservableObject {
     // Track which recipe IDs we already have locally
     private var localRecipeIDs: Set<UUID> = []
 
-    private let cloudKitManager = CloudKitRecipeManager.shared
+    private let cloudKitManager = CloudKitService.shared
     private let authManager = UnifiedAuthManager.shared
 
     private init() {

@@ -178,7 +178,7 @@ public actor RenderPlanner {
     // MARK: Template: PREMIUM Viral Video with Million-Dollar Structure
     private func kineticPlan(_ recipe: ViralRecipe, _ media: MediaBundle) async throws -> RenderPlan {
         let total = min(config.maxDuration.seconds, 15.0)
-        let beatMap = await makeBeatMap(from: media.musicURL, fallbackBPM: config.fallbackBPM, duration: total)
+        _ = await makeBeatMap(from: media.musicURL, fallbackBPM: config.fallbackBPM, duration: total)
 
         var items: [RenderPlan.TrackItem] = []
         var overlays: [RenderPlan.Overlay] = []
@@ -878,8 +878,6 @@ public actor RenderPlanner {
         sparkleCell.alphaSpeed = -0.5
         sparkleCell.spin = .pi
         sparkleCell.spinRange = .pi
-
-        let foodCells = [sparkleCell]
 
         sparkEmitter.emitterCells = [sparkleCell]
 

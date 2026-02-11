@@ -12,7 +12,6 @@ struct ChallengeHubView: View {
     @State private var refreshID = UUID()
     @State private var hasPromptedForNotifications = false
     @State private var showingPremiumView = false
-    @State private var showingAuthPrompt = false
 
     private enum ChallengeFilter: String, CaseIterable {
         case all = "All"
@@ -127,12 +126,8 @@ struct ChallengeHubView: View {
             .sheet(isPresented: $authManager.showAuthSheet) {
                 UnifiedAuthView(requiredFor: .challenges)
             }
-            .sheet(isPresented: $showingAuthPrompt) {
-                ProgressiveAuthPrompt()
-            }
         }
         .onAppear {
-            print("🔍 DEBUG: ChallengeHubView appeared")
             // Track that user viewed challenges for progressive auth
             appState.trackAnonymousAction(.challengeViewed)
 
@@ -148,7 +143,7 @@ struct ChallengeHubView: View {
 
             // Trigger challenge sync when challenges page is visited
             Task {
-                await CloudKitSyncService.shared.triggerChallengeSync()
+                await CloudKitService.shared.triggerChallengeSync()
                 // Also sync challenge join status from CloudKit
                 await gamificationManager.syncChallengesFromCloudKit()
             }
@@ -501,18 +496,23 @@ struct ChallengeHubView: View {
 
     private func handleChallengeInteraction(challenge: Challenge) {
         if !authManager.isAuthenticated {
-            // Track the interaction
-            appState.trackAnonymousAction(.challengeViewed)
-
-            // Trigger progressive authentication prompt
-            authTrigger.onChallengeInterest()
-
-            // Show the prompt if conditions are met
-            if authTrigger.shouldShowPrompt {
-                showingAuthPrompt = true
+            // ChallengeHub onAppear already tracks challenge views for the nudger model.
+            // For explicit tap intent, route through a single auth request path.
+            Task { @MainActor in
+                await requestChallengeAuthentication()
             }
         } else {
             selectedChallenge = challenge
+        }
+    }
+
+    @MainActor
+    private func requestChallengeAuthentication() async {
+        await authTrigger.triggerPrompt(for: .challengeInterest)
+
+        // If the nudge is suppressed by cooldown/frequency rules, still honor explicit user intent.
+        if !authTrigger.shouldShowPrompt {
+            authManager.showAuthSheet = true
         }
     }
 
@@ -547,8 +547,9 @@ struct ChallengeHubView: View {
                         .padding(.horizontal, 16)
 
                     Button(action: {
-                        authTrigger.onChallengeInterest()
-                        showingAuthPrompt = true
+                        Task { @MainActor in
+                            await requestChallengeAuthentication()
+                        }
                     }) {
                         HStack(spacing: 8) {
                             Image(systemName: "person.badge.plus")

@@ -38,8 +38,6 @@
 		2A1E6C5CC0216CD80FA81609 /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 147423E4DF08EDDC2668784C /* CloudKit.framework */; };
 		2D02CE5084479923A9D51FB0 /* ViralVideoRendererPro.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D518D2380480B66FE686C8 /* ViralVideoRendererPro.swift */; };
 		2D3FCBBECA590DA906A60532 /* PantryCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94373B9CA1417FC8E7C430F9 /* PantryCaptureView.swift */; };
-		2E85515A48126D87783202CF /* UsageCounterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ADF148773E6EE1B994200DB /* UsageCounterView.swift */; };
-		30085E2162661396EB939CA8 /* RecipeSyncQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93986695F4ABD95757A2AFD8 /* RecipeSyncQueue.swift */; };
 		3061965FBE04EE83D63B5FE5 /* PhotoStorageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3758078876521E833669F17E /* PhotoStorageManager.swift */; };
 		3061965FBE04EE83D63B5FE6 /* ProfilePhotoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3758078876521E833669F17F /* ProfilePhotoManager.swift */; };
 		3061965FBE04EE83D63B5FE7 /* UserAvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3758078876521E833669F180 /* UserAvatarView.swift */; };
@@ -81,9 +79,17 @@
 		56E3EB5DC2EB662A9C6C3F59 /* RewardSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79D60B603855BD2E41D0CFA /* RewardSystem.swift */; };
 		57A353FC46B94AC45DD9FD34 /* PremiumUpgradePrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB84A651E63FD43617AD03E0 /* PremiumUpgradePrompt.swift */; };
 		588722A57F6F8FB4733B9E2D /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13C669CCD49BD9E3C3961EBE /* SubscriptionManager.swift */; };
-		5D1F87E18E1721FB4368BA1E /* ChallengeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3087E3BC28593B910150BF /* ChallengeService.swift */; };
-		5D2101B614D2956937BA48DB /* CloudKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D1E5B498461918FE635EE77 /* CloudKitManager.swift */; };
-		5EEEBCBA976205B85F916A48 /* DataMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4BD459EBD782ECB2791030 /* DataMigrator.swift */; };
+			5D1F87E18E1721FB4368BA1E /* ChallengeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3087E3BC28593B910150BF /* ChallengeService.swift */; };
+			5D2101B614D2956937BA48DB /* CloudKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D1E5B498461918FE635EE77 /* CloudKitManager.swift */; };
+				B1C2D3E4F5A6B7C8D9E0F1A2 /* CloudKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F4A5B6C7D8E9F0A1B2 /* CloudKitService.swift */; };
+				C20100000000000000000001 /* AuthModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20200000000000000000001 /* AuthModule.swift */; };
+				C20100000000000000000002 /* RecipeModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20200000000000000000002 /* RecipeModule.swift */; };
+				C20100000000000000000003 /* UserModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20200000000000000000003 /* UserModule.swift */; };
+				C20100000000000000000004 /* ChallengeModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20200000000000000000004 /* ChallengeModule.swift */; };
+				C20100000000000000000005 /* DataModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20200000000000000000005 /* DataModule.swift */; };
+				C20100000000000000000006 /* StreakModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20200000000000000000006 /* StreakModule.swift */; };
+				C20100000000000000000007 /* SyncModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20200000000000000000007 /* SyncModule.swift */; };
+			5EEEBCBA976205B85F916A48 /* DataMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4BD459EBD782ECB2791030 /* DataMigrator.swift */; };
 		623D1A9D6546A2BE6A95DD62 /* SimpleMediaBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54C3A058766E816CC5E046EE /* SimpleMediaBundle.swift */; };
 		648361B13FB672E010BE17C6 /* PremiumChallengeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C18EBEBBC731F955270272E7 /* PremiumChallengeManager.swift */; };
 		64E033F0E0718DD8653B655B /* RecipeSyncQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F9B5C4B0DD529E32F8F481B /* RecipeSyncQueue.swift */; };
@@ -97,7 +103,6 @@
 		74AC53E53D8FB55720E4F1D1 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0FCC9F8D9AE29902BE9D1FB5 /* Foundation.framework */; };
 		7696053D9D8BEC87FE5F82A7 /* KeychainProfileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB8077DF1E998ABE8B6B2BF2 /* KeychainProfileManager.swift */; };
 		7833A31EF38C48FD90F49007 /* SocialShareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CCD6FA6649726CC20EA9DE2 /* SocialShareManager.swift */; };
-		7A81E8026AF266C1B8555A5E /* PaywallTriggerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFCD7A51170242B77EFA0816 /* PaywallTriggerManager.swift */; };
 		7B8D6D0B1CE5FFCD36626F34 /* UserLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 739D1F76E83CB505BBE5E8AF /* UserLifecycle.swift */; };
 		7BBE4481D9C08B38B01C33E7 /* LeaderboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4976D3BAC7409CD3C09ED36E /* LeaderboardViewModel.swift */; };
 		7E8464B6ABF815644BDE5E62 /* fridge3.jpg in Resources */ = {isa = PBXBuildFile; fileRef = ADDE0057FDAB5264593D3360 /* fridge3.jpg */; };
@@ -111,7 +116,6 @@
 		8B7E8A3AFC2C41A88807A95E /* CloudKitAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE10EDDC2438467DBDDE607B /* CloudKitAuthView.swift */; };
 		8CF4B86D085DB79938D29D67 /* PhotoLibraryHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFBF9C08DA973B611D990FBF /* PhotoLibraryHelper.swift */; };
 		8D80E4B6DA8C2DFED3912E36 /* UsernameSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B719E521CAD8332D26CB3CC /* UsernameSetupView.swift */; };
-		8ED9ACFC8F28F751BFC4DE14 /* HoneymoonBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CE2AA50D12015B734293A6 /* HoneymoonBanner.swift */; };
 		8FE69C1272F075334D6051EB /* SafeVideoSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6074E73628C7740879D4B558 /* SafeVideoSaver.swift */; };
 		90F4B326E442F3BEAA8FD619 /* MockDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56DF24D3280D9F5229B2C67C /* MockDataProvider.swift */; };
 		9289037A18EC7A2E123C947D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDFFE3F7768F84376E9232D /* AppDelegate.swift */; };
@@ -210,7 +214,19 @@
 		FF107BE1B6CA934969C90F5A /* LocalRecipeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C31EBEB3CA82504B1F83EDA7 /* LocalRecipeManager.swift */; };
 		FFAF7C1CEA1855B0235BE6EC /* SnapchefLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 392BD76253A7DA8F69705F62 /* SnapchefLogo.swift */; };
 		FFCAA2B0DE7B5BAD2D349B8F /* fridge1.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 6DE095E53679E0668984799F /* fridge1.jpg */; };
+		A1F0B001C0FFEE0000000001 /* NotificationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F0B001C0FFEE0000000011 /* NotificationPolicyTests.swift */; };
+		A1F0B001C0FFEE0000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A1F0B001C0FFEE0000000013 /* XCTest.framework */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A1F0B001C0FFEE0000000051 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EFA205B331AF6DBF268A7F9E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1280109CE140D48A03DDC2BD;
+			remoteInfo = SnapChef;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		001A86FF8EC540A5B0D2A5B2 /* AIProcessingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AIProcessingView.swift; path = SnapChef/Features/Camera/AIProcessingView.swift; sourceTree = "<group>"; };
@@ -356,9 +372,17 @@
 		985386977F87C72101805AA4 /* UsageCounterView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UsageCounterView.swift; path = SnapChef/Components/UsageCounterView.swift; sourceTree = "<group>"; };
 		99D9AB655A8898FA9343AE6F /* CloudKitMigration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitMigration.swift; path = SnapChef/Core/Services/CloudKitMigration.swift; sourceTree = "<group>"; };
 		9A8A82594C8D57196A136177 /* SimplePhotoCaptureView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SimplePhotoCaptureView.swift; path = SnapChef/Features/Camera/SimplePhotoCaptureView.swift; sourceTree = "<group>"; };
-		9A8B0F1E88F55951D118BE2F /* CloudKitSchema.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitSchema.swift; path = SnapChef/Core/Services/CloudKitSchema.swift; sourceTree = "<group>"; };
-		9D1E5B498461918FE635EE77 /* CloudKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitManager.swift; path = SnapChef/Core/Services/CloudKitManager.swift; sourceTree = "<group>"; };
-		9D502E726703734D99E68D2E /* AnalyticsManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AnalyticsManager.swift; path = SnapChef/Core/Services/AnalyticsManager.swift; sourceTree = "<group>"; };
+			9A8B0F1E88F55951D118BE2F /* CloudKitSchema.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitSchema.swift; path = SnapChef/Core/Services/CloudKitSchema.swift; sourceTree = "<group>"; };
+			9D1E5B498461918FE635EE77 /* CloudKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitManager.swift; path = SnapChef/Core/Services/CloudKitManager.swift; sourceTree = "<group>"; };
+				C1D2E3F4A5B6C7D8E9F0A1B2 /* CloudKitService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitService.swift; path = SnapChef/Core/Services/CloudKitService.swift; sourceTree = "<group>"; };
+				C20200000000000000000001 /* AuthModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthModule.swift; path = SnapChef/Core/Services/CloudKitModules/AuthModule.swift; sourceTree = "<group>"; };
+				C20200000000000000000002 /* RecipeModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RecipeModule.swift; path = SnapChef/Core/Services/CloudKitModules/RecipeModule.swift; sourceTree = "<group>"; };
+				C20200000000000000000003 /* UserModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserModule.swift; path = SnapChef/Core/Services/CloudKitModules/UserModule.swift; sourceTree = "<group>"; };
+				C20200000000000000000004 /* ChallengeModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeModule.swift; path = SnapChef/Core/Services/CloudKitModules/ChallengeModule.swift; sourceTree = "<group>"; };
+				C20200000000000000000005 /* DataModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DataModule.swift; path = SnapChef/Core/Services/CloudKitModules/DataModule.swift; sourceTree = "<group>"; };
+				C20200000000000000000006 /* StreakModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StreakModule.swift; path = SnapChef/Core/Services/CloudKitModules/StreakModule.swift; sourceTree = "<group>"; };
+				C20200000000000000000007 /* SyncModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SyncModule.swift; path = SnapChef/Core/Services/CloudKitModules/SyncModule.swift; sourceTree = "<group>"; };
+			9D502E726703734D99E68D2E /* AnalyticsManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AnalyticsManager.swift; path = SnapChef/Core/Services/AnalyticsManager.swift; sourceTree = "<group>"; };
 		9F4BD8915CC8BAD33F6F4265 /* PersistentSyncQueue.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PersistentSyncQueue.swift; path = SnapChef/Core/Services/PersistentSyncQueue.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6789012345679 /* ComboEffects.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ComboEffects.swift; path = SnapChef/Design/ComboEffects.swift; sourceTree = "<group>"; };
 		A222D311FA8E5A63B5427FCE /* AIPersonalityManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AIPersonalityManager.swift; path = SnapChef/Features/AIPersonality/AIPersonalityManager.swift; sourceTree = "<group>"; };
@@ -435,6 +459,9 @@
 		FBA1C719280079FC83D76F2E /* SDKInitializer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SDKInitializer.swift; path = SnapChef/Features/Sharing/Core/SDKInitializer.swift; sourceTree = "<group>"; };
 		FBC05392351018737EED0737 /* RecipeLikeManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RecipeLikeManager.swift; path = SnapChef/Core/Services/RecipeLikeManager.swift; sourceTree = "<group>"; };
 		FE10EDDC2438467DBDDE607B /* CloudKitAuthView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitAuthView.swift; path = SnapChef/Features/Authentication/CloudKitAuthView.swift; sourceTree = "<group>"; };
+		A1F0B001C0FFEE0000000011 /* NotificationPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPolicyTests.swift; sourceTree = "<group>"; };
+		A1F0B001C0FFEE0000000012 /* SnapChefTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SnapChefTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1F0B001C0FFEE0000000013 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -448,6 +475,14 @@
 				F5193ABD2E4AF86900922841 /* TikTokOpenAuthSDK in Frameworks */,
 				74AC53E53D8FB55720E4F1D1 /* Foundation.framework in Frameworks */,
 				2A1E6C5CC0216CD80FA81609 /* CloudKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1F0B001C0FFEE0000000031 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1F0B001C0FFEE0000000002 /* XCTest.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -470,6 +505,7 @@
 				13F448B60862378D1B3C2C0E /* SnapChef.app */,
 				089AEF181890C83FE4DC71BC /* SnapChef.app */,
 				AD0DCCE077C4F617880C957D /* SnapChef.app */,
+				A1F0B001C0FFEE0000000012 /* SnapChefTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -480,6 +516,7 @@
 				027AD74E091AC56960637058 /* Products */,
 				C5652B40604108248A1E9076 /* Frameworks */,
 				F4737935B5BA6D0B9ABCEB27 /* SnapChef */,
+				A1F0B001C0FFEE0000000021 /* SnapChefTests */,
 				FAE14391640BA3821562690E /*  */,
 				F56F891D2E3D282000AF95B7 /* Recovered References */,
 				358FFFFCEF94607D3AEF5F6C /* Features */,
@@ -860,11 +897,19 @@
 			children = (
 				4D5C0A42EA6865AC0A0E520C /* AuthenticationManager.swift */,
 				609B6B5762D52F8382EC3FEB /* DeviceManager.swift */,
-				13C669CCD49BD9E3C3961EBE /* SubscriptionManager.swift */,
-				9D502E726703734D99E68D2E /* AnalyticsManager.swift */,
-				9D1E5B498461918FE635EE77 /* CloudKitManager.swift */,
-				A6F1DA4F546442BFA11AE443 /* NotificationManager.swift */,
-				4AC9B83A23805AF72F7FA1CC /* PersistenceController.swift */,
+					13C669CCD49BD9E3C3961EBE /* SubscriptionManager.swift */,
+					9D502E726703734D99E68D2E /* AnalyticsManager.swift */,
+					9D1E5B498461918FE635EE77 /* CloudKitManager.swift */,
+						C1D2E3F4A5B6C7D8E9F0A1B2 /* CloudKitService.swift */,
+						C20200000000000000000001 /* AuthModule.swift */,
+						C20200000000000000000002 /* RecipeModule.swift */,
+						C20200000000000000000003 /* UserModule.swift */,
+						C20200000000000000000004 /* ChallengeModule.swift */,
+						C20200000000000000000005 /* DataModule.swift */,
+						C20200000000000000000006 /* StreakModule.swift */,
+						C20200000000000000000007 /* SyncModule.swift */,
+						A6F1DA4F546442BFA11AE443 /* NotificationManager.swift */,
+					4AC9B83A23805AF72F7FA1CC /* PersistenceController.swift */,
 				E4F9C285D07CBD89E2776441 /* ChallengeAnalytics.swift */,
 				9A8B0F1E88F55951D118BE2F /* CloudKitSchema.swift */,
 				0D754451606A66D155B291DD /* CloudKitSyncService.swift */,
@@ -935,6 +980,14 @@
 				89C60B44A6DEC0A7938BF869 /* ProfanityFilter.swift */,
 			);
 			name = Utilities;
+			sourceTree = "<group>";
+		};
+		A1F0B001C0FFEE0000000021 /* SnapChefTests */ = {
+			isa = PBXGroup;
+			children = (
+				A1F0B001C0FFEE0000000011 /* NotificationPolicyTests.swift */,
+			);
+			path = SnapChefTests;
 			sourceTree = "<group>";
 		};
 		A5BD5D6F19A84974656DB3B7 /* Components */ = {
@@ -1021,6 +1074,7 @@
 			isa = PBXGroup;
 			children = (
 				F56F890A2E3C509A00AF95B7 /* UserNotifications.framework */,
+				A1F0B001C0FFEE0000000013 /* XCTest.framework */,
 				93DBC67312CC766696FB677B /* iOS */,
 				147423E4DF08EDDC2668784C /* CloudKit.framework */,
 			);
@@ -1208,6 +1262,23 @@
 			productReference = 802069908C2ED50AACB32FA2 /* SnapChef.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A1F0B001C0FFEE0000000041 /* SnapChefTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1F0B001C0FFEE0000000063 /* Build configuration list for PBXNativeTarget "SnapChefTests" */;
+			buildPhases = (
+				A1F0B001C0FFEE0000000032 /* Sources */,
+				A1F0B001C0FFEE0000000031 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A1F0B001C0FFEE0000000052 /* PBXTargetDependency */,
+			);
+			name = SnapChefTests;
+			productName = SnapChefTests;
+			productReference = A1F0B001C0FFEE0000000012 /* SnapChefTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1221,6 +1292,10 @@
 					1280109CE140D48A03DDC2BD = {
 						DevelopmentTeam = SDLKTVS646;
 						ProvisioningStyle = Automatic;
+					};
+					A1F0B001C0FFEE0000000041 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 1280109CE140D48A03DDC2BD;
 					};
 				};
 			};
@@ -1241,6 +1316,7 @@
 			projectRoot = "";
 			targets = (
 				1280109CE140D48A03DDC2BD /* SnapChef */,
+				A1F0B001C0FFEE0000000041 /* SnapChefTests */,
 			);
 		};
 /* End PBXProject section */
@@ -1351,11 +1427,19 @@
 				0C1EC8259C114306AB8DE1D5 /* AIProcessingView.swift in Sources */,
 				588722A57F6F8FB4733B9E2D /* SubscriptionManager.swift in Sources */,
 				A6E6D591C4F0B345F912FC7E /* AnalyticsManager.swift in Sources */,
-				57A353FC46B94AC45DD9FD34 /* PremiumUpgradePrompt.swift in Sources */,
-				FFAF7C1CEA1855B0235BE6EC /* SnapchefLogo.swift in Sources */,
-				5D2101B614D2956937BA48DB /* CloudKitManager.swift in Sources */,
-				9C9320B79BD849759CA51AFE /* NotificationManager.swift in Sources */,
-				4F8FB4EE7EC440E2958B775726 /* NotificationSettingsView.swift in Sources */,
+					57A353FC46B94AC45DD9FD34 /* PremiumUpgradePrompt.swift in Sources */,
+					FFAF7C1CEA1855B0235BE6EC /* SnapchefLogo.swift in Sources */,
+					5D2101B614D2956937BA48DB /* CloudKitManager.swift in Sources */,
+						B1C2D3E4F5A6B7C8D9E0F1A2 /* CloudKitService.swift in Sources */,
+						C20100000000000000000001 /* AuthModule.swift in Sources */,
+						C20100000000000000000002 /* RecipeModule.swift in Sources */,
+						C20100000000000000000003 /* UserModule.swift in Sources */,
+						C20100000000000000000004 /* ChallengeModule.swift in Sources */,
+						C20100000000000000000005 /* DataModule.swift in Sources */,
+						C20100000000000000000006 /* StreakModule.swift in Sources */,
+						C20100000000000000000007 /* SyncModule.swift in Sources */,
+						9C9320B79BD849759CA51AFE /* NotificationManager.swift in Sources */,
+					4F8FB4EE7EC440E2958B775726 /* NotificationSettingsView.swift in Sources */,
 				3834916075B6D09838E4B70F /* ChallengeGenerator.swift in Sources */,
 				52A987EF28B4559ACDA698F8 /* ChallengeProgressTracker.swift in Sources */,
 				5D1F87E18E1721FB4368BA1E /* ChallengeService.swift in Sources */,
@@ -1470,18 +1554,30 @@
 				4DE53A459B1AA721235F0173 /* LocalRecipeStorage.swift in Sources */,
 				64E033F0E0718DD8653B655B /* RecipeSyncQueue.swift in Sources */,
 				DCF6630359E8EF0ED17B926E /* PersistentSyncQueue.swift in Sources */,
-				2E85515A48126D87783202CF /* UsageCounterView.swift in Sources */,
-				8ED9ACFC8F28F751BFC4DE14 /* HoneymoonBanner.swift in Sources */,
-				7A81E8026AF266C1B8555A5E /* PaywallTriggerManager.swift in Sources */,
 				31DD91403D061B787FF3D340 /* AccountDeletionService.swift in Sources */,
 				FF107BE1B6CA934969C90F5A /* LocalRecipeManager.swift in Sources */,
 				D3E7809628C6A6B8C038A421 /* CloudKitSyncEngine.swift in Sources */,
-				30085E2162661396EB939CA8 /* RecipeSyncQueue.swift in Sources */,
 				5EEEBCBA976205B85F916A48 /* DataMigrator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1F0B001C0FFEE0000000032 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1F0B001C0FFEE0000000001 /* NotificationPolicyTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A1F0B001C0FFEE0000000052 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1280109CE140D48A03DDC2BD /* SnapChef */;
+			targetProxy = A1F0B001C0FFEE0000000051 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		506E7A0E369F7C89CA737788 /* Release */ = {
@@ -1686,6 +1782,57 @@
 			};
 			name = Debug;
 		};
+		A1F0B001C0FFEE0000000061 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SDLKTVS646;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapchefapp.appTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SnapChef.app/SnapChef";
+				TEST_TARGET_NAME = SnapChef;
+			};
+			name = Debug;
+		};
+		A1F0B001C0FFEE0000000062 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SDLKTVS646;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.snapchefapp.appTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SnapChef.app/SnapChef";
+				TEST_TARGET_NAME = SnapChef;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1703,6 +1850,15 @@
 			buildConfigurations = (
 				81B771C2C3AE4B2FAC759602 /* Debug */,
 				B19330227C0C57FB813CD634 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1F0B001C0FFEE0000000063 /* Build configuration list for PBXNativeTarget "SnapChefTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1F0B001C0FFEE0000000061 /* Debug */,
+				A1F0B001C0FFEE0000000062 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

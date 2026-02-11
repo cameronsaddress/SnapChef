@@ -2,17 +2,33 @@ import SwiftUI
 
 struct AIProcessingView: View {
     @EnvironmentObject var deviceManager: DeviceManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAnimating = false
     @State private var textOpacity = 0.0
     @State private var sparkleScale: CGFloat = 1.0
     @State private var buttonShake: CGFloat = 0
+    @State private var buttonShakeTimer: Timer?
+    @State private var autoAdvanceTask: Task<Void, Never>?
+    @State private var didLaunchGame = false
+    @State private var backendProgress = CameraProcessingPhase.idle.progressFraction
+    @State private var ambientShift = false
+    @State private var tipIndex = 0
+    @State private var tipPulse = false
+    @State private var tipTimer: Timer?
+    @State private var statusBadgePulse = false
+    @State private var completionBurst = false
+    @State private var completionBurstScale: CGFloat = 0.85
+    @State private var lastMilestonePhase: CameraProcessingPhase = .idle
+    @State private var statusResetTask: Task<Void, Never>?
 
     // Photo properties
     let fridgeImage: UIImage?
     let pantryImage: UIImage?
+    let processingMilestone: CameraProcessingMilestone
 
     // Callbacks
     var onPlayGameTapped: (() -> Void)?
+    var onAutoPlayGameTapped: (() -> Void)?
     var onClose: (() -> Void)?
 
     // Computed property to determine if we have both photos
@@ -20,11 +36,85 @@ struct AIProcessingView: View {
         fridgeImage != nil && pantryImage != nil
     }
 
+    private let waitingTips = [
+        "Tap fast streaks in the mini-game to multiply score.",
+        "Share your best recipe card to bring friends into SnapChef.",
+        "Mix fridge + pantry photos for better recipe variety.",
+        "Quick wins go viral: before/after photos beat plain screenshots."
+    ]
+
+    private var statusAccentColor: Color {
+        switch processingMilestone.phase {
+        case .completed:
+            return Color(hex: "#4ade80")
+        case .failed:
+            return Color(hex: "#fb7185")
+        case .waitingForRecipes:
+            return Color(hex: "#f093fb")
+        case .uploadingPhotos:
+            return Color(hex: "#60a5fa")
+        default:
+            return Color.white
+        }
+    }
+
+    private var canLaunchWaitingGame: Bool {
+        switch processingMilestone.phase {
+        case .completed, .failed, .decodingResponse, .finalizingResults:
+            return false
+        default:
+            return true
+        }
+    }
+
     var body: some View {
         ZStack {
             // Background
-            Color.black.opacity(0.85)
+            LinearGradient(
+                colors: [
+                    Color(hex: "#06080f"),
+                    Color(hex: "#141b34"),
+                    Color(hex: "#27123b")
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
                 .ignoresSafeArea()
+
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color(hex: "#38f9d7").opacity(0.35), .clear],
+                        center: .center,
+                        startRadius: 8,
+                        endRadius: 200
+                    )
+                )
+                .frame(width: 320, height: 320)
+                .blur(radius: 14)
+                .offset(x: ambientShift ? -120 : -40, y: ambientShift ? -280 : -220)
+
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color(hex: "#f093fb").opacity(0.28), .clear],
+                        center: .center,
+                        startRadius: 8,
+                        endRadius: 240
+                    )
+                )
+                .frame(width: 360, height: 360)
+                .blur(radius: 18)
+                .offset(x: ambientShift ? 140 : 90, y: ambientShift ? 220 : 150)
+
+            Circle()
+                .stroke(
+                    statusAccentColor.opacity(completionBurst ? 0.72 : 0.0),
+                    lineWidth: completionBurst ? 4 : 0
+                )
+                .frame(width: 260, height: 260)
+                .scaleEffect(completionBurstScale)
+                .blur(radius: completionBurst ? 1.5 : 0)
 
             // Close button at top left
             VStack {
@@ -45,6 +135,8 @@ struct AIProcessingView: View {
                                     .foregroundColor(.white)
                             }
                         }
+                        .accessibilityLabel("Close recipe generation")
+                        .accessibilityHint("Stops processing and returns to the previous screen")
                         .padding(.leading, 20)
                         .padding(.top, 60)
                     }
@@ -217,9 +309,68 @@ struct AIProcessingView: View {
                         .opacity(textOpacity)
                         .animation(.easeInOut(duration: 0.5).delay(0.8), value: textOpacity)
 
+                    Text("Status: \(processingMilestone.phase.displayTitle)")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundColor(statusAccentColor.opacity(0.92))
+                        .monospacedDigit()
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(statusAccentColor.opacity(0.12))
+                                .overlay(
+                                    Capsule()
+                                        .stroke(statusAccentColor.opacity(0.35), lineWidth: 1)
+                                )
+                        )
+                        .scaleEffect(statusBadgePulse ? 1.04 : 1.0)
+                        .opacity(textOpacity)
+                        .contentTransition(.opacity)
+                        .animation(.easeInOut(duration: MotionTuning.seconds(0.4)).delay(MotionTuning.seconds(0.95)), value: textOpacity)
+                        .animation(.spring(response: MotionTuning.seconds(0.3), dampingFraction: 0.86), value: processingMilestone.phase)
+                        .accessibilityLabel("Processing status")
+                        .accessibilityValue(processingMilestone.phase.displayTitle)
+
+                    ProgressView(value: backendProgress, total: 1.0)
+                        .progressViewStyle(.linear)
+                        .tint(statusAccentColor)
+                        .frame(width: 240)
+                        .opacity(textOpacity)
+                        .animation(.spring(response: MotionTuning.seconds(0.28), dampingFraction: 0.9), value: backendProgress)
+                        .accessibilityLabel("Recipe generation progress")
+                        .accessibilityValue("\(Int(backendProgress * 100)) percent")
+                    
+                    VStack(spacing: 6) {
+                        Text("Pro tip")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.62))
+                            .textCase(.uppercase)
+                            .tracking(1.2)
+                        Text(waitingTips[tipIndex])
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.88))
+                            .multilineTextAlignment(.center)
+                            .id(tipIndex)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: 300)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color.white.opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                            )
+                    )
+                    .scaleEffect(tipPulse ? 1.015 : 0.985)
+                    .opacity(textOpacity)
+
                     // Prominent game button
                     Button(action: {
-                        onPlayGameTapped?()
+                        guard canLaunchWaitingGame else { return }
+                        launchGame(manuallyTriggered: true)
                     }) {
                         ZStack {
                             // Pulsing background
@@ -251,7 +402,9 @@ struct AIProcessingView: View {
                         }
                     }
                     .buttonStyle(PlainButtonStyle()) // Remove default button styling
-                    .opacity(textOpacity)
+                    .accessibilityLabel("Play waiting game")
+                    .accessibilityHint("Starts a mini game while recipes are being generated")
+                    .opacity(textOpacity * (canLaunchWaitingGame ? 1.0 : 0.45))
                     .scaleEffect(textOpacity)
                     .rotation3DEffect(
                         .degrees(buttonShake),
@@ -259,6 +412,7 @@ struct AIProcessingView: View {
                     )
                     .animation(.spring(response: 0.8, dampingFraction: 0.6).delay(1.0), value: textOpacity)
                     .padding(.top, 8)
+                    .disabled(!canLaunchWaitingGame || didLaunchGame)
                 }
                 .padding(.horizontal, 30)
                 .frame(maxWidth: 400) // Limit width for readability
@@ -267,38 +421,174 @@ struct AIProcessingView: View {
             }
         }
         .onAppear {
-            print("🔍 DEBUG: [AIProcessingView] appeared")
             // Start animations
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: MotionTuning.seconds(2)).repeatForever(autoreverses: true)) {
                 isAnimating = true
             }
 
-            withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
-                sparkleScale = 1.2
+            withAnimation(.easeInOut(duration: MotionTuning.seconds(6)).repeatForever(autoreverses: true)) {
+                ambientShift = true
             }
 
-            withAnimation(.easeInOut(duration: 0.6)) {
+            withAnimation(.easeInOut(duration: MotionTuning.seconds(1)).repeatForever(autoreverses: true)) {
+                sparkleScale = 1.2
+            }
+            
+            withAnimation(.easeInOut(duration: MotionTuning.seconds(1.7)).repeatForever(autoreverses: true)) {
+                tipPulse = true
+            }
+
+            withAnimation(.easeInOut(duration: MotionTuning.seconds(0.6))) {
                 textOpacity = 1.0
             }
 
-            // Start button shake animation every 2 seconds
-            Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-                Task { @MainActor in
-                    withAnimation(
-                        Animation.easeInOut(duration: 0.1)
-                            .repeatCount(5, autoreverses: true)
-                    ) {
-                        buttonShake = 3
-                    }
+            GrowthLoopManager.shared.trackWaitingGameShown(hasBothPhotos: hasBothPhotos)
+            startButtonShakeTimer()
+            lastMilestonePhase = processingMilestone.phase
+            applyMilestone(phase: processingMilestone.phase)
+            startTipRotation()
+        }
+        .onChange(of: processingMilestone.phase) { newPhase in
+            applyMilestone(phase: newPhase)
+        }
+        .onDisappear {
+            buttonShakeTimer?.invalidate()
+            buttonShakeTimer = nil
+            tipTimer?.invalidate()
+            tipTimer = nil
+            autoAdvanceTask?.cancel()
+            autoAdvanceTask = nil
+            statusResetTask?.cancel()
+            statusResetTask = nil
+            if !didLaunchGame {
+                GrowthLoopManager.shared.trackWaitingGameDismissed()
+            }
+        }
+    }
 
-                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                    buttonShake = 0
+    private func startButtonShakeTimer() {
+        buttonShakeTimer?.invalidate()
+        buttonShakeTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            Task { @MainActor in
+                withAnimation(
+                    Animation.easeInOut(duration: 0.1)
+                        .repeatCount(5, autoreverses: true)
+                ) {
+                    buttonShake = 3
+                }
+
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                buttonShake = 0
+            }
+        }
+    }
+
+    private func scheduleAutoAdvanceToGame(after delay: TimeInterval) {
+        guard autoAdvanceTask == nil else { return }
+        autoAdvanceTask = Task { @MainActor in
+            let nanoseconds = UInt64(delay * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            guard !Task.isCancelled else { return }
+            launchGame(manuallyTriggered: false)
+        }
+    }
+
+    private func startTipRotation() {
+        tipTimer?.invalidate()
+        tipTimer = Timer.scheduledTimer(withTimeInterval: MotionTuning.seconds(2.6), repeats: true) { _ in
+            Task { @MainActor in
+                withAnimation(.spring(response: MotionTuning.seconds(0.38), dampingFraction: 0.9)) {
+                    tipIndex = (tipIndex + 1) % waitingTips.count
                 }
             }
+        }
+    }
+
+    private func applyMilestone(phase: CameraProcessingPhase) {
+        withAnimation(.easeInOut(duration: MotionTuning.seconds(0.35))) {
+            backendProgress = phase.progressFraction
+        }
+
+        if phase != lastMilestonePhase {
+            statusResetTask?.cancel()
+            statusResetTask = nil
+            lastMilestonePhase = phase
+            switch phase {
+            case .completed:
+                if !reduceMotion {
+                    withAnimation(.spring(response: MotionTuning.seconds(0.48), dampingFraction: 0.7)) {
+                        completionBurst = true
+                        completionBurstScale = 1.26
+                    }
+                }
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                withAnimation(.spring(response: MotionTuning.seconds(0.36), dampingFraction: 0.65)) {
+                    statusBadgePulse = true
+                }
+                statusResetTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 650_000_000)
+                    withAnimation(.easeOut(duration: MotionTuning.seconds(0.3))) {
+                        statusBadgePulse = false
+                        completionBurst = false
+                        completionBurstScale = 0.85
+                    }
+                }
+            case .failed:
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                withAnimation(.easeInOut(duration: MotionTuning.seconds(0.22))) {
+                    statusBadgePulse = true
+                }
+                statusResetTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    withAnimation(.easeOut(duration: MotionTuning.seconds(0.25))) {
+                        statusBadgePulse = false
+                    }
+                }
+            default:
+                withAnimation(.easeInOut(duration: MotionTuning.seconds(0.2))) {
+                    statusBadgePulse = phase == .waitingForRecipes || phase == .uploadingPhotos
+                    completionBurst = false
+                    completionBurstScale = 0.85
+                }
+            }
+        }
+
+        guard !didLaunchGame else { return }
+
+        switch phase {
+        case .waitingForRecipes:
+            guard !reduceMotion else { return }
+            guard GrowthLoopManager.shared.shouldAutoStartWaitingGame(hasBothPhotos: hasBothPhotos) else {
+                return
+            }
+            let delay = GrowthLoopManager.shared.waitingGameAutoStartDelay(hasBothPhotos: hasBothPhotos)
+            scheduleAutoAdvanceToGame(after: delay)
+        case .completed, .failed, .decodingResponse, .finalizingResults:
+            autoAdvanceTask?.cancel()
+            autoAdvanceTask = nil
+        default:
+            break
+        }
+    }
+
+    private func launchGame(manuallyTriggered: Bool) {
+        guard !didLaunchGame else { return }
+        didLaunchGame = true
+        autoAdvanceTask?.cancel()
+        autoAdvanceTask = nil
+
+        if manuallyTriggered {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            GrowthLoopManager.shared.trackWaitingGameManualStart()
+            onPlayGameTapped?()
+        } else {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            GrowthLoopManager.shared.trackWaitingGameAutoStart()
+            onAutoPlayGameTapped?()
         }
     }
 }
 
 #Preview {
-    AIProcessingView(fridgeImage: nil, pantryImage: nil)
+    AIProcessingView(fridgeImage: nil, pantryImage: nil, processingMilestone: .idle)
 }

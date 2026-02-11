@@ -14,7 +14,8 @@ struct ShareGeneratorView: View {
     @State private var cloudKitRecordID: String?
     @State private var shareURL: URL?
     @State private var isUploadingToCloudKit = false
-    @StateObject private var cloudKitSync = CloudKitSyncService.shared
+    @State private var showShareReadyMoment = false
+    @StateObject private var cloudKitSync = CloudKitService.shared
     @StateObject private var socialShareManager = SocialShareManager.shared
 
     enum ShareStyle: String, CaseIterable {
@@ -91,6 +92,21 @@ struct ShareGeneratorView: View {
                 }
                 .foregroundColor(Color(hex: "#667eea"))
             )
+            .overlay(alignment: .center) {
+                if isGenerating || isUploadingToCloudKit {
+                    ShareGenerationOverlay(
+                        title: isUploadingToCloudKit ? "Syncing your creation..." : "Building your share card..."
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
+            }
+            .overlay(alignment: .top) {
+                if showShareReadyMoment {
+                    ShareReadyMomentCard()
+                        .padding(.top, 16)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
         }
         .sheet(isPresented: $shareSheet) {
             if let image = generatedImage {
@@ -127,7 +143,7 @@ struct ShareGeneratorView: View {
                 let imageData = afterPhoto?.jpegData(compressionQuality: 0.8)
 
                 // Upload recipe to CloudKit
-                let recordID = try await cloudKitSync.uploadRecipe(recipe, imageData: imageData)
+                let recordID = try await cloudKitSync.uploadRecipeForSharing(recipe, imageData: imageData)
                 cloudKitRecordID = recordID
 
                 // Generate shareable URL
@@ -155,7 +171,14 @@ struct ShareGeneratorView: View {
 
                         // Auto-navigate to share sheet after generation
                         Task { @MainActor in
-                            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                            withAnimation(.spring(response: 0.45, dampingFraction: 0.76)) {
+                                showShareReadyMoment = true
+                            }
+                            try await Task.sleep(nanoseconds: 800_000_000)
+                            withAnimation(.easeOut(duration: 0.28)) {
+                                showShareReadyMoment = false
+                            }
+                            try await Task.sleep(nanoseconds: 220_000_000)
                             shareSheet = true
 
                             // Award coins for sharing
@@ -174,7 +197,7 @@ struct ShareGeneratorView: View {
                             // Create activity for recipe sharing
                             if let userID = UnifiedAuthManager.shared.currentUser?.recordID {
                                 do {
-                                    try await CloudKitSyncService.shared.createActivity(
+                                    try await CloudKitService.shared.createActivity(
                                         type: "recipeShared",
                                         actorID: userID,
                                         recipeID: recipe.id.uuidString,
@@ -221,7 +244,17 @@ struct ShareGeneratorView: View {
 
         if let uiImage = renderer.uiImage {
             generatedImage = uiImage
-            shareSheet = true
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.76)) {
+                showShareReadyMoment = true
+            }
+            Task { @MainActor in
+                try await Task.sleep(nanoseconds: 700_000_000)
+                withAnimation(.easeOut(duration: 0.26)) {
+                    showShareReadyMoment = false
+                }
+                try await Task.sleep(nanoseconds: 200_000_000)
+                shareSheet = true
+            }
         }
     }
 
@@ -586,6 +619,85 @@ struct ShareImageContent: View {
             return Color(hex: "#ecf0f1")
         default:
             return .white
+        }
+    }
+}
+
+private struct ShareGenerationOverlay: View {
+    let title: String
+    @State private var pulse = false
+
+    var body: some View {
+        VStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "#4facfe").opacity(0.24))
+                    .frame(width: pulse ? 88 : 72, height: pulse ? 88 : 72)
+                    .blur(radius: pulse ? 10 : 5)
+
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(.white)
+                    .scaleEffect(1.2)
+            }
+
+            Text(title)
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.94))
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 22)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.white.opacity(0.22), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.25), radius: 20, y: 10)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
+    }
+}
+
+private struct ShareReadyMomentCard: View {
+    @State private var glow = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 14, weight: .bold))
+            Text("Share card ready")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 11, weight: .bold))
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#43e97b"),
+                            Color(hex: "#38f9d7")
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.35), lineWidth: 1)
+        )
+        .shadow(color: Color(hex: "#38f9d7").opacity(glow ? 0.45 : 0.2), radius: glow ? 18 : 8, y: 6)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                glow = true
+            }
         }
     }
 }

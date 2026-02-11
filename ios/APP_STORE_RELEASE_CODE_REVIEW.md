@@ -27,7 +27,7 @@ This document contains a comprehensive code review of the SnapChef iOS applicati
 
 #### ⚠️ CRITICAL ISSUES FOUND:
 1. **🔴 HARDCODED API KEY (Line 499)**: 
-   - API key `"5380e4b60818cf237678fccfd4b8f767d1c94"` is hardcoded in source code
+   - API key was hardcoded in source code
    - **Risk**: High security vulnerability - API key exposed in repository
    - **Fix Required**: Remove hardcoded key, use environment variable or secure configuration service
    

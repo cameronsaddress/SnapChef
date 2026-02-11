@@ -18,7 +18,7 @@ Method: POST (multipart/form-data)
 
 AUTHENTICATION:
   - Header: X-App-API-Key
-  - Value: 5380e4b60818cf237678fccfd4b8f767d1c94
+  - Value: Configured securely at build/runtime
 
 REQUEST PARAMETERS:
   Required:

@@ -463,9 +463,10 @@ struct RecipeCardView: View {
     private func toggleLike() async {
         do {
             if isLiked {
-                try await CloudKitSyncService.shared.likeRecipe(recipe.id, recipeOwnerID: recipe.creatorID)
+                // `isLiked` reflects the post-tap target state.
+                try await CloudKitService.shared.likeRecipe(recipe.id, recipeOwnerID: recipe.creatorID)
             } else {
-                try await CloudKitSyncService.shared.unlikeRecipe(recipe.id)
+                try await CloudKitService.shared.unlikeRecipe(recipe.id)
             }
         } catch {
             print("Failed to toggle like: \(error)")
@@ -526,7 +527,7 @@ final class SocialRecipeFeedManager: ObservableObject {
     @Published var error: Error?
     @Published var showingSkeletonViews = false
     
-    private let cloudKitSync = CloudKitSyncService.shared
+    private let cloudKitSync = CloudKitService.shared
     private let cloudKitAuth = UnifiedAuthManager.shared
     private var lastLoadedDate: Date?
     private let pageSize = 20

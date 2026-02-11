@@ -2,6 +2,15 @@ import SwiftUI
 import AVFoundation
 import AuthenticationServices
 
+private let cameraDebugLoggingEnabled = false
+
+private func cameraDebugLog(_ message: @autoclosure () -> String) {
+#if DEBUG
+    guard cameraDebugLoggingEnabled else { return }
+    print(message())
+#endif
+}
+
 struct CameraView: View {
     @StateObject private var cameraModel = CameraModel()
     @StateObject private var subscriptionManager = SubscriptionManager.shared
@@ -11,7 +20,7 @@ struct CameraView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
     @EnvironmentObject var cloudKitDataManager: CloudKitDataManager
-    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitService.shared
     @Binding var selectedTab: Int
     var isPresented: Binding<Bool>?  // Optional binding to dismiss the camera
     
@@ -32,16 +41,45 @@ struct CameraView: View {
     @State private var showingPreview = false
     @State private var captureAnimation = false
     @State private var scanLineOffset: CGFloat = -200
-    @State private var glowIntensity: Double = 0.3
     @State private var showingUpgrade = false
     @State private var showConfetti = false
     @State private var showWelcomeMessage = false
     @State private var isClosing = false
+    @State private var showResultsTransition = false
+    @State private var resultsTransitionPulse = false
+    @State private var captureFlashOpacity: Double = 0
+    @State private var processingMilestone: CameraProcessingMilestone = .idle
+    @State private var transitionStage: ResultsTransitionStage = .staging
+    @State private var transitionHeroScale: CGFloat = 0.78
+    @State private var transitionHeroOffset: CGFloat = 28
+    @State private var transitionHeroOpacity: Double = 0
+    @State private var transitionProgress: Double = 0.1
+    @State private var transitionAura = false
 
     // Two-step capture flow state
     enum CaptureMode {
         case fridge
         case pantry
+    }
+
+    private enum ResultsTransitionStage {
+        case staging
+        case hero
+        case locking
+        case opening
+
+        var title: String {
+            switch self {
+            case .staging:
+                return "Preparing Reveal"
+            case .hero:
+                return "Crafting Your Hero Shot"
+            case .locking:
+                return "Locking Final Recipes"
+            case .opening:
+                return "Opening Results"
+            }
+        }
     }
 
     @State private var captureMode: CaptureMode = .fridge
@@ -92,81 +130,57 @@ struct CameraView: View {
                     .overlay(Color.black.opacity(0.3))
             }
 
-            // Scanning overlay (OptimizedScanningOverlay temporarily commented out)
+            // Adaptive scan overlay tuned for device performance.
             if !isProcessing && !showingPreview && shouldShowFullUI {
-                // TODO: Implement OptimizedScanningOverlay
-                ScanningOverlay(scanLineOffset: $scanLineOffset)
+                StudioOptimizedScanningOverlay(scanLineOffset: $scanLineOffset)
                     .ignoresSafeArea()
             }
 
             // Optimized UI overlay - load components progressively
             if !showingPreview && shouldShowFullUI {
                 VStack {
-                    // Top controls (CameraTopControls temporarily commented out)
-                    // TODO: Implement CameraTopControls
-                    CameraTopBar(onClose: {
-                        // Start closing animation
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            isClosing = true
-                            shouldShowFullUI = false
-                        }
-                        
-                        // Small delay for smooth animation
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                            // Stop camera session only if it's running
-                            if cameraModel.isSessionReady {
-                                cameraModel.stopSession()
-                            }
-                            resetCaptureFlow()
-                            
-                            // If camera was presented modally from HomeView, dismiss it
-                            if let cameraPresented = isPresented {
-                                cameraPresented.wrappedValue = false
-                            } else {
-                                // Otherwise switch tabs (when used from tab bar)
-                                selectedTab = 0
-                            }
-                            
-                            // Reset closing state for next time
-                            isClosing = false
-                        }
-                    })
+                    StudioCameraTopBar(
+                        captureMode: captureMode,
+                        isSessionReady: cameraModel.isSessionReady,
+                        flashIcon: flashIcon,
+                        onClose: closeCamera,
+                        onFlipCamera: { cameraModel.flipCamera() },
+                        onToggleFlash: { cameraModel.toggleFlash() }
+                    )
                     
                     Spacer()
                     
-                    // Bottom controls (CameraBottomControls temporarily commented out)
-                    // TODO: Implement CameraBottomControls
-                    VStack(spacing: 20) {
-                        CaptureButtonEnhanced(
-                            action: capturePhoto,
-                            isDisabled: isProcessing,
-                            triggerAnimation: $captureAnimation
-                        )
-                        .padding(.bottom, 50)
-                    }
+                    StudioCameraBottomDock(
+                        captureMode: captureMode,
+                        isSessionReady: cameraModel.isSessionReady,
+                        isProcessing: isProcessing,
+                        fridgePhoto: fridgePhoto,
+                        triggerAnimation: $captureAnimation,
+                        onCapture: capturePhoto,
+                        onDebugTest: sendTestFridgeImage
+                    )
                 }
             }
 
-            // Overlays component (CameraOverlays temporarily commented out)
-            // TODO: Implement CameraOverlays
             if isProcessing {
-                let _ = print("🔍 DEBUG: Showing MagicalProcessingOverlay - isProcessing: true")
                 MagicalBackground()
                     .ignoresSafeArea()
                     .overlay(
-                        MagicalProcessingOverlay(capturedImage: capturedImage, onClose: {
-                            print("🔍 DEBUG: MagicalProcessingOverlay onClose called")
+                        MagicalProcessingOverlay(capturedImage: capturedImage, processingMilestone: processingMilestone, onClose: {
+                            cameraDebugLog("🔍 DEBUG: MagicalProcessingOverlay onClose called")
                             // Stop processing and go back
                             isProcessing = false
+                            processingMilestone = .idle
                             capturedImage = nil
                             fridgePhoto = nil
                             captureMode = .fridge
                             showPantryStep = false
-                            
-                            // Navigate back to home tab immediately
-                            selectedTab = 0
+                            routeOutOfCamera()
                         })
                     )
+                    .onAppear {
+                        cameraDebugLog("🔍 DEBUG: Showing MagicalProcessingOverlay - isProcessing: true")
+                    }
             }
             
             // Black overlay when closing to prevent frozen frame
@@ -178,94 +192,25 @@ struct CameraView: View {
             
             // Preview overlay
             if showingPreview, let image = capturedImage {
-                ZStack {
-                    // Black background
-                    Color.black.ignoresSafeArea()
-                    
-                    // Full screen photo with proper aspect ratio
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .ignoresSafeArea()
-                    
-                    // Buttons overlaying directly on image
-                    VStack {
-                        Spacer()
-                        
-                        // Buttons positioned at bottom
-                        HStack(spacing: 60) {
-                            // Retake button
-                            Button(action: {
-                                showingPreview = false
-                                capturedImage = nil
-                            }) {
-                                Text("Retake")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 32)
-                                    .padding(.vertical, 16)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.black.opacity(0.5))
-                                            .overlay(
-                                                Capsule()
-                                                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
-                                            )
-                                    )
-                                    .shadow(color: Color.black.opacity(0.5), radius: 8, y: 4)
-                            }
-                            
-                            // Confirm button with green checkmark
-                            VStack(spacing: 8) {
-                                Button(action: {
-                                    showingPreview = false
-                                    
-                                    // After capturing fridge photo, always show pantry prompt
-                                    if captureMode == .fridge {
-                                        fridgePhoto = capturedImage
-                                        showPantryStep = true  // Show pantry overlay
-                                    } 
-                                    // After capturing pantry photo, process both
-                                    else if captureMode == .pantry {
-                                        if let fridgeImage = fridgePhoto {
-                                            processBothImages(fridgeImage: fridgeImage, pantryImage: capturedImage!)
-                                        }
-                                    }
-                                }) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color.green)
-                                            .frame(width: 70, height: 70)
-                                            .shadow(color: Color.green.opacity(0.6), radius: 12, y: 6)
-                                        
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 28, weight: .bold))
-                                            .foregroundColor(.white)
-                                    }
-                                }
-                                
-                                Text("Looks Good!")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .shadow(color: Color.black.opacity(0.5), radius: 2, x: 0, y: 1)
-                            }
-                        }
-                        .padding(.bottom, 60)
-                    }
-                }
+                CapturedImageView(
+                    image: image,
+                    onRetake: retakeCapturedPhoto,
+                    onConfirm: confirmCapturedPhoto
+                )
+                .transition(.opacity)
             }
         }
         .onAppear {
-            print("🔍 DEBUG: CameraView appeared - Start")
+            cameraDebugLog("🔍 DEBUG: CameraView appeared - Start")
             // Reset closing state when view appears
             isClosing = false
             DispatchQueue.main.async {
-                print("🔍 DEBUG: CameraView - Async block started")
+                cameraDebugLog("🔍 DEBUG: CameraView - Async block started")
                 // Performance optimization: Progressive loading
                 setupViewProgressively()
-                print("🔍 DEBUG: CameraView - Async block completed")
+                cameraDebugLog("🔍 DEBUG: CameraView - Async block completed")
             }
-            print("🔍 DEBUG: CameraView appeared - End")
+            cameraDebugLog("🔍 DEBUG: CameraView appeared - End")
         }
         // Particle explosion only if effects are enabled
         .modifier(ConditionalParticleExplosion(
@@ -285,13 +230,7 @@ struct CameraView: View {
                 isPresented: $showingResults  // Pass binding to control dismissal
             )
             .onDisappear {
-                // When results are dismissed, also dismiss the camera if it was presented from HomeView
-                if let cameraPresented = isPresented {
-                    cameraPresented.wrappedValue = false
-                }
-                // When recipe results are dismissed, go back to home tab
-                selectedTab = 0 // Switch to home tab
-                // Reset the capture flow for next time
+                routeOutOfCamera()
                 resetCaptureFlow()
             }
         }
@@ -324,6 +263,19 @@ struct CameraView: View {
                     .padding(.top, 50)
                 }
                 Spacer()
+            }
+        )
+        .overlay(resultsTransitionOverlay)
+        .overlay(captureFlashOverlay)
+        .overlay(
+            Group {
+                if showWelcomeMessage {
+                    StudioCameraWelcomeOverlay()
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .top).combined(with: .opacity),
+                            removal: .opacity
+                        ))
+                }
             }
         )
         .overlay(
@@ -385,13 +337,216 @@ struct CameraView: View {
         )
     }
 
+    @ViewBuilder
+    private var resultsTransitionOverlay: some View {
+        if showResultsTransition {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.72),
+                        Color(hex: "#0f142d").opacity(0.62)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                    .ignoresSafeArea()
+
+                VStack(spacing: 16) {
+                    if let capturedImage {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 22)
+                                .fill(Color.white.opacity(0.12))
+                                .frame(width: 256, height: 168)
+                                .scaleEffect(transitionAura ? 1.025 : 0.985)
+
+                            Image(uiImage: capturedImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 246, height: 158)
+                                .clipShape(RoundedRectangle(cornerRadius: 18))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 18)
+                                        .stroke(Color.white.opacity(0.24), lineWidth: 1)
+                                )
+                        }
+                        .shadow(color: Color(hex: "#38f9d7").opacity(0.28), radius: 24, y: 12)
+                        .opacity(transitionHeroOpacity)
+                        .scaleEffect(transitionHeroScale)
+                        .offset(y: transitionHeroOffset)
+                    }
+
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#38f9d7"), Color(hex: "#43e97b")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 72, height: 72)
+                            .shadow(color: Color(hex: "#38f9d7").opacity(0.45), radius: 16, y: 8)
+                            .scaleEffect(resultsTransitionPulse ? 1.04 : 0.96)
+
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+
+                    Text(transitionStage.title)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Text("Building your studio-quality reveal...")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundColor(.white.opacity(0.85))
+
+                    ProgressView(value: transitionProgress, total: 1.0)
+                        .progressViewStyle(.linear)
+                        .tint(Color(hex: "#38f9d7"))
+                        .frame(width: 210)
+                }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(Color.white.opacity(0.12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24)
+                                .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                        )
+                )
+            }
+            .transition(.opacity.combined(with: .scale))
+            .animation(.easeInOut(duration: 0.22), value: showResultsTransition)
+        }
+    }
+
     private func startScanAnimation() {
-        withAnimation(.linear(duration: 2).repeatForever(autoreverses: true)) {
+        withAnimation(
+            .linear(duration: MotionTuning.cameraSeconds(GrowthRemoteConfig.shared.cameraScanCycleBaseDuration))
+                .repeatForever(autoreverses: true)
+        ) {
             scanLineOffset = 200
         }
+    }
 
-        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-            glowIntensity = 0.8
+    private func routeOutOfCamera() {
+        if let cameraPresented = isPresented {
+            cameraPresented.wrappedValue = false
+        } else {
+            selectedTab = 0
+        }
+    }
+
+    private func closeCamera() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            isClosing = true
+            shouldShowFullUI = false
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            if cameraModel.isSessionReady {
+                cameraModel.stopSession()
+            }
+            resetCaptureFlow()
+            routeOutOfCamera()
+            isClosing = false
+        }
+    }
+
+    private func retakeCapturedPhoto() {
+        showingPreview = false
+        capturedImage = nil
+    }
+
+    private func confirmCapturedPhoto() {
+        guard let latestCapture = capturedImage else { return }
+        showingPreview = false
+
+        if captureMode == .fridge {
+            fridgePhoto = latestCapture
+            showPantryStep = true
+            return
+        }
+
+        if let fridgeImage = fridgePhoto {
+            processBothImages(fridgeImage: fridgeImage, pantryImage: latestCapture)
+            return
+        }
+
+        // Fallback path if pantry step was resumed without a fridge photo.
+        processImage(latestCapture)
+    }
+
+    @MainActor
+    private func presentRecipeResults() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        transitionStage = .staging
+        transitionHeroScale = 0.78
+        transitionHeroOffset = 28
+        transitionHeroOpacity = 0
+        transitionProgress = 0.1
+        transitionAura = false
+        resultsTransitionPulse = false
+
+        withAnimation(.spring(response: MotionTuning.seconds(0.34), dampingFraction: 0.84)) {
+            showResultsTransition = true
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: MotionTuning.nanoseconds(0.09))
+            transitionStage = .hero
+            withAnimation(.spring(response: MotionTuning.seconds(0.42), dampingFraction: 0.82)) {
+                transitionHeroScale = 1.0
+                transitionHeroOffset = 0
+                transitionHeroOpacity = 1
+                transitionProgress = 0.52
+            }
+
+            try? await Task.sleep(nanoseconds: MotionTuning.nanoseconds(0.14))
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            transitionStage = .locking
+            withAnimation(.easeInOut(duration: MotionTuning.seconds(0.35))) {
+                transitionProgress = 0.83
+                resultsTransitionPulse = true
+                transitionAura = true
+            }
+            withAnimation(.easeInOut(duration: MotionTuning.seconds(1.05)).repeatForever(autoreverses: true)) {
+                transitionAura = true
+            }
+
+            try? await Task.sleep(nanoseconds: MotionTuning.nanoseconds(0.17))
+            transitionStage = .opening
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            withAnimation(.easeOut(duration: MotionTuning.seconds(0.18))) {
+                transitionProgress = 1.0
+            }
+
+            try? await Task.sleep(nanoseconds: MotionTuning.nanoseconds(0.11))
+            updateProcessingMilestone(.completed)
+            NotificationCenter.default.post(
+                name: .snapchefRecipeGenerated,
+                object: nil,
+                userInfo: ["count": generatedRecipes.count]
+            )
+            showingResults = true
+            try? await Task.sleep(nanoseconds: MotionTuning.nanoseconds(0.13))
+            isProcessing = false
+            withAnimation(.easeInOut(duration: MotionTuning.seconds(0.22))) {
+                showResultsTransition = false
+                resultsTransitionPulse = false
+                transitionAura = false
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var captureFlashOverlay: some View {
+        if captureFlashOpacity > 0.001 {
+            Color.white
+                .opacity(captureFlashOpacity)
+                .ignoresSafeArea()
         }
     }
 
@@ -402,6 +557,13 @@ struct CameraView: View {
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .heavy)
         generator.impactOccurred()
+
+        withAnimation(.easeOut(duration: 0.08)) {
+            captureFlashOpacity = 0.28
+        }
+        withAnimation(.easeIn(duration: 0.14).delay(0.08)) {
+            captureFlashOpacity = 0
+        }
 
         cameraModel.capturePhoto { image in
             capturedImage = image
@@ -480,22 +642,25 @@ struct CameraView: View {
     }
 
     private func processImage(_ image: UIImage) {
-        print("🔍 DEBUG: processImage called for single image")
-        print("🔍 DEBUG: Setting isProcessing = true for single image")
+        cameraDebugLog("🔍 DEBUG: processImage called for single image")
+        cameraDebugLog("🔍 DEBUG: Setting isProcessing = true for single image")
         isProcessing = true
+        GrowthLoopManager.shared.resetRecipeWaitMeasurement()
+        updateProcessingMilestone(.preparingRequest)
         capturedImage = image // Store the captured image
-        print("🔍 DEBUG: isProcessing is now: \(isProcessing)")
+        cameraDebugLog("🔍 DEBUG: isProcessing is now: \(isProcessing)")
 
         // Stop camera session to save resources while processing
-        print("🔍 DEBUG: Stopping camera session for single image processing")
+        cameraDebugLog("🔍 DEBUG: Stopping camera session for single image processing")
         cameraModel.stopSession()
 
         Task {
-            print("🔍 DEBUG: processImage Task started")
+            cameraDebugLog("🔍 DEBUG: processImage Task started")
             // Check subscription status and usage limits
             if !subscriptionManager.isPremium {
                 if usageTracker.hasReachedRecipeLimit() {
                     isProcessing = false
+                    updateProcessingMilestone(.idle)
 
                     // Record paywall shown and trigger it
                     if paywallTriggerManager.shouldShowPaywall(for: .recipeLimitReached) {
@@ -581,6 +746,7 @@ struct CameraView: View {
             let llmProvider = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini"
 
             // Call the API
+            updateProcessingMilestone(.uploadingPhotos)
             SnapChefAPIManager.shared.sendImageForRecipeGeneration(
                 image: image,
                 sessionId: sessionId,
@@ -593,18 +759,24 @@ struct CameraView: View {
                 numberOfRecipes: numberOfRecipes,
                 existingRecipeNames: existingRecipeNamesArray,
                 foodPreferences: foodPreferences,
-                llmProvider: llmProvider
+                llmProvider: llmProvider,
+                lifecycle: { milestone in
+                    Task { @MainActor in
+                        self.updateProcessingMilestone(from: milestone)
+                    }
+                }
             ) { result in
                 Task { @MainActor in
                     switch result {
                     case .success(let apiResponse):
+                        self.updateProcessingMilestone(.finalizingResults)
                         // Convert API recipes to app recipes
                         let recipes = apiResponse.data.recipes.map { apiRecipe in
                             SnapChefAPIManager.shared.convertAPIRecipeToAppRecipe(apiRecipe)
                         }
 
                         // 🔍 DEBUG: Log converted recipes in CameraView (single image)
-                        print("🔍 DEBUG: CameraView - Converted \(recipes.count) recipes from API (single image)")
+                        cameraDebugLog("🔍 DEBUG: CameraView - Converted \(recipes.count) recipes from API (single image)")
                         for (index, recipe) in recipes.enumerated() {
                             print("🔍 CAMERA RECIPE \(index + 1) FINAL STATE:")
                             print("🔍   - name: \(recipe.name)")
@@ -631,13 +803,7 @@ struct CameraView: View {
 
                         // Navigate to results - keep processing overlay visible until results show
                         // This prevents the camera from restarting
-                        Task { @MainActor in
-                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-                            self.showingResults = true
-                            // Dismiss processing overlay after results are showing
-                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-                            self.isProcessing = false
-                        }
+                        presentRecipeResults()
 
                         // Capture values before entering detached task (these are @MainActor properties)
                         let flashEnabled = cameraModel.flashMode == .on
@@ -650,7 +816,6 @@ struct CameraView: View {
 
                         // BACKGROUND SAVING: Queue CloudKit upload for background processing
                         Task.detached(priority: .background) {
-                            do {
                                 // Check if recipes already exist in CloudKit before uploading
                                 print("📱 Background: Checking for duplicate recipes before CloudKit upload...")
                                 var recipesToUpload: [Recipe] = []
@@ -663,7 +828,7 @@ struct CameraView: View {
                                 
                                 // Check for duplicates before uploading
                                 for recipe in recipes {
-                                    let existingID = await cloudKitRecipeManager.checkRecipeExists(recipe.name, recipe.description)
+                                    let existingID = await cloudKitRecipeManager.existingRecipeID(name: recipe.name, description: recipe.description)
                                     if existingID == nil {
                                         recipesToUpload.append(recipe)
                                         print("📱 Background: Recipe '\(recipe.name)' will be uploaded")
@@ -720,8 +885,8 @@ struct CameraView: View {
                                 await cloudKitDataManager.trackFeatureUse("recipe_generation")
 
                                 // Check if paywall should be triggered after successful generation
-                                if let suggestedContext = await MainActor.run { self.paywallTriggerManager.getSuggestedPaywallContext() } {
-                                    if await MainActor.run { self.paywallTriggerManager.shouldShowPaywall(for: suggestedContext) } {
+                                if let suggestedContext = await MainActor.run(body: { self.paywallTriggerManager.getSuggestedPaywallContext() }) {
+                                    if await MainActor.run(body: { self.paywallTriggerManager.shouldShowPaywall(for: suggestedContext) }) {
                                         await MainActor.run {
                                             self.premiumPromptReason = .dailyLimitReached
                                             self.showPremiumPrompt = true
@@ -828,14 +993,12 @@ struct CameraView: View {
                                         ])
                                     }
                                 }
-                            } catch {
-                                print("❌ Background saving failed: \(error)")
-                            }
                         }
 
                     case .failure(let error):
-                        print("🔍 DEBUG: API FAILURE: \(error)")
-                        print("🔍 DEBUG: Setting isProcessing = false due to error")
+                        cameraDebugLog("🔍 DEBUG: API FAILURE: \(error)")
+                        cameraDebugLog("🔍 DEBUG: Setting isProcessing = false due to error")
+                        self.updateProcessingMilestone(.failed)
                         self.isProcessing = false
 
                         // Convert API errors to user-friendly SnapChef errors with appropriate recovery strategies
@@ -866,27 +1029,30 @@ struct CameraView: View {
     }
 
     private func processBothImages(fridgeImage: UIImage, pantryImage: UIImage) {
-        print("🔍 DEBUG: processBothImages called")
-        print("🔍 DEBUG: Setting isProcessing = true")
+        cameraDebugLog("🔍 DEBUG: processBothImages called")
+        cameraDebugLog("🔍 DEBUG: Setting isProcessing = true")
         isProcessing = true
+        GrowthLoopManager.shared.resetRecipeWaitMeasurement()
+        updateProcessingMilestone(.preparingRequest)
         capturedImage = fridgeImage // Store the fridge image as the primary image
-        print("🔍 DEBUG: isProcessing is now: \(isProcessing)")
-        print("🔍 DEBUG: capturedImage set: \(capturedImage != nil)")
+        cameraDebugLog("🔍 DEBUG: isProcessing is now: \(isProcessing)")
+        cameraDebugLog("🔍 DEBUG: capturedImage set: \(capturedImage != nil)")
 
         // Stop camera session to save resources while processing
-        print("🔍 DEBUG: Stopping camera session for processing")
+        cameraDebugLog("🔍 DEBUG: Stopping camera session for processing")
         cameraModel.stopSession()
 
         Task {
-            print("🔍 DEBUG: processBothImages Task started")
+            cameraDebugLog("🔍 DEBUG: processBothImages Task started")
             // Check subscription status and usage limits for dual images
-            print("🔍 DEBUG: Checking subscription - isPremium: \(subscriptionManager.isPremium)")
+            cameraDebugLog("🔍 DEBUG: Checking subscription - isPremium: \(subscriptionManager.isPremium)")
             if !subscriptionManager.isPremium {
                 let hasReachedLimit = usageTracker.hasReachedRecipeLimit()
-                print("🔍 DEBUG: Has reached recipe limit: \(hasReachedLimit)")
+                cameraDebugLog("🔍 DEBUG: Has reached recipe limit: \(hasReachedLimit)")
                 if hasReachedLimit {
-                    print("🔍 DEBUG: Recipe limit reached, stopping processing")
+                    cameraDebugLog("🔍 DEBUG: Recipe limit reached, stopping processing")
                     isProcessing = false
+                    updateProcessingMilestone(.idle)
 
                     // Record paywall shown and trigger it
                     if paywallTriggerManager.shouldShowPaywall(for: .recipeLimitReached) {
@@ -899,7 +1065,7 @@ struct CameraView: View {
                     return
                 }
             }
-            print("🔍 DEBUG: Subscription check passed, continuing with API call")
+            cameraDebugLog("🔍 DEBUG: Subscription check passed, continuing with API call")
 
             // Generate session ID
             let sessionId = UUID().uuidString
@@ -959,11 +1125,12 @@ struct CameraView: View {
             let llmProvider = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini"
 
             // Call the new API function for both images
-            print("🔍 DEBUG: About to call API with both images")
-            print("🔍 DEBUG: Fridge image size: \(fridgeImage.size)")
-            print("🔍 DEBUG: Pantry image size: \(pantryImage.size)")
-            print("🔍 DEBUG: Number of recipes: \(numberOfRecipes)")
-            print("🔍 DEBUG: LLM Provider: \(llmProvider)")
+            updateProcessingMilestone(.uploadingPhotos)
+            cameraDebugLog("🔍 DEBUG: About to call API with both images")
+            cameraDebugLog("🔍 DEBUG: Fridge image size: \(fridgeImage.size)")
+            cameraDebugLog("🔍 DEBUG: Pantry image size: \(pantryImage.size)")
+            cameraDebugLog("🔍 DEBUG: Number of recipes: \(numberOfRecipes)")
+            cameraDebugLog("🔍 DEBUG: LLM Provider: \(llmProvider)")
             SnapChefAPIManager.shared.sendBothImagesForRecipeGeneration(
                 fridgeImage: fridgeImage,
                 pantryImage: pantryImage,
@@ -977,21 +1144,27 @@ struct CameraView: View {
                 numberOfRecipes: numberOfRecipes,
                 existingRecipeNames: existingRecipeNamesArray,
                 foodPreferences: foodPreferences,
-                llmProvider: llmProvider
+                llmProvider: llmProvider,
+                lifecycle: { milestone in
+                    Task { @MainActor in
+                        self.updateProcessingMilestone(from: milestone)
+                    }
+                }
             ) { result in
-                print("🔍 DEBUG: API callback received for dual images")
+                cameraDebugLog("🔍 DEBUG: API callback received for dual images")
                 Task { @MainActor in
-                    print("🔍 DEBUG: In MainActor task for dual images")
+                    cameraDebugLog("🔍 DEBUG: In MainActor task for dual images")
                     switch result {
                     case .success(let apiResponse):
-                        print("🔍 DEBUG: API SUCCESS - Got \(apiResponse.data.recipes.count) recipes from dual images")
+                        self.updateProcessingMilestone(.finalizingResults)
+                        cameraDebugLog("🔍 DEBUG: API SUCCESS - Got \(apiResponse.data.recipes.count) recipes from dual images")
                         // Convert API recipes to app recipes
                         let recipes = apiResponse.data.recipes.map { apiRecipe in
                             SnapChefAPIManager.shared.convertAPIRecipeToAppRecipe(apiRecipe)
                         }
 
                         // 🔍 DEBUG: Log converted recipes in CameraView (dual image)
-                        print("🔍 DEBUG: CameraView - Converted \(recipes.count) recipes from API (dual image)")
+                        cameraDebugLog("🔍 DEBUG: CameraView - Converted \(recipes.count) recipes from API (dual image)")
                         for (index, recipe) in recipes.enumerated() {
                             print("🔍 CAMERA RECIPE \(index + 1) FINAL STATE:")
                             print("🔍   - name: \(recipe.name)")
@@ -1021,13 +1194,7 @@ struct CameraView: View {
 
                         // Navigate to results - keep processing overlay visible until results show
                         // This prevents the camera from restarting
-                        Task { @MainActor in
-                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-                            self.showingResults = true
-                            // Dismiss processing overlay after results are showing
-                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-                            self.isProcessing = false
-                        }
+                        presentRecipeResults()
 
                         // Capture values before entering detached task (these are @MainActor properties)
                         let flashEnabled = cameraModel.flashMode == .on
@@ -1040,7 +1207,6 @@ struct CameraView: View {
 
                         // BACKGROUND SAVING: Queue CloudKit upload for background processing
                         Task.detached(priority: .background) {
-                            do {
                                 // Check if recipes already exist in CloudKit before uploading
                                 print("📱 Background: Checking for duplicate recipes before CloudKit upload...")
                                 var recipesToUpload: [Recipe] = []
@@ -1053,7 +1219,7 @@ struct CameraView: View {
                                 
                                 // Check for duplicates before uploading
                                 for recipe in recipes {
-                                    let existingID = await cloudKitRecipeManager.checkRecipeExists(recipe.name, recipe.description)
+                                    let existingID = await cloudKitRecipeManager.existingRecipeID(name: recipe.name, description: recipe.description)
                                     if existingID == nil {
                                         recipesToUpload.append(recipe)
                                         print("📱 Background: Recipe '\(recipe.name)' will be uploaded")
@@ -1208,14 +1374,12 @@ struct CameraView: View {
                                         ])
                                     }
                                 }
-                            } catch {
-                                print("❌ Background saving failed: \(error)")
-                            }
                         }
 
                     case .failure(let error):
-                        print("🔍 DEBUG: API FAILURE: \(error)")
-                        print("🔍 DEBUG: Setting isProcessing = false due to error")
+                        cameraDebugLog("🔍 DEBUG: API FAILURE: \(error)")
+                        cameraDebugLog("🔍 DEBUG: Setting isProcessing = false due to error")
+                        self.updateProcessingMilestone(.failed)
                         self.isProcessing = false
 
                         // Convert API errors to user-friendly SnapChef errors with appropriate recovery strategies
@@ -1265,6 +1429,39 @@ struct CameraView: View {
         showPantryStep = false
         capturedImage = nil
         showingPreview = false
+        GrowthLoopManager.shared.resetRecipeWaitMeasurement()
+        processingMilestone = .idle
+    }
+
+    private func updateProcessingMilestone(_ phase: CameraProcessingPhase) {
+        processingMilestone = CameraProcessingMilestone(phase: phase)
+        switch phase {
+        case .waitingForRecipes:
+            GrowthLoopManager.shared.markRecipeWaitStarted()
+        case .decodingResponse, .completed, .failed:
+            GrowthLoopManager.shared.markRecipeWaitFinished()
+        case .idle:
+            GrowthLoopManager.shared.resetRecipeWaitMeasurement()
+        default:
+            break
+        }
+    }
+
+    private func updateProcessingMilestone(from milestone: SnapChefAPIManager.RecipeGenerationMilestone) {
+        switch milestone {
+        case .requestPrepared:
+            updateProcessingMilestone(.preparingRequest)
+        case .requestSent:
+            updateProcessingMilestone(.waitingForRecipes)
+        case .responseReceived:
+            updateProcessingMilestone(.decodingResponse)
+        case .responseDecoded:
+            updateProcessingMilestone(.finalizingResults)
+        case .completed:
+            updateProcessingMilestone(.finalizingResults)
+        case .failed:
+            updateProcessingMilestone(.failed)
+        }
     }
 
     private func determineRecipeQuality(_ recipe: Recipe) -> RecipeQuality {
@@ -1429,183 +1626,23 @@ struct PantryStepOverlay: View {
             }
         }
         .onAppear {
-            print("🔍 DEBUG: PantryStepOverlay appeared - Start")
+            cameraDebugLog("🔍 DEBUG: PantryStepOverlay appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: PantryStepOverlay - Async block started")
+                cameraDebugLog("🔍 DEBUG: PantryStepOverlay - Async block started")
                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                     pulseAnimation = true
                 }
-                print("🔍 DEBUG: PantryStepOverlay - Async block completed")
+                cameraDebugLog("🔍 DEBUG: PantryStepOverlay - Async block completed")
             }
-            print("🔍 DEBUG: PantryStepOverlay appeared - End")
+            cameraDebugLog("🔍 DEBUG: PantryStepOverlay appeared - End")
         }
         .sheet(isPresented: $showAuthPrompt) {
-            PantryAuthPromptView(
-                isPresented: $showAuthPrompt,
-                onAuthenticated: {
-                    // After successful authentication, continue to pantry capture
-                    onContinue()
-                }
-            )
-        }
-    }
-}
-
-// MARK: - Pantry Authentication Prompt
-struct PantryAuthPromptView: View {
-    @Binding var isPresented: Bool
-    let onAuthenticated: () -> Void
-    @StateObject private var authManager = UnifiedAuthManager.shared
-    @State private var isAuthenticating = false
-    @State private var errorMessage: String?
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                // Gradient background
-                LinearGradient(
-                    colors: [
-                        Color(hex: "#667eea"),
-                        Color(hex: "#764ba2")
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                
-                VStack(spacing: 30) {
-                    Spacer()
-                    
-                    // Icon
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.2))
-                            .frame(width: 100, height: 100)
-                        
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 45))
-                            .foregroundColor(.white)
-                    }
-                    
-                    // Title
-                    Text("Sign In Required")
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    // Description
-                    VStack(spacing: 12) {
-                        Text("Pantry photo feature requires an account")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white.opacity(0.9))
-                            .multilineTextAlignment(.center)
-                        
-                        Text("Sign in to combine fridge and pantry photos for better recipe suggestions!")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.8))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 20)
-                    }
-                    
-                    // Benefits
-                    VStack(alignment: .leading, spacing: 16) {
-                        FeatureRow(icon: "camera.on.rectangle", text: "Combine multiple photos")
-                        FeatureRow(icon: "cloud.fill", text: "Save recipes to your account")
-                        FeatureRow(icon: "person.2.fill", text: "Share with friends")
-                        FeatureRow(icon: "bookmark.fill", text: "Build your cookbook")
-                    }
-                    .padding(.horizontal, 40)
-                    
-                    Spacer()
-                    
-                    // Sign in with Apple button
-                    SignInWithAppleButton(
-                        .signIn,
-                        onRequest: { request in
-                            request.requestedScopes = [.fullName, .email]
-                        },
-                        onCompletion: { result in
-                            handleAppleSignIn(result)
-                        }
-                    )
-                    .signInWithAppleButtonStyle(.white)
-                    .frame(height: 50)
-                    .cornerRadius(25)
-                    .padding(.horizontal, 40)
-                    .disabled(isAuthenticating)
-                    
-                    // Skip button
-                    Button(action: {
-                        isPresented = false
-                    }) {
-                        Text("Maybe Later")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.8))
-                            .underline()
-                    }
-                    .padding(.bottom, 20)
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { isPresented = false }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-                }
-            }
-        }
-    }
-    
-    private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
-        isAuthenticating = true
-        
-        switch result {
-        case .success(let authorization):
-            Task {
-                do {
-                    try await authManager.signInWithApple(authorization: authorization)
-                    
-                    // Wait a moment for auth to propagate
-                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                    
-                    // Check if now authenticated
+            ProgressiveAuthPrompt(overrideContext: .featureUnlock)
+                .onDisappear {
                     if authManager.isAuthenticated {
-                        isPresented = false
-                        onAuthenticated()
+                        onContinue()
                     }
-                } catch {
-                    errorMessage = "Authentication failed. Please try again."
-                    print("Authentication error: \(error)")
                 }
-                isAuthenticating = false
-            }
-            
-        case .failure(let error):
-            errorMessage = "Sign in cancelled or failed."
-            print("Apple Sign In failed: \(error)")
-            isAuthenticating = false
-        }
-    }
-    
-    struct FeatureRow: View {
-        let icon: String
-        let text: String
-        
-        var body: some View {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(.white)
-                    .frame(width: 28)
-                
-                Text(text)
-                    .font(.system(size: 16))
-                    .foregroundColor(.white.opacity(0.9))
-                
-                Spacer()
-            }
         }
     }
 }
@@ -1747,15 +1784,18 @@ struct ScanningOverlay: View {
             }
         }
         .onAppear {
-            print("🔍 DEBUG: ScanningOverlay appeared - Start")
+            cameraDebugLog("🔍 DEBUG: ScanningOverlay appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: ScanningOverlay - Async block started")
-                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                cameraDebugLog("🔍 DEBUG: ScanningOverlay - Async block started")
+                withAnimation(
+                    .easeInOut(duration: MotionTuning.cameraSeconds(GrowthRemoteConfig.shared.cameraScanCycleBaseDuration))
+                        .repeatForever(autoreverses: true)
+                ) {
                     cornerAnimation = true
                 }
-                print("🔍 DEBUG: ScanningOverlay - Async block completed")
+                cameraDebugLog("🔍 DEBUG: ScanningOverlay - Async block completed")
             }
-            print("🔍 DEBUG: ScanningOverlay appeared - End")
+            cameraDebugLog("🔍 DEBUG: ScanningOverlay appeared - End")
         }
     }
 
@@ -1821,11 +1861,11 @@ extension CameraView {
             
             await MainActor.run {
                 DispatchQueue.main.async {
-                    print("🔍 DEBUG: setupViewProgressively - Async block started")
+                    cameraDebugLog("🔍 DEBUG: setupViewProgressively - Async block started")
                     withAnimation(.easeIn(duration: 0.3)) {
                         shouldShowFullUI = true
                     }
-                    print("🔍 DEBUG: setupViewProgressively - Async block completed")
+                    cameraDebugLog("🔍 DEBUG: setupViewProgressively - Async block completed")
                 }
             }
         }
@@ -2030,21 +2070,6 @@ struct CaptureButtonEnhanced: View {
 }
 
 // MagicalProcessingOverlay is now defined in PhysicsLoadingOverlay.swift
-
-// MARK: - Performance Optimized Modifiers
-
-struct ConditionalParticleExplosion: ViewModifier {
-    @Binding var trigger: Bool
-    let enabled: Bool
-    
-    func body(content: Content) -> some View {
-        if enabled {
-            content.particleExplosion(trigger: $trigger)
-        } else {
-            content
-        }
-    }
-}
 
 #Preview {
     CameraView()

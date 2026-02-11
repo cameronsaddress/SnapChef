@@ -411,7 +411,7 @@ final class RecipesViewModel: ObservableObject {
                     print("📤 Immediately uploading recipe to CloudKit: '\(recipe.name)'")
                     
                     // Upload the recipe with before photo if available
-                    let recipeID = try await CloudKitRecipeManager.shared.uploadRecipe(
+                    let recipeID = try await CloudKitService.shared.uploadRecipe(
                         recipe,
                         fromLLM: false,
                         beforePhoto: beforePhoto
@@ -420,9 +420,9 @@ final class RecipesViewModel: ObservableObject {
                     
                     // If we have an after photo, update it immediately
                     if let afterPhoto = afterPhoto {
-                        let recipeExists = await CloudKitRecipeManager.shared.checkRecipeExists(recipeID)
+                        let recipeExists = await CloudKitService.shared.recipeExists(with: recipeID)
                         if recipeExists {
-                            try await CloudKitRecipeManager.shared.updateAfterPhoto(
+                            try await CloudKitService.shared.updateAfterPhoto(
                                 for: recipeID,
                                 afterPhoto: afterPhoto
                             )
@@ -431,7 +431,7 @@ final class RecipesViewModel: ObservableObject {
                     }
                     
                     // Add to user's saved recipes list
-                    try await CloudKitRecipeManager.shared.addRecipeToUserProfile(recipeID, type: .saved)
+                    try await CloudKitService.shared.addRecipeToUserProfile(recipeID, type: .saved)
                     print("✅ Recipe added to user's CloudKit profile")
                 } catch {
                     print("❌ CloudKit upload failed (will retry on next sync): \(error)")
@@ -462,10 +462,10 @@ final class RecipesViewModel: ObservableObject {
                         print("📤 Immediately uploading after photo to CloudKit for recipe ID: \(recipeId)")
                         
                         // Check if recipe exists in CloudKit first
-                        let recipeExists = await CloudKitRecipeManager.shared.checkRecipeExists(recipeId.uuidString)
+                        let recipeExists = await CloudKitService.shared.recipeExists(with: recipeId.uuidString)
                         
                         if recipeExists {
-                            try await CloudKitRecipeManager.shared.updateAfterPhoto(
+                            try await CloudKitService.shared.updateAfterPhoto(
                                 for: recipeId.uuidString,
                                 afterPhoto: afterPhoto
                             )
@@ -473,14 +473,14 @@ final class RecipesViewModel: ObservableObject {
                         } else {
                             // Recipe doesn't exist in CloudKit yet, upload the whole recipe
                             print("📤 Recipe not in CloudKit, uploading full recipe with photos")
-                            let recipeID = try await CloudKitRecipeManager.shared.uploadRecipe(
+                            let recipeID = try await CloudKitService.shared.uploadRecipe(
                                 existingRecipe.recipe,
                                 fromLLM: false,
                                 beforePhoto: existingRecipe.beforePhoto
                             )
                             
                             // Now update with after photo
-                            try await CloudKitRecipeManager.shared.updateAfterPhoto(
+                            try await CloudKitService.shared.updateAfterPhoto(
                                 for: recipeID,
                                 afterPhoto: afterPhoto
                             )
@@ -530,10 +530,14 @@ final class RecipesViewModel: ObservableObject {
     // MARK: - Favorites Management
     
     func toggleFavorite(_ recipeId: UUID) {
+        let wasAdded: Bool
+        
         if favoritedRecipeIds.contains(recipeId) {
             favoritedRecipeIds.remove(recipeId)
+            wasAdded = false
         } else {
             favoritedRecipeIds.insert(recipeId)
+            wasAdded = true
         }
         
         // Save to UserDefaults
@@ -544,22 +548,22 @@ final class RecipesViewModel: ObservableObject {
         // Sync with CloudKit if authenticated
         if unifiedAuthManager.isAuthenticated {
             Task {
-                // CloudKitService integration temporarily commented out
-                // TODO: Implement CloudKitService integration
-                /*
-                if wasAdded {
-                    try await CloudKitService.shared.addRecipeToUserProfile(
-                        recipeId.uuidString,
-                        type: .favorited
-                    )
-                } else {
-                    try await CloudKitService.shared.removeRecipeFromUserProfile(
-                        recipeId.uuidString,
-                        type: .favorited
-                    )
+                do {
+                    if wasAdded {
+                        try await CloudKitService.shared.addRecipeToUserProfile(
+                            recipeId.uuidString,
+                            type: .favorited
+                        )
+                    } else {
+                        try await CloudKitService.shared.removeRecipeFromUserProfile(
+                            recipeId.uuidString,
+                            type: .favorited
+                        )
+                    }
+                    print("✅ Synced favorite status to CloudKit")
+                } catch {
+                    print("❌ Failed to sync favorite status to CloudKit: \(error)")
                 }
-                */
-                print("✅ Synced favorite status to CloudKit")
             }
         }
     }
@@ -714,10 +718,12 @@ final class AuthViewModel: ObservableObject {
         // Update CloudKit user profile if authenticated
         if unifiedAuthManager.isAuthenticated {
             Task {
-                // CloudKitService integration temporarily commented out
-                // TODO: Implement CloudKitService integration
-                // try await CloudKitService.shared.incrementRecipesShared()
-                print("✅ Updated share count in CloudKit")
+                do {
+                    try await CloudKitService.shared.incrementRecipesShared()
+                    print("✅ Updated share count in CloudKit")
+                } catch {
+                    print("⚠️ Failed to update share count in CloudKit: \(error)")
+                }
             }
         }
     }

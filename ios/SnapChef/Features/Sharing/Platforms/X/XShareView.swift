@@ -219,7 +219,8 @@ struct XShareView: View {
             return "🏆 \(achievementName) unlocked!\n\nLevel up your cooking game with SnapChef - download on the App Store"
             
         case .challenge(let challenge):
-            return "Challenge crushed: \(challenge.title) ✅\n\nWho's next? Get SnapChef on the App Store"
+            let challengeLink = SocialShareManager.shared.generateChallengeInviteLink(challengeID: challenge.id).absoluteString
+            return "Challenge crushed: \(challenge.title) ✅\n\nWho's next?\n\(challengeLink)"
             
         default:
             return "Made with SnapChef - turn your fridge into feast! 🍳\nDownload on the App Store"
@@ -375,7 +376,7 @@ struct XShareView: View {
         }
         
         do {
-            try await CloudKitSyncService.shared.createActivity(
+            try await CloudKitService.shared.createActivity(
                 type: activityType,
                 actorID: userID,
                 recipeID: metadata["recipeId"] as? String,

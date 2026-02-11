@@ -2,7 +2,7 @@ import SwiftUI
 
 struct FavoritesView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitService.shared
     @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @State private var cloudKitFavorites: [Recipe] = []
     @State private var isLoadingCloudKit = false

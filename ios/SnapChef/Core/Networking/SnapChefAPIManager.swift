@@ -174,6 +174,15 @@ final class SnapChefAPIManager {
         self.session = URLSession(configuration: configuration)
     } // Private initializer for singleton
 
+    enum RecipeGenerationMilestone: Sendable {
+        case requestPrepared
+        case requestSent
+        case responseReceived
+        case responseDecoded
+        case completed
+        case failed
+    }
+
     /// Creates a multipart/form-data URLRequest for the API.
     private func createMultipartRequest(
         url: URL,
@@ -198,7 +207,6 @@ final class SnapChefAPIManager {
             throw APIError.unauthorized("API key not found. Please reinstall the app.")
         }
         request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
-        print("🔑 API Key being sent in header: \(apiKey.prefix(10))...")
         
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -323,9 +331,11 @@ final class SnapChefAPIManager {
         existingRecipeNames: [String] = [],
         foodPreferences: [String] = [],
         llmProvider: String? = nil,
+        lifecycle: (@Sendable (RecipeGenerationMilestone) -> Void)? = nil,
         completion: @escaping @Sendable (Result<APIResponse, Error>) -> Void
     ) {
         guard let url = URL(string: "\(serverBaseURL)/analyze_fridge_image") else {
+            lifecycle?(.failed)
             completion(.failure(APIError.invalidURL))
             return
         }
@@ -352,7 +362,9 @@ final class SnapChefAPIManager {
                 foodPreferences: foodPreferences,
                 llmProvider: llmProvider
             )
+            lifecycle?(.requestPrepared)
         } catch {
+            lifecycle?(.failed)
             completion(.failure(error))
             return
         }
@@ -367,6 +379,7 @@ final class SnapChefAPIManager {
             print("📡 Request completed in \(String(format: "%.2f", elapsed)) seconds")
 
             if let error = error {
+                lifecycle?(.failed)
                 print("❌ API Network Error: \(error.localizedDescription)")
                 print("❌ Error details: \(error)")
                 print("❌ Error domain: \((error as NSError).domain)")
@@ -383,6 +396,7 @@ final class SnapChefAPIManager {
             }
 
             guard let httpResponse = response as? HTTPURLResponse else {
+                lifecycle?(.failed)
                 print("❌ Invalid response type")
                 completion(.failure(APIError.noData))
                 return
@@ -390,26 +404,31 @@ final class SnapChefAPIManager {
 
             print("📡 Response status code: \(httpResponse.statusCode)")
             print("📡 Response headers: \(httpResponse.allHeaderFields)")
+            lifecycle?(.responseReceived)
 
             // Handle authentication failure specifically
             if httpResponse.statusCode == 401 {
+                lifecycle?(.failed)
                 completion(.failure(APIError.authenticationError))
                 return
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
+                lifecycle?(.failed)
                 let responseData = data.map { String(data: $0, encoding: .utf8) ?? "" } ?? "N/A"
                 completion(.failure(APIError.serverError(statusCode: httpResponse.statusCode, message: responseData)))
                 return
             }
 
             guard let data = data else {
+                lifecycle?(.failed)
                 completion(.failure(APIError.noData))
                 return
             }
 
             do {
                 let apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
+                lifecycle?(.responseDecoded)
                 print("✅ Successfully decoded API response")
                 print("✅ Image analysis - is_food_image: \(apiResponse.data.image_analysis.is_food_image), confidence: \(apiResponse.data.image_analysis.confidence)")
                 print("✅ Found \(apiResponse.data.recipes.count) recipes")
@@ -439,6 +458,7 @@ final class SnapChefAPIManager {
                 
                 // Check if the image analysis indicates this is not a food image
                 if !apiResponse.data.image_analysis.is_food_image {
+                    lifecycle?(.failed)
                     let friendlyMessage = "Hmm, this doesn't look like a fridge or pantry photo. Let's try again with a clear shot of your ingredients! 📸"
                     completion(.failure(APIError.notFoodImage(friendlyMessage)))
                     return
@@ -446,6 +466,7 @@ final class SnapChefAPIManager {
                 
                 // Check if we detected ingredients but got no recipes
                 if apiResponse.data.ingredients.isEmpty {
+                    lifecycle?(.failed)
                     let friendlyMessage = "I couldn't spot any ingredients in this photo. Try taking a clearer shot of your fridge or pantry with better lighting! 💡"
                     completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
                     return
@@ -453,13 +474,16 @@ final class SnapChefAPIManager {
                 
                 // Check if we have ingredients but no recipes (another edge case)
                 if !apiResponse.data.ingredients.isEmpty && apiResponse.data.recipes.isEmpty {
+                    lifecycle?(.failed)
                     let friendlyMessage = "I found some ingredients but couldn't create recipes. This might be due to very limited ingredients or dietary restrictions being too specific. Try with more ingredients or adjust your preferences! 🥘"
                     completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
                     return
                 }
                 
+                lifecycle?(.completed)
                 completion(.success(apiResponse))
             } catch {
+                lifecycle?(.failed)
                 print("❌ Decoding Error: \(error)")
                 if let responseString = String(data: data, encoding: .utf8) {
                     print("❌ Raw response: \(responseString)")
@@ -467,6 +491,7 @@ final class SnapChefAPIManager {
                 completion(.failure(APIError.decodingError(error.localizedDescription)))
             }
         }.resume()
+        lifecycle?(.requestSent)
     }
 
     /// Send both fridge and pantry images for recipe generation
@@ -484,11 +509,13 @@ final class SnapChefAPIManager {
         existingRecipeNames: [String] = [],
         foodPreferences: [String] = [],
         llmProvider: String? = nil,
+        lifecycle: (@Sendable (RecipeGenerationMilestone) -> Void)? = nil,
         completion: @escaping @Sendable (Result<APIResponse, Error>) -> Void
     ) {
         // For now, use the same endpoint but send both images
         // The backend should be updated to handle both images
         guard let url = URL(string: "\(serverBaseURL)/analyze_fridge_image") else {
+            lifecycle?(.failed)
             completion(.failure(APIError.invalidURL))
             return
         }
@@ -517,7 +544,9 @@ final class SnapChefAPIManager {
                 foodPreferences: foodPreferences,
                 llmProvider: llmProvider
             )
+            lifecycle?(.requestPrepared)
         } catch {
+            lifecycle?(.failed)
             completion(.failure(error))
             return
         }
@@ -532,6 +561,7 @@ final class SnapChefAPIManager {
             print("📡 Request completed in \(String(format: "%.2f", elapsed)) seconds")
 
             if let error = error {
+                lifecycle?(.failed)
                 print("❌ API Network Error: \(error.localizedDescription)")
                 print("❌ Error details: \(error)")
                 print("❌ Error domain: \((error as NSError).domain)")
@@ -548,6 +578,7 @@ final class SnapChefAPIManager {
             }
 
             guard let httpResponse = response as? HTTPURLResponse else {
+                lifecycle?(.failed)
                 print("❌ Invalid response type")
                 completion(.failure(APIError.noData))
                 return
@@ -555,26 +586,31 @@ final class SnapChefAPIManager {
 
             print("📡 Response status code: \(httpResponse.statusCode)")
             print("📡 Response headers: \(httpResponse.allHeaderFields)")
+            lifecycle?(.responseReceived)
 
             // Handle authentication failure specifically
             if httpResponse.statusCode == 401 {
+                lifecycle?(.failed)
                 completion(.failure(APIError.authenticationError))
                 return
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
+                lifecycle?(.failed)
                 let responseData = data.map { String(data: $0, encoding: .utf8) ?? "" } ?? "N/A"
                 completion(.failure(APIError.serverError(statusCode: httpResponse.statusCode, message: responseData)))
                 return
             }
 
             guard let data = data else {
+                lifecycle?(.failed)
                 completion(.failure(APIError.noData))
                 return
             }
 
             do {
                 let apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
+                lifecycle?(.responseDecoded)
                 print("✅ Successfully decoded API response for both images")
                 print("✅ Image analysis - is_food_image: \(apiResponse.data.image_analysis.is_food_image), confidence: \(apiResponse.data.image_analysis.confidence)")
                 print("✅ Found \(apiResponse.data.recipes.count) recipes")
@@ -582,6 +618,7 @@ final class SnapChefAPIManager {
                 
                 // Check if the image analysis indicates this is not a food image
                 if !apiResponse.data.image_analysis.is_food_image {
+                    lifecycle?(.failed)
                     let friendlyMessage = "Hmm, one or both of these photos don't look like fridge or pantry shots. Let's try again with clear photos of your ingredients! 📸"
                     completion(.failure(APIError.notFoodImage(friendlyMessage)))
                     return
@@ -589,6 +626,7 @@ final class SnapChefAPIManager {
                 
                 // Check if we detected ingredients but got no recipes
                 if apiResponse.data.ingredients.isEmpty {
+                    lifecycle?(.failed)
                     let friendlyMessage = "I couldn't spot any ingredients in these photos. Try taking clearer shots of your fridge and pantry with better lighting! 💡"
                     completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
                     return
@@ -596,13 +634,16 @@ final class SnapChefAPIManager {
                 
                 // Check if we have ingredients but no recipes
                 if !apiResponse.data.ingredients.isEmpty && apiResponse.data.recipes.isEmpty {
+                    lifecycle?(.failed)
                     let friendlyMessage = "I found some ingredients but couldn't create recipes. This might be due to very limited ingredients or dietary restrictions being too specific. Try with more ingredients or adjust your preferences! 🥘"
                     completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
                     return
                 }
                 
+                lifecycle?(.completed)
                 completion(.success(apiResponse))
             } catch {
+                lifecycle?(.failed)
                 print("❌ Decoding Error: \(error)")
                 if let responseString = String(data: data, encoding: .utf8) {
                     print("❌ Raw response: \(responseString)")
@@ -610,6 +651,7 @@ final class SnapChefAPIManager {
                 completion(.failure(APIError.decodingError(error.localizedDescription)))
             }
         }.resume()
+        lifecycle?(.requestSent)
     }
 
     /// Create multipart request with both fridge and pantry images
@@ -637,7 +679,6 @@ final class SnapChefAPIManager {
             throw APIError.unauthorized("API key not found. Please reinstall the app.")
         }
         request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
-        print("🔑 API Key being sent in header: \(apiKey.prefix(10))...")
         
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -1137,7 +1178,6 @@ final class SnapChefAPIManager {
             throw APIError.unauthorized("API key not found. Please reinstall the app.")
         }
         request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
-        print("🔑 Detective API Key being sent: \(apiKey.prefix(10))...")
         
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")

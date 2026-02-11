@@ -9,6 +9,8 @@ final class CloudKitDebugLogger: @unchecked Sendable {
     
     private let logger = Logger(subsystem: "com.snapchef.app", category: "CloudKit")
     private var operationStats: [String: OperationStats] = [:]
+    private let shouldCrashOnCriticalCloudKitError =
+        ProcessInfo.processInfo.environment["SNAPCHEF_FATAL_CLOUDKIT_ERRORS"] == "1"
     
     private struct OperationStats {
         var successCount: Int = 0
@@ -49,9 +51,8 @@ final class CloudKitDebugLogger: @unchecked Sendable {
         
         updateStats(operation: "save", recordType: recordType, success: false, duration: duration, error: error)
         
-        // Throw assertion failure in debug for critical errors
         if isCriticalError(error) {
-            assertionFailure("CloudKit SAVE failed with critical error: \(error)")
+            handleCriticalError(operation: "SAVE", error: error, file: file, line: line, function: function)
         }
         #endif
     }
@@ -79,9 +80,8 @@ final class CloudKitDebugLogger: @unchecked Sendable {
         
         updateStats(operation: "fetch", recordType: typeString, success: false, duration: duration, error: error)
         
-        // Throw assertion failure in debug for critical errors
         if isCriticalError(error) {
-            assertionFailure("CloudKit FETCH failed with critical error: \(error)")
+            handleCriticalError(operation: "FETCH", error: error, file: file, line: line, function: function)
         }
         #endif
     }
@@ -107,9 +107,8 @@ final class CloudKitDebugLogger: @unchecked Sendable {
         
         updateStats(operation: "delete", recordType: recordType, success: false, duration: duration, error: error)
         
-        // Throw assertion failure in debug for critical errors
         if isCriticalError(error) {
-            assertionFailure("CloudKit DELETE failed with critical error: \(error)")
+            handleCriticalError(operation: "DELETE", error: error, file: file, line: line, function: function)
         }
         #endif
     }
@@ -135,9 +134,8 @@ final class CloudKitDebugLogger: @unchecked Sendable {
         
         updateStats(operation: "query", recordType: query.recordType, success: false, duration: duration, error: error)
         
-        // Throw assertion failure in debug for critical errors
         if isCriticalError(error) {
-            assertionFailure("CloudKit QUERY failed with critical error: \(error)")
+            handleCriticalError(operation: "QUERY", error: error, file: file, line: line, function: function)
         }
         #endif
     }
@@ -154,9 +152,8 @@ final class CloudKitDebugLogger: @unchecked Sendable {
         #if DEBUG
         logger.error("❌ SUBSCRIPTION FAILED: \(subscriptionID) for \(recordType) in \(database) | Error: \(error.localizedDescription) | \(file.split(separator: "/").last ?? ""):\(line)")
         
-        // Throw assertion failure in debug for critical errors
         if isCriticalError(error) {
-            assertionFailure("CloudKit SUBSCRIPTION failed with critical error: \(error)")
+            handleCriticalError(operation: "SUBSCRIPTION", error: error, file: file, line: line, function: function)
         }
         #endif
     }
@@ -183,6 +180,17 @@ final class CloudKitDebugLogger: @unchecked Sendable {
             return false  // These are recoverable
         default:
             return false
+        }
+    }
+
+    private func handleCriticalError(operation: String, error: Error, file: String, line: Int, function: String) {
+        logger.fault(
+            "⚠️ CRITICAL CLOUDKIT \(operation): \(error.localizedDescription) | \(file.split(separator: "/").last ?? ""):\(line) | \(function)"
+        )
+
+        // Opt-in only: lets us force crash behavior during focused debugging without destabilizing normal builds.
+        if shouldCrashOnCriticalCloudKitError {
+            assertionFailure("CloudKit \(operation) failed with critical error: \(error)")
         }
     }
     

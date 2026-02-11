@@ -1,12 +1,12 @@
 import SwiftUI
 import AVFoundation
 import CloudKit
-import CloudKit
 
 // MARK: - Emoji Flick Game
 struct EmojiFlickGame: View {
     let backgroundImage: UIImage?
     @EnvironmentObject var deviceManager: DeviceManager
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var gameState = GameState()
     @State private var emojis: [GameEmoji] = []
@@ -19,6 +19,9 @@ struct EmojiFlickGame: View {
     @State private var showTutorial = true
     @State private var tutorialOpacity: Double = 1.0
     @State private var tutorialFingerPosition = CGPoint(x: 100, y: 300)
+    @State private var tutorialTimer: Timer?
+    @State private var lastTickTimestamp = Date()
+    @State private var frameCounter = 0
     // Haptic feedback is handled via static methods
 
     init(backgroundImage: UIImage? = nil) {
@@ -33,6 +36,15 @@ struct EmojiFlickGame: View {
     // Timers
     let gameTimer = Timer.publish(every: 0.016, on: .main, in: .common).autoconnect() // 60 FPS
     let spawnTimer = Timer.publish(every: 2.5, on: .main, in: .common).autoconnect()
+
+    private var frameStride: Int {
+        deviceManager.isLowPowerModeEnabled ? 2 : 1
+    }
+
+    private var maxEmojiCount: Int {
+        let adaptive = max(12, deviceManager.recommendedParticleCount)
+        return min(36, adaptive)
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -175,100 +187,109 @@ struct EmojiFlickGame: View {
             }
         }
         .onReceive(gameTimer) { _ in
-            // Defer state updates to avoid "Modifying state during view update"
-            DispatchQueue.main.async {
-                updateGame()
-            }
+            guard scenePhase == .active else { return }
+            frameCounter += 1
+            guard frameCounter % frameStride == 0 else { return }
+
+            let now = Date()
+            let delta = max(1.0 / 120.0, min(1.0 / 20.0, now.timeIntervalSince(lastTickTimestamp)))
+            lastTickTimestamp = now
+            updateGame(deltaTime: CGFloat(delta))
         }
         .onReceive(spawnTimer) { _ in
-            // Defer state updates to avoid "Modifying state during view update"
-            DispatchQueue.main.async {
-                spawnEmoji()
-            }
+            guard scenePhase == .active else { return }
+            spawnEmoji()
         }
         .onAppear {
-            print("🔍 DEBUG: [EmojiFlickGame] appeared")
-            // Defer state updates to avoid "Modifying state during view update"
-            DispatchQueue.main.async {
-                spawnInitialEmojis()
-                if deviceManager.shouldShowParticles {
-                    createAmbientParticles()
-                }
-                if deviceManager.animationsEnabled {
-                    startTutorialAnimation()
-                } else {
-                    showTutorial = false
-                }
-                
-                // Always fetch global high score on appear to get latest
-                gameState.isLoadingGlobalScore = true
-                Task {
-                    let globalScore = await GameState.fetchGlobalHighScore()
-                    await MainActor.run {
-                        // Only update if fetched score is higher than cached
-                        if globalScore > gameState.globalHighScore {
-                            gameState.globalHighScore = globalScore
-                        }
-                        gameState.isLoadingGlobalScore = false
-                        gameState.hasLoadedGlobalScore = true
+            lastTickTimestamp = Date()
+            frameCounter = 0
+            spawnInitialEmojis()
+            if deviceManager.shouldShowParticles {
+                createAmbientParticles()
+            }
+            if deviceManager.animationsEnabled {
+                startTutorialAnimation()
+            } else {
+                showTutorial = false
+            }
+            
+            // Always fetch global high score on appear to get latest
+            gameState.isLoadingGlobalScore = true
+            Task {
+                let globalScore = await GameState.fetchGlobalHighScore()
+                await MainActor.run {
+                    // Only update if fetched score is higher than cached
+                    if globalScore > gameState.globalHighScore {
+                        gameState.globalHighScore = globalScore
                     }
+                    gameState.isLoadingGlobalScore = false
+                    gameState.hasLoadedGlobalScore = true
                 }
+            }
+        }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                lastTickTimestamp = Date()
             }
         }
         .onDisappear {
-            print("🔍 DEBUG: [EmojiFlickGame] disappearing")
+            tutorialTimer?.invalidate()
+            tutorialTimer = nil
+
             // Save current high score if it's new
             gameState.saveHighScore()
-            
-            // Also fetch latest global score to ensure we have the most recent
-            Task {
-                let globalScore = await GameState.fetchGlobalHighScore()
-                print("📊 Latest global high score on exit: \(globalScore)")
-            }
         }
     }
 
     // MARK: - Game Logic
 
-    private func updateGame() {
+    private func updateGame(deltaTime: CGFloat) {
+        let clampedDelta = max(1.0 / 120.0, min(1.0 / 20.0, deltaTime))
+        let frameScale = clampedDelta / (1.0 / 60.0)
         let timeMultiplier = timeSlowActive ? 0.3 : 1.0
+        let effectiveScale = frameScale * timeMultiplier
+        let screenWidth = UIScreen.main.bounds.width
+        let screenHeight = UIScreen.main.bounds.height
+        let normalDamping = CGFloat(pow(0.98, Double(frameScale)))
+        let flickedDamping = CGFloat(pow(0.995, Double(frameScale)))
+        let shakeDamping = CGFloat(pow(0.9, Double(frameScale)))
 
         // Update emojis
         for i in emojis.indices.reversed() {
-            emojis[i].position.y += emojis[i].velocity.dy * timeMultiplier
-            emojis[i].position.x += emojis[i].velocity.dx * timeMultiplier
-            emojis[i].rotation += emojis[i].rotationSpeed * timeMultiplier
+            emojis[i].position.y += emojis[i].velocity.dy * effectiveScale
+            emojis[i].position.x += emojis[i].velocity.dx * effectiveScale
+            emojis[i].rotation += emojis[i].rotationSpeed * effectiveScale
 
             // Apply gravity (reduced for slower falling)
             if !emojis[i].isFlicked {
-                emojis[i].velocity.dy += 25 * 0.016 * timeMultiplier // gravity
+                emojis[i].velocity.dy += 25 * clampedDelta * timeMultiplier // gravity
                 // Apply air resistance (increased for slower motion)
-                emojis[i].velocity.dx *= 0.98
-                emojis[i].velocity.dy *= 0.98
+                emojis[i].velocity.dx *= normalDamping
+                emojis[i].velocity.dy *= normalDamping
             } else {
                 // Flicked emojis have less gravity and less air resistance
-                emojis[i].velocity.dy += 5 * 0.016 * timeMultiplier
-                emojis[i].velocity.dx *= 0.995
-                emojis[i].velocity.dy *= 0.995
-                emojis[i].scale *= 0.98 // Shrink as they fly away
-                emojis[i].rotationSpeed *= 1.1 // Spin faster
+                emojis[i].velocity.dy += 5 * clampedDelta * timeMultiplier
+                emojis[i].velocity.dx *= flickedDamping
+                emojis[i].velocity.dy *= flickedDamping
+                emojis[i].scale *= CGFloat(pow(0.98, Double(frameScale))) // Shrink as they fly away
+                emojis[i].rotationSpeed *= CGFloat(pow(1.1, Double(frameScale))) // Spin faster
             }
 
             // Wall bounce
-            if emojis[i].position.x <= 30 || emojis[i].position.x >= UIScreen.main.bounds.width - 30 {
+            if emojis[i].position.x <= 30 || emojis[i].position.x >= screenWidth - 30 {
                 emojis[i].velocity.dx *= -0.7
-                emojis[i].position.x = max(30, min(UIScreen.main.bounds.width - 30, emojis[i].position.x))
+                emojis[i].position.x = max(30, min(screenWidth - 30, emojis[i].position.x))
                 HapticManager.impact(.light)
             }
 
             // Remove if off screen
             let offScreenBuffer: CGFloat = 200
-            if emojis[i].position.y > UIScreen.main.bounds.height + offScreenBuffer ||
+            if emojis[i].position.y > screenHeight + offScreenBuffer ||
                emojis[i].position.y < -offScreenBuffer ||
                emojis[i].position.x < -offScreenBuffer ||
-               emojis[i].position.x > UIScreen.main.bounds.width + offScreenBuffer ||
+               emojis[i].position.x > screenWidth + offScreenBuffer ||
                emojis[i].scale < 0.1 {
-                if !emojis[i].isFlicked && emojis[i].position.y > UIScreen.main.bounds.height {
+                if !emojis[i].isFlicked && emojis[i].position.y > screenHeight {
                     // Reset combo only if emoji fell (not flicked)
                     if gameState.combo > 0 {
                         gameState.combo = 0
@@ -281,9 +302,9 @@ struct EmojiFlickGame: View {
 
         // Update particles
         for i in particles.indices.reversed() {
-            particles[i].lifetime -= 0.016
-            particles[i].position.x += particles[i].velocity.dx * timeMultiplier
-            particles[i].position.y += particles[i].velocity.dy * timeMultiplier
+            particles[i].lifetime -= Double(clampedDelta)
+            particles[i].position.x += particles[i].velocity.dx * effectiveScale
+            particles[i].position.y += particles[i].velocity.dy * effectiveScale
             particles[i].opacity = max(0, particles[i].lifetime / particles[i].maxLifetime)
             particles[i].scale = particles[i].baseScale * (0.5 + 0.5 * particles[i].opacity)
 
@@ -294,8 +315,8 @@ struct EmojiFlickGame: View {
 
         // Update score popups
         for i in scorePopups.indices.reversed() {
-            scorePopups[i].lifetime -= 0.016
-            scorePopups[i].position.y -= 60 * 0.016 // Float up
+            scorePopups[i].lifetime -= Double(clampedDelta)
+            scorePopups[i].position.y -= 60 * clampedDelta // Float up
             scorePopups[i].opacity = max(0, scorePopups[i].lifetime / 1.0)
 
             if scorePopups[i].lifetime <= 0 {
@@ -305,7 +326,7 @@ struct EmojiFlickGame: View {
 
         // Update screen shake
         if screenShake != 0 {
-            screenShake *= 0.9
+            screenShake *= shakeDamping
             if abs(screenShake) < 0.1 {
                 screenShake = 0
             }
@@ -313,8 +334,8 @@ struct EmojiFlickGame: View {
 
         // Update touch sparks
         for i in touchSparks.indices.reversed() {
-            touchSparks[i].lifetime -= 0.016
-            touchSparks[i].scale *= 1.1
+            touchSparks[i].lifetime -= Double(clampedDelta)
+            touchSparks[i].scale *= CGFloat(pow(1.1, Double(frameScale)))
             touchSparks[i].opacity = max(0, touchSparks[i].lifetime / 0.5)
 
             if touchSparks[i].lifetime <= 0 {
@@ -324,7 +345,7 @@ struct EmojiFlickGame: View {
 
         // Update swipe trails
         for i in swipeTrails.indices.reversed() {
-            swipeTrails[i].lifetime -= 0.016
+            swipeTrails[i].lifetime -= Double(clampedDelta)
             swipeTrails[i].opacity = max(0, swipeTrails[i].lifetime / 0.3)
 
             if swipeTrails[i].lifetime <= 0 {
@@ -488,6 +509,14 @@ struct EmojiFlickGame: View {
     }
 
     private func spawnEmoji() {
+        if emojis.count >= maxEmojiCount {
+            if let removableIndex = emojis.firstIndex(where: { !$0.isFlicked }) {
+                emojis.remove(at: removableIndex)
+            } else {
+                emojis.removeFirst()
+            }
+        }
+
         let specialEmojis = ["🌟", "🍳", "🥘", "🍯"]
         let regularEmojis = ["🍕", "🍔", "🌮", "🍜", "🍱", "🥗", "🍰", "🍪", "🧁", "🍩",
                            "🥐", "🥖", "🧀", "🍖", "🍗", "🥓", "🌭", "🍟", "🥙", "🌯",
@@ -647,9 +676,16 @@ struct EmojiFlickGame: View {
 
     private func checkEmojiIntersection(from: CGPoint, to: CGPoint) {
         let emojiRadius: CGFloat = 40 // Half of the 80pt font size
+        let minX = min(from.x, to.x) - emojiRadius
+        let maxX = max(from.x, to.x) + emojiRadius
+        let minY = min(from.y, to.y) - emojiRadius
+        let maxY = max(from.y, to.y) + emojiRadius
 
         for i in emojis.indices where !emojis[i].isFlicked {
             let emojiCenter = emojis[i].position
+            guard emojiCenter.x >= minX, emojiCenter.x <= maxX, emojiCenter.y >= minY, emojiCenter.y <= maxY else {
+                continue
+            }
 
             // Check if line segment intersects with emoji circle
             if lineIntersectsCircle(lineStart: from, lineEnd: to, circleCenter: emojiCenter, radius: emojiRadius) {
@@ -711,12 +747,13 @@ struct EmojiFlickGame: View {
         var animationCompleted = false
 
         // Check every 0.1 seconds for emojis at target position
-        var tutorialTimer: Timer?
+        tutorialTimer?.invalidate()
         tutorialTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             Task { @MainActor in
                 // Stop if animation already completed or tutorial hidden
                 guard !animationCompleted && self.showTutorial else {
-                    tutorialTimer?.invalidate()
+                    self.tutorialTimer?.invalidate()
+                    self.tutorialTimer = nil
                     return
                 }
                 
@@ -727,7 +764,8 @@ struct EmojiFlickGame: View {
 
                 guard !readyEmojis.isEmpty else { return }
 
-                tutorialTimer?.invalidate()
+                self.tutorialTimer?.invalidate()
+                self.tutorialTimer = nil
                 animationCompleted = true
 
                 // Animate finger to first emoji and swipe

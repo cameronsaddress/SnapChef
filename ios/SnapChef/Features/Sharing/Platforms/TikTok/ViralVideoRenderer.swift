@@ -10,11 +10,11 @@ import Foundation
 public final class ViralVideoRenderer: Sendable {
     private let config: RenderConfig
     private let stillWriter: StillWriter
-    private nonisolated(unsafe) let ciContext: CIContext
+    private let ciContext: CIContext
     private let memoryOptimizer = MemoryOptimizer.shared
 
     // SPEED OPTIMIZATION: Cached components and Metal context
-    private nonisolated(unsafe) let metalDevice: MTLDevice?
+    private let metalDevice: MTLDevice?
     private nonisolated(unsafe) let imageCache = NSCache<NSString, UIImage>()
     private nonisolated(unsafe) let filterCache = NSCache<NSString, CIFilter>()
 
@@ -24,7 +24,7 @@ public final class ViralVideoRenderer: Sendable {
     private nonisolated(unsafe) var parallaxFrames: [CGPoint] = []
 
     // SPEED OPTIMIZATION: Metal context and effect cache
-    private nonisolated(unsafe) let metalContext: CIContext?
+    private let metalContext: CIContext?
     private nonisolated(unsafe) let effectCache = NSCache<NSString, CIImage>()
 
     // SPEED OPTIMIZATION: Task groups for parallel processing
@@ -195,44 +195,29 @@ public final class ViralVideoRenderer: Sendable {
 
         print("[ViralVideoRenderer] \(Date()): Export session configured, starting async export to: \(outURL)")
 
-        // Add timeout detection
         let exportStartTime = Date()
-        var progressTimer: Timer?
-
+        let exportBox = ExportSessionBox(export)
         return try await withCheckedThrowingContinuation { cont in
-            // Start progress monitoring
-            progressTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-                let elapsed = Date().timeIntervalSince(exportStartTime)
-                print("[ViralVideoRenderer] \(Date()): Export progress: \(export.progress * 100)% (\(elapsed)s elapsed)")
-
-                // Timeout after 60 seconds
-                if elapsed > 60 {
-                    print("[ViralVideoRenderer] \(Date()): ERROR - Export timeout after \(elapsed)s")
-                    export.cancelExport()
-                    progressTimer?.invalidate()
-                    cont.resume(throwing: RendererError.exportFailed)
-                }
-            }
-
-            export.exportAsynchronously { @Sendable in
-                progressTimer?.invalidate()
+            exportBox.exportAsynchronously {
                 let exportEndTime = Date()
                 let totalTime = exportEndTime.timeIntervalSince(exportStartTime)
+                let status = exportBox.status
+                let exportError = exportBox.error
 
-                print("[ViralVideoRenderer] \(exportEndTime): Export completed in \(totalTime)s with status: \(export.status.rawValue)")
+                print("[ViralVideoRenderer] \(exportEndTime): Export completed in \(totalTime)s with status: \(status.rawValue)")
 
-                switch export.status {
+                switch status {
                 case .completed:
                     print("[ViralVideoRenderer] \(Date()): Export SUCCESS - Output: \(outURL)")
                     cont.resume(returning: outURL)
                 case .failed:
-                    print("[ViralVideoRenderer] \(Date()): Export FAILED - Error: \(export.error?.localizedDescription ?? "Unknown")")
+                    print("[ViralVideoRenderer] \(Date()): Export FAILED - Error: \(exportError?.localizedDescription ?? "Unknown")")
                     cont.resume(throwing: RendererError.exportFailed)
                 case .cancelled:
                     print("[ViralVideoRenderer] \(Date()): Export CANCELLED")
                     cont.resume(throwing: RendererError.exportCancelled)
                 default:
-                    print("[ViralVideoRenderer] \(Date()): Export UNKNOWN status: \(export.status.rawValue)")
+                    print("[ViralVideoRenderer] \(Date()): Export UNKNOWN status: \(status.rawValue)")
                     cont.resume(throwing: RendererError.exportFailed)
                 }
             }
@@ -350,6 +335,7 @@ public final class ViralVideoRenderer: Sendable {
         exportSession.outputFileType = AVFileType.mp4
         exportSession.videoComposition = videoComposition
         exportSession.shouldOptimizeForNetworkUse = true
+        let exportBox = ExportSessionBox(exportSession)
 
         // CRITICAL FIX: Ensure audio is included in export
         if !composition.tracks(withMediaType: .audio).isEmpty {
@@ -412,8 +398,11 @@ public final class ViralVideoRenderer: Sendable {
                 }
             }
             
-            exportSession.exportAsynchronously { @Sendable in
-                let handleCompletion = { @Sendable in
+            exportBox.exportAsynchronously {
+                let status = exportBox.status
+                let exportError = exportBox.error
+                
+                Task {
                     guard await completionTracker.markCompleted() else {
                         return // Already timed out or completed
                     }
@@ -431,19 +420,17 @@ public final class ViralVideoRenderer: Sendable {
                         capturedOptimizer.forceMemoryCleanup()
                     }
 
-                    switch exportSession.status {
+                    switch status {
                     case .completed:
                         continuation.resume(returning: outputURL)
                     case .failed:
-                        continuation.resume(throwing: exportSession.error ?? RendererError.exportFailed)
+                        continuation.resume(throwing: exportError ?? RendererError.exportFailed)
                     case .cancelled:
                         continuation.resume(throwing: RendererError.exportCancelled)
                     default:
                         continuation.resume(throwing: RendererError.exportFailed)
                     }
                 }
-                
-                Task(operation: handleCompletion)
             }
         }
     }
@@ -579,37 +566,31 @@ public final class ViralVideoRenderer: Sendable {
         exportSession.outputFileType = AVFileType.mp4
         exportSession.videoComposition = videoComposition
         exportSession.shouldOptimizeForNetworkUse = true
+        let exportBox = ExportSessionBox(exportSession)
 
-        // SPEED OPTIMIZATION: Async export with timeout
+        // SPEED OPTIMIZATION: Async export
         return try await withCheckedThrowingContinuation { continuation in
             let startTime = Date()
 
-            exportSession.exportAsynchronously {
+            exportBox.exportAsynchronously {
                 let exportTime = Date().timeIntervalSince(startTime)
                 print("[ViralVideoRenderer] ULTRA-FAST export completed in \(exportTime)s")
-
+                let status = exportBox.status
+                let exportError = exportBox.error
+                
                 Task {
                     await progressCallback(1.0)
 
-                    switch exportSession.status {
+                    switch status {
                     case .completed:
                         continuation.resume(returning: outputURL)
                     case .failed:
-                        continuation.resume(throwing: exportSession.error ?? RendererError.exportFailed)
+                        continuation.resume(throwing: exportError ?? RendererError.exportFailed)
                     case .cancelled:
                         continuation.resume(throwing: RendererError.exportCancelled)
                     default:
                         continuation.resume(throwing: RendererError.exportFailed)
                     }
-                }
-            }
-
-            // Add timeout for ultra-fast mode (30 seconds max)
-            Task {
-                try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
-                if exportSession.status == .exporting {
-                    exportSession.cancelExport()
-                    continuation.resume(throwing: RendererError.exportTimeout)
                 }
             }
         }
@@ -743,5 +724,21 @@ private actor CompletionTracker {
     
     func getCompletionStatus() -> Bool {
         return isCompleted
+    }
+}
+
+// MARK: - Sendable wrapper for AVAssetExportSession captures inside @Sendable closures
+private final class ExportSessionBox: @unchecked Sendable {
+    let session: AVAssetExportSession
+    
+    init(_ session: AVAssetExportSession) {
+        self.session = session
+    }
+    
+    var status: AVAssetExportSession.Status { session.status }
+    var error: Error? { session.error }
+    
+    func exportAsynchronously(_ completion: @escaping @Sendable () -> Void) {
+        session.exportAsynchronously(completionHandler: completion)
     }
 }

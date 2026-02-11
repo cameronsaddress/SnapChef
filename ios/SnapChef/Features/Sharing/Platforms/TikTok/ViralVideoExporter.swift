@@ -528,13 +528,14 @@ public final class ViralVideoExporter: @unchecked Sendable {
         return try await withCheckedThrowingContinuation { continuation in
             // Box to hold timer reference for proper cleanup
             let timerBox = Box(value: nil as Timer?)
+            let exportSessionBox = Box(value: exportSession)
 
             // Capture export session progress in a thread-safe way
             let progressBox = Box(value: 0.0)
 
             let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
                 // Safely read progress from export session
-                let currentProgress = Double(exportSession.progress)
+                let currentProgress = Double(exportSessionBox.value.progress)
                 progressBox.value = currentProgress
 
                 Task { @MainActor in
@@ -544,7 +545,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
                 // Check render time limit as specified in requirements (<5 seconds)
                 let elapsedTime = Date().timeIntervalSince(startTime)
                 if elapsedTime > ExportSettings.maxRenderTime {
-                    exportSession.cancelExport()
+                    exportSessionBox.value.cancelExport()
                     timerBox.value?.invalidate()
                     continuation.resume(throwing: ExportError.renderTimeExceeded)
                     return
@@ -553,10 +554,12 @@ public final class ViralVideoExporter: @unchecked Sendable {
 
             timerBox.value = progressTimer
 
-            exportSession.exportAsynchronously { @Sendable in
+            exportSessionBox.value.exportAsynchronously {
                 timerBox.value?.invalidate()
+                let status = exportSessionBox.value.status
+                let exportError = exportSessionBox.value.error
 
-                switch exportSession.status {
+                switch status {
                 case .completed:
                     // Validate output meets requirements
                     Task {
@@ -569,7 +572,7 @@ public final class ViralVideoExporter: @unchecked Sendable {
                     }
 
                 case .failed:
-                    let error = exportSession.error ?? ExportError.exportFailed
+                    let error = exportError ?? ExportError.exportFailed
                     continuation.resume(throwing: error)
 
                 case .cancelled:

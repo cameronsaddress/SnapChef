@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import Social
 import UserNotifications
 import Photos
 
@@ -22,6 +21,7 @@ class ChallengeSharingManager: ObservableObject {
     @Published var shareProgress: Double = 0
 
     private lazy var gamificationManager = GamificationManager.shared
+    private let socialShareManager = SocialShareManager.shared
 
     // Social Platform Types
     enum SocialPlatform: String, CaseIterable {
@@ -171,6 +171,7 @@ class ChallengeSharingManager: ObservableObject {
         switch type {
         case .challengeComplete(let challenge):
             text += "🎉 Challenge Complete! I just finished \"\(challenge.title)\" and earned \(challenge.points) points! 🔥\n\n"
+            text += "Think you can beat me? \(socialShareManager.generateChallengeInviteLink(challengeID: challenge.id).absoluteString)\n\n"
 
         case .levelUp(let level):
             text += "🆙 LEVEL UP! Just reached Level \(level) on SnapChef! 🎊\n\n"
@@ -199,6 +200,7 @@ class ChallengeSharingManager: ObservableObject {
 
         // Add call to action
         text += "Join me on SnapChef and start your cooking journey! 👨‍🍳\n\n"
+        text += "Invite link: \(socialShareManager.referralInviteURL().absoluteString)\n\n"
 
         // Add platform-specific hashtags
         let hashtags = platform.hashtagSuggestions.joined(separator: " ")
@@ -228,7 +230,7 @@ class ChallengeSharingManager: ObservableObject {
         case .tiktok:
             shareToTikTok(image: image, from: viewController)
         case .general:
-            showGeneralShareSheet(items: [text, image].compactMap { $0 }, from: viewController)
+            showGeneralShareSheet(items: composeShareItems(text: text, image: image, url: url), from: viewController)
         }
 
         // Award social sharing points
@@ -252,45 +254,11 @@ class ChallengeSharingManager: ObservableObject {
     }
 
     private func shareToTwitter(text: String, image: UIImage?, url: URL?, from viewController: UIViewController) {
-        if SLComposeViewController.isAvailable(forServiceType: SLServiceTypeTwitter) {
-            if let twitterVC = SLComposeViewController(forServiceType: SLServiceTypeTwitter) {
-                twitterVC.setInitialText(text)
-                if let image = image {
-                    twitterVC.add(image)
-                }
-                if let url = url {
-                    twitterVC.add(url)
-                }
-                viewController.present(twitterVC, animated: true)
-            }
-        } else {
-            // Fallback to Twitter app or web
-            let twitterText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            if let twitterURL = URL(string: "twitter://post?message=\(twitterText)") {
-                if UIApplication.shared.canOpenURL(twitterURL) {
-                    UIApplication.shared.open(twitterURL)
-                } else if let webURL = URL(string: "https://twitter.com/intent/tweet?text=\(twitterText)") {
-                    UIApplication.shared.open(webURL)
-                }
-            }
-        }
+        showGeneralShareSheet(items: composeShareItems(text: text, image: image, url: url), from: viewController)
     }
 
     private func shareToFacebook(text: String, image: UIImage?, url: URL?, from viewController: UIViewController) {
-        if SLComposeViewController.isAvailable(forServiceType: SLServiceTypeFacebook) {
-            if let facebookVC = SLComposeViewController(forServiceType: SLServiceTypeFacebook) {
-                facebookVC.setInitialText(text)
-                if let image = image {
-                    facebookVC.add(image)
-                }
-                if let url = url {
-                    facebookVC.add(url)
-                }
-                viewController.present(facebookVC, animated: true)
-            }
-        } else {
-            showGeneralShareSheet(items: [text, image].compactMap { $0 }, from: viewController)
-        }
+        showGeneralShareSheet(items: composeShareItems(text: text, image: image, url: url), from: viewController)
     }
 
     private func shareToSnapchat(image: UIImage?, from viewController: UIViewController) {
@@ -336,6 +304,17 @@ class ChallengeSharingManager: ObservableObject {
         }
 
         viewController.present(activityController, animated: true)
+    }
+
+    private func composeShareItems(text: String, image: UIImage?, url: URL?) -> [Any] {
+        var items: [Any] = [text]
+        if let image {
+            items.append(image)
+        }
+        if let url {
+            items.append(url)
+        }
+        return items
     }
 
     private func saveImageToPhotoLibrary(_ image: UIImage) {
@@ -879,21 +858,15 @@ extension ChallengeNotificationManager {
     func notifyFriendChallengeInvite(from userName: String, challengeName: String) {
         guard notificationsEnabled else { return }
 
-        let content = UNMutableNotificationContent()
-        content.title = "Challenge Invite! ⚔️"
-        content.body = "\(userName) challenged you to \(challengeName)! Are you ready?"
-        content.sound = .default
-        content.categoryIdentifier = NotificationCategory.newChallenge.rawValue
-
-        let request = UNNotificationRequest(
+        _ = notificationManager.scheduleNotification(
             identifier: "friend_challenge_\(UUID().uuidString)",
-            content: content,
-            trigger: nil
+            title: "Challenge Invite! ⚔️",
+            body: "\(userName) challenged you to \(challengeName)! Are you ready?",
+            category: .newChallenge,
+            userInfo: [:],
+            trigger: nil,
+            priority: .medium,
+            deliveryPolicy: .transactional
         )
-
-        Task.detached {
-            let center = UNUserNotificationCenter.current()
-            try? await center.add(request)
-        }
     }
 }

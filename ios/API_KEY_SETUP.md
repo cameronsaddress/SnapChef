@@ -110,7 +110,7 @@ If an API key is compromised:
 Verify your setup:
 ```bash
 # Check no hardcoded keys exist
-grep -r "5380e4b60818cf237678fccfd4b8f767d1c94" .
+grep -RIn 'let apiKey = ".*"' ios/SnapChef/App/SnapChefApp.swift
 # Should return no results
 
 # Build and check for warnings

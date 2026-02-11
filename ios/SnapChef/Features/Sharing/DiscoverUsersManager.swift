@@ -13,8 +13,7 @@ class DiscoverUsersManager: ObservableObject {
     @Published var selectedUser: UserProfile?
     @Published var showingSkeletonViews = false
     
-    private let cloudKitSync = CloudKitSyncService.shared
-    private let cloudKitActor = CloudKitSyncService.shared.cloudKitActor
+    private let cloudKitActor = CloudKitService.shared.cloudKitActor
     private var lastFetchedRecord: CKRecord?
     private var currentCategory: DiscoverUsersView.DiscoverCategory = .suggested
     

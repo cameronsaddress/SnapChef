@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 // MARK: - Particle Emitter System
-class ParticleEmitter: ObservableObject {
+class ParticleEmitter: NSObject, ObservableObject {
     @Published var particles: [EmitterParticle] = []
     private var particlePool: [EmitterParticle] = []
     private var cancellables = Set<AnyCancellable>()
@@ -32,6 +32,8 @@ class ParticleEmitter: ObservableObject {
         
         // For isolated properties, use ProcessInfo as fallback since we can't access main actor here
         self.isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+
+        super.init()
         
         setupPerformanceSettings(deviceManager: deviceManager)
         setupParticlePool()
@@ -63,9 +65,17 @@ class ParticleEmitter: ObservableObject {
     
     private func setupPerformanceMonitoring() {
         // Monitor performance and adjust particle count dynamically
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.adjustPerformanceSettings()
-        }
+        _ = Timer.scheduledTimer(
+            timeInterval: 2.0,
+            target: self,
+            selector: #selector(handlePerformanceMonitoringTick),
+            userInfo: nil,
+            repeats: true
+        )
+    }
+
+    @objc private func handlePerformanceMonitoringTick() {
+        adjustPerformanceSettings()
     }
     
     private func adjustPerformanceSettings() {
@@ -409,7 +419,6 @@ struct DeviceCapabilities {
     
     @MainActor init() {
         let deviceModel = UIDevice.current.model
-        let systemVersion = UIDevice.current.systemVersion
         
         // Detect device capabilities based on model and processor count
         if deviceModel.contains("iPhone") {

@@ -1,5 +1,42 @@
 import SwiftUI
 
+enum MotionProfile {
+    case simulator
+    case device
+}
+
+enum MotionTuning {
+    static let profile: MotionProfile = {
+        #if targetEnvironment(simulator)
+        return .simulator
+        #else
+        return .device
+        #endif
+    }()
+
+    static var speedMultiplier: Double {
+        switch profile {
+        case .simulator:
+            return 0.82
+        case .device:
+            return 1.0
+        }
+    }
+
+    static func seconds(_ base: Double) -> Double {
+        max(0.02, base * speedMultiplier)
+    }
+
+    static func cameraSeconds(_ base: Double) -> Double {
+        let growthMultiplier = GrowthRemoteConfig.shared.cameraMotionMultiplier
+        return max(0.02, seconds(base * growthMultiplier))
+    }
+
+    static func nanoseconds(_ baseSeconds: Double) -> UInt64 {
+        UInt64(seconds(baseSeconds) * 1_000_000_000)
+    }
+}
+
 // MARK: - Glassmorphic Card
 struct GlassmorphicCard<Content: View>: View {
     let content: () -> Content
@@ -388,6 +425,26 @@ struct AnimatedProgressRing: View {
                 animatedProgress = newValue
             }
         }
+    }
+}
+
+// MARK: - Studio Interaction
+struct StudioSpringButtonStyle: ButtonStyle {
+    var pressedScale: CGFloat = 0.94
+    var pressedYOffset: CGFloat = 1.5
+    var activeRotation: Double = 1.8
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? pressedScale : 1.0)
+            .offset(y: configuration.isPressed ? pressedYOffset : 0)
+            .rotation3DEffect(
+                .degrees(configuration.isPressed ? activeRotation : 0),
+                axis: (x: 1, y: 0, z: 0)
+            )
+            .saturation(configuration.isPressed ? 1.08 : 1.0)
+            .brightness(configuration.isPressed ? 0.03 : 0.0)
+            .animation(.spring(response: MotionTuning.seconds(0.22), dampingFraction: 0.72), value: configuration.isPressed)
     }
 }
 

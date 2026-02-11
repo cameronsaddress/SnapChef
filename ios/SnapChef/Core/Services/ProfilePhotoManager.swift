@@ -30,7 +30,7 @@ class ProfilePhotoManager: ObservableObject {
     
     /// Save profile photo locally and queue CloudKit upload (overwrites existing)
     func saveProfilePhoto(_ image: UIImage, for userID: String? = nil) async {
-        let currentUser = await UnifiedAuthManager.shared.currentUser
+        let currentUser = UnifiedAuthManager.shared.currentUser
         let targetUserID = userID ?? (currentUser?.recordID ?? "anonymous")
         
         // Delete old photo first to ensure overwrite
@@ -53,6 +53,12 @@ class ProfilePhotoManager: ObservableObject {
         // Queue CloudKit upload (background) - will overwrite existing
         Task.detached(priority: .background) {
             await self.uploadPhotoToCloudKit(image, for: targetUserID, overwrite: true)
+            
+            // Invalidate cache to force refresh on all devices (UserCacheManager is in a different file)
+            // This will be handled through the activity notification
+            
+            // Create activity to notify other devices
+            await self.createProfileUpdateActivity(for: targetUserID)
         }
     }
     
@@ -82,13 +88,13 @@ class ProfilePhotoManager: ObservableObject {
     
     /// Load current user's photo
     func loadCurrentUserPhoto() async {
-        guard let currentUser = await UnifiedAuthManager.shared.currentUser else { return }
+        guard let currentUser = UnifiedAuthManager.shared.currentUser else { return }
         currentUserPhoto = await getProfilePhoto(for: currentUser.recordID ?? "anonymous")
     }
     
     /// Delete profile photo
     func deleteProfilePhoto(for userID: String? = nil) async {
-        let currentUser = await UnifiedAuthManager.shared.currentUser
+        let currentUser = UnifiedAuthManager.shared.currentUser
         let targetUserID = userID ?? (currentUser?.recordID ?? "anonymous")
         
         // Delete locally
@@ -146,6 +152,16 @@ class ProfilePhotoManager: ObservableObject {
     }
     
     // MARK: - CloudKit Sync
+    
+    private func createProfileUpdateActivity(for userID: String) async {
+        // Create activity through UnifiedAuthManager to trigger cache refresh on other devices
+        // Using the public method that's available
+        if let currentUser = UnifiedAuthManager.shared.currentUser,
+           currentUser.recordID == userID {
+            // For current user, we can use the notifyProfilePhotoUpdate method
+            await UnifiedAuthManager.shared.notifyProfilePhotoUpdate(for: userID)
+        }
+    }
     
     private func uploadPhotoToCloudKit(_ image: UIImage, for userID: String, overwrite: Bool = false) async {
         // Compress image to reasonable size (max 2MB for CloudKit)
@@ -208,7 +224,7 @@ class ProfilePhotoManager: ObservableObject {
     
     /// Migrate existing photos from CloudKit to local storage
     func migrateExistingPhotos() async {
-        guard let currentUser = await UnifiedAuthManager.shared.currentUser,
+        guard let currentUser = UnifiedAuthManager.shared.currentUser,
               let userID = currentUser.recordID else { return }
         
         // Check if we already have a local photo

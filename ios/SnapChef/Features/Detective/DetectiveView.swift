@@ -9,6 +9,7 @@ struct DetectiveView: View {
     @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @StateObject private var userLifecycle = UserLifecycleManager.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.presentationMode) private var presentationMode
     
     @State private var showingCamera = false
     @State private var capturedImage: UIImage?
@@ -75,17 +76,19 @@ struct DetectiveView: View {
             .navigationTitle("Recipe Detective")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white.opacity(0.7))
-                            .background(
-                                Circle()
-                                    .fill(Color.black.opacity(0.2))
-                            )
+                if presentationMode.wrappedValue.isPresented {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: {
+                            dismiss()
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.white.opacity(0.7))
+                                .background(
+                                    Circle()
+                                        .fill(Color.black.opacity(0.2))
+                                )
+                        }
                     }
                 }
             }
@@ -733,7 +736,7 @@ struct DetectiveView: View {
             // Remove from CloudKit if authenticated
             if cloudKitAuth.isAuthenticated {
                 Task {
-                    try? await CloudKitRecipeManager.shared.removeRecipeFromUserProfile(
+                    try? await CloudKitService.shared.removeRecipeFromUserProfile(
                         baseRecipe.id.uuidString,
                         type: .saved
                     )
@@ -775,7 +778,7 @@ struct DetectiveView: View {
             // Save to CloudKit if authenticated (will sync later if not)
             if cloudKitAuth.isAuthenticated {
                 Task {
-                    _ = try? await CloudKitRecipeManager.shared.uploadRecipe(
+                    _ = try? await CloudKitService.shared.uploadRecipe(
                         baseRecipe,
                         fromLLM: true,
                         beforePhoto: beforePhoto
@@ -1441,7 +1444,7 @@ struct DetectiveRecipeDetailView: View {
             // Remove from CloudKit if authenticated
             if UnifiedAuthManager.shared.isAuthenticated {
                 Task {
-                    try? await CloudKitRecipeManager.shared.removeRecipeFromUserProfile(
+                    try? await CloudKitService.shared.removeRecipeFromUserProfile(
                         baseRecipe.id.uuidString,
                         type: .saved
                     )
@@ -1458,7 +1461,7 @@ struct DetectiveRecipeDetailView: View {
             // Save to CloudKit if authenticated (will sync later if not)
             if UnifiedAuthManager.shared.isAuthenticated {
                 Task {
-                    _ = try? await CloudKitRecipeManager.shared.uploadRecipe(baseRecipe)
+                    _ = try? await CloudKitService.shared.uploadRecipe(baseRecipe)
                 }
             }
             

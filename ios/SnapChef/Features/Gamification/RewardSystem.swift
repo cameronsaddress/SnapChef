@@ -67,7 +67,7 @@ enum RewardType: String, CaseIterable, Codable {
 
 // MARK: - Reward Model
 struct Reward: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let type: RewardType
     let tier: RewardTier
     let value: Int

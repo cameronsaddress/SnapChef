@@ -46,16 +46,6 @@ public struct ShareContent: Sendable {
             return nil
         }
         
-        // Use a placeholder image if no beforeImage is available
-        let imageToUse: UIImage
-        if let beforeImage = beforeImage {
-            imageToUse = beforeImage
-        } else {
-            // Create a simple placeholder image with recipe name
-            print("🎬 TikTok: No beforeImage available, creating placeholder")
-            imageToUse = UIImage() // Use empty image as fallback
-        }
-
         let viralRecipe = ViralRecipe(
             title: recipe.name,
             hook: "Fridge chaos → \(recipe.name) in \(recipe.prepTime + recipe.cookTime) min",
@@ -209,9 +199,15 @@ class ShareService: ObservableObject {
     @Published var shareProgress: Double = 0
     @Published var errorMessage: String?
 
-    private let cloudKitSync = CloudKitSyncService.shared
     private let socialShareManager = SocialShareManager.shared
     // private let analytics = AnalyticsManager.shared // Commented out until AnalyticsManager is ready
+    private let userDefaults = UserDefaults.standard
+    
+    private enum GrowthKeys {
+        static let rewardMonthBucket = "growth_share_reward_month_bucket"
+        static let rewardedShareCount = "growth_share_reward_count"
+        static let rewardedPlatforms = "growth_share_rewarded_platforms"
+    }
 
     private init() {}
 
@@ -220,7 +216,7 @@ class ShareService: ObservableObject {
     /// Create share content with photos fetched from CloudKit
     func createShareContentWithPhotos(for recipe: Recipe) async throws -> ShareContent {
         // Fetch photos from CloudKit
-        let photos = try await CloudKitRecipeManager.shared.fetchRecipePhotos(for: recipe.id.uuidString)
+        let photos = try await CloudKitService.shared.fetchRecipePhotos(for: recipe.id.uuidString)
 
         // Create share content with the fetched photos
         return ShareContent(
@@ -279,6 +275,11 @@ class ShareService: ObservableObject {
 
             // Track success
             trackShareCompleted(platform: platform, content: content)
+            NotificationCenter.default.post(
+                name: .snapchefShareCompleted,
+                object: nil,
+                userInfo: ["platform": platform.rawValue]
+            )
         } catch {
             errorMessage = error.localizedDescription
             trackShareFailed(platform: platform, error: error)
@@ -286,6 +287,23 @@ class ShareService: ObservableObject {
 
         isProcessing = false
         shareProgress = 1.0
+    }
+    
+    /// Called by direct platform flows that bypass ShareService.share(to:).
+    func registerExternalShareCompletion(platform: SharePlatformType, source: String) {
+        awardShareRewards(platform: platform, rewardBase: true)
+        AnalyticsManager.shared.logEvent(
+            "viral_share_completed_external",
+            parameters: [
+                "platform": platform.rawValue,
+                "source": source
+            ]
+        )
+        NotificationCenter.default.post(
+            name: .snapchefShareCompleted,
+            object: nil,
+            userInfo: ["platform": platform.rawValue]
+        )
     }
 
     // MARK: - Platform Implementations
@@ -458,37 +476,109 @@ class ShareService: ObservableObject {
 
         // Add hashtags
         let hashtagString = content.hashtags.map { "#\($0)" }.joined(separator: " ")
+        let shareURL = trackedShareURL(for: content).absoluteString
 
         // Platform-specific formatting
         switch platform {
         case .twitter:
             // Twitter has character limit
-            text = String(text.prefix(200))
+            text = String(text.prefix(150))
             text += "\n\n\(hashtagString)"
+            text += "\n\(shareURL)"
 
         case .instagram, .instagramStory:
             text += "\n\n\(hashtagString)"
-            text += "\n\n📱 Get SnapChef and join the challenge!"
+            text += "\n\n📱 Get SnapChef and cook smarter."
+            text += "\n🔗 \(shareURL)"
 
         default:
             text += "\n\n\(hashtagString)"
-            if let url = content.deepLink {
-                text += "\n\n🔗 \(url.absoluteString)"
-            }
+            text += "\n\n🔥 Join me on SnapChef: \(shareURL)"
         }
 
         return text
     }
 
     private func uploadContentToCloudKit(_ content: inout ShareContent) async -> URL? {
-        // Upload content to CloudKit and return shareable URL
-        // This would integrate with CloudKitSyncService
-        return nil // Placeholder
+        switch content.type {
+        case .recipe(let recipe):
+            // Use canonical universal links so shared content resolves reliably even without app install.
+            let base = socialShareManager.generateUniversalLink(for: recipe, cloudKitRecordID: nil)
+            return socialShareManager.appendReferralCode(to: base)
+        case .challenge(let challenge):
+            return socialShareManager.generateChallengeInviteLink(challengeID: challenge.id)
+        case .achievement(let badge):
+            let encoded = badge.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "achievement"
+            let base = URL(string: "https://snapchef.app/achievement/\(encoded)")
+            guard let base else { return nil }
+            return socialShareManager.appendReferralCode(to: base)
+        case .profile:
+            let base = URL(string: "https://snapchef.app/profile")
+            guard let base else { return nil }
+            return socialShareManager.appendReferralCode(to: base)
+        case .teamInvite(_, let joinCode):
+            let encoded = joinCode.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? joinCode
+            let base = URL(string: "https://snapchef.app/team/join?code=\(encoded)")
+            guard let base else { return nil }
+            return socialShareManager.appendReferralCode(to: base)
+        case .leaderboard:
+            let base = URL(string: "https://snapchef.app/leaderboard")
+            guard let base else { return nil }
+            return socialShareManager.appendReferralCode(to: base)
+        }
     }
 
-    private func awardShareRewards(platform: SharePlatformType) {
-        // Award Chef Coins for sharing
-        ChefCoinsManager.shared.awardSocialCoins(action: .share)
+    private func awardShareRewards(platform: SharePlatformType, rewardBase: Bool = true) {
+        let monthBucket = currentMonthBucket()
+        let storedBucket = userDefaults.string(forKey: GrowthKeys.rewardMonthBucket)
+        
+        if storedBucket != monthBucket {
+            userDefaults.set(monthBucket, forKey: GrowthKeys.rewardMonthBucket)
+            userDefaults.set(0, forKey: GrowthKeys.rewardedShareCount)
+            userDefaults.set([], forKey: GrowthKeys.rewardedPlatforms)
+        }
+        
+        var rewardedShareCount = userDefaults.integer(forKey: GrowthKeys.rewardedShareCount)
+        var rewardedPlatforms = Set(userDefaults.stringArray(forKey: GrowthKeys.rewardedPlatforms) ?? [])
+        var bonusCoins = 0
+        
+        if rewardBase {
+            // Base reward for explicit share action.
+            ChefCoinsManager.shared.awardSocialCoins(action: .share)
+        }
+        
+        // First share each month gets a stronger boost.
+        if rewardedShareCount == 0 {
+            bonusCoins += 20
+        }
+        
+        // First share on a new platform gets small extra incentive.
+        if !rewardedPlatforms.contains(platform.rawValue) {
+            bonusCoins += 6
+            rewardedPlatforms.insert(platform.rawValue)
+        }
+        
+        if bonusCoins > 0 {
+            ChefCoinsManager.shared.earnCoins(
+                bonusCoins,
+                reason: "Share Momentum Bonus (\(platform.rawValue))",
+                isBonus: true
+            )
+        }
+        
+        rewardedShareCount += 1
+        userDefaults.set(rewardedShareCount, forKey: GrowthKeys.rewardedShareCount)
+        userDefaults.set(Array(rewardedPlatforms), forKey: GrowthKeys.rewardedPlatforms)
+        
+        NotificationCenter.default.post(
+            name: Notification.Name("ViralShareCompleted"),
+            object: nil,
+            userInfo: [
+                "platform": platform.rawValue,
+                "monthlyShareCount": rewardedShareCount,
+                "bonusCoins": bonusCoins
+            ]
+        )
 
         // Track share streak
         Task {
@@ -499,6 +589,22 @@ class ShareService: ObservableObject {
         ChallengeProgressTracker.shared.trackAction(.recipeShared, metadata: [
             "platform": platform.rawValue
         ])
+    }
+    
+    private func referralURL() -> URL {
+        socialShareManager.referralInviteURL()
+    }
+
+    private func trackedShareURL(for content: ShareContent) -> URL {
+        let baseURL = content.deepLink ?? referralURL()
+        return socialShareManager.appendReferralCode(to: baseURL)
+    }
+    
+    private func currentMonthBucket() -> String {
+        let components = Calendar.current.dateComponents([.year, .month], from: Date())
+        let year = components.year ?? 0
+        let month = components.month ?? 0
+        return "\(year)-\(month)"
     }
 
     // MARK: - Analytics

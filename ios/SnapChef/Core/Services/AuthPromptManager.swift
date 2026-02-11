@@ -10,6 +10,58 @@ import SwiftUI
 import Combine
 import CloudKit
 
+struct AuthNudgerDecision {
+    let shouldPrompt: Bool
+    let dismissalCooldownDays: Int
+}
+
+enum AuthNudgerPolicy {
+    static func decision(
+        for action: AnonymousAction,
+        profile: AnonymousUserProfile,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> AuthNudgerDecision {
+        let daysSinceFirstUse = calendar.dateComponents([.day], from: profile.firstLaunchDate, to: now).day ?? 0
+        let shouldShow: Bool = switch action {
+        case .recipeCreated:
+            profile.recipesCreatedCount >= 3 || (daysSinceFirstUse >= 7 && profile.recipesCreatedCount >= 1)
+        case .videoGenerated:
+            profile.videosGeneratedCount >= 2
+        case .videoShared:
+            profile.videosSharedCount >= 1
+        case .socialExplored:
+            profile.socialFeaturesExplored >= 2
+        case .challengeViewed:
+            profile.challengesViewed >= 2
+        case .appOpened:
+            profile.appOpenCount >= 5 && daysSinceFirstUse >= 3
+        case .recipeViewed:
+            false
+        }
+
+        let dismissalCooldown = daysSinceFirstUse < 7 ? 7 : 3
+        return AuthNudgerDecision(shouldPrompt: shouldShow, dismissalCooldownDays: dismissalCooldown)
+    }
+
+    static func triggerContext(for action: AnonymousAction) -> AuthPromptTrigger.TriggerContext? {
+        switch action {
+        case .recipeCreated:
+            return .firstRecipeSuccess
+        case .videoGenerated, .videoShared:
+            return .viralContentCreated
+        case .socialExplored:
+            return .socialFeatureExplored
+        case .challengeViewed:
+            return .challengeInterest
+        case .appOpened:
+            return .returningUser
+        case .recipeViewed:
+            return nil
+        }
+    }
+}
+
 @MainActor
 class AuthPromptManager: ObservableObject {
     static let shared = AuthPromptManager()
@@ -110,37 +162,28 @@ class AuthPromptManager: ObservableObject {
         if hasShownInSession {
             return nil
         }
-        
-        // Check for first recipe success
-        if profile.recipesCreatedCount == 1 && !hasShownPrompt(for: .firstRecipeSuccess, in: profile) {
-            return createPrompt(for: .firstRecipeSuccess, profile: profile)
-        }
-        
-        // Check for viral content creation
-        if profile.videosGeneratedCount >= 1 && profile.videosSharedCount >= 1 && !hasShownPrompt(for: .viralContentCreated, in: profile) {
-            return createPrompt(for: .viralContentCreated, profile: profile)
-        }
-        
-        // Check for reengagement
-        let daysSinceFirstLaunch = Calendar.current.dateComponents([.day], from: profile.firstLaunchDate, to: Date()).day ?? 0
-        if daysSinceFirstLaunch >= 3 && profile.appOpenCount >= 5 && !hasShownPrompt(for: .reengagement(day: daysSinceFirstLaunch), in: profile) {
-            return createPrompt(for: .reengagement(day: daysSinceFirstLaunch), profile: profile)
-        }
-        
-        // Check for challenge interest
-        if profile.challengesViewed >= 3 && !hasShownPrompt(for: .challengeInterest, in: profile) {
-            return createPrompt(for: .challengeInterest, profile: profile)
-        }
-        
-        // Check for social exploration
-        if profile.socialFeaturesExplored >= 5 && !hasShownPrompt(for: .socialExploration, in: profile) {
-            return createPrompt(for: .socialExploration, profile: profile)
+
+        // Keep this manager aligned with canonical auth nudger policy.
+        for action in nudgerPriorityOrder {
+            let decision = AuthNudgerPolicy.decision(for: action, profile: profile)
+            guard decision.shouldPrompt else { continue }
+            guard !profile.hasRecentDismissals(within: decision.dismissalCooldownDays) else { continue }
+            guard let context = promptContext(for: action, profile: profile) else { continue }
+            guard !hasShownPrompt(for: context, in: profile) else { continue }
+            return createPrompt(for: context, profile: profile)
         }
         
         return nil
     }
     
     func showPrompt(_ prompt: AuthPrompt) {
+        if let triggerContext = mapToTriggerContext(prompt.context) {
+            Task { @MainActor in
+                await AuthPromptTrigger.shared.triggerPrompt(for: triggerContext)
+            }
+            return
+        }
+
         guard !isShowingPrompt else { return }
         
         currentPrompt = prompt
@@ -169,22 +212,35 @@ class AuthPromptManager: ObservableObject {
         shouldShowPrompt = false
         
         guard let prompt = currentPrompt else { return }
+
+        if let triggerContext = mapToTriggerContext(prompt.context) {
+            let mappedAction = mapDismissActionToTriggerAction(action)
+            Task { @MainActor in
+                await AuthPromptTrigger.shared.recordPromptAction(mappedAction, for: triggerContext)
+            }
+            currentPrompt = nil
+            return
+        }
         
         switch action {
         case .later:
             // Set cooldown
             promptCooldown = Date().addingTimeInterval(cooldownDuration)
+            persistCooldown()
             savePromptEvent(context: prompt.context, action: "dismissed")
         case .never:
             // Mark as never ask
+            clearCooldown()
             savePromptEvent(context: prompt.context, action: "never")
             markNeverAsk(for: prompt.context)
         case .swipedAway:
             // Light dismissal, shorter cooldown
             promptCooldown = Date().addingTimeInterval(cooldownDuration / 2)
+            persistCooldown()
             savePromptEvent(context: prompt.context, action: "swiped")
         case .completed:
             // User authenticated!
+            clearCooldown()
             savePromptEvent(context: prompt.context, action: "completed")
         }
         
@@ -195,15 +251,16 @@ class AuthPromptManager: ObservableObject {
     }
     
     func scheduleReengagementPrompt() {
-        // Schedule a notification for tomorrow
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 86400, repeats: false)
-        let content = UNMutableNotificationContent()
-        content.title = "Your recipes are waiting! 🍳"
-        content.body = "Come back to create more amazing dishes with SnapChef"
-        content.sound = .default
-        
-        let request = UNNotificationRequest(identifier: "reengagement_prompt", content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(request)
+        _ = NotificationManager.shared.scheduleNotification(
+            identifier: "reengagement_prompt",
+            title: "Your recipes are waiting! 🍳",
+            body: "Come back to create more amazing dishes with SnapChef.",
+            category: .streakReminder,
+            userInfo: [:],
+            trigger: nil,
+            priority: .low,
+            deliveryPolicy: .monthlyEngagement
+        )
     }
     
     // MARK: - Private Methods
@@ -246,6 +303,34 @@ class AuthPromptManager: ObservableObject {
             return .delayed(seconds: 1.0)
         }
     }
+
+    private var nudgerPriorityOrder: [AnonymousAction] {
+        [
+            .videoShared,
+            .videoGenerated,
+            .recipeCreated,
+            .challengeViewed,
+            .socialExplored,
+            .appOpened
+        ]
+    }
+
+    private func promptContext(for action: AnonymousAction, profile: AnonymousUserProfile) -> PromptContext? {
+        switch action {
+        case .recipeCreated:
+            return .firstRecipeSuccess
+        case .videoGenerated, .videoShared:
+            return .viralContentCreated
+        case .challengeViewed:
+            return .challengeInterest
+        case .socialExplored:
+            return .socialExploration
+        case .appOpened:
+            return .reengagement(day: max(1, profile.daysSinceFirstLaunch))
+        case .recipeViewed:
+            return nil
+        }
+    }
     
     private func hasShownPrompt(for context: PromptContext, in profile: AnonymousUserProfile) -> Bool {
         return profile.authPromptHistory.contains { event in
@@ -264,6 +349,38 @@ class AuthPromptManager: ObservableObject {
         case .challengeInterest: return "challenge_interest"
         case .socialExploration: return "social_exploration"
         case .iCloudSetup: return "icloud_setup"
+        }
+    }
+
+    private func mapToTriggerContext(_ context: PromptContext) -> AuthPromptTrigger.TriggerContext? {
+        switch context {
+        case .firstRecipeSuccess:
+            return .firstRecipeSuccess
+        case .viralContentCreated:
+            return .viralContentCreated
+        case .dailyLimitReached:
+            return .dailyLimitReached
+        case .challengeInterest:
+            return .challengeInterest
+        case .socialExploration:
+            return .socialFeatureExplored
+        case .reengagement:
+            return .returningUser
+        case .shareIntent:
+            return .shareAttempt
+        case .featureDiscovery, .iCloudSetup:
+            return nil
+        }
+    }
+
+    private func mapDismissActionToTriggerAction(_ action: DismissAction) -> String {
+        switch action {
+        case .completed:
+            return "completed"
+        case .never:
+            return "never"
+        case .later, .swipedAway:
+            return "dismissed"
         }
     }
     
@@ -297,6 +414,17 @@ class AuthPromptManager: ObservableObject {
         if let cooldownDate = UserDefaults.standard.object(forKey: "auth_prompt_cooldown") as? Date {
             promptCooldown = cooldownDate
         }
+    }
+
+    private func persistCooldown() {
+        if let promptCooldown {
+            UserDefaults.standard.set(promptCooldown, forKey: "auth_prompt_cooldown")
+        }
+    }
+
+    private func clearCooldown() {
+        promptCooldown = nil
+        UserDefaults.standard.removeObject(forKey: "auth_prompt_cooldown")
     }
 }
 

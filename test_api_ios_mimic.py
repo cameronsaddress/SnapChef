@@ -7,6 +7,7 @@ This tests the multipart/form-data request format and verifies the response stru
 import requests
 import json
 import uuid
+import os
 from pathlib import Path
 from typing import Dict, List, Optional
 import pprint
@@ -14,7 +15,7 @@ import pprint
 # API Configuration
 API_BASE_URL = "https://snapchef-server.onrender.com"
 API_ENDPOINT = "/analyze_fridge_image"
-API_KEY = "5380e4b60818cf237678fccfd4b8f767d1c94"
+API_KEY = os.environ.get("SNAPCHEF_API_KEY", "")
 
 # Test image path
 TEST_IMAGE_PATH = Path(__file__).parent / "webapp-archive" / "assets" / "fridge.jpg"
@@ -57,6 +58,9 @@ def test_api_submission(
     # Generate session ID (mimicking iOS UUID().uuidString)
     session_id = str(uuid.uuid4())
     print(f"\n✓ Generated session ID: {session_id}")
+
+    if not API_KEY:
+        raise RuntimeError("SNAPCHEF_API_KEY is not set. Export it before running this script.")
     
     # Prepare headers with authentication
     headers = {
@@ -95,7 +99,7 @@ def test_api_submission(
     
     print("\n📤 Request Details:")
     print(f"  URL: {API_BASE_URL}{API_ENDPOINT}")
-    print(f"  Headers: {headers}")
+    print("  Headers: {'X-App-API-Key': '<redacted>'}")
     print(f"  Form Data:")
     for key, value in data.items():
         print(f"    {key}: {value}")

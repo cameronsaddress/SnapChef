@@ -1959,7 +1959,7 @@ class CloudKitRecipeManager: ObservableObject {
         likeRecord["likedAt"] = Date()
         
         // Save to CloudKit using CloudKitActor for safety
-        _ = try await CloudKitSyncService.shared.cloudKitActor.saveRecord(likeRecord)
+        _ = try await CloudKitService.shared.cloudKitActor.saveRecord(likeRecord)
         
         // Update the recipe's like count
         await updateRecipeLikeCount(recipeID: recipeID, increment: true)
@@ -1967,14 +1967,14 @@ class CloudKitRecipeManager: ObservableObject {
         // Create activity for recipe owner (if it's not their own recipe)
         do {
             // Fetch the recipe to get owner info and recipe name using CloudKitActor
-            let recipeRecord = try await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: CKRecord.ID(recordName: recipeID))
+            let recipeRecord = try await CloudKitService.shared.cloudKitActor.fetchRecord(with: CKRecord.ID(recordName: recipeID))
             let recipeOwnerID = recipeRecord["ownerID"] as? String
             let recipeName = recipeRecord["title"] as? String ?? recipeRecord["name"] as? String
             
             // Only create activity if it's not the user's own recipe
             if let recipeOwnerID = recipeOwnerID, recipeOwnerID != userID {
-                // Use CloudKitSyncService to create the activity
-                try await CloudKitSyncService.shared.createActivity(
+                // Use CloudKitService to create the activity
+                try await CloudKitService.shared.createActivity(
                     type: "recipeLiked",
                     actorID: userID,
                     targetUserID: recipeOwnerID,
@@ -2010,7 +2010,7 @@ class CloudKitRecipeManager: ObservableObject {
         
         do {
             // Use CloudKitActor for safe deletion
-            try await CloudKitSyncService.shared.cloudKitActor.deleteRecordByID(recordID)
+            try await CloudKitService.shared.cloudKitActor.deleteRecordByID(recordID)
             
             // Update the recipe's like count
             await updateRecipeLikeCount(recipeID: recipeID, increment: false)
@@ -2035,7 +2035,7 @@ class CloudKitRecipeManager: ObservableObject {
         
         do {
             // Use CloudKitActor for safe fetching
-            _ = try await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID)
+            _ = try await CloudKitService.shared.cloudKitActor.fetchRecord(with: recordID)
             return true
         } catch {
             return false
@@ -2046,7 +2046,7 @@ class CloudKitRecipeManager: ObservableObject {
     func getLikeCount(for recipeID: String) async -> Int {
         // First try to get the cached count from the Recipe record itself
         let recordID = CKRecord.ID(recordName: recipeID)
-        if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
+        if let record = try? await CloudKitService.shared.cloudKitActor.fetchRecord(with: recordID) {
             if let likeCount = record["likeCount"] as? Int64 {
                 return Int(likeCount)
             }
@@ -2058,7 +2058,7 @@ class CloudKitRecipeManager: ObservableObject {
         print("🔍 Querying RecipeLike records with predicate: recipeID == \(recipeID)")
         
         do {
-            let results = try await CloudKitSyncService.shared.cloudKitActor.executeQueryWithResults(query)
+            let results = try await CloudKitService.shared.cloudKitActor.executeQueryWithResults(query)
             let count = results.matchResults.count
             print("🔍 Found \(count) RecipeLike records for recipe: \(recipeID)")
             
@@ -2119,7 +2119,7 @@ class CloudKitRecipeManager: ObservableObject {
             for recipeID in recipeIDs {
                 group.addTask {
                     let recordID = CKRecord.ID(recordName: recipeID)
-                    if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
+                    if let record = try? await CloudKitService.shared.cloudKitActor.fetchRecord(with: recordID) {
                         if let likeCount = record["likeCount"] as? Int64 {
                             return (recipeID, Int(likeCount))
                         }
@@ -2148,7 +2148,7 @@ class CloudKitRecipeManager: ObservableObject {
         let query = CKQuery(recordType: "RecipeLike", predicate: predicate)
         
         do {
-            let results = try await CloudKitSyncService.shared.cloudKitActor.executeQueryWithResults(query)
+            let results = try await CloudKitService.shared.cloudKitActor.executeQueryWithResults(query)
             let recipeIDs = results.matchResults.compactMap { (_, result) -> String? in
                 guard case .success(let record) = result else { return nil }
                 return record["recipeID"] as? String
@@ -2167,10 +2167,10 @@ class CloudKitRecipeManager: ObservableObject {
         
         do {
             // Try to fetch from public database using CloudKitActor
-            if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
+            if let record = try? await CloudKitService.shared.cloudKitActor.fetchRecord(with: recordID) {
                 let currentCount = record["likeCount"] as? Int64 ?? 0
                 record["likeCount"] = increment ? currentCount + 1 : max(0, currentCount - 1)
-                _ = try await CloudKitSyncService.shared.cloudKitActor.saveRecord(record)
+                _ = try await CloudKitService.shared.cloudKitActor.saveRecord(record)
                 print("✅ Updated like count for recipe: \(recipeID) to \(record["likeCount"] ?? 0)")
             }
         } catch {
@@ -2184,9 +2184,9 @@ class CloudKitRecipeManager: ObservableObject {
         
         do {
             // Try to fetch from public database using CloudKitActor
-            if let record = try? await CloudKitSyncService.shared.cloudKitActor.fetchRecord(with: recordID) {
+            if let record = try? await CloudKitService.shared.cloudKitActor.fetchRecord(with: recordID) {
                 record["likeCount"] = Int64(absoluteCount)
-                _ = try await CloudKitSyncService.shared.cloudKitActor.saveRecord(record)
+                _ = try await CloudKitService.shared.cloudKitActor.saveRecord(record)
                 print("✅ Set like count for recipe: \(recipeID) to \(absoluteCount)")
             }
         } catch {

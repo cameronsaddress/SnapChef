@@ -22,7 +22,7 @@ class RecipeLikeManager: ObservableObject {
     private var pendingOperations: Set<String> = []
     
     /// Reference to CloudKit manager
-    private let cloudKitManager = CloudKitRecipeManager.shared
+    private let cloudKitManager = CloudKitService.shared
     
     /// Reference to auth manager
     private let authManager = UnifiedAuthManager.shared

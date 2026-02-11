@@ -15,7 +15,6 @@ class UserProfileViewModel: ObservableObject {
     @Published var dynamicStats: UserStats?
 
     private let cloudKitAuth = UnifiedAuthManager.shared
-    private let cloudKitSync = CloudKitSyncService.shared
     private let cloudKitUserManager = CloudKitUserManager.shared
     private let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
 
@@ -585,18 +584,6 @@ struct UserProfileConverter {
         let sourceFollowersCount = record["followersCount"] as? Int ?? 0
         let sourceFollowingCount = record["followingCount"] as? Int ?? 0
         let sourceIsVerified = record["isVerified"] as? Bool ?? false
-        let sourceUserID = record["userID"] as? String ?? record.recordID.recordName
-        let sourceBio = record["bio"] as? String ?? ""
-        let sourceCreatedAt = record["createdAt"] as? Date ?? Date()
-        let sourceUpdatedAt = record["updatedAt"] as? Date ?? Date()
-        
-        // Get profile image URL
-        let profileImageURL: String?
-        if let imageAsset = record["profileImageAsset"] as? CKAsset {
-            profileImageURL = imageAsset.fileURL?.absoluteString
-        } else {
-            profileImageURL = nil
-        }
         
         print("🔍 DEBUG UserProfile: Source data:")
         print("  - Username: '\(sourceUsername ?? "nil")'")

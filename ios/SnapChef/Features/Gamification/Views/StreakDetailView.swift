@@ -426,17 +426,10 @@ struct QuickActionsSection: View {
         isLoadingCloudKitStreaks = true
         
         Task {
-            do {
-                let streaks = await CloudKitStreakManager.shared.syncStreaks()
-                await MainActor.run {
-                    self.cloudKitStreaks = streaks
-                    self.isLoadingCloudKitStreaks = false
-                }
-            } catch {
-                print("Error loading CloudKit streaks: \(error)")
-                await MainActor.run {
-                    self.isLoadingCloudKitStreaks = false
-                }
+            let streaks = await CloudKitStreakManager.shared.syncStreaks()
+            await MainActor.run {
+                self.cloudKitStreaks = streaks
+                self.isLoadingCloudKitStreaks = false
             }
         }
     }

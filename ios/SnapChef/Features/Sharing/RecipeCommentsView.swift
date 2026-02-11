@@ -467,7 +467,7 @@ class RecipeCommentsViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var hasMore = true
 
-    private let cloudKitSync = CloudKitSyncService.shared
+    private let cloudKitSync = CloudKitService.shared
     private let cloudKitAuth = UnifiedAuthManager.shared
     private var lastFetchedRecord: CKRecord?
     private var recipeID: String = ""
@@ -623,7 +623,7 @@ class RecipeCommentsViewModel: ObservableObject {
                 content: current.content,
                 createdAt: current.createdAt,
                 editedAt: current.editedAt,
-                likeCount: current.isLiked ? current.likeCount - 1 : current.likeCount + 1,
+                likeCount: current.isLiked ? max(0, current.likeCount - 1) : current.likeCount + 1,
                 isLiked: !current.isLiked,
                 parentCommentID: current.parentCommentID,
                 replies: current.replies
@@ -712,7 +712,8 @@ class RecipeCommentsViewModel: ObservableObject {
             print("   - userID: \(record[CKField.RecipeComment.userID] as? String ?? "missing")")
             print("   - recipeID: \(record[CKField.RecipeComment.recipeID] as? String ?? "missing")")
             print("   - content: \(record[CKField.RecipeComment.content] as? String ?? "missing")")
-            print("   - createdAt: \(record[CKField.RecipeComment.createdAt] as? Date)")
+            let createdAtValue = record[CKField.RecipeComment.createdAt] as? Date
+            print("   - createdAt: \(createdAtValue?.formatted(date: .abbreviated, time: .shortened) ?? "missing")")
             return nil
         }
         
@@ -725,8 +726,8 @@ class RecipeCommentsViewModel: ObservableObject {
         let likeCount = Int(record[CKField.RecipeComment.likeCount] as? Int64 ?? 0)
         let parentCommentID = record[CKField.RecipeComment.parentCommentID] as? String
         
-        // Check if current user has liked this comment (not implemented yet)
-        let isLiked = false // TODO: Implement comment likes
+        // Resolve current user's like state for this comment.
+        let isLiked = (try? await cloudKitSync.isCommentLiked(id)) ?? false
         
         let commentItem = CommentItem(
             id: id,

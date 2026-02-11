@@ -20,7 +20,6 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
     // MARK: - Dependencies
 
     private let profileManager = KeychainProfileManager.shared
-    private let authManager = UnifiedAuthManager.shared
 
     // MARK: - State
 
@@ -40,6 +39,7 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
         case firstRecipeSuccess = "first_recipe_success"
         case viralContentCreated = "viral_content_created"
         case dailyLimitReached = "daily_limit_reached"
+        case featureUnlock = "feature_unlock"
         case socialFeatureExplored = "social_feature_explored"
         case challengeInterest = "challenge_interest"
         case shareAttempt = "share_attempt"
@@ -54,6 +54,8 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
                 return "Ready to go viral?"
             case .dailyLimitReached:
                 return "Unlock unlimited recipes"
+            case .featureUnlock:
+                return "Unlock this feature"
             case .socialFeatureExplored:
                 return "Connect with other chefs"
             case .challengeInterest:
@@ -75,6 +77,8 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
                 return "Sign in to track your viral videos and compete with other chefs!"
             case .dailyLimitReached:
                 return "Create unlimited recipes and save your favorites with a free account!"
+            case .featureUnlock:
+                return "Sign in to save likes, keep your progress, and unlock the full SnapChef experience."
             case .socialFeatureExplored:
                 return "Follow other chefs, share your creations, and join the community!"
             case .challengeInterest:
@@ -93,6 +97,7 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
             case .firstRecipeSuccess: return 5
             case .viralContentCreated: return 8
             case .dailyLimitReached: return 9
+            case .featureUnlock: return 8
             case .socialFeatureExplored: return 6
             case .challengeInterest: return 7
             case .shareAttempt: return 8
@@ -114,7 +119,7 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
     /// - Parameter context: The trigger context being evaluated
     /// - Returns: True if prompt should be shown, false otherwise
     func shouldTriggerPrompt(for context: TriggerContext) async -> Bool {
-        guard let profile = await profileManager.loadProfile() else {
+        guard let profile = profileManager.loadProfile() else {
             return false
         }
 
@@ -158,9 +163,7 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
         lastPromptDate = Date()
 
         // Record the prompt event
-        Task {
-            await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "shown")
-        }
+        _ = await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "shown")
     }
 
     /// Records user action on the authentication prompt
@@ -168,16 +171,16 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
     ///   - action: Action taken by user ("completed", "dismissed", "never")
     ///   - context: The context that triggered the prompt
     func recordPromptAction(_ action: String, for context: TriggerContext) async {
-        await profileManager.recordAuthPromptEvent(context: context.rawValue, action: action)
+        _ = await profileManager.recordAuthPromptEvent(context: context.rawValue, action: action)
 
         // Update authentication state if applicable
         switch action {
         case "completed":
-            await profileManager.updateAuthenticationState(.authenticated)
+            _ = await profileManager.updateAuthenticationState(.authenticated)
         case "never":
-            await profileManager.updateAuthenticationState(.neverAsk)
+            _ = await profileManager.updateAuthenticationState(.neverAsk)
         case "dismissed":
-            await profileManager.updateAuthenticationState(.dismissed)
+            _ = await profileManager.updateAuthenticationState(.dismissed)
         default:
             break
         }
@@ -199,7 +202,7 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
 
     /// Checks if user has indicated they never want to be prompted
     func hasUserOptedOut() async -> Bool {
-        guard let profile = await profileManager.loadProfile() else {
+        guard let profile = profileManager.loadProfile() else {
             return false
         }
         return profile.authenticationState == .neverAsk
@@ -269,14 +272,19 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
     private func evaluateContextConditions(_ context: TriggerContext, profile: AnonymousUserProfile) -> Bool {
         switch context {
         case .firstRecipeSuccess:
-            return profile.recipesCreatedCount == 1 && !profile.hasShownPrompt(for: context.rawValue)
+            return profile.recipesCreatedCount >= 1 && !profile.hasShownPrompt(for: context.rawValue)
 
         case .viralContentCreated:
-            return profile.videosGeneratedCount >= 1 && profile.hasShownSocialInterest
+            return profile.videosGeneratedCount >= 1 &&
+                profile.hasShownSocialInterest &&
+                !profile.hasShownPrompt(for: context.rawValue)
 
         case .dailyLimitReached:
             // This would be triggered by premium logic when limits are hit
-            return true
+            return !profile.hasShownPrompt(for: context.rawValue)
+
+        case .featureUnlock:
+            return !profile.hasShownPrompt(for: context.rawValue)
 
         case .socialFeatureExplored:
             return profile.socialFeaturesExplored >= 1 && !profile.hasShownPrompt(for: context.rawValue)
@@ -285,13 +293,18 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
             return profile.challengesViewed >= 2 && !profile.hasShownPrompt(for: context.rawValue)
 
         case .shareAttempt:
-            return profile.videosSharedCount >= 1 || profile.socialFeaturesExplored >= 1
+            return (profile.videosSharedCount >= 1 || profile.socialFeaturesExplored >= 1) &&
+                !profile.hasShownPrompt(for: context.rawValue)
 
         case .weeklyHighEngagement:
-            return profile.engagementScore >= 3.0 && profile.daysSinceFirstLaunch >= 3
+            return profile.engagementScore >= 3.0 &&
+                profile.daysSinceFirstLaunch >= 3 &&
+                !profile.hasShownPrompt(for: context.rawValue)
 
         case .returningUser:
-            return profile.daysSinceLastActive >= 1 && profile.appOpenCount >= 3
+            return profile.appOpenCount >= 3 &&
+                profile.daysSinceFirstLaunch >= 3 &&
+                !profile.hasShownPrompt(for: context.rawValue)
         }
     }
 
@@ -312,14 +325,27 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
             return false
         }
 
-        // Check if user recently dismissed prompts
-        if profile.hasRecentDismissals(within: 3) {
+        // Enforce dismissal cooldown.
+        let lastDismissal = profile.authPromptHistory
+            .filter { $0.action == "dismissed" || $0.action == "never" }
+            .map(\.date)
+            .max()
+        if let lastDismissal,
+           Date().timeIntervalSince(lastDismissal) < promptCooldownAfterDismissal {
             return false
         }
 
-        // Check minimum time between any prompts
-        if let lastDate = lastPromptDate,
-           Date().timeIntervalSince(lastDate) < minimumTimeBetweenPrompts {
+        // Check minimum time between any prompts, including across app relaunches.
+        let persistedLastShownDate = profile.authPromptHistory
+            .filter { $0.action == "shown" }
+            .map(\.date)
+            .max()
+        let effectiveLastShownDate = [lastPromptDate, persistedLastShownDate]
+            .compactMap { $0 }
+            .max()
+
+        if let effectiveLastShownDate,
+           Date().timeIntervalSince(effectiveLastShownDate) < minimumTimeBetweenPrompts {
             return false
         }
 
@@ -346,7 +372,7 @@ final class AuthPromptTrigger: ObservableObject, @unchecked Sendable {
 extension AuthPromptTrigger {
     /// Gets analytics data about prompt performance
     func getPromptAnalytics() async -> [String: Any] {
-        guard let profile = await profileManager.loadProfile() else {
+        guard let profile = profileManager.loadProfile() else {
             return [:]
         }
 
@@ -372,7 +398,7 @@ extension AuthPromptTrigger {
 
     /// Gets the most effective prompt contexts for analytics
     func getContextEffectiveness() async -> [String: Double] {
-        guard let profile = await profileManager.loadProfile() else {
+        guard let profile = profileManager.loadProfile() else {
             return [:]
         }
 
@@ -422,17 +448,17 @@ extension AuthPromptTrigger {
 
     /// Simulates user actions for testing
     func simulatePromptShown(for context: TriggerContext) async {
-        await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "shown")
+        _ = await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "shown")
     }
 
     func simulatePromptCompleted(for context: TriggerContext) async {
-        await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "completed")
-        await profileManager.updateAuthenticationState(.authenticated)
+        _ = await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "completed")
+        _ = await profileManager.updateAuthenticationState(.authenticated)
     }
 
     func simulatePromptDismissed(for context: TriggerContext) async {
-        await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "dismissed")
-        await profileManager.updateAuthenticationState(.dismissed)
+        _ = await profileManager.recordAuthPromptEvent(context: context.rawValue, action: "dismissed")
+        _ = await profileManager.updateAuthenticationState(.dismissed)
     }
 }
 #endif

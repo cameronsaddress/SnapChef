@@ -277,24 +277,14 @@ struct SimpleProgressivePrompt: View {
     
     private func handleTikTokSignIn() {
         Task {
-            do {
-                isLoading = true
-                
-                // TikTok sign-in not available with CloudKitAuthManager
-                throw NSError(domain: "AuthError", code: -1, userInfo: [NSLocalizedDescriptionKey: "TikTok sign-in requires UnifiedAuthManager"])
-                
-                await MainActor.run {
-                    recordSuccess()
-                    dismissPrompt()
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "TikTok sign in failed. Please try again."
-                    showError = true
-                }
-            }
-            
             await MainActor.run {
+                isLoading = true
+            }
+
+            // TikTok sign-in not available with CloudKitAuthManager.
+            await MainActor.run {
+                errorMessage = "TikTok sign in requires UnifiedAuthManager."
+                showError = true
                 isLoading = false
             }
         }

@@ -32,7 +32,7 @@ struct MorphingTabBar: View {
                         if let onTabSelection = onTabSelection {
                             onTabSelection(index)
                         } else {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            withAnimation(.spring(response: MotionTuning.seconds(0.3), dampingFraction: 0.7)) {
                                 selectedTab = index
                             }
                         }
@@ -58,14 +58,17 @@ struct MorphingTabItem: View {
     let action: () -> Void
 
     @State private var iconRotation: Double = 0
+    @State private var labelPulse = false
 
     var body: some View {
         Button(action: {
             action()
-            if isSelected {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
-                    iconRotation += 360
-                }
+            withAnimation(.spring(response: MotionTuning.seconds(0.5), dampingFraction: 0.62)) {
+                iconRotation += isSelected ? 320 : 12
+                labelPulse = true
+            }
+            withAnimation(.easeOut(duration: MotionTuning.seconds(0.24)).delay(MotionTuning.seconds(0.08))) {
+                labelPulse = false
             }
         }) {
             VStack(spacing: 4) {
@@ -95,6 +98,7 @@ struct MorphingTabItem: View {
                     Text(title)
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(color)
+                        .scaleEffect(labelPulse ? 1.06 : 1.0)
                         .transition(.asymmetric(
                             insertion: .scale.combined(with: .opacity),
                             removal: .scale.combined(with: .opacity)
@@ -103,7 +107,7 @@ struct MorphingTabItem: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(StudioSpringButtonStyle(pressedScale: 0.9, pressedYOffset: 1.2, activeRotation: 2.4))
     }
 }
 
@@ -162,7 +166,7 @@ struct GlassmorphicTabBarBackground: View {
                 )
         }
         .onAppear {
-            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+            withAnimation(.linear(duration: MotionTuning.seconds(3)).repeatForever(autoreverses: false)) {
                 shimmerPhase = 2
             }
         }

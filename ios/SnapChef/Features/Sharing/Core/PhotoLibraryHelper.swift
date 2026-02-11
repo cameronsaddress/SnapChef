@@ -14,7 +14,7 @@ class PhotoLibraryHelper {
 
     private init() {}
 
-    func requestPermissionAndSaveImage(_ image: UIImage, completion: @escaping (Bool, String?) -> Void) {
+    func requestPermissionAndSaveImage(_ image: UIImage, completion: @escaping @Sendable (Bool, String?) -> Void) {
         // Ensure we're on the main thread
         guard Thread.isMainThread else {
             DispatchQueue.main.async {
@@ -61,7 +61,7 @@ class PhotoLibraryHelper {
         }
     }
 
-    private func performSave(_ image: UIImage, completion: @escaping (Bool, String?) -> Void) {
+    private func performSave(_ image: UIImage, completion: @escaping @Sendable (Bool, String?) -> Void) {
         PHPhotoLibrary.shared().performChanges({
             PHAssetChangeRequest.creationRequestForAsset(from: image)
         }) { success, error in

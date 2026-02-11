@@ -117,7 +117,7 @@ final class RecipeModule: ObservableObject {
         
         // Trigger manual sync after saving a recipe
         Task {
-            await parent?.dataModule.triggerManualSync()
+            await parent?.triggerManualSync()
         }
         
         print("✅ Recipe processed in CloudKit: \(recipeID)")
@@ -467,6 +467,26 @@ final class RecipeModule: ObservableObject {
             print("☁️ Recipe fetched from public CloudKit: \(recipeID)")
             return recipe
         }
+    }
+    
+    /// Check if a recipe record exists in CloudKit by ID.
+    func recipeExists(with recipeID: String) async -> Bool {
+        let recordID = CKRecord.ID(recordName: recipeID)
+        
+        if (try? await privateDatabase.record(for: recordID)) != nil {
+            return true
+        }
+        
+        if (try? await publicDatabase.record(for: recordID)) != nil {
+            return true
+        }
+        
+        return false
+    }
+    
+    /// Returns an existing recipe ID when the same recipe content already exists.
+    func existingRecipeID(name: String, description: String) async -> String? {
+        return await checkRecipeExists(name, description)
     }
     
     /// Batch fetch recipes by IDs (optimized with concurrent downloads)
@@ -938,6 +958,7 @@ final class RecipeModule: ObservableObject {
         
         let recipe = Recipe(
             id: UUID(uuidString: id) ?? UUID(),
+            ownerID: record["ownerID"] as? String,
             name: title,
             description: description,
             ingredients: ingredients,
@@ -950,7 +971,14 @@ final class RecipeModule: ObservableObject {
             imageURL: nil,
             createdAt: record["createdAt"] as? Date ?? Date(),
             tags: record["tags"] as? [String] ?? [],
-            dietaryInfo: dietaryInfo
+            dietaryInfo: dietaryInfo,
+            isDetectiveRecipe: false,
+            cookingTechniques: [],
+            flavorProfile: nil,
+            secretIngredients: [],
+            proTips: [],
+            visualClues: [],
+            shareCaption: ""
         )
         
         return recipe
@@ -1149,13 +1177,4 @@ final class RecipeModule: ObservableObject {
 // MARK: - Recipe List Types
 enum RecipeListType {
     case saved, created, favorited
-}
-
-// MARK: - Array Extension for Chunking
-extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
-        }
-    }
 }

@@ -194,11 +194,6 @@ class PremiumChallengeManager: ObservableObject {
             name: Notification.Name("PremiumFeaturesUnlocked"),
             object: nil
         )
-
-        // Update badges
-        if let eliteBadgeIndex = exclusiveBadges.firstIndex(where: { $0.name == "Elite Chef" }) {
-            // Badge is already created with current date
-        }
     }
 
     func applyDoubleRewards(basePoints: Int, baseCoins: Int) -> (points: Int, coins: Int) {

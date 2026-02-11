@@ -35,7 +35,7 @@ struct CloudKitRecipeWithPhotos: Codable {
 }
 
 /// Extension to fetch CloudKit recipes with photos and add them to app state
-extension CloudKitRecipeManager {
+extension CloudKitService {
     /// Fetch recipe with photos and store in app state
     @MainActor
     func fetchRecipeWithPhotosForAppState(recipeID: String, appState: AppState) async {

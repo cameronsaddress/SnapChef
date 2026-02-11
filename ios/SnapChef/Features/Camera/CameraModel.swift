@@ -388,7 +388,9 @@ struct CameraPreview: UIViewRepresentable {
 
         // Update existing preview layer
         previewLayer.frame = uiView.bounds
-        previewLayer.session = cameraModel.session
+        if previewLayer.session !== cameraModel.session {
+            previewLayer.session = cameraModel.session
+        }
     }
     
     // Called when the view is being removed

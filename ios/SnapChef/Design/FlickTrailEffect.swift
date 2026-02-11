@@ -72,7 +72,7 @@ class FlickTrailManager: ObservableObject {
         // Dynamic particle count based on speed
         let particleCount = min(Int(speed / 20), 5)
 
-        for i in 0..<particleCount {
+        for _ in 0..<particleCount {
             let offsetAngle = Double.random(in: 0...(2 * .pi))
             let offsetDistance = CGFloat.random(in: 0...5)
 
@@ -143,18 +143,6 @@ struct FlickTrailView: View {
         let glowLayers = 3
         for layer in 0..<glowLayers {
             let layerScale = 1.0 + CGFloat(layer) * 0.5
-            let layerOpacity = particle.opacity / CGFloat(layer + 1)
-
-            let gradient = RadialGradient(
-                colors: [
-                    particle.color.opacity(layerOpacity),
-                    particle.color.opacity(layerOpacity * 0.5),
-                    particle.color.opacity(0)
-                ],
-                center: .center,
-                startRadius: 0,
-                endRadius: particle.size * layerScale
-            )
 
             let rect = CGRect(
                 x: -particle.size * layerScale / 2,

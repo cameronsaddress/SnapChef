@@ -7,17 +7,27 @@ import SwiftUI
 class CloudKitChallengeManager: ObservableObject {
     static let shared = CloudKitChallengeManager()
 
-    private let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-    private let publicDB: CKDatabase
-    private let privateDB: CKDatabase
+    private static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+        NSClassFromString("XCTestCase") != nil
+    }
+
+    private lazy var container: CKContainer = {
+        CKContainer(identifier: "iCloud.com.snapchefapp.app")
+    }()
+    private lazy var publicDB: CKDatabase = {
+        container.publicCloudDatabase
+    }()
+    private lazy var privateDB: CKDatabase = {
+        container.privateCloudDatabase
+    }()
 
     @Published var activeChallenges: [Challenge] = []
     @Published var userChallenges: [CloudKitUserChallenge] = []
     @Published var teams: [CloudKitTeam] = []
 
     private init() {
-        self.publicDB = container.publicCloudDatabase
-        self.privateDB = container.privateCloudDatabase
+        guard !Self.isRunningTests else { return }
         Task {
             await syncChallenges()
         }

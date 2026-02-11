@@ -11,12 +11,15 @@ import Foundation
 /// Actor that handles all CloudKit operations in a thread-safe manner
 /// This prevents dispatch queue assertion failures by ensuring consistent execution context
 actor CloudKitActor {
-    private let database: CKDatabase
-    private let container: CKContainer
+    private lazy var container: CKContainer = {
+        CKContainer.default()
+    }()
+    private lazy var database: CKDatabase = {
+        container.publicCloudDatabase
+    }()
     
     init(containerIdentifier: String = CloudKitConfig.containerIdentifier) {
-        self.container = CKContainer(identifier: containerIdentifier)
-        self.database = container.publicCloudDatabase
+        _ = containerIdentifier
     }
     
     // MARK: - Record Operations
@@ -98,16 +101,18 @@ actor CloudKitActor {
         return try await withCheckedThrowingContinuation { continuation in
             let operation = CKQueryOperation(query: query)
             var records: [CKRecord] = []
+            let recordsLock = NSLock()
             
             // Critical: Prevent double-resume which causes crashes
             var hasResumed = false
             let resumeLock = NSLock()
             
             operation.recordMatchedBlock = { _, result in
-                // Don't need lock here as we're just appending to array
                 switch result {
                 case .success(let record):
+                    recordsLock.lock()
                     records.append(record)
+                    recordsLock.unlock()
                 case .failure:
                     break // Skip failed records
                 }
@@ -144,6 +149,7 @@ actor CloudKitActor {
         return try await withCheckedThrowingContinuation { continuation in
             let operation = CKQueryOperation(query: query)
             var records: [CKRecord] = []
+            let recordsLock = NSLock()
             
             // Critical: Prevent double-resume which causes crashes
             var hasResumed = false
@@ -153,10 +159,11 @@ actor CloudKitActor {
             operation.resultsLimit = resultsLimit
             
             operation.recordMatchedBlock = { _, result in
-                // Don't need lock here as we're just appending to array
                 switch result {
                 case .success(let record):
+                    recordsLock.lock()
                     records.append(record)
+                    recordsLock.unlock()
                 case .failure:
                     break // Skip failed records
                 }
@@ -202,12 +209,9 @@ actor CloudKitActor {
         }
         
         var deletedIDs: [CKRecord.ID] = []
-        for (_, result) in deleteResults {
+        for (recordID, result) in deleteResults {
             if case .success = result {
-                // Record was deleted successfully
-                if let id = recordIDsToDelete?.first(where: { _ in true }) {
-                    deletedIDs.append(id)
-                }
+                deletedIDs.append(recordID)
             }
         }
         

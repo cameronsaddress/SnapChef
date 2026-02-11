@@ -29,6 +29,8 @@ struct ProgressiveAuthPrompt: View {
     @State private var showSuccess = false
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var didRecordPromptAction = false
+    private let overrideContext: AuthPromptTrigger.TriggerContext?
 
     // MARK: - Constants
 
@@ -39,7 +41,11 @@ struct ProgressiveAuthPrompt: View {
     // MARK: - Computed Properties
 
     private var currentContext: AuthPromptTrigger.TriggerContext {
-        authTrigger.currentContext ?? .firstRecipeSuccess
+        overrideContext ?? authTrigger.currentContext ?? .firstRecipeSuccess
+    }
+
+    init(overrideContext: AuthPromptTrigger.TriggerContext? = nil) {
+        self.overrideContext = overrideContext
     }
 
     private var contextIcon: String {
@@ -47,6 +53,7 @@ struct ProgressiveAuthPrompt: View {
         case .firstRecipeSuccess: return "heart.fill"
         case .viralContentCreated: return "flame.fill"
         case .dailyLimitReached: return "infinity"
+        case .featureUnlock: return "lock.open.fill"
         case .socialFeatureExplored: return "person.3.fill"
         case .challengeInterest: return "trophy.fill"
         case .shareAttempt: return "square.and.arrow.up"
@@ -63,6 +70,8 @@ struct ProgressiveAuthPrompt: View {
             return [Color(hex: "#ff6b35"), Color(hex: "#ff1493")]
         case .dailyLimitReached:
             return [Color(hex: "#667eea"), Color(hex: "#764ba2")]
+        case .featureUnlock:
+            return [Color(hex: "#4facfe"), Color(hex: "#00f2fe")]
         case .socialFeatureExplored:
             return [Color(hex: "#43e97b"), Color(hex: "#38f9d7")]
         case .challengeInterest:
@@ -95,6 +104,12 @@ struct ProgressiveAuthPrompt: View {
                 ("infinity", "Unlimited recipes"),
                 ("heart.fill", "Save favorites"),
                 ("star.fill", "Premium features")
+            ]
+        case .featureUnlock:
+            return [
+                ("heart.fill", "Save and like recipes"),
+                ("icloud.fill", "Keep progress on every device"),
+                ("sparkles", "Unlock the full SnapChef experience")
             ]
         case .socialFeatureExplored:
             return [
@@ -290,9 +305,7 @@ struct ProgressiveAuthPrompt: View {
                         HStack(spacing: 16) {
                             // Maybe Later
                             Button(action: {
-                                Task {
-                                    await authTrigger.recordPromptAction("dismissed", for: currentContext)
-                                }
+                                recordPromptActionIfNeeded("dismissed")
                                 dismissPrompt()
                             }) {
                                 Text("Maybe Later")
@@ -308,9 +321,7 @@ struct ProgressiveAuthPrompt: View {
 
                             // Don't Ask Again
                             Button(action: {
-                                Task {
-                                    await authTrigger.recordPromptAction("never", for: currentContext)
-                                }
+                                recordPromptActionIfNeeded("never")
                                 dismissPrompt()
                             }) {
                                 Text("Don't Ask Again")
@@ -375,6 +386,9 @@ struct ProgressiveAuthPrompt: View {
             // Trigger particle effect
             triggerParticleEffect()
         }
+        .onDisappear {
+            recordPromptActionIfNeeded("dismissed")
+        }
     }
 
     // MARK: - Action Handlers
@@ -392,9 +406,7 @@ struct ProgressiveAuthPrompt: View {
                     throw error
                 }
                 await MainActor.run {
-                    Task {
-                        await authTrigger.recordPromptAction("completed", for: currentContext)
-                    }
+                    recordPromptActionIfNeeded("completed")
                     showSuccessAndDismiss()
                 }
             } catch {
@@ -416,9 +428,7 @@ struct ProgressiveAuthPrompt: View {
                 // TikTok authentication using the shared manager
                 _ = try await tikTokAuthManager.authenticate()
                 await MainActor.run {
-                    Task {
-                        await authTrigger.recordPromptAction("completed", for: currentContext)
-                    }
+                    recordPromptActionIfNeeded("completed")
                     showSuccessAndDismiss()
                 }
             } catch {
@@ -451,6 +461,7 @@ struct ProgressiveAuthPrompt: View {
     }
 
     private func dismissPrompt() {
+        recordPromptActionIfNeeded("dismissed")
         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
             isVisible = false
         }
@@ -485,6 +496,21 @@ struct ProgressiveAuthPrompt: View {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 dragOffset = 0
             }
+        }
+    }
+
+    private func recordPromptActionIfNeeded(_ action: String) {
+        guard !didRecordPromptAction else { return }
+
+        // Avoid recording phantom events when previewing without an active trigger.
+        if overrideContext == nil && authTrigger.currentContext == nil {
+            return
+        }
+
+        didRecordPromptAction = true
+        let context = currentContext
+        Task {
+            await authTrigger.recordPromptAction(action, for: context)
         }
     }
 }

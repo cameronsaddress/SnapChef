@@ -6,16 +6,8 @@ struct RecipeResultsView: View {
     let capturedImage: UIImage?
     var isPresented: Binding<Bool>?  // Optional binding for direct control
     @Environment(\.dismiss) var dismiss
-    @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var appState: AppState
     @StateObject private var authManager = UnifiedAuthManager.shared
-    @State private var selectedRecipe: Recipe?
-    @State private var showShareSheet = false
-    @State private var showShareGenerator = false
-    @State private var showSocialShare = false
-    @State private var generatedShareImage: UIImage?
-    @State private var confettiTrigger = false
-    @State private var contentVisible = false
     @State private var activeSheet: ActiveSheet?
     // Use LocalRecipeManager instead of LocalRecipeStorage
     @StateObject private var localManager = LocalRecipeManager.shared
@@ -26,8 +18,6 @@ struct RecipeResultsView: View {
             localManager.isRecipeSaved(recipe.id) ? recipe.id : nil
         })
     }
-    @State private var showingExitConfirmation = false
-    
     // Authentication states
     @State private var showAuthPrompt = false
     @State private var pendingAction: PendingAction?
@@ -59,19 +49,30 @@ struct RecipeResultsView: View {
     @State private var recipesDiscoveredAnimation = false
     @State private var sparkleAnimation = false
     @State private var cardEntranceAnimations = Array(repeating: false, count: 5)
+    @State private var topSectionVisible = false
+    @State private var showViralPrompt = false
+    @State private var didTrackViralPrompt = false
+    @State private var viralPromptTask: Task<Void, Never>?
+    @State private var preparingShare = false
+    @State private var sharePrepPulse = false
+    @State private var showShareMomentum = false
+    @State private var shareMomentumPulse = false
+    @State private var shareMomentumMessage = "Share one recipe this month to unlock bonus coins."
+    @State private var shareMomentumCount = 0
+    @State private var entryHeroVisible = false
+    @State private var entryHeroOpacity: Double = 0
+    @State private var entryHeroScale: CGFloat = 1.08
+    @State private var entryHeroOffset: CGFloat = 20
+    @State private var heroCardAccent = false
     
     enum ActiveSheet: Identifiable {
         case recipeDetail(Recipe)
-        case shareGenerator(Recipe)
         case fridgeInventory
-        case brandedShare(Recipe)  // Add this for branded share
         
         var id: String {
             switch self {
             case .recipeDetail(let recipe): return "detail_\(recipe.id)"
-            case .shareGenerator(let recipe): return "share_\(recipe.id)"
             case .fridgeInventory: return "fridge_inventory"
-            case .brandedShare(let recipe): return "branded_\(recipe.id)"
             }
         }
     }
@@ -89,19 +90,79 @@ struct RecipeResultsView: View {
             // Dark detective background - exact same as DetectiveResultsView
             LinearGradient(
                 colors: [
-                    Color(hex: "#0f0625"),
-                    Color(hex: "#1a0033"),
-                    Color(hex: "#0a051a")
+                    Color(hex: "#0b1024"),
+                    Color(hex: "#1a0a33"),
+                    Color(hex: "#12061f")
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
+
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color(hex: "#38f9d7").opacity(0.22), .clear],
+                        center: .center,
+                        startRadius: 12,
+                        endRadius: 220
+                    )
+                )
+                .frame(width: 320, height: 320)
+                .blur(radius: 10)
+                .offset(x: -120, y: -260)
+
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color(hex: "#f093fb").opacity(0.2), .clear],
+                        center: .center,
+                        startRadius: 8,
+                        endRadius: 260
+                    )
+                )
+                .frame(width: 360, height: 360)
+                .blur(radius: 14)
+                .offset(x: 140, y: 240)
             
             ScrollView {
                 LazyVStack(spacing: 30) {
                     // Add top padding to avoid navigation bar overlap
                     Color.clear.frame(height: 1)
+
+                    ResultsHeroCard(recipeCount: recipes.count, sourceImage: capturedImage, accent: heroCardAccent)
+                        .padding(.horizontal, 20)
+                        .opacity(topSectionVisible ? 1 : 0)
+                        .offset(y: topSectionVisible ? 0 : 12)
+                        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: topSectionVisible)
+
+                    if !ingredients.isEmpty {
+                        FridgeInventoryCard(ingredientCount: ingredients.count) {
+                            activeSheet = .fridgeInventory
+                        }
+                        .padding(.horizontal, 20)
+                        .opacity(topSectionVisible ? 1 : 0)
+                        .offset(y: topSectionVisible ? 0 : 12)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.84).delay(0.06), value: topSectionVisible)
+                    }
+
+                    if showViralPrompt, let leadRecipe = recipes.first {
+                        ViralSharePrompt {
+                            handleViralPromptTap(recipe: leadRecipe)
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    
+                    if showShareMomentum, let leadRecipe = recipes.first {
+                        ShareMomentumCard(
+                            monthlyShareCount: shareMomentumCount,
+                            message: shareMomentumMessage,
+                            pulse: shareMomentumPulse
+                        ) {
+                            handleViralPromptTap(recipe: leadRecipe)
+                        }
+                        .padding(.horizontal, 20)
+                    }
                     
                     // Recipe Cards with Detective styling
                     ForEach(Array(recipes.enumerated()), id: \.element.id) { index, recipe in
@@ -112,41 +173,11 @@ struct RecipeResultsView: View {
                             isAuthenticated: authManager.isAuthenticated,
                             onSelect: {
                                 activeSheet = .recipeDetail(recipe)
-                                confettiTrigger = true
                             },
                             onShare: {
-                                print("🔍 RecipeResultsView: Share button tapped for recipe \(recipe.id) - \(recipe.name)")
-                                
-                                // Load photos from PhotoStorageManager
-                                let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
-                                print("🔍 RecipeResultsView: Photos from storage - fridge: \(photos?.fridgePhoto != nil), pantry: \(photos?.pantryPhoto != nil), meal: \(photos?.mealPhoto != nil)")
-                                
-                                if let fridge = photos?.fridgePhoto {
-                                    print("🔍 RecipeResultsView: Fridge photo size: \(fridge.size)")
-                                }
-                                if let pantry = photos?.pantryPhoto {
-                                    print("🔍 RecipeResultsView: Pantry photo size: \(pantry.size)")
-                                }
-                                
-                                // Use stored photos or fallback to capturedImage
-                                let beforeImage = photos?.fridgePhoto ?? photos?.pantryPhoto ?? capturedImage
-                                let afterImage = photos?.mealPhoto
-                                
-                                print("🔍 RecipeResultsView: Final ShareContent - beforeImage: \(beforeImage != nil), afterImage: \(afterImage != nil)")
-                                if let before = beforeImage {
-                                    print("🔍 RecipeResultsView: Final beforeImage size: \(before.size)")
-                                }
-                                
-                                shareContent = ShareContent(
-                                    type: .recipe(recipe),
-                                    beforeImage: beforeImage,
-                                    afterImage: afterImage
-                                )
-                                showBrandedShare = true
+                                presentBrandedShare(for: recipe, source: "recipe_card")
                             },
                             onSave: {
-                                print("🔍 onSave callback triggered for recipe: \(recipe.name)")
-                                // Add animation for visual feedback
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                     saveRecipe(recipe)
                                 }
@@ -166,6 +197,71 @@ struct RecipeResultsView: View {
                     Spacer(minLength: 50)
                 }
             }
+
+            if entryHeroVisible, let capturedImage {
+                VStack {
+                    Image(uiImage: capturedImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 260, height: 170)
+                        .clipShape(RoundedRectangle(cornerRadius: 22))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22)
+                                .stroke(Color.white.opacity(0.34), lineWidth: 1)
+                        )
+                        .shadow(color: Color(hex: "#38f9d7").opacity(0.24), radius: 24, y: 10)
+                        .opacity(entryHeroOpacity)
+                        .scaleEffect(entryHeroScale)
+                        .offset(y: entryHeroOffset)
+                    Spacer()
+                }
+                .padding(.top, 96)
+                .allowsHitTesting(false)
+            }
+            
+            if preparingShare {
+                ZStack {
+                    Color.black.opacity(0.35)
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#667eea"), Color(hex: "#9b59b6")],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 64, height: 64)
+                                .scaleEffect(sharePrepPulse ? 1.04 : 0.95)
+
+                            Image(systemName: "square.and.arrow.up.fill")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+
+                        Text("Preparing Share Card")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("Optimizing your result for social")
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.85))
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 22)
+                            .fill(Color.white.opacity(0.12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 22)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
+                    )
+                }
+                .transition(.opacity.combined(with: .scale))
+            }
             // Removed .onTapGesture { } that was intercepting button taps
         }
     }
@@ -177,25 +273,7 @@ struct RecipeResultsView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        print("🔍 DEBUG: Close button tapped in RecipeResultsView")
-                        
-                        // Try direct binding control first
-                        if let binding = isPresented {
-                            print("🔍 DEBUG: Using direct binding to dismiss")
-                            binding.wrappedValue = false
-                        } else {
-                            print("🔍 DEBUG: No direct binding available")
-                        }
-                        
-                        // Try presentationMode
-                        print("🔍 DEBUG: Trying presentationMode.dismiss...")
-                        presentationMode.wrappedValue.dismiss()
-                        
-                        // Also try environment dismiss
-                        print("🔍 DEBUG: Trying environment dismiss...")
-                        dismiss()
-                    }) {
+                    Button(action: dismissResults) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 24))
                             .foregroundStyle(
@@ -221,31 +299,39 @@ struct RecipeResultsView: View {
                 }
             }
             .onAppear {
-                print("🔍 DEBUG: RecipeResultsView appeared")
-                print("🔍 DEBUG: Number of recipes: \(recipes.count)")
-                print("🔍 DEBUG: Auth status: \(authManager.isAuthenticated)")
-                print("💾 Currently saved recipes: \(savedRecipeIds.count)")
-                
                 startAnimations()
+                scheduleViralPromptPresentation()
+                refreshShareMomentumFromStorage()
+                withAnimation(.easeInOut(duration: MotionTuning.seconds(1.8)).repeatForever(autoreverses: true)) {
+                    shareMomentumPulse = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ViralShareCompleted"))) { notification in
+                let platform = notification.userInfo?["platform"] as? String ?? "Share"
+                let monthlyCount = notification.userInfo?["monthlyShareCount"] as? Int ?? shareMomentumCount
+                let bonusCoins = notification.userInfo?["bonusCoins"] as? Int ?? 0
+
+                shareMomentumCount = monthlyCount
+                if bonusCoins > 0 {
+                    shareMomentumMessage = "Nice. \(platform) share sent. +\(bonusCoins) bonus coins earned."
+                } else {
+                    shareMomentumMessage = "\(platform) share tracked. Keep momentum going."
+                }
+
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) {
+                    showShareMomentum = true
+                }
             }
             .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .recipeDetail(let recipe):
                 // Use the same detail view as Detective
                 RecipeDetailView(recipe: recipe)
-            case .shareGenerator(let recipe):
-                ShareGeneratorView(
-                    recipe: recipe,
-                    ingredientsPhoto: capturedImage
-                )
             case .fridgeInventory:
                 SimpleFridgeInventoryView(
                     ingredients: ingredients,
                     capturedImage: capturedImage
                 )
-            case .brandedShare(_):
-                // This case is handled by the separate sheet below
-                EmptyView()
             }
         }
         // Add branded share popup sheet
@@ -254,56 +340,16 @@ struct RecipeResultsView: View {
                 BrandedSharePopup(content: content)
             }
         }
-        // Keep old sheets for backward compatibility (not used but available)
-        .sheet(isPresented: $showSocialShare) {
-            if let recipe = selectedRecipe ?? recipes.first,
-               let shareImage = generatedShareImage {
-                // Use UIActivityViewController wrapper
-                ActivityView(items: [
-                    shareImage,
-                    "Just turned my fridge into \(recipe.name)! 🔥"
-                ])
-            }
-        }
-        .sheet(isPresented: $showShareSheet) {
-            if let recipe = recipes.first {
-                EnhancedShareSheet(recipe: recipe)
-            }
-        }
-        .alert("Exit Without Saving?", isPresented: $showingExitConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Exit", role: .destructive) {
-                dismiss()
-            }
-        } message: {
-            Text("You haven't saved any recipes yet. They will be lost if you exit now.")
-        }
         // Authentication prompt sheet
         .sheet(isPresented: $showAuthPrompt) {
-            RecipeAuthPromptSheet(
-                action: pendingAction?.actionName ?? "save",
-                recipeName: pendingAction?.recipeName ?? "this recipe",
-                isPresented: $showAuthPrompt,
-                onAuthenticated: {
-                    // Complete the pending action after authentication
-                    if let pending = pendingAction {
-                        switch pending {
-                        case .save(let recipe):
-                            // Re-attempt save after authentication
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                saveRecipe(recipe)
-                            }
-                        case .like(let recipe):
-                            // Handle like action (future implementation)
-                            print("Like action for: \(recipe.name)")
-                        }
-                    }
-                    pendingAction = nil
+            ProgressiveAuthPrompt(overrideContext: .featureUnlock)
+                .onDisappear {
+                    completePendingActionAfterAuthentication()
                 }
-            )
         }
         .onDisappear {
-            print("🔍 DEBUG: RecipeResultsView disappeared")
+            viralPromptTask?.cancel()
+            viralPromptTask = nil
         }
         } // End NavigationStack
     }
@@ -327,7 +373,6 @@ struct RecipeResultsView: View {
         withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
             if currentlySaved {
                 // UNSAVE
-                print("🗑 Unsaving recipe '\(recipe.name)' locally")
                 localManager.unsaveRecipe(recipe.id)
             
                 // Update AppState for other views
@@ -337,7 +382,6 @@ struct RecipeResultsView: View {
                 
             } else {
                 // SAVE
-                print("💾 Saving recipe '\(recipe.name)' locally")
                 localManager.saveRecipe(recipe, capturedImage: capturedImage)
                 
                 // Update AppState for other views
@@ -372,23 +416,160 @@ struct RecipeResultsView: View {
         
         // CloudKit sync happens automatically in background via RecipeSyncQueue
     }
+
+    private func completePendingActionAfterAuthentication() {
+        defer { pendingAction = nil }
+        guard authManager.isAuthenticated, let pending = pendingAction else { return }
+
+        switch pending {
+        case .save(let recipe):
+            DispatchQueue.main.asyncAfter(deadline: .now() + MotionTuning.seconds(0.4)) {
+                saveRecipe(recipe)
+            }
+        case .like(let recipe):
+            print("Like action for: \(recipe.name)")
+        }
+    }
     
     private func startAnimations() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
+        if capturedImage != nil {
+            entryHeroVisible = true
+            entryHeroOpacity = 0
+            entryHeroScale = 1.08
+            entryHeroOffset = 20
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                entryHeroOpacity = 0.95
+                entryHeroScale = 1.0
+                entryHeroOffset = 0
+            }
+        }
+
+        withAnimation(.spring(response: MotionTuning.seconds(0.45), dampingFraction: 0.82)) {
+            topSectionVisible = true
+            heroCardAccent = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + MotionTuning.seconds(0.18)) {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + MotionTuning.seconds(0.42)) {
+            withAnimation(.easeOut(duration: MotionTuning.seconds(0.24))) {
+                entryHeroOpacity = 0
+                entryHeroScale = 0.92
+                entryHeroOffset = -42
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + MotionTuning.seconds(0.24)) {
+                entryHeroVisible = false
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + MotionTuning.seconds(0.5)) {
             recipesDiscoveredAnimation = true
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + MotionTuning.seconds(1.8)) {
             sparkleAnimation = true
         }
         
         // Stagger card entrance animations - start immediately
         for i in 0..<min(recipes.count, 5) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1 + Double(i) * 0.1) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + MotionTuning.seconds(0.1 + Double(i) * 0.1)) {
                 if i < cardEntranceAnimations.count {
                     cardEntranceAnimations[i] = true
                 }
             }
+        }
+    }
+
+    private func scheduleViralPromptPresentation() {
+        guard !didTrackViralPrompt, !recipes.isEmpty else { return }
+
+        viralPromptTask?.cancel()
+        viralPromptTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: MotionTuning.nanoseconds(1.35))
+            guard !Task.isCancelled else { return }
+            withAnimation(.spring(response: MotionTuning.seconds(0.45), dampingFraction: 0.85)) {
+                showViralPrompt = true
+            }
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            didTrackViralPrompt = true
+            GrowthLoopManager.shared.trackViralPromptShown(recipeCount: recipes.count)
+        }
+    }
+
+    private func handleViralPromptTap(recipe: Recipe) {
+        GrowthLoopManager.shared.trackViralCTATapped(recipeID: recipe.id)
+        presentBrandedShare(for: recipe, source: "viral_prompt")
+    }
+
+    private func presentBrandedShare(for recipe: Recipe, source: String) {
+        guard !preparingShare else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        let photos = PhotoStorageManager.shared.getPhotos(for: recipe.id)
+        let beforeImage = photos?.fridgePhoto ?? photos?.pantryPhoto ?? capturedImage
+        let afterImage = photos?.mealPhoto
+
+        shareContent = ShareContent(
+            type: .recipe(recipe),
+            beforeImage: beforeImage,
+            afterImage: afterImage
+        )
+        
+        withAnimation(.easeOut(duration: MotionTuning.seconds(0.18))) {
+            preparingShare = true
+            sharePrepPulse = true
+        }
+        
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: MotionTuning.nanoseconds(0.18))
+            showBrandedShare = true
+            try? await Task.sleep(nanoseconds: MotionTuning.nanoseconds(0.12))
+            withAnimation(.easeIn(duration: MotionTuning.seconds(0.18))) {
+                preparingShare = false
+                sharePrepPulse = false
+            }
+        }
+
+        AnalyticsManager.shared.logEvent(
+            "viral_share_started",
+            parameters: [
+                "source": source,
+                "recipe_id": recipe.id.uuidString
+            ]
+        )
+    }
+    
+    private func refreshShareMomentumFromStorage() {
+        let defaults = UserDefaults.standard
+        let currentBucket = currentMonthBucket()
+        let storedBucket = defaults.string(forKey: "growth_share_reward_month_bucket")
+        if storedBucket == currentBucket {
+            shareMomentumCount = defaults.integer(forKey: "growth_share_reward_count")
+        } else {
+            shareMomentumCount = 0
+        }
+        showShareMomentum = true
+        if shareMomentumCount == 0 {
+            shareMomentumMessage = "Share one recipe this month to unlock bonus coins."
+        } else {
+            shareMomentumMessage = "You have \(shareMomentumCount) share\(shareMomentumCount == 1 ? "" : "s") this month. Push one more for extra reach."
+        }
+    }
+    
+    private func currentMonthBucket() -> String {
+        let parts = Calendar.current.dateComponents([.year, .month], from: Date())
+        return "\(parts.year ?? 0)-\(parts.month ?? 0)"
+    }
+
+    private func dismissResults() {
+        if let binding = isPresented {
+            binding.wrappedValue = false
+        } else {
+            dismiss()
         }
     }
 }
@@ -610,10 +791,6 @@ struct DetectiveRecipeCard: View {
         HStack(spacing: 12) {
             // Save button - with explicit hit testing priority
             Button {
-                // Add debug logging
-                print("🔍 Save button tapped for recipe: \(recipe.name)")
-                print("🔍 Is authenticated: \(isAuthenticated)")
-                print("🔍 Is saved: \(isSaved)")
                 onSave()
             } label: {
                 HStack(spacing: 8) {
@@ -651,12 +828,11 @@ struct DetectiveRecipeCard: View {
                 )
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(StudioSpringButtonStyle(pressedScale: 0.94, pressedYOffset: 1.4, activeRotation: 1.2))
             .zIndex(1)
             
             // Share button - with explicit hit testing priority
             Button {
-                print("🔍 Share button tapped for recipe: \(recipe.name)")
                 onShare()
             } label: {
                 HStack(spacing: 8) {
@@ -674,7 +850,7 @@ struct DetectiveRecipeCard: View {
                 )
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(StudioSpringButtonStyle(pressedScale: 0.94, pressedYOffset: 1.4, activeRotation: 1.2))
             .zIndex(1)
         }
     }
@@ -772,185 +948,62 @@ struct DetectiveRecipeCard: View {
     }
 }
 
+private struct ShareMomentumCard: View {
+    let monthlyShareCount: Int
+    let message: String
+    let pulse: Bool
+    let onTap: () -> Void
 
-
-// MARK: - Recipe Auth Prompt Sheet
-struct RecipeAuthPromptSheet: View {
-    let action: String
-    let recipeName: String
-    @Binding var isPresented: Bool
-    let onAuthenticated: () -> Void
-    
-    @State private var isAuthenticating = false
-    @State private var lockRotation = false
-    @State private var showingAuthSheet = false
-    @Environment(\.colorScheme) var colorScheme
-    
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Beautiful gradient background
-                LinearGradient(
-                    colors: [
-                        Color(hex: "#667eea"),
-                        Color(hex: "#764ba2"),
-                        Color(hex: "#8e44ad")
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                
-                VStack(spacing: 30) {
-                    // Animated lock icon
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.15))
-                            .frame(width: 100, height: 100)
-                        
-                        Image(systemName: lockRotation ? "lock.open.fill" : "lock.fill")
-                            .font(.system(size: 45))
-                            .foregroundColor(.white)
-                            .rotation3DEffect(
-                                .degrees(lockRotation ? 360 : 0),
-                                axis: (x: 0, y: 1, z: 0)
-                            )
-                            .animation(.spring(response: 0.6, dampingFraction: 0.7), value: lockRotation)
-                    }
-                    .padding(.top, 30)
-                    
-                    // Title and message
-                    VStack(spacing: 12) {
-                        Text("Sign In to \(action.capitalized) Recipes")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
-                        
-                        Text("Create your account to \(action) **\(recipeName)** and build your personal recipe collection")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.9))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 20)
-                    }
-                    
-                    // Benefits list
-                    VStack(alignment: .leading, spacing: 16) {
-                        benefitRow(icon: "heart.fill", text: "Save unlimited recipes", color: .red)
-                        benefitRow(icon: "icloud.fill", text: "Sync across all devices", color: .blue)
-                        benefitRow(icon: "star.fill", text: "Track your favorites", color: .yellow)
-                        benefitRow(icon: "person.3.fill", text: "Join the community", color: .green)
-                        benefitRow(icon: "trophy.fill", text: "Unlock challenges & rewards", color: .orange)
-                    }
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 20)
-                    
-                    Spacer()
-                    
-                    // Action buttons
-                    VStack(spacing: 16) {
-                        if isAuthenticating {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.5)
-                        } else {
-                            // Sign in with Apple button
-                            Button(action: {
-                                // Show the UnifiedAuthManager's auth sheet
-                                UnifiedAuthManager.shared.showAuthSheet = true
-                                lockRotation = true
-                                
-                                // Monitor authentication state immediately
-                                Task {
-                                    // Start checking for auth success immediately
-                                    for _ in 0..<40 { // Check for up to 10 seconds (40 * 0.25s)
-                                        if UnifiedAuthManager.shared.isAuthenticated {
-                                            // Haptic success
-                                            let generator = UINotificationFeedbackGenerator()
-                                            generator.notificationOccurred(.success)
-                                            
-                                            // Call the completion handler
-                                            await MainActor.run {
-                                                onAuthenticated()
-                                                
-                                                // Dismiss the sheet
-                                                isPresented = false
-                                            }
-                                            break
-                                        }
-                                        try? await Task.sleep(nanoseconds: 250_000_000) // Check every 0.25s
-                                    }
-                                    
-                                    // Reset state if auth wasn't successful
-                                    if !UnifiedAuthManager.shared.isAuthenticated {
-                                        await MainActor.run {
-                                            lockRotation = false
-                                        }
-                                    }
-                                }
-                            }) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "applelogo")
-                                        .font(.system(size: 20))
-                                    Text("Sign in with Apple")
-                                        .font(.system(size: 18, weight: .semibold))
-                                }
-                                .foregroundColor(.black)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 56)
-                                .background(Color.white)
-                                .cornerRadius(16)
-                            }
-                            .padding(.horizontal, 40)
-                            
-                            // Maybe later button
-                            Button(action: {
-                                isPresented = false
-                            }) {
-                                Text("Maybe Later")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.8))
-                            }
-                        }
-                    }
-                    .padding(.bottom, 40)
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Viral Momentum", systemImage: "megaphone.fill")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                Spacer()
+                Text("\(monthlyShareCount) this month")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundColor(Color(hex: "#43e97b"))
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        isPresented = false
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
+
+            Text(message)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundColor(.white.opacity(0.9))
+                .lineLimit(2)
+
+            Button(action: onTap) {
+                HStack(spacing: 8) {
+                    Image(systemName: "paperplane.fill")
+                    Text("Share Lead Recipe")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
                 }
-            }
-        }
-        .onAppear {
-            // Haptic feedback on appear
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-        }
-    }
-    
-    private func benefitRow(icon: String, text: String, color: Color) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundColor(color)
-                .frame(width: 28)
-            
-            Text(text)
-                .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white)
-            
-            Spacer()
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(hex: "#FF8A00"), Color(hex: "#FF5E62")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                )
+            }
         }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+        )
+        .scaleEffect(pulse ? 1.01 : 0.985)
     }
 }
-
 // MARK: - Success Header (Legacy - now using Detective style)
 struct SuccessHeaderView: View {
     var body: some View {
@@ -1053,7 +1106,6 @@ struct MagicalRecipeCard: View {
     @State private var isHovered = false
     @State private var shimmerPhase: CGFloat = -1
     @StateObject private var likeManager = RecipeLikeManager.shared
-    @StateObject private var cloudKitSync = CloudKitSyncService.shared
     @EnvironmentObject var appState: AppState
     
     var body: some View {
@@ -1225,41 +1277,158 @@ struct ActionButton: View {
     }
 }
 
+// MARK: - Results Hero
+struct ResultsHeroCard: View {
+    let recipeCount: Int
+    let sourceImage: UIImage?
+    let accent: Bool
+    @State private var pulse = false
+    @State private var shimmer = false
+
+    var body: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "#43e97b"), Color(hex: "#38f9d7")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 58, height: 58)
+                    .scaleEffect(pulse ? 1.06 : 1.0)
+
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("\(recipeCount) recipes ready")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                Text("Pick one and start cooking")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.72))
+            }
+
+            if let sourceImage {
+                Image(uiImage: sourceImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 54, height: 54)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.28), lineWidth: 1)
+                    )
+                    .shadow(color: Color(hex: "#38f9d7").opacity(0.22), radius: 12, y: 6)
+            }
+
+            Spacer()
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.09))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(accent ? 0.44 : 0.2),
+                                    Color(hex: "#38f9d7").opacity(shimmer ? 0.52 : 0.22),
+                                    Color(hex: "#f093fb").opacity(shimmer ? 0.46 : 0.18),
+                                    Color.white.opacity(0.2)
+                                ],
+                                startPoint: shimmer ? .topLeading : .bottomTrailing,
+                                endPoint: shimmer ? .bottomTrailing : .topLeading
+                            ),
+                            lineWidth: 1.2
+                        )
+                )
+        )
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+                shimmer = true
+            }
+        }
+    }
+}
+
 // MARK: - Viral Share Prompt
 struct ViralSharePrompt: View {
     let action: () -> Void
-    @State private var glowAnimation = false
+    @State private var pulseAnimation = false
+    @State private var borderShift = false
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("🎉 Amazing recipes!")
-                .font(.system(size: 24, weight: .bold, design: .rounded))
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Show off your best dish")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            
-            Text("Share your culinary journey and inspire others")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white.opacity(0.8))
-                .multilineTextAlignment(.center)
-            
-            MagneticButton(
-                title: "Share & Earn Credits",
-                icon: "sparkles",
-                action: action
-            )
-            .shadow(
-                color: Color(hex: "#667eea").opacity(glowAnimation ? 0.8 : 0.4),
-                radius: glowAnimation ? 30 : 20
-            )
+            Text("One tap to create a branded share card.")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.white.opacity(0.76))
+
+            Button(action: action) {
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Share This Result")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 13, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(hex: "#667eea"), Color(hex: "#9b59b6")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .scaleEffect(pulseAnimation ? 1.01 : 1)
+                )
+            }
+            .buttonStyle(StudioSpringButtonStyle(pressedScale: 0.93, pressedYOffset: 1.8, activeRotation: 1.6))
         }
-        .padding(30)
+        .padding(22)
         .background(
-            GlassmorphicCard(content: {
-                Color.clear
-            }, glowColor: Color(hex: "#9b59b6"))
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.white.opacity(0.09))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.2),
+                                    Color(hex: "#38f9d7").opacity(0.55),
+                                    Color(hex: "#f093fb").opacity(0.5),
+                                    Color.white.opacity(0.2)
+                                ],
+                                startPoint: borderShift ? .topLeading : .bottomTrailing,
+                                endPoint: borderShift ? .bottomTrailing : .topLeading
+                            ),
+                            lineWidth: 1.2
+                        )
+                )
         )
+        .shadow(color: Color(hex: "#f093fb").opacity(0.18), radius: 18, y: 10)
         .onAppear {
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                glowAnimation = true
+            withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                pulseAnimation = true
+            }
+            withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) {
+                borderShift = true
             }
         }
     }
@@ -1270,97 +1439,56 @@ struct FridgeInventoryCard: View {
     let ingredientCount: Int
     let onTap: () -> Void
     
-    @State private var sparkleAnimation = false
     @State private var bounceAnimation = false
     
     var body: some View {
-        GlassmorphicCard(content: {
-            VStack(spacing: 20) {
-                // Title at top
-                Text("Here's what's in your fridge")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+        HStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "#38f9d7"), Color(hex: "#43e97b")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 58, height: 58)
+                    .scaleEffect(bounceAnimation ? 1.05 : 1)
+                Image(systemName: "refrigerator.fill")
+                    .font(.system(size: 28, weight: .semibold))
                     .foregroundColor(.white)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                
-                // Icon and content
-                HStack(spacing: 20) {
-                    // Fridge icon with animation
-                    ZStack {
-                        // Background gradient circle
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#38f9d7"),
-                                        Color(hex: "#43e97b")
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 80, height: 80)
-                            .scaleEffect(bounceAnimation ? 1.1 : 1)
-                        
-                        // Fridge icon
-                        Image(systemName: "refrigerator.fill")
-                            .font(.system(size: 40, weight: .medium))
-                            .foregroundColor(.white)
-                        
-                        // Sparkles around
-                        ForEach(0..<3) { index in
-                            Image(systemName: "sparkle")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color(hex: "#ffa726"))
-                                .offset(x: 40, y: 0)
-                                .rotationEffect(.degrees(sparkleAnimation ? 360 : 0))
-                                .rotationEffect(.degrees(Double(index) * 120))
-                                .scaleEffect(sparkleAnimation ? 1.2 : 0.8)
-                                .opacity(sparkleAnimation ? 1 : 0.6)
-                        }
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("\(ingredientCount) ingredients detected")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
-                        
-                        HStack(spacing: 4) {
-                            Image(systemName: "eye.fill")
-                                .font(.system(size: 14))
-                            Text("See what we found")
-                                .font(.system(size: 14, weight: .medium))
-                        }
-                        .foregroundColor(Color(hex: "#38f9d7"))
-                    }
-                    
-                    Spacer()
-                    
-                    // Arrow indicator
-                    Image(systemName: "chevron.right.circle.fill")
-                        .font(.system(size: 30))
-                        .foregroundColor(Color(hex: "#ffd700"))
-                        .scaleEffect(bounceAnimation ? 1.2 : 1)
-                }
-                
-                // Fun message
-                Text("🎉 We analyzed your fridge like magic!")
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.9))
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(24)
-        }, glowColor: Color(hex: "#38f9d7"))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(ingredientCount) ingredients found")
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                Text("Tap to review your inventory")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.76))
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white.opacity(0.8))
+                .offset(x: bounceAnimation ? 2 : 0)
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.white.opacity(0.09))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+        )
         .onTapGesture {
             onTap()
         }
         .onAppear {
-            withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
-                sparkleAnimation = true
-            }
-            
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
                 bounceAnimation = true
             }
         }

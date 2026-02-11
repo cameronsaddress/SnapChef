@@ -175,7 +175,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
     func needsRefresh() -> Bool {
         // Check if cache is older than TTL
         if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date {
-            let cacheAge = Date().timeIntervalSince(cacheTimestamp)
+            _ = cacheTimestamp
             return false // Never expire - was: cacheAge > cacheTTL
         }
         return true // No cache timestamp means we need to refresh
@@ -185,7 +185,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
         let key = "\(cacheKey)_\(category.rawValue)"
         
         guard let data = UserDefaults.standard.data(forKey: key),
-              let timestamp = UserDefaults.standard.object(forKey: "\(key)_timestamp") as? Date else {
+              UserDefaults.standard.object(forKey: "\(key)_timestamp") as? Date != nil else {
             return false
         }
         

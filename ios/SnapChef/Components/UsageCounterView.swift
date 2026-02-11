@@ -32,7 +32,7 @@ struct UsageCounterView: View {
             return Color(hex: "#43e97b") // Unlimited green
         }
 
-        guard let limit = limit else { return Color(hex: "#43e97b") }
+        guard limit != nil else { return Color(hex: "#43e97b") }
 
         let ratio = progressRatio
         if ratio >= 1.0 {
@@ -168,7 +168,7 @@ struct UsageCounterView: View {
             return "crown.fill"
         }
 
-        guard let limit = limit else { return "checkmark.circle.fill" }
+        guard limit != nil else { return "checkmark.circle.fill" }
 
         let ratio = progressRatio
         if ratio >= 1.0 {

@@ -357,7 +357,7 @@ final class SyncQueueManager: ObservableObject {
     
     private func syncSingleRecipe(_ localRecipe: LocalRecipe) async -> SyncResult {
         do {
-            let cloudKitRecordID = try await CloudKitSyncService.shared.uploadRecipe(
+            let cloudKitRecordID = try await CloudKitService.shared.uploadRecipeForSharing(
                 localRecipe.recipe,
                 imageData: nil
             )
@@ -406,7 +406,7 @@ final class SyncQueueManager: ObservableObject {
         } else {
             // Server version is newer - update local with server data
             do {
-                let (serverRecipe, _) = try await CloudKitSyncService.shared.fetchRecipe(by: serverRecord.recordID.recordName)
+                let (serverRecipe, _) = try await CloudKitService.shared.fetchSharedRecipe(by: serverRecord.recordID.recordName)
                 localStore.updateRecipe(serverRecipe)
                 localStore.markRecipeSynced(id: serverRecipe.id, cloudKitRecordID: serverRecord.recordID.recordName)
                 print("✅ Conflict resolved: Server version won for \(serverRecipe.name)")

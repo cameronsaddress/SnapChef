@@ -1,5 +1,65 @@
 import SwiftUI
 
+enum CameraProcessingPhase: String, Equatable {
+    case idle
+    case preparingRequest
+    case uploadingPhotos
+    case waitingForRecipes
+    case decodingResponse
+    case finalizingResults
+    case completed
+    case failed
+
+    var displayTitle: String {
+        switch self {
+        case .idle:
+            return "Preparing..."
+        case .preparingRequest:
+            return "Preparing request..."
+        case .uploadingPhotos:
+            return "Uploading photos..."
+        case .waitingForRecipes:
+            return "Generating recipes..."
+        case .decodingResponse:
+            return "Processing response..."
+        case .finalizingResults:
+            return "Finalizing results..."
+        case .completed:
+            return "Recipes ready"
+        case .failed:
+            return "Generation paused"
+        }
+    }
+
+    var progressFraction: Double {
+        switch self {
+        case .idle:
+            return 0.05
+        case .preparingRequest:
+            return 0.12
+        case .uploadingPhotos:
+            return 0.25
+        case .waitingForRecipes:
+            return 0.58
+        case .decodingResponse:
+            return 0.78
+        case .finalizingResults:
+            return 0.92
+        case .completed:
+            return 1.0
+        case .failed:
+            return 0.0
+        }
+    }
+}
+
+struct CameraProcessingMilestone: Equatable {
+    var phase: CameraProcessingPhase
+    var updatedAt: Date = Date()
+
+    static let idle = CameraProcessingMilestone(phase: .idle)
+}
+
 // MARK: - Falling Emoji Model
 struct PhysicsFallingEmoji: Identifiable {
     let id = UUID()
@@ -65,13 +125,12 @@ struct PhysicsLoadingOverlay: View {
                 }
             }
             .onAppear {
-                print("🔍 DEBUG: [PhysicsLoadingOverlay] appeared")
                 // Defer state updates to avoid "Modifying state during view update"
                 DispatchQueue.main.async {
                     startAnimations(in: geometry.size)
                 }
             }
-            .onReceive(Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()) { _ in
+            .onReceive(Timer.publish(every: 0.033, on: .main, in: .common).autoconnect()) { _ in
                 // Defer state updates to avoid "Modifying state during view update"
                 DispatchQueue.main.async {
                     updatePhysics(in: geometry.size)
@@ -120,6 +179,9 @@ struct PhysicsLoadingOverlay: View {
             )
         )
         fallingEmojis.append(emoji)
+        if fallingEmojis.count > 18 {
+            fallingEmojis.removeFirst(fallingEmojis.count - 18)
+        }
 
         // Remove old emojis that are off screen
         fallingEmojis.removeAll { $0.position.y > size.height + 100 }
@@ -151,6 +213,7 @@ struct PhysicsLoadingOverlay: View {
 // MARK: - Emoji Flick Game Overlay
 struct EmojiFlickGameOverlay: View {
     let capturedImage: UIImage?
+    let processingMilestone: CameraProcessingMilestone
     @State private var progress: CGFloat = 0.0
 
     var body: some View {
@@ -208,12 +271,22 @@ struct EmojiFlickGameOverlay: View {
             }
         }
         .onAppear {
-            // Start progress animation immediately
-            DispatchQueue.main.async {
-                withAnimation(.linear(duration: 60)) {
-                    progress = 1.0
-                }
+            updateProgress(for: processingMilestone.phase, animated: false)
+        }
+        .onChange(of: processingMilestone.phase) { newPhase in
+            updateProgress(for: newPhase, animated: true)
+        }
+    }
+
+    private func updateProgress(for phase: CameraProcessingPhase, animated: Bool) {
+        let target = CGFloat(max(0, min(1, phase.progressFraction)))
+        let nextValue = max(progress, target)
+        if animated {
+            withAnimation(.easeInOut(duration: 0.28)) {
+                progress = nextValue
             }
+        } else {
+            progress = nextValue
         }
     }
 }
@@ -221,6 +294,7 @@ struct EmojiFlickGameOverlay: View {
 // MARK: - Integration with MagicalProcessingOverlay
 struct MagicalProcessingOverlay: View {
     let capturedImage: UIImage?
+    let processingMilestone: CameraProcessingMilestone
     var onClose: (() -> Void)? = nil
     @State private var useGameMode = true
     @State private var showAIProcessingView = true
@@ -228,14 +302,18 @@ struct MagicalProcessingOverlay: View {
     var body: some View {
         if useGameMode {
             if showAIProcessingView {
-                AIProcessingView(fridgeImage: nil, pantryImage: nil, onPlayGameTapped: {
+                AIProcessingView(fridgeImage: capturedImage, pantryImage: nil, processingMilestone: processingMilestone, onPlayGameTapped: {
                     // User tapped the play game button - transition immediately
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        showAIProcessingView = false
+                    }
+                }, onAutoPlayGameTapped: {
                     withAnimation(.easeOut(duration: 0.3)) {
                         showAIProcessingView = false
                     }
                 }, onClose: onClose)
             } else {
-                EmojiFlickGameOverlay(capturedImage: capturedImage)
+                EmojiFlickGameOverlay(capturedImage: capturedImage, processingMilestone: processingMilestone)
             }
         } else {
             PhysicsLoadingOverlay()
@@ -248,6 +326,7 @@ struct OriginalProcessingOverlay: View {
     @State private var rotation: Double = 0
     @State private var scale: CGFloat = 0.8
     @State private var messageIndex = 0
+    @State private var messageTimer: Timer?
 
     let messages = [
         "Analyzing ingredients...",
@@ -311,7 +390,8 @@ struct OriginalProcessingOverlay: View {
                     scale = 1.2
                 }
 
-                Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
+                messageTimer?.invalidate()
+                messageTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
                     Task { @MainActor in
                         withAnimation {
                             messageIndex = (messageIndex + 1) % messages.count
@@ -319,6 +399,10 @@ struct OriginalProcessingOverlay: View {
                     }
                 }
             }
+        }
+        .onDisappear {
+            messageTimer?.invalidate()
+            messageTimer = nil
         }
     }
 }

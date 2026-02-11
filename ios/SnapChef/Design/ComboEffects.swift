@@ -15,7 +15,8 @@ struct FireParticle: Identifiable {
 
     mutating func update(deltaTime: Double) {
         age += deltaTime
-        let progress = age / lifespan
+        // Protect against division by zero
+        let progress = lifespan > 0 ? age / lifespan : 1.0
 
         // Rise and spread
         velocity.dy -= 150 * deltaTime // Fire rises
@@ -240,6 +241,9 @@ struct ParticleVortex: View {
         particles.removeAll()
 
         let particleCount = Int(50 * intensity)
+        // Protect against division by zero
+        guard particleCount > 0 else { return }
+        
         for i in 0..<particleCount {
             let angle = (Double(i) / Double(particleCount)) * .pi * 2
             let heightFactor = CGFloat(i) / CGFloat(particleCount)
@@ -256,7 +260,7 @@ struct ParticleVortex: View {
 }
 
 // MARK: - Combo Effect Manager
-class ComboEffectManager: ObservableObject {
+final class ComboEffectManager: NSObject, ObservableObject {
     @Published var fireParticles: [FireParticle] = []
     @Published var rainbowParticles: [RainbowTrailParticle] = []
     @Published var edgeGlowIntensity: CGFloat = 0
@@ -266,8 +270,11 @@ class ComboEffectManager: ObservableObject {
     private var lastUpdateTime = Date()
     private var currentCombo: Int = 0
     private var fireEmissionTimer: Timer?
+    private var fireEmissionPosition: CGPoint = .zero
+    private var fireEmissionIntensity: CGFloat = 0
 
-    init() {
+    override init() {
+        super.init()
         setupDisplayLink()
     }
 
@@ -326,15 +333,25 @@ class ComboEffectManager: ObservableObject {
 
     private func startFireEffect(at position: CGPoint, intensity: CGFloat) {
         fireEmissionTimer?.invalidate()
+        fireEmissionPosition = position
+        fireEmissionIntensity = intensity
 
-        fireEmissionTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
-            self.emitFire(at: position, intensity: intensity)
-        }
+        fireEmissionTimer = Timer.scheduledTimer(
+            timeInterval: 0.05,
+            target: self,
+            selector: #selector(handleFireEmissionTick),
+            userInfo: nil,
+            repeats: true
+        )
     }
 
     private func stopFireEffect() {
         fireEmissionTimer?.invalidate()
         fireEmissionTimer = nil
+    }
+
+    @objc private func handleFireEmissionTick() {
+        emitFire(at: fireEmissionPosition, intensity: fireEmissionIntensity)
     }
 
     private func emitFire(at position: CGPoint, intensity: CGFloat) {

@@ -29,6 +29,12 @@ struct OnboardingView: View {
 struct OnboardingFoodPreferencesView: View {
     @Binding var selectedCuisines: Set<String>
     let onComplete: () -> Void
+    @State private var headerVisible = false
+    @State private var gridVisible = false
+    @State private var ctaVisible = false
+    @State private var ctaPulse = false
+    @State private var orbDrift = false
+    @State private var revealedTileIndex = -1
     
     // Cuisine grid data reordered from most popular to least popular
     let cuisineOptions = [
@@ -59,8 +65,35 @@ struct OnboardingFoodPreferencesView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            VStack(spacing: 0) {
+        GeometryReader { _ in
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color(hex: "#FFB347").opacity(0.38), .clear],
+                            center: .center,
+                            startRadius: 12,
+                            endRadius: 180
+                        )
+                    )
+                    .frame(width: 300, height: 300)
+                    .blur(radius: 12)
+                    .offset(x: orbDrift ? -120 : -20, y: orbDrift ? -340 : -260)
+
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color(hex: "#FF5E62").opacity(0.28), .clear],
+                            center: .center,
+                            startRadius: 8,
+                            endRadius: 220
+                        )
+                    )
+                    .frame(width: 340, height: 340)
+                    .blur(radius: 14)
+                    .offset(x: orbDrift ? 150 : 70, y: orbDrift ? 260 : 180)
+
+                VStack(spacing: 0) {
                 // Headline - compact at top
                 VStack(spacing: 4) {
                     Text("What Makes You Hungry?")
@@ -76,6 +109,8 @@ struct OnboardingFoodPreferencesView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 60)
                 .padding(.bottom, 20)
+                .opacity(headerVisible ? 1 : 0)
+                .offset(y: headerVisible ? 0 : 12)
                 
                 // Counter pill
                 HStack {
@@ -96,10 +131,14 @@ struct OnboardingFoodPreferencesView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
+                .opacity(headerVisible ? 1 : 0)
+                .offset(y: headerVisible ? 0 : 8)
                 
                 // 4x4 grid of cuisine options - taking up maximum space
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4), spacing: 4) {
-                    ForEach(cuisineOptions, id: \.0) { cuisine, emoji in
+                    ForEach(Array(cuisineOptions.enumerated()), id: \.element.0) { index, item in
+                        let cuisine = item.0
+                        let emoji = item.1
                         CuisineGridItem(
                             title: cuisine,
                             emoji: emoji,
@@ -118,10 +157,15 @@ struct OnboardingFoodPreferencesView: View {
                                 }
                             }
                         }
+                        .opacity(gridVisible && index <= revealedTileIndex ? 1 : 0)
+                        .scaleEffect(gridVisible && index <= revealedTileIndex ? 1 : 0.9)
+                        .offset(y: gridVisible && index <= revealedTileIndex ? 0 : 10)
                     }
                 }
                 .padding(.horizontal, 8)
                 .frame(maxHeight: .infinity)
+                .opacity(gridVisible ? 1 : 0.001)
+                .offset(y: gridVisible ? 0 : 10)
                 
                 // Start Creating! button - compact at bottom
                 Button(action: {
@@ -144,18 +188,54 @@ struct OnboardingFoodPreferencesView: View {
                         .padding(.vertical, 16)
                         .background(
                             LinearGradient(
-                                colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                colors: [Color(hex: "#FF8A00"), Color(hex: "#FF5E62")],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                             .cornerRadius(25)
-                            .shadow(color: Color(hex: "#667eea").opacity(0.5), radius: 10, x: 0, y: 4)
+                            .shadow(color: Color(hex: "#FF8A00").opacity(0.45), radius: 12, x: 0, y: 4)
                         )
                 }
                 .disabled(selectedCuisines.count < 3)
                 .opacity(selectedCuisines.count < 3 ? 0.6 : 1.0)
+                .scaleEffect(selectedCuisines.count >= 3 ? (ctaPulse ? 1.01 : 0.99) : 1.0)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)
+                .opacity(ctaVisible ? 1 : 0)
+                .offset(y: ctaVisible ? 0 : 16)
+            }
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.55, dampingFraction: 0.86)) {
+                headerVisible = true
+            }
+            withAnimation(.spring(response: 0.58, dampingFraction: 0.84).delay(0.08)) {
+                gridVisible = true
+            }
+            withAnimation(.spring(response: 0.65, dampingFraction: 0.85).delay(0.16)) {
+                ctaVisible = true
+            }
+            withAnimation(.easeInOut(duration: 5.5).repeatForever(autoreverses: true)) {
+                orbDrift = true
+            }
+
+            revealedTileIndex = -1
+            for index in cuisineOptions.indices {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.14 + Double(index) * 0.02) {
+                    withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                        revealedTileIndex = index
+                    }
+                }
+            }
+        }
+        .onChange(of: selectedCuisines.count) { count in
+            guard count >= 3 else {
+                ctaPulse = false
+                return
+            }
+            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                ctaPulse = true
             }
         }
     }
@@ -174,7 +254,7 @@ struct CuisineGridItem: View {
     // MARK: - Helper Properties
     
     private var selectedColor: Color {
-        Color(hex: "#667eea").opacity(0.3)
+        Color(hex: "#FF8A00").opacity(0.28)
     }
     
     private var unselectedColor: Color {
@@ -182,7 +262,7 @@ struct CuisineGridItem: View {
     }
     
     private var borderSelectedColor: Color {
-        Color(hex: "#667eea")
+        Color(hex: "#FF8A00")
     }
     
     private var borderUnselectedColor: Color {
@@ -272,7 +352,7 @@ struct CuisineGridItem: View {
             )
             .scaleEffect(isSelected ? (isPressed ? 1.1 : 1.05) : (isPressed ? 0.95 : 1.0))
             .shadow(
-                color: isSelected ? Color(hex: "#667eea").opacity(0.5) : Color.black.opacity(0.1),
+                color: isSelected ? Color(hex: "#FF8A00").opacity(0.45) : Color.black.opacity(0.1),
                 radius: isSelected ? 12 : 4,
                 x: 0,
                 y: isSelected ? 6 : 2

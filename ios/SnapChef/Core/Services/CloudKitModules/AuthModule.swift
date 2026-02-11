@@ -76,7 +76,7 @@ final class AuthModule: ObservableObject {
                 print("⚠️ User record has incorrect type '\(existingRecord.recordType)', expected '\(CloudKitConfig.userRecordType)'. Creating new record.")
                 // Delete the old record with wrong type and create a new one
                 _ = try await publicDatabase.deleteRecord(withID: existingRecord.recordID)
-                throw UnifiedAuthError.invalidRecordType // Will trigger creation of new record
+                throw UnifiedAuthError.authenticationFailed // Will trigger creation of new record
             }
             
             // Store user ID
@@ -178,7 +178,7 @@ final class AuthModule: ObservableObject {
                 print("⚠️ User record has incorrect type '\(existingRecord.recordType)', expected '\(CloudKitConfig.userRecordType)'. Creating new record.")
                 // Delete the old record with wrong type and create a new one
                 _ = try await publicDatabase.deleteRecord(withID: existingRecord.recordID)
-                throw UnifiedAuthError.invalidRecordType // Will trigger creation of new record
+                throw UnifiedAuthError.authenticationFailed // Will trigger creation of new record
             }
             parent?.isAuthenticated = true
             parent?.currentUser = self.currentUser
@@ -396,8 +396,7 @@ final class AuthModule: ObservableObject {
     
     // MARK: - Social Methods
     func followUser(_ userID: String) async throws {
-        guard let currentUserID = currentUser?.recordID,
-              let currentUserName = currentUser?.displayName else {
+        guard let currentUserID = currentUser?.recordID else {
             throw UnifiedAuthError.notAuthenticated
         }
         
@@ -423,13 +422,11 @@ final class AuthModule: ObservableObject {
         await updateUserFollowerCount(userID, increment: true)
         
         // Create activity for the followed user
-        if let syncModule = parent?.syncModule {
-            try await syncModule.createActivity(
-                type: "follow",
-                actorID: currentUserID,
-                targetUserID: userID
-            )
-        }
+        try await parent?.createActivity(
+            type: "follow",
+            actorID: currentUserID,
+            targetUserID: userID
+        )
     }
     
     func unfollowUser(_ userID: String) async throws {
@@ -716,15 +713,4 @@ final class AuthModule: ObservableObject {
     private func parseUserRecord(_ record: CKRecord) -> CloudKitUser? {
         return CloudKitUser(from: record)
     }
-}
-
-// MARK: - Auth Required Features
-enum AuthRequiredFeature {
-    case challenges
-    case leaderboard
-    case socialSharing
-    case teams
-    case streaks
-    case premiumFeatures
-    case basicRecipes
 }

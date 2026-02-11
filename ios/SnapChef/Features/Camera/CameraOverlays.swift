@@ -4,6 +4,7 @@ struct CameraOverlays: View {
     let isProcessing: Bool
     let showingPreview: Bool
     let capturedImage: UIImage?
+    let processingMilestone: CameraProcessingMilestone
     let showWelcomeMessage: Bool
     @Binding var showConfetti: Bool
     @EnvironmentObject var deviceManager: DeviceManager
@@ -17,7 +18,7 @@ struct CameraOverlays: View {
         ZStack {
             // Processing overlay
             if isProcessing {
-                MagicalProcessingOverlay(capturedImage: capturedImage, onClose: onCloseProcessing)
+                MagicalProcessingOverlay(capturedImage: capturedImage, processingMilestone: processingMilestone, onClose: onCloseProcessing)
             }
 
             // Captured image preview
@@ -61,6 +62,7 @@ struct CameraOverlays: View {
         isProcessing: false,
         showingPreview: false,
         capturedImage: nil,
+        processingMilestone: .idle,
         showWelcomeMessage: true,
         showConfetti: .constant(false),
         onRetake: {},

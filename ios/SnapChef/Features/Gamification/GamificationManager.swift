@@ -356,7 +356,6 @@ final class GamificationManager: ObservableObject {
         }
 
         // Filter to show only current and upcoming challenges
-        let activeWindow = Date().addingTimeInterval(14 * 24 * 60 * 60) // Show next 2 weeks
         activeChallenges = scheduledChallenges.filter { challenge in
             return challenge.startDate <= Date() && challenge.endDate >= Date()
         }
@@ -487,8 +486,8 @@ final class GamificationManager: ObservableObject {
     private func setupCloudKitSync() {
         // Start syncing with CloudKit
         Task {
-            await CloudKitSyncService.shared.syncChallenges()
-            await CloudKitSyncService.shared.syncUserProgress()
+            await CloudKitService.shared.syncChallenges()
+            await CloudKitService.shared.syncUserProgress()
         }
     }
 
@@ -583,72 +582,12 @@ final class GamificationManager: ObservableObject {
 
     // MARK: - Challenge Management
     
-    /// Smart notification scheduling with weekly limit
+    /// Refreshes centralized monthly notification scheduling when challenge state changes.
     private func scheduleSmartChallengeNotifications(for challenge: Challenge) {
-        // Only schedule for joined challenges
         guard challenge.isJoined else { return }
-        
-        // With 1 notification per week limit, we only schedule the most important reminder
-        // Priority: Time-sensitive challenges ending soon > Regular reminders
-        
-        let now = Date()
-        let timeUntilEnd = challenge.endDate.timeIntervalSince(now)
-        
-        // Don't schedule if challenge is already expired
-        guard timeUntilEnd > 0 else { return }
-        
-        // Determine priority based on time remaining and challenge importance
-        let priority: NotificationPriority
-        if timeUntilEnd < 24 * 3600 { // Less than 24 hours
-            priority = .high // Time-sensitive
-        } else if timeUntilEnd < 72 * 3600 { // Less than 3 days
-            priority = .medium
-        } else {
-            priority = .low // Can wait
-        }
-        
-        // Only schedule ONE notification at the optimal time
-        let optimalReminderTime: Date
-        if timeUntilEnd < 24 * 3600 {
-            // For challenges ending soon, remind 2 hours before
-            optimalReminderTime = challenge.endDate.addingTimeInterval(-2 * 3600)
-        } else {
-            // For longer challenges, remind at midpoint
-            optimalReminderTime = now.addingTimeInterval(timeUntilEnd / 2)
-        }
-        
-        // Ensure it's during reasonable hours (10 AM - 6 PM for best engagement)
-        let calendar = Calendar.current
-        var components = calendar.dateComponents([.year, .month, .day, .hour], from: optimalReminderTime)
-        
-        if let hour = components.hour {
-            if hour < 10 {
-                components.hour = 10 // Move to 10 AM
-            } else if hour > 18 {
-                // Move to next day 10 AM
-                if let nextDay = calendar.date(byAdding: .day, value: 1, to: optimalReminderTime) {
-                    components = calendar.dateComponents([.year, .month, .day], from: nextDay)
-                    components.hour = 10
-                    components.minute = 0
-                }
-            }
-        }
-        
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        
-        // Use the new NotificationManager with priority
-        let notificationManager = NotificationManager.shared
-        _ = notificationManager.scheduleNotification(
-            identifier: "challenge_\(challenge.id)",
-            title: "🏆 Challenge Reminder",
-            body: "\(challenge.title) ends soon! Complete it to earn \(challenge.points) points.",
-            category: .challengeReminder,
-            userInfo: ["challengeId": challenge.id],
-            trigger: trigger,
-            priority: priority
-        )
-        
-        print("📅 Queued challenge notification for \(challenge.title) with \(priority) priority")
+
+        NotificationManager.shared.scheduleMonthlyEngagementNotification()
+        print("📅 Refreshed monthly engagement notification after joining challenge: \(challenge.title)")
     }
 
     func saveChallenge(_ challenge: Challenge) {
@@ -781,7 +720,7 @@ final class GamificationManager: ObservableObject {
                 let (results, _) = try await privateDB.records(matching: query)
                 
                 // Delete or update the UserChallenge record
-                for (recordId, result) in results {
+                for (_, result) in results {
                     if let record = try? result.get() {
                         // Update status to "left" instead of deleting
                         record["status"] = "left"
@@ -845,12 +784,23 @@ final class GamificationManager: ObservableObject {
 
         // Award rewards (with premium multiplier)
         awardPoints(finalPoints)
+        ChefCoinsManager.shared.earnCoins(finalCoins, reason: "Challenge completion: \(challenge.title)")
 
         // Remove from active
         activeChallenges.removeAll { $0.id == challenge.id }
 
         // Update stats
         userStats.challengesCompleted += 1
+
+        NotificationCenter.default.post(
+            name: Notification.Name("ChallengeCompleted"),
+            object: nil,
+            userInfo: [
+                "challengeID": completedChallenge.id,
+                "title": completedChallenge.title,
+                "points": finalPoints
+            ]
+        )
 
         // Track analytics
         ChallengeAnalyticsService.shared.trackChallengeInteraction(
@@ -860,15 +810,15 @@ final class GamificationManager: ObservableObject {
                 "challengeType": challenge.type.rawValue,
                 "difficulty": challenge.difficulty.rawValue,
                 "category": challenge.category,
-                "pointsEarned": challenge.points,
-                "coinsEarned": challenge.coins
+                "pointsEarned": finalPoints,
+                "coinsEarned": finalCoins
             ]
         )
 
         // Track coin earning
         ChallengeAnalyticsService.shared.trackRewardInteraction(
             rewardType: "coins",
-            amount: challenge.coins,
+            amount: finalCoins,
             source: "challenge_completion"
         )
 
@@ -906,6 +856,16 @@ final class GamificationManager: ObservableObject {
 
         // Update stats
         userStats.challengesCompleted += 1
+
+        NotificationCenter.default.post(
+            name: Notification.Name("ChallengeCompleted"),
+            object: nil,
+            userInfo: [
+                "challengeID": completedChallenge.id,
+                "title": completedChallenge.title,
+                "points": finalPoints
+            ]
+        )
 
         // Save to persistent storage
         saveChallengeProgress(
@@ -953,7 +913,11 @@ final class GamificationManager: ObservableObject {
             NotificationCenter.default.post(
                 name: Notification.Name("ChallengeCompleted"),
                 object: nil,
-                userInfo: ["challengeID": challengeID]
+                userInfo: [
+                    "challengeID": challengeID,
+                    "title": completedChallenge.title,
+                    "points": completedChallenge.points
+                ]
             )
         }
     }

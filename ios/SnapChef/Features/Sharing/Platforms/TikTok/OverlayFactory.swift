@@ -4,6 +4,63 @@ import UIKit
 import AVFoundation
 import QuartzCore
 
+private final class ExportCompletionGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isCompleted = false
+
+    func markCompletedIfNeeded() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if isCompleted {
+            return false
+        }
+        isCompleted = true
+        return true
+    }
+}
+
+private final class SendableTimerBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var timer: Timer?
+
+    func store(_ timer: Timer) {
+        lock.lock()
+        self.timer = timer
+        lock.unlock()
+    }
+
+    func invalidate() {
+        lock.lock()
+        let timer = self.timer
+        self.timer = nil
+        lock.unlock()
+
+        DispatchQueue.main.async {
+            timer?.invalidate()
+        }
+    }
+}
+
+private final class ExportSessionBox: @unchecked Sendable {
+    private let session: AVAssetExportSession
+
+    init(_ session: AVAssetExportSession) {
+        self.session = session
+    }
+
+    var progress: Float { session.progress }
+    var status: AVAssetExportSession.Status { session.status }
+    var error: Error? { session.error }
+
+    func cancel() {
+        session.cancelExport()
+    }
+
+    func exportAsynchronously(_ completion: @escaping @Sendable () -> Void) {
+        session.exportAsynchronously(completionHandler: completion)
+    }
+}
+
 public final class OverlayFactory: @unchecked Sendable {
     private let config: RenderConfig
 
@@ -1709,55 +1766,58 @@ public extension OverlayFactory {
                 cont.resume(throwing: CancellationError())
                 return
             }
-            
-            var hasCompleted = false
-            var progressTimer: Timer?
+
+            let completionGate = ExportCompletionGate()
+            let progressTimerBox = SendableTimerBox()
+            let timeoutTimerBox = SendableTimerBox()
+            let exportBox = ExportSessionBox(export)
 
             // Set up timeout timer (60 seconds for overlay processing)
             let timeoutTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: false) { _ in
-                guard !hasCompleted else { return }
-                hasCompleted = true
-                progressTimer?.invalidate()
-                export.cancelExport()
+                guard completionGate.markCompletedIfNeeded() else { return }
+                progressTimerBox.invalidate()
+                exportBox.cancel()
                 print("[OverlayFactory] ERROR - Overlay export timed out after 60 seconds")
                 cont.resume(throwing: NSError(domain: "OverlayFactory", code: -6, userInfo: [NSLocalizedDescriptionKey: "Export timeout"]))
             }
+            timeoutTimerBox.store(timeoutTimer)
 
             // Monitor progress
-            progressTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-                let currentProgress = export.progress
+            let progressTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                let currentProgress = exportBox.progress
                 Task { @MainActor in
                     await progress(Double(currentProgress))
                 }
-                if export.progress > 0 {
-                    print("[OverlayFactory] Overlay export progress: \(Int(export.progress * 100))%")
+                if currentProgress > 0 {
+                    print("[OverlayFactory] Overlay export progress: \(Int(currentProgress * 100))%")
                 }
             }
+            progressTimerBox.store(progressTimer)
 
-            export.exportAsynchronously {
-                guard !hasCompleted else {
+            exportBox.exportAsynchronously {
+                guard completionGate.markCompletedIfNeeded() else {
                     print("[OverlayFactory] Export completion called but already handled")
                     return
                 }
-                hasCompleted = true
-                timeoutTimer.invalidate()
-                progressTimer?.invalidate()
+                timeoutTimerBox.invalidate()
+                progressTimerBox.invalidate()
 
-                print("[OverlayFactory] Overlay export completed with status: \(export.status.rawValue)")
+                let status = exportBox.status
+                print("[OverlayFactory] Overlay export completed with status: \(status.rawValue)")
 
-                switch export.status {
+                switch status {
                 case .completed:
                     print("[OverlayFactory] SUCCESS - Overlay export completed: \(out)")
                     cont.resume(returning: out)
                 case .failed:
-                    let error = export.error ?? NSError(domain: "OverlayFactory", code: -3)
+                    let error = exportBox.error ?? NSError(domain: "OverlayFactory", code: -3)
                     print("[OverlayFactory] ERROR - Overlay export failed: \(error.localizedDescription)")
                     cont.resume(throwing: error)
                 case .cancelled:
                     print("[OverlayFactory] ERROR - Overlay export cancelled")
                     cont.resume(throwing: NSError(domain: "OverlayFactory", code: -4))
                 default:
-                    print("[OverlayFactory] ERROR - Overlay export ended with status: \(export.status.rawValue)")
+                    print("[OverlayFactory] ERROR - Overlay export ended with status: \(status.rawValue)")
                     cont.resume(throwing: NSError(domain: "OverlayFactory", code: -5))
                 }
             }

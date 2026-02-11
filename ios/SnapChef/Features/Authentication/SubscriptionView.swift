@@ -195,7 +195,7 @@ struct SubscriptionView: View {
                 }
 
                 // Purchase through SubscriptionManager
-                if let transaction = try await subscriptionManager.purchase(product) {
+                if try await subscriptionManager.purchase(product) != nil {
                     // Success - dismiss view
                     dismiss()
                 } else {

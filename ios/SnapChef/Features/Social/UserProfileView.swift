@@ -435,8 +435,8 @@ struct UserProfileView: View {
         // If we already have the user data from viewModel, use that
         if let user = viewModel.userProfile {
             let result = user.username ?? user.displayName
-            if result != nil && result != "Anonymous Chef" {
-                print("✅ DEBUG UserProfileView: Using cached display name: \(result ?? "nil")")
+            if result != "Anonymous Chef" {
+                print("✅ DEBUG UserProfileView: Using cached display name: \(result)")
                 return result
             }
         }
@@ -493,7 +493,7 @@ struct RecipeGridItem: View {
     @State private var fullRecipe: Recipe?
     @State private var isLoadingRecipe = false
     @State private var isLikeAnimating = false
-    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitService.shared
     @StateObject private var likeManager = RecipeLikeManager.shared
     
     // Computed properties for like state from manager
@@ -846,16 +846,16 @@ struct UserListRow: View {
                     )
                     .frame(width: 50, height: 50)
                     .overlay(
-                        Text((user.username ?? user.displayName ?? "U").prefix(1).uppercased())
+                        Text((user.username ?? user.displayName).prefix(1).uppercased())
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(.white)
                     )
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(user.username ?? user.displayName ?? "Chef")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(user.username ?? user.displayName)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
 
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
@@ -891,7 +891,7 @@ struct UserListRow: View {
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingProfile) {
-            UserProfileView(userID: user.recordID ?? "", userName: user.username ?? user.displayName ?? "Chef")
+            UserProfileView(userID: user.recordID ?? "", userName: user.username ?? user.displayName)
         }
     }
 }

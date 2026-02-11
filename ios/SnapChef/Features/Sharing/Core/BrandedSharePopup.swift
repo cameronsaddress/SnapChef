@@ -20,6 +20,9 @@ struct BrandedSharePopup: View {
     @State private var animationScale: CGFloat = 0.8
     @State private var animationOpacity: Double = 0
     @State private var hasSharedToFeed = false
+    @State private var backdropOpacity: Double = 0
+    @State private var cardFloat = false
+    @State private var revealedPlatformIndex = -1
     
     // Direct sharing states for Instagram/Messages
     @State private var showingGenerationOverlay = false
@@ -72,7 +75,7 @@ struct BrandedSharePopup: View {
     var body: some View {
         ZStack {
             // Background blur
-            Color.black.opacity(0.4)
+            Color.black.opacity(0.58 * backdropOpacity)
                 .ignoresSafeArea()
                 .onTapGesture {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -103,7 +106,7 @@ struct BrandedSharePopup: View {
 
                 // Platform grid
                 LazyVGrid(columns: columns, spacing: 20) {
-                    ForEach(displayPlatforms, id: \.self) { platform in
+                    ForEach(Array(displayPlatforms.enumerated()), id: \.element) { index, platform in
                         PlatformButton(
                             platform: platform,
                             isSelected: selectedPlatform == platform,
@@ -111,6 +114,9 @@ struct BrandedSharePopup: View {
                                 handlePlatformSelection(platform)
                             }
                         )
+                        .opacity(index <= revealedPlatformIndex ? 1 : 0)
+                        .offset(y: index <= revealedPlatformIndex ? 0 : 10)
+                        .scaleEffect(index <= revealedPlatformIndex ? 1 : 0.92)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -141,11 +147,25 @@ struct BrandedSharePopup: View {
             .padding(.horizontal, 16)
             .scaleEffect(animationScale)
             .opacity(animationOpacity)
+            .offset(y: cardFloat ? -4 : 6)
             .onAppear {
                 print("🔍 DEBUG: BrandedSharePopup appeared")
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    backdropOpacity = 1
+                }
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) {
                     animationScale = 1.0
                     animationOpacity = 1.0
+                }
+                withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+                    cardFloat = true
+                }
+                for index in displayPlatforms.indices {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1 + Double(index) * 0.028) {
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                            revealedPlatformIndex = index
+                        }
+                    }
                 }
                 
                 // Automatically share to user's followers' feeds when popup opens
@@ -408,12 +428,16 @@ struct BrandedSharePopup: View {
                 switch platform {
                 case .instagram:
                     try await generateAndShareInstagram(content: shareContent, isStory: false)
+                    ShareService.shared.registerExternalShareCompletion(platform: .instagram, source: "branded_popup_direct")
                 case .instagramStory:
                     try await generateAndShareInstagram(content: shareContent, isStory: true)
+                    ShareService.shared.registerExternalShareCompletion(platform: .instagramStory, source: "branded_popup_direct")
                 case .messages:
                     try await generateAndShareMessages(content: shareContent)
+                    ShareService.shared.registerExternalShareCompletion(platform: .messages, source: "branded_popup_direct")
                 case .twitter:
                     try await generateAndShareX(content: shareContent)
+                    ShareService.shared.registerExternalShareCompletion(platform: .twitter, source: "branded_popup_direct")
                 default:
                     break
                 }
@@ -695,11 +719,12 @@ Level up your kitchen game 👨‍🍳
 """
             
         case .challenge(let challenge):
+            let challengeLink = SocialShareManager.shared.generateChallengeInviteLink(challengeID: challenge.id).absoluteString
             return """
 Challenge crushed: \(challenge.title) ✅
 
 Who's next? 💪
-📱 Join me on SnapChef (App Store)
+📱 Join me on SnapChef: \(challengeLink)
 
 #SnapChefChallenge
 """
@@ -738,7 +763,8 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
         case .achievement(let name):
             return "🏆 Achievement unlocked: \(name)! Leveling up my cooking game with #SnapChef #CookingAchievement"
         case .challenge(let challenge):
-            return "🎯 Joined the \(challenge.title) challenge on SnapChef! Who's with me? #SnapChefChallenge #CookingChallenge"
+            let challengeLink = SocialShareManager.shared.generateChallengeInviteLink(challengeID: challenge.id).absoluteString
+            return "🎯 Joined the \(challenge.title) challenge on SnapChef! Who's with me?\n\(challengeLink)\n#SnapChefChallenge #CookingChallenge"
         default:
             return "Check out what I made with SnapChef! 🍳 #SnapChef #AIRecipes"
         }
@@ -802,7 +828,7 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
         case .recipe(let recipe):
             activityType = "recipeXShared"
             do {
-                try await CloudKitSyncService.shared.createActivity(
+                try await CloudKitService.shared.createActivity(
                     type: activityType,
                     actorID: userID,
                     recipeID: recipe.id.uuidString,
@@ -828,7 +854,7 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
         case .recipe(let recipe):
             activityType = "recipeMessagesShared"
             do {
-                try await CloudKitSyncService.shared.createActivity(
+                try await CloudKitService.shared.createActivity(
                     type: activityType,
                     actorID: userID,
                     recipeID: recipe.id.uuidString,
@@ -854,7 +880,7 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
         case .recipe(let recipe):
             activityType = isStory ? "recipeInstagramStoryShared" : "recipeInstagramFeedShared"
             do {
-                try await CloudKitSyncService.shared.createActivity(
+                try await CloudKitService.shared.createActivity(
                     type: activityType,
                     actorID: userID,
                     recipeID: recipe.id.uuidString,
@@ -871,8 +897,7 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
     // MARK: - Activity Creation
     private func createShareActivity(platform: SharePlatformType) async {
         guard UnifiedAuthManager.shared.isAuthenticated,
-              let userID = UnifiedAuthManager.shared.currentUser?.recordID,
-              let userName = UnifiedAuthManager.shared.currentUser?.displayName else {
+              let userID = UnifiedAuthManager.shared.currentUser?.recordID else {
             return
         }
         
@@ -903,7 +928,7 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
         }
         
         do {
-            try await CloudKitSyncService.shared.createActivity(
+            try await CloudKitService.shared.createActivity(
                 type: activityType,
                 actorID: userID,
                 recipeID: metadata["recipeId"] as? String,
@@ -919,8 +944,7 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
     // MARK: - Share to Followers Feed
     private func shareToFollowersFeed() async {
         guard authManager.isAuthenticated,
-              let currentUserID = authManager.currentUser?.recordID,
-              let currentUserName = authManager.currentUser?.displayName else {
+              let currentUserID = authManager.currentUser?.recordID else {
             print("❌ Cannot share to feed: User not authenticated")
             return
         }
@@ -964,7 +988,7 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
             // Create a single public activity that will appear in followers' feeds
             // The feed system will automatically show this to followers
             // No targetUserID means it's a public activity from this user
-            try await CloudKitSyncService.shared.createActivity(
+            try await CloudKitService.shared.createActivity(
                 type: activityType,
                 actorID: currentUserID,
                 targetUserID: nil,  // No specific target - this is a public activity
@@ -996,7 +1020,10 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
                 let caption = generateTikTokCaption()
                 
                 // Share to TikTok using ShareKit
-                await shareToTikTokApp(localIdentifier: localIdentifier, caption: caption)
+                let didShare = await shareToTikTokApp(localIdentifier: localIdentifier, caption: caption)
+                if didShare {
+                    ShareService.shared.registerExternalShareCompletion(platform: .tiktok, source: "branded_popup_tiktok")
+                }
                 
             } catch {
                 print("❌ Failed to share to TikTok: \(error)")
@@ -1019,7 +1046,7 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
         }
     }
     
-    private func shareToTikTokApp(localIdentifier: String, caption: String) async {
+    private func shareToTikTokApp(localIdentifier: String, caption: String) async -> Bool {
         await withCheckedContinuation { continuation in
             ViralVideoExporter.shareToTikTok(
                 localIdentifiers: [localIdentifier],
@@ -1028,10 +1055,11 @@ Made with SnapChef - the AI that turns your fridge into amazing recipes ✨
                 switch result {
                 case .success:
                     print("✅ TikTok ShareKit: Video shared successfully")
+                    continuation.resume(returning: true)
                 case .failure(let error):
                     print("❌ TikTok ShareKit error: \(error)")
+                    continuation.resume(returning: false)
                 }
-                continuation.resume()
             }
         }
     }

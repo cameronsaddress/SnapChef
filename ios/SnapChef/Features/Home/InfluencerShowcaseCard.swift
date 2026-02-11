@@ -299,6 +299,7 @@ struct CTAButton: View {
             )
             .shadow(color: Color(hex: "#667eea").opacity(0.5), radius: 10, y: 5)
         }
+        .buttonStyle(StudioSpringButtonStyle(pressedScale: 0.95, pressedYOffset: 1.2, activeRotation: 1.2))
     }
 }
 

@@ -299,100 +299,90 @@ struct RecipeDetectiveView: View {
         guard let image = capturedImage else { return }
         
         isProcessing = true
-        
-        // Cycle through detective messages
-        var messageIndex = 0
-        let timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { timer in
-            if messageIndex < processingMessages.count {
-                Task { @MainActor in
-                    processingMessage = processingMessages[messageIndex]
-                }
-                messageIndex += 1
-            } else {
-                timer.invalidate()
-                // Create mock detected recipe
-                Task { @MainActor in
-                    detectedRecipe = DetectedRecipe(
-                        originalImage: image,
-                        dishName: "Classic Chicken Parmesan",
-                        confidenceScore: 87,
-                        estimatedIngredients: [
-                            "Chicken breast",
-                            "Parmesan cheese",
-                            "Breadcrumbs",
-                            "Marinara sauce",
-                            "Mozzarella cheese",
-                            "Italian seasoning"
-                        ],
-                        reconstructedRecipe: Recipe(
-                            id: UUID(),
-                            ownerID: nil,
-                            name: "Classic Chicken Parmesan",
-                            description: "Crispy breaded chicken breast topped with marinara sauce and melted cheese",
-                            ingredients: [
-                                Ingredient(id: UUID(), name: "Chicken breast", quantity: "2", unit: "pieces", isAvailable: true),
-                                Ingredient(id: UUID(), name: "Panko breadcrumbs", quantity: "1", unit: "cup", isAvailable: true),
-                                Ingredient(id: UUID(), name: "Parmesan cheese", quantity: "1/2", unit: "cup", isAvailable: true),
-                                Ingredient(id: UUID(), name: "Marinara sauce", quantity: "1", unit: "cup", isAvailable: true),
-                                Ingredient(id: UUID(), name: "Mozzarella cheese", quantity: "1", unit: "cup", isAvailable: true),
-                                Ingredient(id: UUID(), name: "Eggs", quantity: "2", unit: "pieces", isAvailable: true),
-                                Ingredient(id: UUID(), name: "Flour", quantity: "1/2", unit: "cup", isAvailable: true),
-                                Ingredient(id: UUID(), name: "Salt and pepper", quantity: "To taste", unit: nil, isAvailable: true),
-                                Ingredient(id: UUID(), name: "Italian seasoning", quantity: "1", unit: "tsp", isAvailable: true)
-                            ],
-                            instructions: [
-                                "Preheat oven to 425°F",
-                                "Set up breading station with flour, beaten eggs, and breadcrumb mixture",
-                                "Season chicken with salt and pepper",
-                                "Dredge chicken in flour, then egg, then breadcrumb mixture",
-                                "Place on baking sheet and bake for 20 minutes",
-                                "Top with marinara sauce and mozzarella cheese",
-                                "Bake for additional 5-10 minutes until cheese melts",
-                                "Let rest for 5 minutes before serving"
-                            ],
-                            cookTime: 35,
-                            prepTime: 15,
-                            servings: 4,
-                            difficulty: .medium,
-                            nutrition: Nutrition(
-                                calories: 485,
-                                protein: 42,
-                                carbs: 28,
-                                fat: 22,
-                                fiber: 3,
-                                sugar: 8,
-                                sodium: 850
-                            ),
-                            imageURL: nil,
-                            createdAt: Date(),
-                            tags: ["Italian", "Main Course", "Comfort Food"],
-                            dietaryInfo: DietaryInfo(
-                                isVegetarian: false,
-                                isVegan: false,
-                                isGlutenFree: false,
-                                isDairyFree: false
-                            ),
-                            isDetectiveRecipe: true,
-                            cookingTechniques: ["breading", "baking"],
-                            flavorProfile: FlavorProfile(sweet: 3, salty: 7, sour: 2, bitter: 1, umami: 6),
-                            secretIngredients: ["Italian seasoning blend"],
-                            proTips: ["Pound chicken evenly for consistent cooking"],
-                            visualClues: ["Golden brown crust", "Melted cheese topping"],
-                            shareCaption: "Homemade Chicken Parmesan! 🍗🧀 #ChickenParmesan #Homemade"
-                        )
-                    )
-                    
-                    // Decrease usage count
-                    if !deviceManager.hasUnlimitedAccess {
-                        usagesRemaining = max(0, usagesRemaining - 1)
-                    }
-                    
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        isProcessing = false
-                        showingResults = true
-                    }
-                }
+
+        Task { @MainActor in
+            for message in processingMessages {
+                processingMessage = message
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
+
+            detectedRecipe = DetectedRecipe(
+                originalImage: image,
+                dishName: "Classic Chicken Parmesan",
+                confidenceScore: 87,
+                estimatedIngredients: [
+                    "Chicken breast",
+                    "Parmesan cheese",
+                    "Breadcrumbs",
+                    "Marinara sauce",
+                    "Mozzarella cheese",
+                    "Italian seasoning"
+                ],
+                reconstructedRecipe: Recipe(
+                    id: UUID(),
+                    ownerID: nil,
+                    name: "Classic Chicken Parmesan",
+                    description: "Crispy breaded chicken breast topped with marinara sauce and melted cheese",
+                    ingredients: [
+                        Ingredient(id: UUID(), name: "Chicken breast", quantity: "2", unit: "pieces", isAvailable: true),
+                        Ingredient(id: UUID(), name: "Panko breadcrumbs", quantity: "1", unit: "cup", isAvailable: true),
+                        Ingredient(id: UUID(), name: "Parmesan cheese", quantity: "1/2", unit: "cup", isAvailable: true),
+                        Ingredient(id: UUID(), name: "Marinara sauce", quantity: "1", unit: "cup", isAvailable: true),
+                        Ingredient(id: UUID(), name: "Mozzarella cheese", quantity: "1", unit: "cup", isAvailable: true),
+                        Ingredient(id: UUID(), name: "Eggs", quantity: "2", unit: "pieces", isAvailable: true),
+                        Ingredient(id: UUID(), name: "Flour", quantity: "1/2", unit: "cup", isAvailable: true),
+                        Ingredient(id: UUID(), name: "Salt and pepper", quantity: "To taste", unit: nil, isAvailable: true),
+                        Ingredient(id: UUID(), name: "Italian seasoning", quantity: "1", unit: "tsp", isAvailable: true)
+                    ],
+                    instructions: [
+                        "Preheat oven to 425°F",
+                        "Set up breading station with flour, beaten eggs, and breadcrumb mixture",
+                        "Season chicken with salt and pepper",
+                        "Dredge chicken in flour, then egg, then breadcrumb mixture",
+                        "Place on baking sheet and bake for 20 minutes",
+                        "Top with marinara sauce and mozzarella cheese",
+                        "Bake for additional 5-10 minutes until cheese melts",
+                        "Let rest for 5 minutes before serving"
+                    ],
+                    cookTime: 35,
+                    prepTime: 15,
+                    servings: 4,
+                    difficulty: .medium,
+                    nutrition: Nutrition(
+                        calories: 485,
+                        protein: 42,
+                        carbs: 28,
+                        fat: 22,
+                        fiber: 3,
+                        sugar: 8,
+                        sodium: 850
+                    ),
+                    imageURL: nil,
+                    createdAt: Date(),
+                    tags: ["Italian", "Main Course", "Comfort Food"],
+                    dietaryInfo: DietaryInfo(
+                        isVegetarian: false,
+                        isVegan: false,
+                        isGlutenFree: false,
+                        isDairyFree: false
+                    ),
+                    isDetectiveRecipe: true,
+                    cookingTechniques: ["breading", "baking"],
+                    flavorProfile: FlavorProfile(sweet: 3, salty: 7, sour: 2, bitter: 1, umami: 6),
+                    secretIngredients: ["Italian seasoning blend"],
+                    proTips: ["Pound chicken evenly for consistent cooking"],
+                    visualClues: ["Golden brown crust", "Melted cheese topping"],
+                    shareCaption: "Homemade Chicken Parmesan! 🍗🧀 #ChickenParmesan #Homemade"
+                )
+            )
+
+            if !deviceManager.hasUnlimitedAccess {
+                usagesRemaining = max(0, usagesRemaining - 1)
+            }
+
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            isProcessing = false
+            showingResults = true
         }
     }
 }

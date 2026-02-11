@@ -93,7 +93,7 @@ public final class ViralVideoEngine: ObservableObject {
             try validateOutputFile(url: url)
             
             return url
-        } catch let error as CancellationError {
+        } catch is CancellationError {
             print("[ViralVideoEngine] Render cancelled by user or memory pressure")
             let snapChefError = SnapChefError.videoGenerationError("Video generation was cancelled.", recovery: .retry)
             ErrorAnalytics.logError(snapChefError, context: "viral_video_cancelled")

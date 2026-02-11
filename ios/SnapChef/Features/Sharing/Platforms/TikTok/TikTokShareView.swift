@@ -61,12 +61,15 @@ struct TikTokShareView: View {
                     }
                 }
 
-                // Confetti overlay - TODO: Implement ConfettiView
-                // if showConfetti {
-                //     ConfettiView()
-                //         .allowsHitTesting(false)
-                //         .animation(.easeInOut(duration: 0.5), value: showConfetti)
-                // }
+                if showConfetti {
+                    TikTokConfettiOverlay(
+                        tint: Color(red: 1.0, green: 0.078, blue: 0.576),
+                        accent: .cyan,
+                        pieceCount: 42
+                    )
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -139,9 +142,6 @@ struct TikTokShareView: View {
             }
         } message: {
             Text(tokenExpiredMessage)
-        }
-        .sheet(isPresented: $authTrigger.shouldShowPrompt) {
-            ProgressiveAuthPrompt()
         }
         .alert("Daily Video Limit Reached", isPresented: $showLimitReached) {
             Button("Upgrade to Premium") {
@@ -249,7 +249,7 @@ struct TikTokShareView: View {
         }
         
         do {
-            try await CloudKitSyncService.shared.createActivity(
+            try await CloudKitService.shared.createActivity(
                 type: activityType,
                 actorID: userID,
                 recipeID: metadata["recipeId"] as? String,
@@ -1212,5 +1212,57 @@ struct PulsingProgressView: View {
     }
 }
 
-// ConfettiView is already defined in RecipeResultsView.swift
+private struct TikTokConfettiOverlay: View {
+    let tint: Color
+    let accent: Color
+    let pieceCount: Int
 
+    @State private var progress: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                ForEach(0..<max(pieceCount, 1), id: \.self) { index in
+                    let spec = confettiSpec(for: index)
+                    RoundedRectangle(cornerRadius: 2.4, style: .continuous)
+                        .fill(spec.color)
+                        .frame(width: spec.width, height: spec.height)
+                        .rotationEffect(.degrees(spec.baseRotation + spec.spin * Double(progress)))
+                        .offset(
+                            x: spec.horizontal * progress,
+                            y: spec.rise * progress + spec.fall * progress * progress
+                        )
+                        .opacity(max(0, 1 - Double(progress * 1.08)))
+                }
+            }
+            .position(x: proxy.size.width / 2, y: 92)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .onAppear {
+            withAnimation(.timingCurve(0.14, 0.72, 0.22, 1.0, duration: MotionTuning.seconds(1.0))) {
+                progress = 1
+            }
+        }
+    }
+
+    private func confettiSpec(for index: Int) -> (horizontal: CGFloat, rise: CGFloat, fall: CGFloat, width: CGFloat, height: CGFloat, baseRotation: Double, spin: Double, color: Color) {
+        let count = max(pieceCount, 1)
+        let angle = (Double(index) / Double(count)) * 2 * .pi + Double((index % 7) - 3) * 0.08
+        let horizontal = CGFloat(cos(angle)) * CGFloat(82 + ((index * 13) % 72))
+        let rise = -CGFloat(88 + ((index * 11) % 76))
+        let fall = CGFloat(156 + ((index * 17) % 104))
+        let width = CGFloat(4 + (index % 3))
+        let height = CGFloat(7 + ((index * 3) % 7))
+        let baseRotation = Double((index * 31) % 360)
+        let spin = Double(220 + (index % 5) * 64)
+
+        let color: Color = switch index % 4 {
+        case 0: tint
+        case 1: accent
+        case 2: .white.opacity(0.94)
+        default: tint.opacity(0.72)
+        }
+
+        return (horizontal, rise, fall, width, height, baseRotation, spin, color)
+    }
+}

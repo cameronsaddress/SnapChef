@@ -204,7 +204,7 @@ final class CloudKitSyncEngine: ObservableObject {
         let image = loadImageForSync(recipeID: recipeID)
         
         // Upload to CloudKit using existing manager
-        _ = try await CloudKitRecipeManager.shared.uploadRecipe(
+        _ = try await CloudKitService.shared.uploadRecipe(
             recipe,
             fromLLM: false,
             beforePhoto: image
@@ -217,7 +217,7 @@ final class CloudKitSyncEngine: ObservableObject {
     private func deleteRecipeFromCloudKit(recipeID: String) async throws {
         // Delete from CloudKit using CloudKitActor
         let recordID = CKRecord.ID(recordName: recipeID)
-        try await CloudKitSyncService.shared.cloudKitActor.deleteRecordByID(recordID)
+        try await CloudKitService.shared.cloudKitActor.deleteRecordByID(recordID)
     }
     
     private func updateRecipeInCloudKit(recipeID: String) async throws {

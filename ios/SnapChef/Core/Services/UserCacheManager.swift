@@ -193,24 +193,37 @@ class UserCacheManager: ObservableObject {
         return (0, cache.count, oldestEntry) // hits would need to be tracked separately
     }
     
+    /// Force refresh user data from CloudKit, bypassing cache
+    func forceRefreshUser(_ userID: String) async -> (username: String, displayName: String?, bio: String?, avatar: Data?) {
+        invalidateUser(userID)
+        print("🔄 Force refreshing user data for: \(userID)")
+        return await getUserInfo(userID)
+    }
+    
+    /// Force refresh multiple users at once
+    func forceRefreshUsers(_ userIDs: [String]) async -> [String: (username: String, displayName: String?, avatar: Data?)] {
+        print("🔄 Force refreshing \(userIDs.count) users")
+        for userID in userIDs {
+            invalidateUser(userID)
+        }
+        return await batchFetchUsers(userIDs)
+    }
+    
     // MARK: - Private Methods
     
     /// Check if cached user is still valid
     private func getCachedUser(_ userID: String) -> CachedUser? {
         guard let cached = cache[userID] else { return nil }
         
-        // Check if cache is still valid
+        // Check if cache is still valid (30 minutes)
         if Date().timeIntervalSince(cached.fetchTime) < cacheTimeout {
             return cached
         }
         
-        // DISABLED: Never expire cache - always return cached data
-        return cached
-        
-        // Original expiration code disabled:
-        // cache.removeValue(forKey: userID)
-        // print("⏰ Cache expired for user: \(userID)")
-        // return nil
+        // Cache expired - remove and return nil
+        cache.removeValue(forKey: userID)
+        print("⏰ Cache expired for user: \(userID)")
+        return nil
     }
     
     /// Fetch user from CloudKit

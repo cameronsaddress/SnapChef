@@ -775,7 +775,7 @@ Made with SnapChef 🍳
         }
         
         do {
-            try await CloudKitSyncService.shared.createActivity(
+            try await CloudKitService.shared.createActivity(
                 type: activityType,
                 actorID: userID,
                 recipeID: metadata["recipeId"] as? String,

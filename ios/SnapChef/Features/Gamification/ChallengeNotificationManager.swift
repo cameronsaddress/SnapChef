@@ -14,7 +14,7 @@ final class ChallengeNotificationManager: ObservableObject {
     @Published var pendingNotifications: [UNNotificationRequest] = []
 
     private lazy var gamificationManager = GamificationManager.shared
-    private lazy var notificationManager = NotificationManager.shared
+    let notificationManager = NotificationManager.shared
 
     // DEPRECATED: Use NotificationManager.NotificationCategory instead
     // This enum is kept for backward compatibility only
@@ -67,14 +67,7 @@ final class ChallengeNotificationManager: ObservableObject {
     }
 
     private func checkNotificationAuthorization() {
-        Task.detached {
-            let center = UNUserNotificationCenter.current()
-            let settings = await center.notificationSettings()
-            let isAuthorized = settings.authorizationStatus == .authorized
-            await MainActor.run {
-                self.notificationsEnabled = isAuthorized
-            }
-        }
+        notificationsEnabled = notificationManager.isEnabled
     }
 
     // MARK: - Setup Categories
@@ -166,40 +159,30 @@ final class ChallengeNotificationManager: ObservableObject {
                 "challengeId": challenge.id,
                 "challengeType": challenge.type.rawValue
             ],
-            trigger: trigger
+            trigger: trigger,
+            deliveryPolicy: .transactional
         )
     }
 
     func notifyChallengeComplete(_ challenge: Challenge, reward: ChallengeReward) {
         guard notificationsEnabled else { return }
 
-        // Capture values
-        let challengeId = challenge.id
-        let challengeTitle = challenge.title
-        let rewardPoints = reward.points
-        let rewardBadge = reward.badge
-
-        Task.detached {
-            let center = UNUserNotificationCenter.current()
-
-            let content = UNMutableNotificationContent()
-            content.title = "Challenge Complete! 🎉"
-            content.body = "You've completed \"\(challengeTitle)\" and earned \(rewardPoints) points!"
-
-            if let badge = rewardBadge {
-                content.subtitle = "New badge unlocked: \(badge)"
-            }
-
-            content.sound = UNNotificationSound(named: UNNotificationSoundName("celebration.wav"))
-            content.categoryIdentifier = LegacyNotificationCategory.challengeComplete.rawValue
-
-            let request = UNNotificationRequest(
-                identifier: NotificationIdentifier.challengeComplete(challengeId),
-                content: content,
-                trigger: nil // Immediate notification
-            )
-            try? await center.add(request)
+        var subtitle = ""
+        if let badge = reward.badge {
+            subtitle = "New badge unlocked: \(badge)"
         }
+
+        _ = notificationManager.scheduleNotification(
+            identifier: NotificationIdentifier.challengeComplete(challenge.id),
+            title: "Challenge Complete! 🎉",
+            body: "You've completed \"\(challenge.title)\" and earned \(reward.points) points!",
+            subtitle: subtitle,
+            category: .challengeComplete,
+            userInfo: ["challengeId": challenge.id],
+            trigger: nil,
+            priority: .high,
+            deliveryPolicy: .transactional
+        )
     }
 
     // MARK: - Streak Notifications
@@ -218,37 +201,23 @@ final class ChallengeNotificationManager: ObservableObject {
         guard notificationsEnabled else { return }
 
         let weeklyRank = gamificationManager.userStats.weeklyRank
-
-        Task.detached {
-            let center = UNUserNotificationCenter.current()
-
-            let content = UNMutableNotificationContent()
-            content.title = "Weekly Leaderboard Update 📊"
-
-            if let rank = weeklyRank {
-                content.body = "You're currently ranked #\(rank) this week! Check the leaderboard to see who you're competing against."
-            } else {
-                content.body = "The weekly leaderboard has been updated. See where you stand!"
-            }
-
-            content.sound = .default
-            content.categoryIdentifier = LegacyNotificationCategory.leaderboardUpdate.rawValue
-
-            // Schedule for every Sunday at 6 PM
-            var dateComponents = DateComponents()
-            dateComponents.weekday = 1 // Sunday
-            dateComponents.hour = 18
-            dateComponents.minute = 0
-
-            let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-
-            let request = UNNotificationRequest(
-                identifier: NotificationIdentifier.weeklyLeaderboard,
-                content: content,
-                trigger: trigger
-            )
-            try? await center.add(request)
+        let body: String
+        if let rank = weeklyRank {
+            body = "You're currently ranked #\(rank). Tap in and climb this month."
+        } else {
+            body = "Your ranking has moved. Check your position and keep cooking."
         }
+
+        _ = notificationManager.scheduleNotification(
+            identifier: NotificationIdentifier.weeklyLeaderboard,
+            title: "Leaderboard Update 📊",
+            body: body,
+            category: .leaderboardUpdate,
+            userInfo: [:],
+            trigger: nil,
+            priority: .low,
+            deliveryPolicy: .monthlyEngagement
+        )
     }
 
     // MARK: - Team Challenge Notifications
@@ -258,27 +227,20 @@ final class ChallengeNotificationManager: ObservableObject {
 
         let identifier = "\(NotificationIdentifier.teamChallengeInvite)_\(UUID().uuidString)"
 
-        Task.detached {
-            let center = UNUserNotificationCenter.current()
-
-            let content = UNMutableNotificationContent()
-            content.title = "Team Challenge Invite! 👥"
-            content.body = "\(userName) invited you to join \"\(teamName)\" for the \(challengeName) challenge"
-            content.sound = .default
-            content.categoryIdentifier = LegacyNotificationCategory.teamChallenge.rawValue
-            content.userInfo = [
+        _ = notificationManager.scheduleNotification(
+            identifier: identifier,
+            title: "Team Challenge Invite! 👥",
+            body: "\(userName) invited you to join \"\(teamName)\" for \(challengeName).",
+            category: .teamChallenge,
+            userInfo: [
                 "teamName": teamName,
                 "challengeName": challengeName,
                 "inviterName": userName
-            ]
-
-            let request = UNNotificationRequest(
-                identifier: identifier,
-                content: content,
-                trigger: nil
-            )
-            try? await center.add(request)
-        }
+            ],
+            trigger: nil,
+            priority: .medium,
+            deliveryPolicy: .transactional
+        )
     }
 
     // MARK: - New Challenge Notifications
@@ -286,29 +248,17 @@ final class ChallengeNotificationManager: ObservableObject {
     func notifyNewChallengeAvailable(_ challenge: Challenge) {
         guard notificationsEnabled else { return }
 
-        let challengeType = challenge.type.rawValue
-        let challengeTitle = challenge.title
-        let challengeDescription = challenge.description
-        let challengePoints = challenge.points
-        let identifier = "new_challenge_\(challenge.id)"
-
-        Task.detached {
-            let center = UNUserNotificationCenter.current()
-
-            let content = UNMutableNotificationContent()
-            content.title = "New \(challengeType) Available! ✨"
-            content.body = "\"\(challengeTitle)\" - \(challengeDescription)"
-            content.subtitle = "Reward: \(challengePoints) points"
-            content.sound = .default
-            content.categoryIdentifier = LegacyNotificationCategory.newChallenge.rawValue
-
-            let request = UNNotificationRequest(
-                identifier: identifier,
-                content: content,
-                trigger: nil
-            )
-            try? await center.add(request)
-        }
+        _ = notificationManager.scheduleNotification(
+            identifier: "new_challenge_\(challenge.id)",
+            title: "New \(challenge.type.rawValue) Available! ✨",
+            body: "\"\(challenge.title)\" - \(challenge.description)",
+            subtitle: "Reward: \(challenge.points) points",
+            category: .newChallenge,
+            userInfo: ["challengeId": challenge.id],
+            trigger: nil,
+            priority: .medium,
+            deliveryPolicy: .monthlyEngagement
+        )
     }
 
     // MARK: - Helper Methods
@@ -320,10 +270,7 @@ final class ChallengeNotificationManager: ObservableObject {
     }
 
     func cancelNotification(identifier: String) {
-        Task.detached {
-            let center = UNUserNotificationCenter.current()
-            center.removePendingNotificationRequests(withIdentifiers: [identifier])
-        }
+        notificationManager.cancelNotification(identifier: identifier)
     }
 
     func cancelAllChallengeNotifications() {
@@ -332,31 +279,17 @@ final class ChallengeNotificationManager: ObservableObject {
     }
 
     func updatePendingNotifications() {
-        Task.detached {
-            let center = UNUserNotificationCenter.current()
-            let pending = await center.pendingNotificationRequests()
-            await MainActor.run {
-                self.pendingNotifications = pending
-            }
+        Task { @MainActor in
+            await notificationManager.refreshPendingNotifications()
+            pendingNotifications = notificationManager.pendingNotifications
         }
     }
 
     // MARK: - Default Notifications Setup
 
     private func setupDefaultNotifications() async {
-        // CRITICAL FIX: Only schedule for JOINED challenges to prevent notification bomb
-        // Delegate to NotificationManager for centralized handling
-        
-        // Schedule streak reminder (handled by NotificationManager)
-        notificationManager.scheduleDailyStreakReminder()
-        
-        // Schedule weekly leaderboard update
-        scheduleWeeklyLeaderboardUpdate()
-        
-        // Schedule challenge reminders ONLY for joined challenges (max 3)
-        notificationManager.scheduleJoinedChallengeReminders()
-        
-        print("✅ Setup default notifications with spam prevention")
+        notificationManager.scheduleMonthlyEngagementNotification()
+        print("✅ Setup default notifications with monthly scheduling")
     }
 
     // MARK: - Settings
@@ -367,19 +300,12 @@ final class ChallengeNotificationManager: ObservableObject {
         leaderboardUpdates: Bool,
         teamInvites: Bool
     ) {
-        UserDefaults.standard.set(challengeReminders, forKey: "notifications.challengeReminders")
-        UserDefaults.standard.set(streakReminders, forKey: "notifications.streakReminders")
-        UserDefaults.standard.set(leaderboardUpdates, forKey: "notifications.leaderboardUpdates")
-        UserDefaults.standard.set(teamInvites, forKey: "notifications.teamInvites")
-
-        // Update scheduled notifications based on preferences
-        if !streakReminders {
-            cancelNotification(identifier: NotificationIdentifier.dailyStreak)
-        }
-
-        if !leaderboardUpdates {
-            cancelNotification(identifier: NotificationIdentifier.weeklyLeaderboard)
-        }
+        var preferences = notificationManager.preferences
+        preferences.challengeReminders = challengeReminders
+        preferences.streakReminders = streakReminders
+        preferences.leaderboardUpdates = leaderboardUpdates
+        preferences.teamInvites = teamInvites
+        notificationManager.updatePreferences(preferences)
     }
 }
 

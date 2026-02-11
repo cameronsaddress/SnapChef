@@ -194,7 +194,7 @@ enum SnapChefError: LocalizedError, Equatable {
         case .manageSubscription: return "Manage Subscription"
         case .clearData: return "Clear Data"
         case .forcSync: return "Force Sync"
-        case .closeApp: return "Close App"
+        case .closeApp: return "OK"
         case .contactSupport: return "Contact Support"
         case .none: return "OK"
         }
@@ -501,8 +501,8 @@ struct ErrorAlertModifier: ViewModifier {
             // Handle force sync
             onAction?()
         case .closeApp:
-            // Close the app (extreme case)
-            exit(0)
+            // iOS apps should not terminate themselves; fall back to external handler.
+            onAction?()
         case .contactSupport:
             handleContactSupport(for: error)
         case .none:
@@ -944,11 +944,11 @@ struct DefaultErrorView: View {
                         .font(.caption)
                         .fontWeight(.semibold)
                     
-                    Text("Type: \(error.category)")
+                    Text(verbatim: "Type: \(String(describing: error.category))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    Text("Severity: \(error.severity)")
+                    Text(verbatim: "Severity: \(String(describing: error.severity))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     

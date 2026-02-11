@@ -61,8 +61,6 @@ class LeaderboardViewModel: ObservableObject {
     }
 
     private func updateCurrentUserRank() {
-        guard let currentUserId = AuthenticationManager().currentUser?.id else { return }
-
         currentUserRank = entries.firstIndex(where: { $0.isCurrentUser })
     }
 

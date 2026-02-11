@@ -10,7 +10,7 @@
 request.setValue(APP_CLIENT_API_KEY, forHTTPHeaderField: "X-App-API-Key")
 ```
 
-The API key `"5380e4b60818cf237678fccfd4b8f767d1c94"` is hardcoded in the app and sent as the `X-App-API-Key` header with every request to the server.
+The API key was previously hardcoded in the app and sent as the `X-App-API-Key` header with every request to the server.
 
 ### Server Side Protection
 **YES**, the server is properly protected against unauthorized access:

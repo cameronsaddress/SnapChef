@@ -9,7 +9,7 @@ import Metal
 
 public final class StillWriter: Sendable {
     private let config: RenderConfig
-    private nonisolated(unsafe) let ciContext: CIContext
+    private let ciContext: CIContext
     private nonisolated(unsafe) var pixelBufferPool: CVPixelBufferPool?
     private let memoryOptimizer = MemoryOptimizer.shared
 
@@ -19,7 +19,7 @@ public final class StillWriter: Sendable {
     private nonisolated(unsafe) var parallaxFrames: [CGPoint] = []
 
     // SPEED OPTIMIZATION: Metal acceleration and caching
-    private nonisolated(unsafe) let metalContext: CIContext?
+    private let metalContext: CIContext?
     private nonisolated(unsafe) let effectCache = NSCache<NSString, CIImage>()
 
     public init(config: RenderConfig) {
@@ -154,15 +154,8 @@ public final class StillWriter: Sendable {
 
         // PREMIUM: Subtle Ken Burns + Enhanced Parallax effects (5-8% zoom)
         let totalFrames = max(1, Int(duration.seconds * Double(config.fps)))
-        let maxScale = min(config.maxKenBurnsScale, 1.08) // Cap at 8% for subtle movement
-        let breatheIntensity = config.breatheIntensity
-        let parallaxIntensity = config.parallaxIntensity
         var t: Double = 0
         let dt = 1.0 / Double(config.fps)
-
-        // Beat timing for breathe effect (assuming 80 BPM default)
-        let beatDuration = 60.0 / config.fallbackBPM
-        let breatheFreq = 1.0 / beatDuration
 
         // Log memory usage at start
         memoryOptimizer.logMemoryProfile(phase: "StillWriter start")
@@ -307,8 +300,8 @@ public final class StillWriter: Sendable {
             )
 
             // SPEED OPTIMIZATION: Apply filters efficiently with caching
-            img = autoreleasepool {
-                try! applyFiltersEfficiently(to: img, filters: filters, specs: specs, frame: frame, totalFrames: totalFrames)
+            img = try autoreleasepool {
+                try applyFiltersEfficiently(to: img, filters: filters, specs: specs, frame: frame, totalFrames: totalFrames)
             }
 
             // SPEED OPTIMIZATION: Render with Metal acceleration if available
@@ -362,21 +355,14 @@ public final class StillWriter: Sendable {
         input.markAsFinished()
         await progressCallback(1.0)
 
-        // CRITICAL FIX: Proper completion handling with memory cleanup
-        await withCheckedContinuation { continuation in
-            writer.finishWriting { [weak self] in
-                autoreleasepool {
-                    if writer.status == .failed {
-                        print("❌ AVAssetWriter failed with error: \(writer.error?.localizedDescription ?? "Unknown")")
-                    } else if writer.status == .completed {
-                        print("✅ StillWriter successfully created video at: \(out.path)")
-                    }
-                    
-                    // Force cleanup after completion
-                    self?.memoryOptimizer.forceMemoryCleanup()
-                    continuation.resume()
-                }
+        await writer.finishWriting()
+        autoreleasepool {
+            if writer.status == .failed {
+                print("❌ AVAssetWriter failed with error: \(writer.error?.localizedDescription ?? "Unknown")")
+            } else if writer.status == .completed {
+                print("✅ StillWriter successfully created video at: \(out.path)")
             }
+            memoryOptimizer.forceMemoryCleanup()
         }
 
         guard writer.status == .completed else {

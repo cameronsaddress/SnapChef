@@ -64,19 +64,19 @@ class ChallengeAnalyticsService: ObservableObject {
 
     /// Track an analytics event
     func trackEvent(_ event: AnalyticsEvent, parameters: [String: Any] = [:]) {
-        analyticsQueue.async { [weak self] in
-            guard let self = self else { return }
+        // Convert to Sendable payload before entering async queue closure.
+        let sendableParameters: [String: String] = Dictionary(uniqueKeysWithValues: parameters.compactMap { key, value in
+            let stringValue: String
+            if let str = value as? String { stringValue = str }
+            else if let int = value as? Int { stringValue = String(int) }
+            else if let double = value as? Double { stringValue = String(double) }
+            else if let bool = value as? Bool { stringValue = String(bool) }
+            else { stringValue = String(describing: value) }
+            return (key, stringValue)
+        })
 
-            // Create sendable copy of parameters to avoid capture issues
-            let sendableParameters: [String: String] = Dictionary(uniqueKeysWithValues: parameters.compactMap { key, value in
-                let stringValue: String
-                if let str = value as? String { stringValue = str }
-                else if let int = value as? Int { stringValue = String(int) }
-                else if let double = value as? Double { stringValue = String(double) }
-                else if let bool = value as? Bool { stringValue = String(bool) }
-                else { stringValue = String(describing: value) }
-                return (key, stringValue)
-            })
+        analyticsQueue.async { [weak self, event, sendableParameters] in
+            guard let self else { return }
 
             let eventData = AnalyticsEventData(
                 event: event,

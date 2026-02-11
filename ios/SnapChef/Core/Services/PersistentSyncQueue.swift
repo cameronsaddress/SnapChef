@@ -27,7 +27,7 @@ class PersistentSyncQueue {
         // Check if this operation already exists
         if let index = operations.firstIndex(where: { $0.operation.recipeId == operation.recipeId }) {
             // Update retry count
-            var existingOp = operations[index]
+            let existingOp = operations[index]
             let newRetryCount = existingOp.retryCount + 1
             
             // If exceeded max retries, remove it

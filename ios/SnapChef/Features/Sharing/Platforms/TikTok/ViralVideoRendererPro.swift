@@ -29,11 +29,14 @@ struct PIPInstruction {
 // MARK: - Meta Container Instruction
 
 final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionProtocol {
-    var timeRange: CMTimeRange
-    var enablePostProcessing: Bool = false
-    var containsTweening: Bool = true
-    var requiredSourceTrackIDs: [NSValue]?
-    var passthroughTrackID: CMPersistentTrackID = kCMPersistentTrackID_Invalid
+    let timeRange: CMTimeRange
+    let enablePostProcessing: Bool = false
+    let containsTweening: Bool = true
+    private let sourceTrackIDs: [CMPersistentTrackID]
+    var requiredSourceTrackIDs: [NSValue]? {
+        sourceTrackIDs.map { NSValue(nonretainedObject: NSNumber(value: $0)) }
+    }
+    let passthroughTrackID: CMPersistentTrackID = kCMPersistentTrackID_Invalid
 
     let videoInstructions: [VideoInstruction]
     let pipTrackID: CMPersistentTrackID?
@@ -45,7 +48,7 @@ final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionPro
         self.timeRange = timeRange
         self.videoInstructions = videoInstructions
         self.pipTrackID = pipTrackID
-        self.requiredSourceTrackIDs = trackIDs.map { NSValue(nonretainedObject: NSNumber(value: $0)) }
+        self.sourceTrackIDs = trackIDs
         super.init()
     }
 }
@@ -54,7 +57,7 @@ final class MetaContainerInstruction: NSObject, AVVideoCompositionInstructionPro
 
 @objc final class CIFilterCompositor: NSObject, AVVideoCompositing, Sendable {
     // CRITICAL FIX: Remove force unwraps to prevent EXC_BREAKPOINT crashes
-    nonisolated(unsafe) private let ciContext: CIContext = {
+    private let ciContext: CIContext = {
         let sRGBColorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
         return CIContext(options: [
             .workingColorSpace: sRGBColorSpace,
@@ -499,25 +502,7 @@ public final class ViralVideoRendererPro: Sendable {
         print("[ViralVideoRendererPro] \(Date()): Starting export session...")
         let exportStartTime = Date()
 
-        // Add progress monitoring
-        let progressTask = Task { @Sendable in
-            while exportSession.status == .exporting {
-                let progress = exportSession.progress
-                let elapsed = Date().timeIntervalSince(exportStartTime)
-                print("[ViralVideoRendererPro] \(Date()): Export progress: \(progress * 100)% (\(elapsed)s elapsed)")
-
-                if elapsed > 120 { // 2 minute timeout
-                    print("[ViralVideoRendererPro] \(Date()): ERROR - Export timeout after \(elapsed)s")
-                    exportSession.cancelExport()
-                    break
-                }
-
-                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-            }
-        }
-
         await exportSession.export()
-        progressTask.cancel()
 
         let exportEndTime = Date()
         let exportDuration = exportEndTime.timeIntervalSince(exportStartTime)

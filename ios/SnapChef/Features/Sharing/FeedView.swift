@@ -106,11 +106,17 @@ struct FeedView: View {
             await userStatsTask
         }
         .refreshable {
-            // Pull to refresh
+            // Pull to refresh - get latest data
             await refreshUserStats()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Refresh when app becomes active
+            Task {
+                await refreshUserStats()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.userProfileUpdated)) { notification in
+            // Refresh when a user profile is updated
             Task {
                 await refreshUserStats()
             }
@@ -533,6 +539,11 @@ struct ChallengeQuickCard: View {
         }
         .buttonStyle(PlainButtonStyle())
     }
+}
+
+// MARK: - Notification Names
+extension Notification.Name {
+    static let userProfileUpdated = Notification.Name("userProfileUpdated")
 }
 
 #Preview {
