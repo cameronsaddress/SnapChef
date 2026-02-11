@@ -3,6 +3,7 @@ import CloudKit
 import SwiftUI
 import Combine
 import UIKit
+import AuthenticationServices
 
 /// Unified CloudKit Service that consolidates all CloudKit operations
 /// Replaces: CloudKitManager, CloudKitAuthManager, CloudKitRecipeManager, 
@@ -16,10 +17,22 @@ final class CloudKitService: ObservableObject {
         return instance
     }()
     
+    private static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+        NSClassFromString("XCTestCase") != nil
+    }
+
     // MARK: - Core Properties
-    private let container: CKContainer
-    private let publicDatabase: CKDatabase
-    private let privateDatabase: CKDatabase
+    private lazy var container: CKContainer = {
+        CKContainer(identifier: CloudKitConfig.containerIdentifier)
+    }()
+    private lazy var publicDatabase: CKDatabase = {
+        container.publicCloudDatabase
+    }()
+    private lazy var privateDatabase: CKDatabase = {
+        container.privateCloudDatabase
+    }()
+    let cloudKitActor = CloudKitActor()
     
     // MARK: - Service Modules
     private var authModule: AuthModule!
@@ -36,15 +49,16 @@ final class CloudKitService: ObservableObject {
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
     @Published var syncError: Error?
+    @Published var userSavedRecipeIDs: Set<String> = []
+    @Published var userCreatedRecipeIDs: Set<String> = []
+    @Published var userFavoritedRecipeIDs: Set<String> = []
     
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Initialization
     private init() {
-        self.container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
-        self.publicDatabase = container.publicCloudDatabase
-        self.privateDatabase = container.privateCloudDatabase
+        guard !Self.isRunningTests else { return }
         
         // Initialize modules
         self.authModule = AuthModule(container: container, publicDB: publicDatabase, privateDB: privateDatabase, parent: self)
@@ -55,7 +69,35 @@ final class CloudKitService: ObservableObject {
         self.streakModule = StreakModule(container: container, publicDB: publicDatabase, privateDB: privateDatabase, parent: self)
         self.syncModule = SyncModule(container: container, publicDB: publicDatabase, privateDB: privateDatabase, parent: self)
         
-        setupInitialConfiguration()
+        setupModuleBindings()
+        if CloudKitRuntimeSupport.hasCloudKitEntitlement {
+            setupInitialConfiguration()
+        } else {
+            print("⚠️ CloudKitService startup configuration skipped: missing iCloud CloudKit entitlement")
+        }
+    }
+    
+    private func setupModuleBindings() {
+        recipeModule.$userSavedRecipeIDs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] ids in
+                self?.userSavedRecipeIDs = ids
+            }
+            .store(in: &cancellables)
+        
+        recipeModule.$userCreatedRecipeIDs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] ids in
+                self?.userCreatedRecipeIDs = ids
+            }
+            .store(in: &cancellables)
+        
+        recipeModule.$userFavoritedRecipeIDs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] ids in
+                self?.userFavoritedRecipeIDs = ids
+            }
+            .store(in: &cancellables)
     }
     
     private func setupInitialConfiguration() {
@@ -188,6 +230,14 @@ extension CloudKitService {
         return try await recipeModule.fetchRecipe(by: recipeID)
     }
     
+    func recipeExists(with recipeID: String) async -> Bool {
+        return await recipeModule.recipeExists(with: recipeID)
+    }
+    
+    func existingRecipeID(name: String, description: String) async -> String? {
+        return await recipeModule.existingRecipeID(name: name, description: description)
+    }
+    
     func fetchRecipes(by recipeIDs: [String]) async throws -> [Recipe] {
         return try await recipeModule.fetchRecipes(by: recipeIDs)
     }
@@ -219,6 +269,10 @@ extension CloudKitService {
     
     func getUserFavoritedRecipes() async throws -> [Recipe] {
         return try await recipeModule.getUserFavoritedRecipes()
+    }
+    
+    func loadUserRecipeReferences() async {
+        recipeModule.loadUserRecipeReferences()
     }
     
     // Recipe search and sharing
@@ -304,6 +358,7 @@ extension CloudKitService {
     }
     
     func syncChallenges() async {
+        await syncModule.syncChallenges()
         await challengeModule.syncChallenges()
     }
     
@@ -435,7 +490,15 @@ extension CloudKitService {
         try await syncModule.likeRecipe(recipeID, recipeOwnerID: recipeOwnerID)
     }
     
+    func likeRecipe(recipeID: String) async throws {
+        try await syncModule.likeRecipe(recipeID)
+    }
+    
     func unlikeRecipe(_ recipeID: String) async throws {
+        try await syncModule.unlikeRecipe(recipeID)
+    }
+    
+    func unlikeRecipe(recipeID: String) async throws {
         try await syncModule.unlikeRecipe(recipeID)
     }
     
@@ -445,6 +508,23 @@ extension CloudKitService {
     
     func getRecipeLikeCount(_ recipeID: String) async throws -> Int {
         return try await syncModule.getRecipeLikeCount(recipeID)
+    }
+    
+    func getLikeCount(for recipeID: String) async -> Int {
+        return (try? await syncModule.getRecipeLikeCount(recipeID)) ?? 0
+    }
+    
+    func fetchUserLikedRecipes() async -> [String] {
+        return (try? await syncModule.fetchUserLikedRecipeIDs()) ?? []
+    }
+    
+    func batchFetchLikeCounts(for recipeIDs: [String]) async -> [String: Int] {
+        var counts: [String: Int] = [:]
+        for recipeID in recipeIDs {
+            counts[recipeID] = (try? await syncModule.getRecipeLikeCount(recipeID)) ?? 0
+        }
+        
+        return counts
     }
     
     /// Syncs the like count for a recipe by counting RecipeLike records
@@ -483,8 +563,28 @@ extension CloudKitService {
         try await syncModule.deleteComment(commentID)
     }
     
+    func likeComment(_ commentID: String) async throws {
+        try await syncModule.likeComment(commentID)
+    }
+    
+    func unlikeComment(_ commentID: String) async throws {
+        try await syncModule.unlikeComment(commentID)
+    }
+    
+    func isCommentLiked(_ commentID: String) async throws -> Bool {
+        return try await syncModule.isCommentLiked(commentID)
+    }
+    
     func triggerChallengeSync() async {
         await syncModule.triggerChallengeSync()
+    }
+    
+    func syncUserProgress() async {
+        await syncModule.syncUserProgress()
+    }
+    
+    func fetchSocialRecipeFeed(lastDate: Date? = nil, limit: Int = 20) async throws -> [SocialRecipeCard] {
+        return try await syncModule.fetchSocialRecipeFeed(lastDate: lastDate, limit: limit)
     }
     
     func submitChallengeProof(challengeID: String, proofImage: UIImage, notes: String? = nil) async throws {
@@ -544,18 +644,6 @@ extension CloudKitService {
     
     var cachedRecipes: [String: Recipe] {
         recipeModule.cachedRecipes
-    }
-    
-    var userSavedRecipeIDs: Set<String> {
-        recipeModule.userSavedRecipeIDs
-    }
-    
-    var userCreatedRecipeIDs: Set<String> {
-        recipeModule.userCreatedRecipeIDs
-    }
-    
-    var userFavoritedRecipeIDs: Set<String> {
-        recipeModule.userFavoritedRecipeIDs
     }
     
     var activeChallenges: [Challenge] {

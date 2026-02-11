@@ -44,6 +44,8 @@ struct ActivityItem: Identifiable {
         case challengeCompleted
         case challengeShared  // When user shares a challenge
         case badgeEarned
+        case profileUpdated  // Profile changes (username/photo)
+        case profilePhotoUpdated  // Profile photo changes
 
         var icon: String {
             switch self {
@@ -54,6 +56,7 @@ struct ActivityItem: Identifiable {
             case .challengeCompleted: return "checkmark.circle.fill"
             case .challengeShared: return "square.and.arrow.up.circle.fill"
             case .badgeEarned: return "medal.fill"
+            case .profileUpdated, .profilePhotoUpdated: return "person.crop.circle.badge.checkmark"
             }
         }
 
@@ -66,6 +69,7 @@ struct ActivityItem: Identifiable {
             case .challengeCompleted: return Color(hex: "#ffd93d")
             case .challengeShared: return Color(hex: "#9b59b6")
             case .badgeEarned: return Color(hex: "#ff6b6b")
+            case .profileUpdated, .profilePhotoUpdated: return Color(hex: "#667eea")
             }
         }
     }
@@ -147,6 +151,10 @@ struct ActivityItem: Identifiable {
             }
         case .badgeEarned:
             text += AttributedString(" earned a new badge!")
+        case .profileUpdated:
+            text += AttributedString(" updated their profile")
+        case .profilePhotoUpdated:
+            text += AttributedString(" updated their profile photo")
         }
 
         return text
@@ -317,11 +325,6 @@ struct ActivityFeedView: View {
             
             print("🔍 DEBUG: ActivityFeedView appeared - End")
         }
-        .task {
-            print("🔍 DEBUG: ActivityFeedView task starting")
-            await feedManager.loadInitialActivities()
-            print("🔍 DEBUG: ActivityFeedView task completed")
-        }
         .sheet(item: $sheetRecipe) { identifiableRecipe in
             NavigationStack {
                 RecipeDetailView(recipe: identifiableRecipe.recipe)
@@ -443,6 +446,10 @@ struct ActivityFeedView: View {
             // Show badge detail
             print("🏅 Badge activity tapped - badge detail view not implemented")
             break
+        case .profileUpdated, .profilePhotoUpdated:
+            // Profile update activities are just for cache refresh, not interactive
+            print("👤 Profile update activity - cache refresh only")
+            break
         }
     }
     
@@ -487,7 +494,7 @@ struct ActivityFeedView: View {
             
             do {
                 // Fetch from CloudKit (this call is already async)
-                let recipe = try await CloudKitRecipeManager.shared.fetchRecipe(by: recipeID)
+                let recipe = try await CloudKitService.shared.fetchRecipe(by: recipeID)
                 print("✅ CLOUDKIT FETCH SUCCESS: \(recipe.name)")
                 
                 print("🔍 CloudKit recipe data verification:")
@@ -617,12 +624,24 @@ struct ActivityItemView: View {
         HStack(spacing: 16) {
             // User Avatar with profile photo
             ZStack {
-                UserAvatarView(
-                    userID: activity.userID,
-                    username: activity.userName,
-                    displayName: activity.userName,
-                    size: 50
-                )
+                if let userPhoto = activity.userPhoto {
+                    Image(uiImage: userPhoto)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 50, height: 50)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                        )
+                } else {
+                    UserAvatarView(
+                        userID: activity.userID,
+                        username: activity.userName,
+                        displayName: activity.userName,
+                        size: 50
+                    )
+                }
 
                 // Activity Type Icon
                 Circle()
@@ -734,6 +753,12 @@ struct EmptyActivityView: View {
 class ActivityFeedManager: ObservableObject {
     // SINGLETON: Shared instance for background preloading
     static let shared = ActivityFeedManager()
+
+    private struct ImageCacheEntry {
+        let image: UIImage
+        let createdAt: Date
+        var lastAccessedAt: Date
+    }
     
     @Published var activities: [ActivityItem] = []
     
@@ -754,12 +779,27 @@ class ActivityFeedManager: ObservableObject {
     private var isRefreshing = false
 
     // Lazy initialization to prevent crashes
-    private var cloudKitSync: CloudKitSyncService {
-        CloudKitSyncService.shared
+    private var cloudKitSync: CloudKitService {
+        CloudKitService.shared
     }
     private var lastFetchedRecord: CKRecord?
     // PHASE 5: Enhanced user cache with TTL
     private var userCache: [String: (user: CloudKitUser, timestamp: Date)] = [:] // Cache with timestamps
+    private var profilePhotoCache: [String: ImageCacheEntry] = [:]
+    private var recipeImageCache: [String: ImageCacheEntry] = [:]
+    private var missingRecipeImageIDs: [String: Date] = [:]
+    private var profilePhotoCacheHits = 0
+    private var profilePhotoCacheMisses = 0
+    private var recipeImageCacheHits = 0
+    private var recipeImageCacheMisses = 0
+    private var lastCacheTelemetryAt = Date.distantPast
+    private let cacheTelemetryInterval: TimeInterval = 120
+    private let profileImageCacheTTL: TimeInterval = 6 * 60 * 60
+    private let recipeImageCacheTTL: TimeInterval = 24 * 60 * 60
+    private let missingRecipeImageTTL: TimeInterval = 4 * 60 * 60
+    private let profileImageCacheMaxEntries = 80
+    private let recipeImageCacheMaxEntries = 120
+    private let missingRecipeImageMaxEntries = 200
     private let userCacheTTL: TimeInterval = Double.greatestFiniteMagnitude // Never expire - keep user data forever
     // PHASE 7: Memory management
     private let maxCacheSize = 100 // Maximum number of cached users
@@ -811,6 +851,8 @@ class ActivityFeedManager: ObservableObject {
             print("🔍 DEBUG: Setting isLoading = false")
             isLoading = false
         }
+
+        emitImageCacheTelemetryIfNeeded(force: true)
         
         print("🔍 DEBUG: loadInitialActivities completed with \(activities.count) activities")
     }
@@ -843,6 +885,7 @@ class ActivityFeedManager: ObservableObject {
         // Always fetch only newest activities
         print("🔄 Refresh: fetching newest activities only")
         await fetchNewestActivitiesOnly()
+        emitImageCacheTelemetryIfNeeded(force: true)
     }
     
     // Check if we need to fetch new activities
@@ -1225,7 +1268,7 @@ class ActivityFeedManager: ObservableObject {
         let followingQuery = CKQuery(recordType: "Follow", predicate: followingPredicate)
         
         // Use CloudKitActor for safe query execution
-        let cloudKitSync = CloudKitSyncService.shared
+        let cloudKitSync = CloudKitService.shared
         let followRecords = try await cloudKitSync.cloudKitActor.executeQuery(
             followingQuery, 
             desiredKeys: ["followingID"], // Only fetch the ID field we need
@@ -1256,8 +1299,8 @@ class ActivityFeedManager: ObservableObject {
         var followedUserIDs: [String] = []
         
         do {
-            // Use CloudKitSyncService's actor instead of direct database access
-            let cloudKitSync = CloudKitSyncService.shared
+            // Use CloudKitService's actor instead of direct database access
+            let cloudKitSync = CloudKitService.shared
             let followRecords = try await cloudKitSync.cloudKitActor.executeQuery(followingQuery)
             
             for record in followRecords {
@@ -1363,7 +1406,7 @@ class ActivityFeedManager: ObservableObject {
         let recordIDs = validUserIDs.map { CKRecord.ID(recordName: "user_\($0)") }
         
         // Use CloudKitActor for safe batch fetch
-        let cloudKitSync = CloudKitSyncService.shared
+        let cloudKitSync = CloudKitService.shared
         
         for recordID in recordIDs {
             do {
@@ -1434,6 +1477,10 @@ class ActivityFeedManager: ObservableObject {
             activities = Array(activities.prefix(30))
             print("🧹 PHASE 7: Cleaned up memory - keeping 30 most recent activities")
         }
+        purgeExpiredImageCaches(now: now)
+        trimProfilePhotoCacheIfNeeded()
+        trimRecipeImageCacheIfNeeded()
+        trimMissingRecipeMarkersIfNeeded()
         
         print("📊 PHASE 7: Memory cleanup complete - \(userCache.count) users, \(activities.count) activities")
     }
@@ -1478,7 +1525,7 @@ class ActivityFeedManager: ObservableObject {
             let query = CKQuery(recordType: CloudKitConfig.activityRecordType, predicate: newerPredicate)
             query.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
             
-            let cloudKitSync = CloudKitSyncService.shared
+            let cloudKitSync = CloudKitService.shared
             let newRecords = try await cloudKitSync.cloudKitActor.executeQuery(
                 query,
                 desiredKeys: nil,
@@ -1537,6 +1584,12 @@ class ActivityFeedManager: ObservableObject {
             // For now, we'll leave the user cache as-is since it's already efficient
             print("📊 User cache has \(userCache.count) items")
         }
+
+        let now = Date()
+        purgeExpiredImageCaches(now: now)
+        trimProfilePhotoCacheIfNeeded()
+        trimRecipeImageCacheIfNeeded()
+        trimMissingRecipeMarkersIfNeeded()
     }
     
     /// Reset singleton for testing or logout
@@ -1553,6 +1606,14 @@ class ActivityFeedManager: ObservableObject {
         
         activities.removeAll()
         userCache.removeAll()
+        profilePhotoCache.removeAll()
+        recipeImageCache.removeAll()
+        missingRecipeImageIDs.removeAll()
+        profilePhotoCacheHits = 0
+        profilePhotoCacheMisses = 0
+        recipeImageCacheHits = 0
+        recipeImageCacheMisses = 0
+        lastCacheTelemetryAt = .distantPast
         lastFetchedRecord = nil
         hasMore = true
         isLoading = false
@@ -1608,6 +1669,218 @@ class ActivityFeedManager: ObservableObject {
         }
     }
 
+    private func imageFromAsset(_ asset: CKAsset?) async -> UIImage? {
+        guard let fileURL = asset?.fileURL else { return nil }
+        return await Task.detached(priority: .utility) {
+            guard let data = try? Data(contentsOf: fileURL) else { return nil }
+            return UIImage(data: data)
+        }.value
+    }
+
+    private func profilePhotoFromCache(userID: String, now: Date = Date()) -> UIImage? {
+        guard var entry = profilePhotoCache[userID] else { return nil }
+        if now.timeIntervalSince(entry.createdAt) > profileImageCacheTTL {
+            profilePhotoCache.removeValue(forKey: userID)
+            return nil
+        }
+        entry.lastAccessedAt = now
+        profilePhotoCache[userID] = entry
+        return entry.image
+    }
+
+    private func saveProfilePhotoToCache(_ image: UIImage, userID: String, now: Date = Date()) {
+        profilePhotoCache[userID] = ImageCacheEntry(image: image, createdAt: now, lastAccessedAt: now)
+        trimProfilePhotoCacheIfNeeded()
+    }
+
+    private func recipeImageFromCache(recipeID: String, now: Date = Date()) -> UIImage? {
+        guard var entry = recipeImageCache[recipeID] else { return nil }
+        if now.timeIntervalSince(entry.createdAt) > recipeImageCacheTTL {
+            recipeImageCache.removeValue(forKey: recipeID)
+            return nil
+        }
+        entry.lastAccessedAt = now
+        recipeImageCache[recipeID] = entry
+        return entry.image
+    }
+
+    private func saveRecipeImageToCache(_ image: UIImage, recipeID: String, now: Date = Date()) {
+        recipeImageCache[recipeID] = ImageCacheEntry(image: image, createdAt: now, lastAccessedAt: now)
+        missingRecipeImageIDs.removeValue(forKey: recipeID)
+        trimRecipeImageCacheIfNeeded()
+    }
+
+    private func isRecipeImageMarkedMissing(_ recipeID: String, now: Date = Date()) -> Bool {
+        guard let markedAt = missingRecipeImageIDs[recipeID] else { return false }
+        if now.timeIntervalSince(markedAt) > missingRecipeImageTTL {
+            missingRecipeImageIDs.removeValue(forKey: recipeID)
+            return false
+        }
+        return true
+    }
+
+    private func markRecipeImageMissing(_ recipeID: String, now: Date = Date()) {
+        missingRecipeImageIDs[recipeID] = now
+        trimMissingRecipeMarkersIfNeeded()
+    }
+
+    private func trimProfilePhotoCacheIfNeeded() {
+        guard profilePhotoCache.count > profileImageCacheMaxEntries else { return }
+        let sortedByAccess = profilePhotoCache.sorted { $0.value.lastAccessedAt < $1.value.lastAccessedAt }
+        let removeCount = profilePhotoCache.count - profileImageCacheMaxEntries
+        for (key, _) in sortedByAccess.prefix(removeCount) {
+            profilePhotoCache.removeValue(forKey: key)
+        }
+    }
+
+    private func trimRecipeImageCacheIfNeeded() {
+        guard recipeImageCache.count > recipeImageCacheMaxEntries else { return }
+        let sortedByAccess = recipeImageCache.sorted { $0.value.lastAccessedAt < $1.value.lastAccessedAt }
+        let removeCount = recipeImageCache.count - recipeImageCacheMaxEntries
+        for (key, _) in sortedByAccess.prefix(removeCount) {
+            recipeImageCache.removeValue(forKey: key)
+        }
+    }
+
+    private func trimMissingRecipeMarkersIfNeeded() {
+        guard missingRecipeImageIDs.count > missingRecipeImageMaxEntries else { return }
+        let sortedByAge = missingRecipeImageIDs.sorted { $0.value < $1.value }
+        let removeCount = missingRecipeImageIDs.count - missingRecipeImageMaxEntries
+        for (key, _) in sortedByAge.prefix(removeCount) {
+            missingRecipeImageIDs.removeValue(forKey: key)
+        }
+    }
+
+    private func purgeExpiredImageCaches(now: Date = Date()) {
+        profilePhotoCache = profilePhotoCache.filter { _, entry in
+            now.timeIntervalSince(entry.createdAt) <= profileImageCacheTTL
+        }
+        recipeImageCache = recipeImageCache.filter { _, entry in
+            now.timeIntervalSince(entry.createdAt) <= recipeImageCacheTTL
+        }
+        missingRecipeImageIDs = missingRecipeImageIDs.filter { _, markedAt in
+            now.timeIntervalSince(markedAt) <= missingRecipeImageTTL
+        }
+    }
+
+    private func fetchUserPhoto(userID: String) async -> UIImage? {
+        if let cached = profilePhotoFromCache(userID: userID) {
+            profilePhotoCacheHits += 1
+            emitImageCacheTelemetryIfNeeded()
+            return cached
+        }
+
+        profilePhotoCacheMisses += 1
+        guard let photo = await ProfilePhotoManager.shared.getProfilePhoto(for: userID) else {
+            emitImageCacheTelemetryIfNeeded()
+            return nil
+        }
+
+        saveProfilePhotoToCache(photo, userID: userID)
+        emitImageCacheTelemetryIfNeeded()
+        return photo
+    }
+
+    private func recipeImageFromRecord(_ record: CKRecord) async -> UIImage? {
+        if let after = await imageFromAsset(record["afterPhotoAsset"] as? CKAsset) {
+            return after
+        }
+        if let before = await imageFromAsset(record["beforePhotoAsset"] as? CKAsset) {
+            return before
+        }
+        return nil
+    }
+
+    private func fetchRecipeImage(recipeID: String, prefetchedRecord: CKRecord?) async -> UIImage? {
+        if let cached = recipeImageFromCache(recipeID: recipeID) {
+            recipeImageCacheHits += 1
+            emitImageCacheTelemetryIfNeeded()
+            return cached
+        }
+
+        if isRecipeImageMarkedMissing(recipeID) {
+            recipeImageCacheMisses += 1
+            emitImageCacheTelemetryIfNeeded()
+            return nil
+        }
+
+        recipeImageCacheMisses += 1
+        if let prefetchedRecord,
+           let image = await recipeImageFromRecord(prefetchedRecord) {
+            saveRecipeImageToCache(image, recipeID: recipeID)
+            emitImageCacheTelemetryIfNeeded()
+            return image
+        }
+
+        do {
+            let photos = try await cloudKitSync.fetchRecipePhotos(for: recipeID)
+            if let image = photos.after ?? photos.before {
+                saveRecipeImageToCache(image, recipeID: recipeID)
+                emitImageCacheTelemetryIfNeeded()
+                return image
+            }
+            markRecipeImageMissing(recipeID)
+            emitImageCacheTelemetryIfNeeded()
+            return nil
+        } catch {
+            print("⚠️ Failed to load recipe image for \(recipeID): \(error)")
+            markRecipeImageMissing(recipeID)
+            emitImageCacheTelemetryIfNeeded()
+            return nil
+        }
+    }
+
+    private func resolveActivityImage(
+        activityType: ActivityItem.ActivityType,
+        recipeID: String?,
+        prefetchedRecipeRecord: CKRecord?,
+        challengeProofImage: UIImage?
+    ) async -> UIImage? {
+        if let challengeProofImage {
+            return challengeProofImage
+        }
+
+        guard let recipeID else { return nil }
+        guard [.recipeShared, .recipeLiked, .recipeComment, .challengeCompleted, .challengeShared]
+            .contains(activityType) else {
+            return nil
+        }
+
+        return await fetchRecipeImage(recipeID: recipeID, prefetchedRecord: prefetchedRecipeRecord)
+    }
+
+    private func emitImageCacheTelemetryIfNeeded(force: Bool = false) {
+        let profileTotal = profilePhotoCacheHits + profilePhotoCacheMisses
+        let recipeTotal = recipeImageCacheHits + recipeImageCacheMisses
+        let combinedTotal = profileTotal + recipeTotal
+
+        guard force || combinedTotal >= 8 else { return }
+
+        let now = Date()
+        guard force || now.timeIntervalSince(lastCacheTelemetryAt) >= cacheTelemetryInterval else {
+            return
+        }
+
+        purgeExpiredImageCaches(now: now)
+        lastCacheTelemetryAt = now
+
+        let profileHitRate = profileTotal == 0 ? 0 : Double(profilePhotoCacheHits) / Double(profileTotal)
+        let recipeHitRate = recipeTotal == 0 ? 0 : Double(recipeImageCacheHits) / Double(recipeTotal)
+
+        AnalyticsManager.shared.logEvent(
+            "activity_feed_image_cache_snapshot",
+            parameters: [
+                "profile_hit_rate": (profileHitRate * 100).rounded() / 100,
+                "recipe_hit_rate": (recipeHitRate * 100).rounded() / 100,
+                "profile_samples": profileTotal,
+                "recipe_samples": recipeTotal,
+                "profile_cache_size": profilePhotoCache.count,
+                "recipe_cache_size": recipeImageCache.count,
+                "recipe_missing_markers": missingRecipeImageIDs.count
+            ]
+        )
+    }
+
     private func mapCloudKitRecordToActivityItem(_ record: CKRecord) async -> ActivityItem? {
         guard let id = record[CKField.Activity.id] as? String,
               let typeString = record[CKField.Activity.type] as? String,
@@ -1634,28 +1907,57 @@ class ActivityFeedManager: ObservableObject {
             activityType = .challengeShared
         case "badgeearned":
             activityType = .badgeEarned
+        case "profileupdated":
+            activityType = .profileUpdated
+        case "profilephotoupdated":
+            activityType = .profilePhotoUpdated
         default:
             activityType = .recipeShared
         }
 
+        // If this is a profile update activity, notify other views to refresh
+        // Don't display profile update activities in the feed
+        if activityType == .profileUpdated || activityType == .profilePhotoUpdated {
+            print("🔄 Profile update activity detected for user \(actorID)")
+            
+            // Clear any local cached data for this user
+            // The fetchUserDisplayName will get fresh data from CloudKit
+            
+            // Notify other views that this user's profile was updated
+            await MainActor.run {
+                NotificationCenter.default.post(
+                    name: .userProfileUpdated,
+                    object: nil,
+                    userInfo: ["userID": actorID]
+                )
+            }
+            
+            // Don't display in feed
+            return nil
+        }
+        
         // Fetch actor (user) details dynamically
         let actorName = await fetchUserDisplayName(userID: actorID)
         // print("🔍 DEBUG: Creating ActivityItem for \(actorID) with name '\(actorName)'")
         
         // Extract optional fields
         let targetUserID = record[CKField.Activity.targetUserID] as? String
+        async let actorPhotoTask = fetchUserPhoto(userID: actorID)
         let targetUserName = targetUserID != nil ? await fetchUserDisplayName(userID: targetUserID!) : nil
         let recipeID = record[CKField.Activity.recipeID] as? String
         let recipeName = record[CKField.Activity.recipeName] as? String
         let challengeName = record[CKField.Activity.challengeName] as? String
         let isReadInt = record[CKField.Activity.isRead] as? Int64 ?? 0
+        var validatedRecipeRecord: CKRecord?
+        var challengeProofImage: UIImage?
 
         // For recipe-related activities, validate that the recipe exists
         // Skip activities that reference non-existent recipes to avoid errors
         if let recipeID = recipeID, [.recipeShared, .recipeLiked, .recipeComment].contains(activityType) {
             do {
                 // Quick check if recipe exists in CloudKit
-                let _ = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
+                let recipeRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
+                validatedRecipeRecord = recipeRecord
                 print("✅ Validated recipe exists for activity: \(id)")
             } catch {
                 if let ckError = error as? CKError, ckError.code == .unknownItem {
@@ -1698,6 +2000,9 @@ class ActivityFeedManager: ObservableObject {
                             print("⚠️ Skipping challenge completion activity \(id) - no proof image found")
                             return nil
                         }
+                        if let proofAsset = userChallengeRecord["proofImage"] as? CKAsset {
+                            challengeProofImage = await imageFromAsset(proofAsset)
+                        }
                         print("✅ Validated challenge completion with proof for activity: \(id)")
                     }
                 } catch {
@@ -1712,18 +2017,25 @@ class ActivityFeedManager: ObservableObject {
 
         // Extract challenge ID if this is a challenge-related activity
         let challengeID = record["challengeID"] as? String
+        let actorPhoto = await actorPhotoTask
+        let activityImage = await resolveActivityImage(
+            activityType: activityType,
+            recipeID: recipeID,
+            prefetchedRecipeRecord: validatedRecipeRecord,
+            challengeProofImage: challengeProofImage
+        )
         
         return ActivityItem(
             id: id,
             type: activityType,
             userID: actorID,
             userName: actorName,
-            userPhoto: nil, // TODO: Implement user photo loading
+            userPhoto: actorPhoto,
             targetUserID: targetUserID,
             targetUserName: targetUserName,
             recipeID: recipeID,
             recipeName: (activityType == .challengeCompleted || activityType == .challengeShared) ? challengeName : recipeName,
-            recipeImage: nil, // TODO: Implement recipe image loading
+            recipeImage: activityImage,
             challengeID: challengeID,
             timestamp: timestamp,
             isRead: isReadInt == 1
@@ -1890,6 +2202,8 @@ extension ActivityItem: Codable {
         case "challengeCompleted": type = .challengeCompleted
         case "challengeShared": type = .challengeShared
         case "badgeEarned": type = .badgeEarned
+        case "profileUpdated": type = .profileUpdated
+        case "profilePhotoUpdated": type = .profilePhotoUpdated
         default: type = .recipeShared
         }
     }
@@ -1918,6 +2232,8 @@ extension ActivityItem: Codable {
         case .challengeCompleted: typeString = "challengeCompleted"
         case .challengeShared: typeString = "challengeShared"
         case .badgeEarned: typeString = "badgeEarned"
+        case .profileUpdated: typeString = "profileUpdated"
+        case .profilePhotoUpdated: typeString = "profilePhotoUpdated"
         }
         try container.encode(typeString, forKey: .type)
     }
@@ -1992,6 +2308,11 @@ struct SkeletonActivityView: View {
             print("🔍 DEBUG: SkeletonActivityView appeared - End")
         }
     }
+}
+
+// MARK: - Notification Names
+extension Notification.Name {
+    static let userProfileUpdated = Notification.Name("userProfileUpdated")
 }
 
 #Preview {

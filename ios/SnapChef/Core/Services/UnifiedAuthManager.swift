@@ -45,9 +45,17 @@ final class UnifiedAuthManager: ObservableObject {
     
     // MARK: - Dependencies
     
-    private let cloudKitContainer = CKContainer(identifier: CloudKitConfig.containerIdentifier)
-    private let cloudKitDatabase = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
-    private let cloudKitActor = CloudKitActor()  // Swift 6 compliant CloudKit operations
+    private static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+        NSClassFromString("XCTestCase") != nil
+    }
+    private lazy var cloudKitContainer: CKContainer = {
+        CKContainer.default()
+    }()
+    private lazy var cloudKitDatabase: CKDatabase = {
+        cloudKitContainer.publicCloudDatabase
+    }()
+    private lazy var cloudKitActor = CloudKitActor()  // Swift 6 compliant CloudKit operations
     internal let profileManager = KeychainProfileManager.shared
     private let tikTokAuthManager = TikTokAuthManager.shared
     
@@ -63,12 +71,19 @@ final class UnifiedAuthManager: ObservableObject {
         }
         
         // Check existing auth status
-        checkAuthStatus()
+        if !Self.isRunningTests {
+            checkAuthStatus()
+        }
     }
     
     // MARK: - Auth Status Management
     
     func checkAuthStatus() {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            print("⚠️ UnifiedAuthManager: CloudKit auth bootstrap skipped (missing entitlement)")
+            return
+        }
+
         // Check CloudKit auth - silently on app launch
         if let storedUserID = UserDefaults.standard.string(forKey: "currentUserRecordID") {
             print("🔍 Found stored CloudKit userRecordID: \(storedUserID)")
@@ -349,73 +364,80 @@ final class UnifiedAuthManager: ObservableObject {
             }
         }
         
-        do {
-            // Try BOTH possible record IDs - with and without prefix
-            let recordIDsToTry = [
-                "user_\(recordID)",  // Standard format
-                recordID             // Just the raw ID
-            ]
-            
-            var recordFound: CKRecord? = nil
-            var usedRecordID: String? = nil
-            
-            for tryID in recordIDsToTry {
-                do {
-                    print("🔍 DEBUG: Trying to fetch record with ID: \(tryID)")
-                    let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: tryID))
-                    recordFound = record
-                    usedRecordID = tryID
-                    print("✅ Found record with ID: \(tryID)")
-                    break
-                } catch {
-                    print("   Record not found with ID: \(tryID)")
-                    continue
+        // STEP 1: Update local state IMMEDIATELY (local-first)
+        print("📱 Updating username locally first: '\(username)'")
+        self.currentUser?.username = username.lowercased()
+        self.currentUser?.displayName = username
+        self.showUsernameSetup = false
+        
+        // Save to UserDefaults for persistence
+        UserDefaults.standard.set(username, forKey: "cached_username_\(recordID)")
+        UserDefaults.standard.set(username, forKey: "cached_displayname_\(recordID)")
+        
+        // Cache will be invalidated when profile update activity is detected
+        
+        // STEP 2: Sync to CloudKit in background (don't block UI)
+        Task.detached(priority: .background) { [weak self] in
+            do {
+                // Try BOTH possible record IDs - with and without prefix
+                let recordIDsToTry = [
+                    "user_\(recordID)",  // Standard format
+                    recordID             // Just the raw ID
+                ]
+                
+                var recordFound: CKRecord? = nil
+                var usedRecordID: String? = nil
+                
+                for tryID in recordIDsToTry {
+                    do {
+                        print("🔍 DEBUG: Trying to fetch record with ID: \(tryID)")
+                        let record = try await self?.cloudKitDatabase.record(for: CKRecord.ID(recordName: tryID))
+                        recordFound = record
+                        usedRecordID = tryID
+                        print("✅ Found record with ID: \(tryID)")
+                        break
+                    } catch {
+                        print("   Record not found with ID: \(tryID)")
+                        continue
+                    }
                 }
+                
+                guard let record = recordFound, let finalRecordID = usedRecordID else {
+                    print("❌ Could not find user record with any ID format")
+                    return
+                }
+                
+                // Debug what's currently in CloudKit before update
+                print("🔍 DEBUG setUsername - BEFORE update (record ID: \(finalRecordID)):")
+                print("   username field: '\(record[CKField.User.username] as? String ?? "nil")'")
+                print("   displayName field: '\(record[CKField.User.displayName] as? String ?? "nil")'")
+                
+                record[CKField.User.username] = username.lowercased()
+                // ALWAYS update displayName to match username - we only use username!
+                record[CKField.User.displayName] = username
+                print("   Setting BOTH username and displayName to '\(username)'")
+                
+                guard let database = await self?.cloudKitDatabase else { return }
+                let savedRecord = try await database.save(record)
+                
+                // Debug what was actually saved
+                print("✅ Successfully saved username '\(username)' to CloudKit record")
+                print("🔍 DEBUG setUsername - AFTER save:")
+                print("   username field: '\(savedRecord[CKField.User.username] as? String ?? "nil")'")
+                print("   displayName field: '\(savedRecord[CKField.User.displayName] as? String ?? "nil")'")
+                
+                // Create an activity to notify other devices
+                if let self = self {
+                    await self.createProfileUpdateActivity()
+                }
+                
+            } catch {
+                print("⚠️ Failed to sync username to CloudKit: \(error)")
+                // Local changes remain, will retry on next app launch
             }
-            
-            guard let record = recordFound, let finalRecordID = usedRecordID else {
-                print("❌ Could not find user record with any ID format")
-                throw UnifiedAuthError.userRecordNotFound
-            }
-            
-            // Debug what's currently in CloudKit before update
-            print("🔍 DEBUG setUsername - BEFORE update (record ID: \(finalRecordID)):")
-            print("   username field: '\(record[CKField.User.username] as? String ?? "nil")'")
-            print("   displayName field: '\(record[CKField.User.displayName] as? String ?? "nil")'")
-            
-            record[CKField.User.username] = username.lowercased()
-            // ALWAYS update displayName to match username - we only use username!
-            record[CKField.User.displayName] = username
-            print("   Setting BOTH username and displayName to '\(username)'")
-            
-            let savedRecord = try await cloudKitDatabase.save(record)
-            
-            // Debug what was actually saved
-            print("✅ Successfully saved username '\(username)' to CloudKit record")
-            print("🔍 DEBUG setUsername - AFTER save:")
-            print("   username field: '\(savedRecord[CKField.User.username] as? String ?? "nil")'")
-            print("   displayName field: '\(savedRecord[CKField.User.displayName] as? String ?? "nil")'")
-            
-            // Update local state - both username and displayName
-            self.currentUser?.username = username.lowercased()
-            self.currentUser?.displayName = username  // Always keep them in sync
-            self.showUsernameSetup = false
-            
-            completeAuthentication()
-        } catch let error as CKError {
-            print("❌ CloudKit error setting username: \(error)")
-            print("   Error code: \(error.code)")
-            print("   Error description: \(error.localizedDescription)")
-            
-            if error.code == .unknownItem {
-                print("❌ User record doesn't exist. May need to create it first.")
-                throw UnifiedAuthError.userRecordNotFound
-            }
-            throw error
-        } catch {
-            print("❌ Unexpected error setting username: \(error)")
-            throw error
         }
+        
+        completeAuthentication()
     }
     
     func checkUsernameAvailability(_ username: String) async throws -> Bool {
@@ -470,39 +492,19 @@ final class UnifiedAuthManager: ObservableObject {
     private func checkProgressiveAuthConditions(for action: AnonymousAction, profile: AnonymousUserProfile) {
         // Only show if not already authenticated and user hasn't opted out
         guard !isAuthenticated && profile.authenticationState == .anonymous else { return }
-        
-        // Progressive thresholds based on engagement
-        let daysSinceFirstUse = Calendar.current.dateComponents([.day], from: profile.firstLaunchDate, to: Date()).day ?? 0
-        
-        let shouldShow = switch action {
-        case .recipeCreated:
-            // Show after 3 recipes or after 7 days with 1 recipe
-            profile.recipesCreatedCount >= 3 || (daysSinceFirstUse >= 7 && profile.recipesCreatedCount >= 1)
-        case .videoGenerated:
-            // Show after 2 videos (viral potential)
-            profile.videosGeneratedCount >= 2
-        case .videoShared:
-            // Show immediately on share (high intent)
-            profile.videosSharedCount >= 1
-        case .socialExplored:
-            // Show after exploring social features twice
-            profile.socialFeaturesExplored >= 2
-        case .challengeViewed:
-            // Show after viewing 2 challenges
-            profile.challengesViewed >= 2
-        case .appOpened:
-            // Show after 5 app opens over 3+ days
-            profile.appOpenCount >= 5 && daysSinceFirstUse >= 3
-        case .recipeViewed:
-            // Don't prompt for just viewing
-            false
-        }
-        
+        let nudgerDecision = AuthNudgerPolicy.decision(for: action, profile: profile)
+
         // Check dismissal cooldown (don't annoy users)
-        if shouldShow && !profile.hasRecentDismissals(within: daysSinceFirstUse < 7 ? 7 : 3) {
+        if nudgerDecision.shouldPrompt && !profile.hasRecentDismissals(within: nudgerDecision.dismissalCooldownDays) {
+            // Drive the canonical progressive auth nudger path.
+            if let triggerContext = AuthNudgerPolicy.triggerContext(for: action) {
+                Task { @MainActor in
+                    await AuthPromptTrigger.shared.triggerPrompt(for: triggerContext)
+                }
+            }
+
             // Set context-aware prompt message
             setupProgressivePromptMessage(for: action, profile: profile)
-            self.shouldShowProgressivePrompt = true
         }
     }
     
@@ -786,6 +788,56 @@ final class UnifiedAuthManager: ObservableObject {
         
         let savedRecord = try await cloudKitDatabase.save(record)
         print("✅ Fixed username for user \(userID): username='\(savedRecord[CKField.User.username] as? String ?? "nil")'")
+    }
+    
+    // MARK: - Profile Update Activity
+    
+    private func createProfileUpdateActivity() async {
+        guard let currentUser = currentUser,
+              let userID = currentUser.recordID else { return }
+        
+        do {
+            // Create a special activity type that triggers cache refresh
+            let activity = CKRecord(recordType: "Activity")
+            activity[CKField.Activity.id] = UUID().uuidString
+            activity[CKField.Activity.type] = "profileUpdated"
+            activity[CKField.Activity.actorID] = userID
+            activity[CKField.Activity.actorName] = currentUser.displayName
+            activity[CKField.Activity.timestamp] = Date()
+            activity[CKField.Activity.isRead] = Int64(0)
+            // Use metadata field for additional info if needed
+            activity[CKField.Activity.metadata] = "{\"action\":\"profileUpdated\"}"
+            
+            _ = try await cloudKitDatabase.save(activity)
+            print("📢 Created profile update activity to notify other devices")
+        } catch {
+            print("⚠️ Failed to create profile update activity: \(error)")
+        }
+    }
+    
+    func notifyProfilePhotoUpdate(for userID: String) async {
+        do {
+            // Create a special activity type that triggers cache refresh
+            let activity = CKRecord(recordType: "Activity")
+            activity[CKField.Activity.id] = UUID().uuidString
+            activity[CKField.Activity.type] = "profilePhotoUpdated"
+            activity[CKField.Activity.actorID] = userID
+            
+            // Get the user's display name if available
+            let actorName = currentUser?.recordID == userID ? 
+                (currentUser?.displayName ?? currentUser?.username ?? "User") : "User"
+            activity[CKField.Activity.actorName] = actorName
+            
+            activity[CKField.Activity.timestamp] = Date()
+            activity[CKField.Activity.isRead] = Int64(0)
+            // Use metadata field for additional info if needed
+            activity[CKField.Activity.metadata] = "{\"action\":\"profilePhotoUpdated\"}"
+            
+            _ = try await cloudKitDatabase.save(activity)
+            print("📢 Created profile photo update activity to notify other devices")
+        } catch {
+            print("⚠️ Failed to create profile photo update activity: \(error)")
+        }
     }
     
     // MARK: - Profile Photo Management
@@ -1955,7 +2007,7 @@ public struct UserStatUpdates: Sendable {
     public var coinBalance: Int?
     public var followerCount: Int?
     public var followingCount: Int?
-    public var experiencePoints: Int?  // Added for CloudKitSyncService compatibility
+    public var experiencePoints: Int?  // Added for legacy CloudKit sync compatibility
     
     public init(totalPoints: Int? = nil,
          currentStreak: Int? = nil,

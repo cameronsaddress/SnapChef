@@ -11,6 +11,11 @@ import Combine
 
 @main
 struct SnapChefApp: App {
+    private static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+        NSClassFromString("XCTestCase") != nil
+    }
+
     // Connect the UIKit AppDelegate for TikTok SDK
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
@@ -19,13 +24,19 @@ struct SnapChefApp: App {
     @StateObject private var authManager = UnifiedAuthManager.shared
     @StateObject private var deviceManager = DeviceManager()
     @StateObject private var gamificationManager = GamificationManager()
+    @StateObject private var authPromptTrigger = AuthPromptTrigger.shared
 
     // Use the shared singleton instances, managed by @StateObject, to ensure
     // SwiftUI observes changes and triggers view updates.
     @StateObject private var socialShareManager = SocialShareManager.shared
-    @StateObject private var cloudKitSyncService = CloudKitSyncService.shared
+    @StateObject private var cloudKitService = CloudKitService.shared
     @StateObject private var cloudKitDataManager = CloudKitDataManager.shared
     @StateObject private var notificationManager = NotificationManager.shared
+    @State private var hasCompletedInitialSetup = false
+
+    private var cloudKitRuntimeEnabled: Bool {
+        CloudKitRuntimeSupport.hasCloudKitEntitlement
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -36,18 +47,25 @@ struct SnapChefApp: App {
                 .environmentObject(deviceManager)
                 .environmentObject(gamificationManager)
                 .environmentObject(socialShareManager)
-                .environmentObject(cloudKitSyncService)
+                .environmentObject(cloudKitService)
                 .environmentObject(cloudKitDataManager)
                 .environmentObject(notificationManager)
 
                 .preferredColorScheme(.dark)
 
                 .onAppear {
+                    guard !Self.isRunningTests else { return }
+                    guard !hasCompletedInitialSetup else { return }
+                    hasCompletedInitialSetup = true
                     setupApp()
                 }
 
                 .onOpenURL { url in
                     handleIncomingURL(url)
+                }
+
+                .sheet(isPresented: $authPromptTrigger.shouldShowPrompt) {
+                    ProgressiveAuthPrompt()
                 }
 
                 // The sheet is now presented using the singleton's property, and
@@ -57,7 +75,7 @@ struct SnapChefApp: App {
                     DeepLinkRecipeView()
                         // These are the instances managed by this App struct.
                         .environmentObject(socialShareManager)
-                        .environmentObject(cloudKitSyncService)
+                        .environmentObject(cloudKitService)
                 }
 
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
@@ -74,13 +92,32 @@ struct SnapChefApp: App {
                     // Memory management will be handled by item count limits, not time-based clearing
                     // Tasks will be properly cancelled in managers
                 }
+                .onChange(of: authManager.isAuthenticated) { isAuthenticated in
+                    guard cloudKitRuntimeEnabled else { return }
+                    guard isAuthenticated else { return }
+                    Task { @MainActor in
+                        socialShareManager.markReferralConversionIfEligible()
+                        await socialShareManager.claimReferrerRewardsIfEligible()
+                        await cloudKitDataManager.ensureSubscriptionsConfigured()
+                    }
+                    Task {
+                        await GrowthRemoteConfig.shared.refreshFromCloudKit()
+                    }
+                }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     Task { @MainActor in
+                        await notificationManager.bootstrapMonthlyScheduleIfAuthorized()
+
                         // Preload fresh data when coming to foreground
-                        if UnifiedAuthManager.shared.isAuthenticated {
+                        if cloudKitRuntimeEnabled, UnifiedAuthManager.shared.isAuthenticated {
+                            await cloudKitDataManager.ensureSubscriptionsConfigured()
                             await ActivityFeedManager.shared.preloadInBackground()
                             await SimpleDiscoverUsersManager.shared.loadUsers(for: .suggested)
+                            await socialShareManager.claimReferrerRewardsIfEligible()
                         }
+                    }
+                    Task {
+                        await GrowthRemoteConfig.shared.refreshFromCloudKit()
                     }
                 }
         }
@@ -93,17 +130,24 @@ struct SnapChefApp: App {
         configureTableView()
         configureWindow()
         configureImageCache()
+        GrowthRemoteConfig.shared.bootstrap()
+        if cloudKitRuntimeEnabled {
+            Task {
+                await GrowthRemoteConfig.shared.refreshFromCloudKit()
+            }
+        }
 
         // Check CloudKit environment (determined by Xcode build configuration)
-        detectCloudKitEnvironment()
+        if cloudKitRuntimeEnabled {
+            detectCloudKitEnvironment()
+        } else {
+            print("⚠️ CloudKit runtime disabled: missing iCloud CloudKit entitlement")
+        }
 
         // Set default LLM provider to Gemini if not already set
         if UserDefaults.standard.object(forKey: "SelectedLLMProvider") == nil {
             UserDefaults.standard.set("gemini", forKey: "SelectedLLMProvider")
         }
-        
-        // ONE-TIME API KEY RESTORATION - Run this once to restore the key, then comment it out
-        // restoreAPIKeyToKeychain() // ✅ API key restored - commented out after successful restoration
         
         // Preload social feed after 2 seconds if authenticated
         // Using shared singleton to ensure data is available to views
@@ -111,7 +155,7 @@ struct SnapChefApp: App {
             try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
             
             // Check authentication status
-            if UnifiedAuthManager.shared.isAuthenticated {
+            if cloudKitRuntimeEnabled, UnifiedAuthManager.shared.isAuthenticated {
                 print("🚀 Starting background social feed preload...")
                 print("   - User authenticated: ✓")
                 print("   - Preloading into shared singleton instance")
@@ -131,7 +175,7 @@ struct SnapChefApp: App {
             try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
             
             // Check authentication status
-            if UnifiedAuthManager.shared.isAuthenticated {
+            if cloudKitRuntimeEnabled, UnifiedAuthManager.shared.isAuthenticated {
                 print("🚀 Starting background discover users preload...")
                 print("   - User authenticated: ✓")
                 print("   - Preloading into shared singleton instance")
@@ -159,22 +203,21 @@ struct SnapChefApp: App {
         NetworkManager.shared.configure()
         deviceManager.checkDeviceStatus()
 
-        // Initialize notification system with comprehensive spam prevention
+        // Initialize notification system without launch-time permission prompt.
         Task {
-            let granted = await notificationManager.requestNotificationPermission()
-            // print("📱 Notification permission granted: \(granted)")
-            
-            if granted {
-                // Setup default notifications (with limits and controls)
-                notificationManager.scheduleDailyStreakReminder()
-                notificationManager.scheduleJoinedChallengeReminders()
-                print("✅ Notification system initialized with spam prevention")
-            }
+            await notificationManager.bootstrapMonthlyScheduleIfAuthorized()
+            print("✅ Notification system bootstrap complete")
         }
 
         Task {
             let sessionID = cloudKitDataManager.startAppSession()
             appState.currentSessionID = sessionID
+
+            guard cloudKitRuntimeEnabled else {
+                print("⚠️ CloudKit runtime disabled - running local-only startup flow")
+                await migrateToLocalFirstStorage()
+                return
+            }
 
             try? await cloudKitDataManager.registerDevice()
             // Removed automatic sync on app launch - only sync when user visits recipe views
@@ -192,6 +235,9 @@ struct SnapChefApp: App {
             
             if UnifiedAuthManager.shared.isAuthenticated {
                 print("✅ Authentication confirmed, proceeding with CloudKit operations")
+                socialShareManager.markReferralConversionIfEligible()
+                await socialShareManager.claimReferrerRewardsIfEligible()
+                await cloudKitDataManager.ensureSubscriptionsConfigured()
             } else {
                 print("⚠️ Authentication not completed after 2 seconds, proceeding anyway")
             }
@@ -229,8 +275,8 @@ struct SnapChefApp: App {
             // LOCAL-FIRST MIGRATION: Migrate existing saved recipes to local storage
             await migrateToLocalFirstStorage()
             
-            // Retry any failed sync operations from last session
-            await PersistentSyncQueue.shared.retryAllFailedOperations()
+            // Retry pending sync operations from last session.
+            await CloudKitSyncEngine.shared.processPendingSync()
         }
     }
 
@@ -284,9 +330,7 @@ struct SnapChefApp: App {
         }
 
         // Otherwise handle as a deep link
-        if socialShareManager.handleIncomingURL(url) {
-            socialShareManager.resolvePendingDeepLink()
-        }
+        _ = socialShareManager.handleIncomingURL(url)
     }
 
     /// Initialize authentication systems
@@ -421,7 +465,7 @@ struct SnapChefApp: App {
 
             // Fetch photos from CloudKit
             do {
-                let photos = try await CloudKitRecipeManager.shared.fetchRecipePhotos(for: recipe.id.uuidString)
+                let photos = try await CloudKitService.shared.fetchRecipePhotos(for: recipe.id.uuidString)
 
                 // Store in PhotoStorageManager if we got any photos
                 if photos.before != nil || photos.after != nil {
@@ -568,8 +612,6 @@ struct SnapChefApp: App {
             print("🔑 Using API key from build configuration")
         } else {
             print("❌ CRITICAL: No API key found in production build")
-            // One-time restoration of API key (remove after first run)
-            restoreAPIKeyToKeychain()
             return
         }
         #endif
@@ -582,10 +624,10 @@ struct SnapChefApp: App {
         
         // Store in Keychain for secure access
         KeychainManager.shared.storeAPIKey(apiKey)
-        print("🔑 API key stored in Keychain: \(apiKey.prefix(10))...")
+        print("🔑 API key stored in Keychain")
         
         // Verify storage
-        if let storedKey = KeychainManager.shared.getAPIKey() {
+        if KeychainManager.shared.getAPIKey() != nil {
             print("✅ API key verification successful")
         } else {
             print("❌ Failed to verify API key storage")
@@ -607,37 +649,12 @@ struct SnapChefApp: App {
         
         return isValid
     }
-    
-    // MARK: - ONE-TIME API KEY RESTORATION
-    // This function restores the API key to the keychain
-    // Run the app once with this function called, then comment out the call in setupApp()
-    private func restoreAPIKeyToKeychain() {
-        // Check if API key already exists
-        if let existingKey = KeychainManager.shared.getAPIKey(), !existingKey.isEmpty {
-            print("✅ API key already exists in keychain")
-            return
-        }
-        
-        // Store the API key in keychain
-        // This is a one-time restoration after the deletion issue
-        // The key will be stored securely in the keychain
-        let apiKey = "5380e4b60818cf237678fccfd4b8f767d1c94"
-        KeychainManager.shared.storeAPIKey(apiKey)
-        print("✅ API key has been restored to keychain")
-        
-        // Verify it was stored correctly
-        if let storedKey = KeychainManager.shared.getAPIKey() {
-            print("✅ Verification: API key successfully stored (length: \(storedKey.count))")
-        } else {
-            print("❌ Error: API key storage verification failed")
-        }
-    }
 }
 
 // MARK: - Deep Link Recipe View
 struct DeepLinkRecipeView: View {
     @EnvironmentObject var socialShareManager: SocialShareManager
-    @EnvironmentObject var cloudKitSync: CloudKitSyncService
+    @EnvironmentObject var cloudKitSync: CloudKitService
     @Environment(\.dismiss) var dismiss
 
     @State private var recipe: Recipe?
@@ -712,7 +729,7 @@ struct DeepLinkRecipeView: View {
         }
 
         do {
-            let (fetchedRecipe, _) = try await cloudKitSync.fetchRecipe(by: recipeID)
+            let fetchedRecipe = try await cloudKitSync.fetchRecipe(by: recipeID)
             recipe = fetchedRecipe
             isLoading = false
         } catch {

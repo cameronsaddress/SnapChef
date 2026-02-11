@@ -40,6 +40,8 @@ struct ProfileView: View {
     @State private var showingRecipes = false
     @State private var showingFavorites = false
     @State private var showingPerformanceSettings = false
+    @State private var showingInviteCenter = false
+    @State private var showingGrowthHub = false
     @State private var contentVisible = false
     @State private var profileImageScale: CGFloat = 0
     @State private var userStats: UserStats?
@@ -82,20 +84,32 @@ struct ProfileView: View {
                     )
                     .staggeredFade(index: 4, isShowing: contentVisible)
 
+                    InviteCenterQuickCard(
+                        referralCode: SocialShareManager.shared.currentReferralCode(),
+                        onTap: {
+                            showingInviteCenter = true
+                        }
+                    )
+                    .staggeredFade(index: 5, isShowing: contentVisible)
+
+                    GrowthHubQuickCard {
+                        showingGrowthHub = true
+                    }
+                    .staggeredFade(index: 6, isShowing: contentVisible)
 
                     // Sign Out Button (only if authenticated)
                     if authManager.isAuthenticated {
                         EnhancedSignOutButton(action: {
                             authManager.signOut()
                         })
-                        .staggeredFade(index: 6, isShowing: contentVisible)
+                        .staggeredFade(index: 7, isShowing: contentVisible)
                         .padding(.top, 10)
                     }
                     
                     // Delete Account Button (shown for all users, including anonymous)
                     // Anonymous users may have local data to delete
                     DeleteAccountButton(authManager: authManager, appState: appState)
-                        .staggeredFade(index: 7, isShowing: contentVisible)
+                        .staggeredFade(index: 8, isShowing: contentVisible)
                         .padding(.top, authManager.isAuthenticated ? 8 : 10)
                 }
                 .padding(.horizontal, 20)
@@ -112,7 +126,7 @@ struct ProfileView: View {
                 do {
                     try await authManager.refreshCurrentUserData()
                     // Load user recipe references for favorites count
-                    await CloudKitRecipeManager.shared.loadUserRecipeReferences()
+                    await CloudKitService.shared.loadUserRecipeReferences()
                 } catch {
                     print("Failed to refresh user data: \(error)")
                 }
@@ -157,6 +171,12 @@ struct ProfileView: View {
                         showingFavorites = false
                     })
             }
+        }
+        .sheet(isPresented: $showingInviteCenter) {
+            InviteCenterView()
+        }
+        .sheet(isPresented: $showingGrowthHub) {
+            GrowthHubView()
         }
     }
     
@@ -213,7 +233,7 @@ struct EnhancedProfileHeader: View {
     @State private var photoSourceType: UIImagePickerController.SourceType = .photoLibrary
     @State private var selectedImage: UIImage?
     // Using UnifiedAuthManager from environment
-    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitService.shared
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var gamificationManager: GamificationManager
     @EnvironmentObject var authManager: UnifiedAuthManager
@@ -1055,6 +1075,787 @@ struct UpgradePrompt: View {
             }
             .foregroundColor(Color(hex: "#f093fb"))
         }
+    }
+}
+
+struct InviteCenterQuickCard: View {
+    let referralCode: String
+    let onTap: () -> Void
+
+    @State private var shimmerPhase: CGFloat = -1
+
+    var body: some View {
+        Button(action: onTap) {
+            GlassmorphicCard(content: {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: "#43e97b").opacity(0.2))
+                            .frame(width: 42, height: 42)
+                        Image(systemName: "person.2.wave.2.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(Color(hex: "#43e97b"))
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Invite Center")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("Code: \(referralCode)")
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.76))
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "arrow.up.right.circle.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(Color(hex: "#38f9d7"))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .overlay(
+                    LinearGradient(
+                        colors: [Color.clear, Color.white.opacity(0.3), Color.clear],
+                        startPoint: UnitPoint(x: shimmerPhase - 0.3, y: 0),
+                        endPoint: UnitPoint(x: shimmerPhase + 0.3, y: 1)
+                    )
+                    .allowsHitTesting(false)
+                )
+            }, glowColor: Color(hex: "#38f9d7"))
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onAppear {
+            withAnimation(.linear(duration: 3.2).repeatForever(autoreverses: false)) {
+                shimmerPhase = 2
+            }
+        }
+    }
+}
+
+struct GrowthHubQuickCard: View {
+    let onTap: () -> Void
+    @State private var pulse = false
+
+    var body: some View {
+        Button(action: onTap) {
+            GlassmorphicCard(content: {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: "#4facfe").opacity(0.2))
+                            .frame(width: 42, height: 42)
+                        Image(systemName: "sparkles.rectangle.stack.fill")
+                            .font(.system(size: 19, weight: .bold))
+                            .foregroundColor(Color(hex: "#4facfe"))
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Growth Hub")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("Virality, retention, and push guardrails")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.74))
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right.circle.fill")
+                        .font(.system(size: 21, weight: .semibold))
+                        .foregroundColor(Color(hex: "#38f9d7"))
+                        .scaleEffect(pulse ? 1.08 : 1.0)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }, glowColor: Color(hex: "#4facfe"))
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            withAnimation(.easeInOut(duration: MotionTuning.seconds(1.3)).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
+    }
+}
+
+struct GrowthHubView: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var socialShareManager = SocialShareManager.shared
+    @StateObject private var notificationManager = NotificationManager.shared
+
+    @State private var inviteSnapshot: SocialShareManager.InviteCenterSnapshot?
+    @State private var notificationAudit: NotificationAuditReport?
+    @State private var growthDiagnostics = GrowthRemoteConfig.shared.diagnostics
+    @State private var isLoading = false
+    @State private var showingInviteCenter = false
+    @State private var showingNotificationSettings = false
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                MagicalBackground()
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 16) {
+                        growthHeroCard
+                        growthSignalsCard
+                        waitingGameCard
+                        growthConfigCard
+                        notificationGuardrailCard
+                        actionsCard
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 34)
+                }
+                .scrollContentBackground(.hidden)
+                .refreshable {
+                    await refreshData()
+                }
+            }
+            .navigationTitle("Growth Hub")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(.white)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        Task { await refreshData() }
+                    } label: {
+                        if isLoading {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+            }
+            .task {
+                await refreshData()
+            }
+            .sheet(isPresented: $showingInviteCenter) {
+                InviteCenterView()
+            }
+            .sheet(isPresented: $showingNotificationSettings) {
+                NotificationSettingsView()
+            }
+        }
+    }
+
+    private var growthHeroCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Studio-Grade Growth Loop")
+                .font(.system(size: 21, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+
+            Text("Every recipe success, challenge win, and share now gets a premium hero moment with anti-spam push guardrails.")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.84))
+                .lineSpacing(2)
+
+            HStack(spacing: 8) {
+                GrowthPill(label: "Recipe Wins", icon: "wand.and.stars", color: Color(hex: "#43e97b"))
+                GrowthPill(label: "Challenge Hype", icon: "trophy.fill", color: Color(hex: "#f6d365"))
+                GrowthPill(label: "Share Velocity", icon: "paperplane.fill", color: Color(hex: "#4facfe"))
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "#667eea").opacity(0.62), Color(hex: "#764ba2").opacity(0.54)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+
+    private var growthSignalsCard: some View {
+        let conversions = inviteSnapshot?.totalConversions ?? 0
+        let pending = inviteSnapshot?.pendingRewards ?? 0
+        let earned = inviteSnapshot?.earnedCoins ?? 0
+
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Growth Signals")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.white)
+
+            HStack(spacing: 10) {
+                InviteMetricTile(title: "Conversions", value: "\(conversions)", tint: Color(hex: "#4facfe"))
+                InviteMetricTile(title: "Pending", value: "\(pending)", tint: Color(hex: "#f6d365"))
+                InviteMetricTile(title: "Coins Earned", value: "\(earned)", tint: Color(hex: "#43e97b"))
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
+        )
+    }
+
+    private var waitingGameCard: some View {
+        let growth = GrowthLoopManager.shared
+        let config = GrowthRemoteConfig.shared
+        let estimated = growth.estimatedRecipeWaitLatency
+        let quickAuto = growth.shouldAutoStartWaitingGame(hasBothPhotos: false)
+        let dualAuto = growth.shouldAutoStartWaitingGame(hasBothPhotos: true)
+        let variant = growth.waitingGameVariant.rawValue.capitalized
+        let experiment = config.experimentGroup.rawValue.capitalized
+
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("LLM Waiting-Game Tuning")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.white)
+
+            Text("Variant: \(variant) • Group: \(experiment) • Estimated latency: \(String(format: "%.1fs", estimated)) • Samples: \(growth.recipeWaitSampleCount)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.8))
+
+            HStack(spacing: 10) {
+                GrowthStatusTile(
+                    title: "Single Photo",
+                    value: quickAuto ? "Auto-start ON" : "Auto-start OFF",
+                    tint: quickAuto ? Color(hex: "#43e97b") : Color(hex: "#f093fb")
+                )
+                GrowthStatusTile(
+                    title: "Dual Photo",
+                    value: dualAuto ? "Auto-start ON" : "Auto-start OFF",
+                    tint: dualAuto ? Color(hex: "#43e97b") : Color(hex: "#f093fb")
+                )
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
+        )
+    }
+
+    private var notificationGuardrailCard: some View {
+        let statusText = notificationAudit?.isHealthy == false ? "Needs Attention" : "Healthy"
+        let statusColor = notificationAudit?.isHealthy == false ? Color.orange : Color(hex: "#43e97b")
+        let nextScheduled = notificationAudit?.items.first?.nextTriggerDate
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Push Guardrails")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.white)
+                Spacer()
+                Text(statusText)
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundColor(statusColor)
+            }
+
+            Text("Policy: max 1 notification per month. Pending: \(notificationAudit?.pendingCount ?? 0) • Queue: \(notificationAudit?.queueCount ?? 0)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.8))
+
+            Text("Next send: \(nextScheduled.map(formatDate) ?? "None")")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.75))
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
+        )
+    }
+
+    private var growthConfigCard: some View {
+        let hasError = growthDiagnostics.lastFetchError?.isEmpty == false
+        let healthText = hasError ? "Fallback" : "Synced"
+        let healthTint = hasError ? Color.orange : Color(hex: "#43e97b")
+        let source = growthDiagnostics.source
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: ":", with: " • ")
+            .capitalized
+        let variantOverride = growthDiagnostics.waitingVariantOverride?.capitalized ?? "None"
+        let lastSuccess = growthDiagnostics.lastSuccessfulFetch.map(formatDate) ?? "Never"
+        let lastAttempt = growthDiagnostics.lastFetchAttempt.map(formatDate) ?? "Never"
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Remote Config Health")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.white)
+                Spacer()
+                Text(healthText)
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundColor(healthTint)
+            }
+
+            HStack(spacing: 10) {
+                GrowthStatusTile(
+                    title: "Experiment",
+                    value: growthDiagnostics.experimentGroup.rawValue.capitalized,
+                    tint: Color(hex: "#4facfe")
+                )
+                GrowthStatusTile(
+                    title: "Variant Override",
+                    value: variantOverride,
+                    tint: Color(hex: "#f093fb")
+                )
+            }
+
+            Text("Source: \(source) • Cached payload: \(growthDiagnostics.hasCachedPayload ? "Yes" : "No")")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.82))
+
+            Text("Last sync: \(lastSuccess) • Last attempt: \(lastAttempt)")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.75))
+
+            if let error = growthDiagnostics.lastFetchError, !error.isEmpty {
+                Text("Latest fetch note: \(error)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Color.orange.opacity(0.92))
+                    .lineLimit(2)
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
+        )
+    }
+
+    private var actionsCard: some View {
+        VStack(spacing: 10) {
+            Button {
+                showingInviteCenter = true
+            } label: {
+                Label("Open Invite Center", systemImage: "person.2.wave.2.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(Color.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showingNotificationSettings = true
+            } label: {
+                Label("Open Notification Controls", systemImage: "bell.badge.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(Color.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
+        )
+    }
+
+    @MainActor
+    private func refreshData() async {
+        isLoading = true
+        await notificationManager.refreshPendingNotifications()
+        async let invite = socialShareManager.fetchInviteCenterSnapshot()
+        async let audit = notificationManager.generateAuditReport()
+        async let growthRefresh: Void = GrowthRemoteConfig.shared.refreshFromCloudKit()
+        let latestInvite = await invite
+        let latestAudit = await audit
+        _ = await growthRefresh
+        let latestGrowth = GrowthRemoteConfig.shared.diagnostics
+
+        withAnimation(.easeOut(duration: MotionTuning.seconds(0.24))) {
+            inviteSnapshot = latestInvite
+            notificationAudit = latestAudit
+            growthDiagnostics = latestGrowth
+        }
+        isLoading = false
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+}
+
+private struct GrowthPill: View {
+    let label: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .bold))
+            Text(label)
+                .font(.system(size: 11, weight: .bold))
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule(style: .continuous)
+                .fill(color.opacity(0.28))
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(color.opacity(0.45), lineWidth: 1)
+                )
+        )
+    }
+}
+
+private struct GrowthStatusTile: View {
+    let title: String
+    let value: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.white.opacity(0.72))
+            Text(value)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(.white)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(tint.opacity(0.22))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(tint.opacity(0.42), lineWidth: 1)
+                )
+        )
+    }
+}
+
+struct InviteCenterView: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var socialShareManager = SocialShareManager.shared
+
+    @State private var snapshot: SocialShareManager.InviteCenterSnapshot?
+    @State private var isLoading = true
+    @State private var isClaiming = false
+    @State private var didCopyCode = false
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                MagicalBackground()
+                    .ignoresSafeArea()
+
+                if isLoading && snapshot == nil {
+                    ProgressView()
+                        .tint(.white)
+                        .scaleEffect(1.1)
+                } else if let snapshot {
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            heroCard(snapshot: snapshot)
+                            metricsCard(snapshot: snapshot)
+                            actionCard(snapshot: snapshot)
+                            attributionCard(snapshot: snapshot)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        .padding(.bottom, 40)
+                    }
+                    .scrollContentBackground(.hidden)
+                    .refreshable {
+                        await refreshSnapshot()
+                    }
+                }
+            }
+            .navigationTitle("Invite Center")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(.white)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        Task { await refreshSnapshot() }
+                    } label: {
+                        if isLoading {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+            }
+            .task {
+                await refreshSnapshot()
+            }
+        }
+    }
+
+    private func heroCard(snapshot: SocialShareManager.InviteCenterSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your Invite Code")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white.opacity(0.78))
+
+            HStack(spacing: 10) {
+                Text(snapshot.referralCode)
+                    .font(.system(size: 30, weight: .heavy, design: .monospaced))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Button {
+                    UIPasteboard.general.string = snapshot.referralCode
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) {
+                        didCopyCode = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            didCopyCode = false
+                        }
+                    }
+                } label: {
+                    Label("Copy", systemImage: didCopyCode ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.white.opacity(0.18), in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text(snapshot.inviteURL.absoluteString)
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.75))
+                .lineLimit(2)
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "#43e97b").opacity(0.65), Color(hex: "#38f9d7").opacity(0.55)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                )
+        )
+    }
+
+    private func metricsCard(snapshot: SocialShareManager.InviteCenterSnapshot) -> some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                InviteMetricTile(title: "Conversions", value: "\(snapshot.totalConversions)", tint: Color(hex: "#4facfe"))
+                InviteMetricTile(title: "Pending", value: "\(snapshot.pendingRewards)", tint: Color(hex: "#f6d365"))
+                InviteMetricTile(title: "Claimed", value: "\(snapshot.claimedRewards)", tint: Color(hex: "#43e97b"))
+            }
+
+            HStack(spacing: 10) {
+                InviteMetricTile(title: "Pending Coins", value: "\(snapshot.pendingCoins)", tint: Color(hex: "#f093fb"))
+                InviteMetricTile(title: "Earned Coins", value: "\(snapshot.earnedCoins)", tint: Color(hex: "#ffd93d"))
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
+        )
+    }
+
+    private func actionCard(snapshot: SocialShareManager.InviteCenterSnapshot) -> some View {
+        VStack(spacing: 12) {
+            ShareLink(
+                item: snapshot.inviteURL,
+                subject: Text("Join me on SnapChef"),
+                message: Text("Turn your fridge into recipes with me.")
+            ) {
+                Label("Share Invite Link", systemImage: "square.and.arrow.up")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                Task { await claimPendingRewards() }
+            } label: {
+                HStack(spacing: 8) {
+                    if isClaiming {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: "gift.fill")
+                    }
+                    Text(snapshot.pendingRewards > 0 ? "Claim \(snapshot.pendingCoins) Coins" : "No Pending Rewards")
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white.opacity(snapshot.pendingRewards > 0 ? 0.18 : 0.08))
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isClaiming || snapshot.pendingRewards == 0 || !snapshot.isAuthenticated)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
+        )
+    }
+
+    private func attributionCard(snapshot: SocialShareManager.InviteCenterSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Attribution Status")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+
+            if let applied = snapshot.inviteeAppliedCode {
+                Text("Current applied invite: \(applied)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.86))
+                Text("Invite link opens tracked: \(snapshot.inviteeOpenCount)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.74))
+            } else {
+                Text("No invite attribution on this device yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.74))
+            }
+
+            if !snapshot.isAuthenticated {
+                Text("Sign in to claim referrer rewards and unlock full referral analytics.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.orange.opacity(0.95))
+            } else if let sourceError = snapshot.sourceError {
+                Text("Cloud sync info: \(sourceError)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.orange.opacity(0.95))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
+        )
+    }
+
+    @MainActor
+    private func refreshSnapshot() async {
+        isLoading = true
+        let latest = await socialShareManager.fetchInviteCenterSnapshot()
+        withAnimation(.easeOut(duration: 0.22)) {
+            snapshot = latest
+        }
+        isLoading = false
+    }
+
+    @MainActor
+    private func claimPendingRewards() async {
+        isClaiming = true
+        await socialShareManager.claimReferrerRewardsIfEligible()
+        await refreshSnapshot()
+        isClaiming = false
+    }
+}
+
+private struct InviteMetricTile: View {
+    let title: String
+    let value: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.white.opacity(0.72))
+            Text(value)
+                .font(.system(size: 22, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+        }
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(tint.opacity(0.2))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(tint.opacity(0.4), lineWidth: 1)
+                )
+        )
     }
 }
 
@@ -2033,7 +2834,7 @@ struct ProviderOptionCard: View {
 struct CollectionProgressView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var authManager: UnifiedAuthManager
-    @StateObject private var cloudKitRecipeManager = CloudKitRecipeManager.shared
+    @StateObject private var cloudKitRecipeManager = CloudKitService.shared
     @StateObject private var cloudKitUserManager = CloudKitUserManager.shared
     @StateObject private var likeManager = RecipeLikeManager.shared
     @State private var animateProgress = false
@@ -2710,7 +3511,7 @@ struct ActiveChallengesSection: View {
             
             // Trigger challenge sync when section is displayed
             Task {
-                await CloudKitSyncService.shared.triggerChallengeSync()
+                await CloudKitService.shared.triggerChallengeSync()
                 // Also sync challenge join status from CloudKit
                 await gamificationManager.syncChallengesFromCloudKit()
             }

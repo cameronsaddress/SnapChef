@@ -12,9 +12,20 @@ final class CloudKitDataManager: ObservableObject {
         return instance
     }()
 
-    private let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-    private let publicDB: CKDatabase
-    private let privateDB: CKDatabase
+    private static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+        NSClassFromString("XCTestCase") != nil
+    }
+
+    private lazy var container: CKContainer = {
+        CKContainer(identifier: "iCloud.com.snapchefapp.app")
+    }()
+    private lazy var publicDB: CKDatabase = {
+        container.publicCloudDatabase
+    }()
+    private lazy var privateDB: CKDatabase = {
+        container.privateCloudDatabase
+    }()
 
     // Published properties for dynamic UI updates
     @Published var isSyncing = false
@@ -24,11 +35,18 @@ final class CloudKitDataManager: ObservableObject {
     // Cache for offline access
     private var dataCache = DataCache()
     private var syncQueue = DispatchQueue(label: "com.snapchef.cloudkit.sync", qos: .background)
+    private let userDefaults = UserDefaults.standard
+    private let subscriptionSetupKeyPrefix = "cloudkit_subscription_setup_v2_"
 
     private init() {
-        self.publicDB = container.publicCloudDatabase
-        self.privateDB = container.privateCloudDatabase
-        setupSubscriptions()
+        guard !Self.isRunningTests else { return }
+        if CloudKitRuntimeSupport.hasCloudKitEntitlement {
+            Task { @MainActor in
+                await ensureSubscriptionsConfigured()
+            }
+        } else {
+            print("⚠️ CloudKitDataManager subscription bootstrap skipped: missing iCloud CloudKit entitlement")
+        }
         // Removed automatic periodic sync - only sync when needed
     }
 
@@ -373,9 +391,47 @@ final class CloudKitDataManager: ObservableObject {
 
     // MARK: - Real-time Subscriptions
 
-    private func setupSubscriptions() {
+    func ensureSubscriptionsConfigured() async {
+        guard let userID = getCurrentUserID(), !userID.isEmpty else {
+            return
+        }
+
+        let setupKey = "\(subscriptionSetupKeyPrefix)\(userID)"
+        if userDefaults.bool(forKey: setupKey) {
+            return
+        }
+
+        let status = await cloudKitAccountStatus()
+        guard status == .available else {
+            print("⏭️ Skipping CloudKit subscription setup - account unavailable (\(status.rawValue))")
+            return
+        }
+
+        let didSucceed = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            setupSubscriptions(for: userID) { success in
+                continuation.resume(returning: success)
+            }
+        }
+
+        if didSucceed {
+            userDefaults.set(true, forKey: setupKey)
+        }
+    }
+
+    private func cloudKitAccountStatus() async -> CKAccountStatus {
+        await withCheckedContinuation { continuation in
+            container.accountStatus { status, error in
+                if let error {
+                    print("⚠️ CloudKit account status check failed: \(error)")
+                }
+                continuation.resume(returning: status)
+            }
+        }
+    }
+
+    private func setupSubscriptions(for userID: String, completion: @escaping @Sendable (Bool) -> Void) {
         // Subscribe to preference changes
-        let preferencePredicate = NSPredicate(format: "userID == %@", getCurrentUserID() ?? "")
+        let preferencePredicate = NSPredicate(format: "userID == %@", userID)
         let preferenceSubscription = CKQuerySubscription(
             recordType: "FoodPreference",
             predicate: preferencePredicate,
@@ -387,14 +443,26 @@ final class CloudKitDataManager: ObservableObject {
         notificationInfo.shouldSendContentAvailable = true
         preferenceSubscription.notificationInfo = notificationInfo
 
+        let privateDatabaseName = privateDB.debugName
         privateDB.save(preferenceSubscription) { subscription, error in
             let logger = CloudKitDebugLogger.shared
             if let error = error {
-                logger.logSubscriptionFailed(subscriptionID: "preference-updates-subscription", recordType: "FoodPreference", database: self.privateDB.debugName, error: error)
+                logger.logSubscriptionFailed(
+                    subscriptionID: "preference-updates-subscription",
+                    recordType: "FoodPreference",
+                    database: privateDatabaseName,
+                    error: error
+                )
                 print("Failed to setup subscription: \(error)")
+                completion(false)
             } else {
-                logger.logSubscriptionCreated(subscriptionID: "preference-updates-subscription", recordType: "FoodPreference", database: self.privateDB.debugName)
+                logger.logSubscriptionCreated(
+                    subscriptionID: "preference-updates-subscription",
+                    recordType: "FoodPreference",
+                    database: privateDatabaseName
+                )
                 print("✅ Subscribed to preference updates")
+                completion(true)
             }
         }
     }

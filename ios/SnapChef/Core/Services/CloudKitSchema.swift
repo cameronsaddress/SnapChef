@@ -267,6 +267,19 @@ struct CloudKitConfig {
     static let userProgressSubscription = "user-progress"
 }
 
+enum CloudKitRuntimeSupport {
+    static var hasCloudKitEntitlement: Bool {
+        #if targetEnvironment(simulator)
+        if ProcessInfo.processInfo.environment["SNAPCHEF_DISABLE_CLOUDKIT_ON_SIMULATOR"] == "1" {
+            return false
+        }
+        return true
+        #else
+        return true
+        #endif
+    }
+}
+
 // MARK: - CloudKit Field Names
 struct CKField {
     // User Fields - EXACT production field names from CloudKit (v4.0 Schema)
