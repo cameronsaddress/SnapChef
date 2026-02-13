@@ -288,16 +288,21 @@ enum CloudKitRuntimeSupport {
         if environment[disableAllEnvKey] == "1" {
             return false
         }
-        #if targetEnvironment(simulator)
+#if targetEnvironment(simulator)
         if environment[disableOnSimulatorEnvKey] == "1" {
             return false
         }
-        // CloudKit can SIGTRAP in simulator/CI builds when the app isn't signed with iCloud entitlements
-        // (e.g. `CODE_SIGNING_ALLOWED=NO`). Keep it disabled by default; opt-in explicitly when needed.
-        return environment[enableOnSimulatorEnvKey] == "1"
-        #else
+        // In Simulator, default to enabled so social/CloudKit features work out of the box.
+        // If you're building without code signing (e.g. `CODE_SIGNING_ALLOWED=NO`) and hit a
+        // CloudKit SIGTRAP, set `SNAPCHEF_DISABLE_CLOUDKIT_ON_SIMULATOR=1`.
+        if environment["XCTestConfigurationFilePath"] != nil || NSClassFromString("XCTestCase") != nil {
+            // Avoid CloudKit during tests unless explicitly enabled for an integration run.
+            return environment[enableOnSimulatorEnvKey] == "1"
+        }
         return true
-        #endif
+#else
+        return true
+#endif
     }
 
     static func makeContainer(identifier: String? = nil) -> CKContainer? {
@@ -323,7 +328,7 @@ enum CloudKitRuntimeSupport {
 
     static var diagnostics: (hasEntitlement: Bool, mode: String) {
         #if targetEnvironment(simulator)
-        let mode = hasCloudKitEntitlement ? "simulator-explicit-enabled" : "simulator-disabled-default"
+        let mode = hasCloudKitEntitlement ? "simulator-enabled" : "simulator-disabled"
         #else
         let mode = "device-entitled"
         #endif

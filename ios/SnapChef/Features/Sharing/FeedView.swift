@@ -8,6 +8,7 @@ struct FeedView: View {
     @State private var showingChallengePopup = false
     @State private var selectedTab: FeedTab = .activity
     @State private var isRefreshing = false
+    @State private var didAutoPresentDiscoverUsers = false
 
     enum FeedTab: String, CaseIterable {
         case activity = "Activity"
@@ -99,6 +100,18 @@ struct FeedView: View {
             print("🔍 DEBUG: FeedView appeared")
         }
         .task {
+            #if DEBUG
+            if !didAutoPresentDiscoverUsers,
+               ProcessInfo.processInfo.arguments.contains("-presentDiscoverChefs") {
+                didAutoPresentDiscoverUsers = true
+                // Present after the first frame so the navigation stack is ready.
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                await MainActor.run {
+                    showingDiscoverUsers = true
+                }
+            }
+            #endif
+
             // Load initial data in parallel
             async let userStatsTask = refreshUserStats()
             

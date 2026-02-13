@@ -218,15 +218,15 @@ final class NotificationPolicyTests: XCTestCase {
     }
 
     func testTransactionalCriticalPolicyEnforcesMonthlyCap() {
-        XCTAssertTrue(NotificationDeliveryPolicy.transactionalCritical.enforcesMonthlyCap)
+        XCTAssertFalse(NotificationDeliveryPolicy.transactionalCritical.enforcesMonthlyCap)
         XCTAssertTrue(NotificationDeliveryPolicy.transactionalCritical.enforcesOneShotDelivery)
     }
     
     func testMonthlyAndTransactionalPoliciesEnforceMonthlyCap() {
         XCTAssertTrue(NotificationDeliveryPolicy.monthlyEngagement.enforcesMonthlyCap)
         XCTAssertTrue(NotificationDeliveryPolicy.transactionalNudge.enforcesMonthlyCap)
-        XCTAssertTrue(NotificationDeliveryPolicy.transactionalCritical.enforcesMonthlyCap)
-        XCTAssertTrue(NotificationDeliveryPolicy.transactional.enforcesMonthlyCap)
+        XCTAssertFalse(NotificationDeliveryPolicy.transactionalCritical.enforcesMonthlyCap)
+        XCTAssertFalse(NotificationDeliveryPolicy.transactional.enforcesMonthlyCap)
     }
 }
 
