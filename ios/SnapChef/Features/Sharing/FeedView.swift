@@ -97,7 +97,9 @@ struct FeedView: View {
                 .environmentObject(appState)
         }
         .onAppear {
+            #if DEBUG
             print("🔍 DEBUG: FeedView appeared")
+            #endif
         }
         .task {
             #if DEBUG
