@@ -875,7 +875,7 @@ struct ChallengeDetailView: View {
             // Sync to CloudKit
             if let userID = authManager.currentUser?.id.uuidString {
                 // Save join status to CloudKit
-                let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
+                guard let container = CloudKitRuntimeSupport.makeContainer() else { return }
                 let database = container.publicCloudDatabase
                 let recordID = CKRecord.ID(recordName: "uc_\(userID)_\(displayChallenge.id)")
                 let record = CKRecord(recordType: CloudKitConfig.userChallengeRecordType, recordID: recordID)
@@ -955,7 +955,9 @@ struct ChallengeDetailView: View {
     }
     
     private func saveToCloudKit(image: UIImage, userID: String) async throws {
-        let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
+        guard let container = CloudKitRuntimeSupport.makeContainer() else {
+            throw SnapChefError.syncError("CloudKit unavailable in this runtime")
+        }
         let database = container.publicCloudDatabase
         
         // Create UserChallenge record

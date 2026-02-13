@@ -117,10 +117,19 @@ struct NotificationSettingsView: View {
                                     .foregroundColor(.secondary)
                                     .lineLimit(1)
                                 HStack(spacing: 8) {
-                                    Text(item.deliveryPolicy == .monthlyEngagement ? "Monthly" : "Transactional")
+                                    Text({
+                                        switch item.deliveryPolicy {
+                                        case .monthlyEngagement:
+                                            return "Monthly"
+                                        case .transactionalNudge:
+                                            return "Capped nudge"
+                                        case .transactionalCritical, .transactional:
+                                            return "Critical"
+                                        }
+                                    }())
                                     Text(item.nextTriggerDate.map(formatDate) ?? "No next trigger")
                                     Text(item.repeats ? "Repeats" : "One-shot")
-                                    Text(item.appearsMonthlyCompliant ? "Monthly window" : "Outside monthly window")
+                                    Text(item.appearsMonthlyCompliant ? "Policy OK" : "Policy drift")
                                 }
                                 .font(.caption2)
                                 .foregroundColor(.secondary)

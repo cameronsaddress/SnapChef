@@ -1,6 +1,41 @@
 import Foundation
 import Security
 
+private let snapChefSupportedAPIKeyNames = ["SNAPCHEF_API_KEY", "APP_API_KEY"]
+
+func snapChefSanitizedConfigurationValue(_ value: String?) -> String? {
+    guard let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+        return nil
+    }
+
+    // Ignore unresolved placeholders like "$(SNAPCHEF_API_KEY)".
+    if raw.contains("$(") {
+        return nil
+    }
+
+    return raw
+}
+
+func snapChefResolvedConfiguredAPIKey() -> (name: String, value: String, source: String)? {
+    #if DEBUG
+    for keyName in snapChefSupportedAPIKeyNames {
+        if let envValue = snapChefSanitizedConfigurationValue(ProcessInfo.processInfo.environment[keyName]) {
+            return (keyName, envValue, "environment variable")
+        }
+    }
+    #endif
+
+    for keyName in snapChefSupportedAPIKeyNames {
+        if let plistValue = snapChefSanitizedConfigurationValue(
+            Bundle.main.object(forInfoDictionaryKey: keyName) as? String
+        ) {
+            return (keyName, plistValue, "Info.plist")
+        }
+    }
+
+    return nil
+}
+
 /// Manages secure storage of sensitive data in the iOS Keychain
 @MainActor
 class KeychainManager {
@@ -13,36 +48,50 @@ class KeychainManager {
     private let tiktokClientSecretIdentifier = "com.snapchef.tiktok.client.secret"
     private let googleClientIdIdentifier = "com.snapchef.google.client.id"
     private let authTokenIdentifier = "com.snapchef.auth.token"
+    private var runtimeFallbackAPIKey: String?
 
     /// Stores the API key in the keychain
-    func storeAPIKey(_ key: String) {
-        // print("🔐 KeychainManager: Storing API key with length \(key.count)")
-        let data = key.data(using: .utf8)!
-        
-        // First delete any existing item to ensure clean state
-        deleteAPIKey()
-        
-        // Now add the new key
-        let addQuery: [String: Any] = [
+    @discardableResult
+    func storeAPIKey(_ key: String) -> Bool {
+        let normalizedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedKey.isEmpty, let data = normalizedKey.data(using: .utf8) else {
+            deleteAPIKey()
+            return false
+        }
+
+        runtimeFallbackAPIKey = normalizedKey
+
+        let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: apiKeyIdentifier,
-            kSecAttrService as String: "com.snapchef.app", // Add service identifier
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            kSecAttrService as String: "com.snapchef.app"
         ]
-        
-        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
-        // print("🔐 KeychainManager: Add status = \(addStatus)")
-        
-        if addStatus == noErr {
-            // print("✅ API key successfully stored in keychain")
-        } else {
-            print("❌ Failed to store API key, error code: \(addStatus)")
+        let updateAttributes: [String: Any] = [
+            kSecValueData as String: data
+        ]
+
+        let updateStatus = SecItemUpdate(baseQuery as CFDictionary, updateAttributes as CFDictionary)
+        switch updateStatus {
+        case noErr:
+            return true
+        case errSecItemNotFound:
+            var addQuery = baseQuery
+            addQuery[kSecValueData as String] = data
+            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+            if addStatus == noErr {
+                return true
+            }
+            print("❌ Failed to store API key in keychain, error code: \(addStatus). Using runtime fallback for this launch.")
+            return false
+        default:
+            print("❌ Failed to update API key in keychain, error code: \(updateStatus). Using runtime fallback for this launch.")
+            return false
         }
     }
 
     /// Retrieves the API key from the keychain
-    func getAPIKey() -> String? {
+    private func getPersistedAPIKey() -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: apiKeyIdentifier,
@@ -59,17 +108,38 @@ class KeychainManager {
         if status == noErr {
             if let data = dataTypeRef as? Data,
                let key = String(data: data, encoding: .utf8) {
-                // print("🔐 KeychainManager: Retrieved API key with length \(key.count)")
                 return key
             }
         }
-        
-        // print("🔐 KeychainManager: No API key found in keychain")
+
+        return nil
+    }
+
+    /// Retrieves the API key, falling back to runtime configuration when keychain is unavailable.
+    func getAPIKey() -> String? {
+        if let persistedKey = getPersistedAPIKey()?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !persistedKey.isEmpty {
+            runtimeFallbackAPIKey = persistedKey
+            return persistedKey
+        }
+
+        if let runtimeFallbackAPIKey,
+           !runtimeFallbackAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return runtimeFallbackAPIKey
+        }
+
+        if let configured = snapChefResolvedConfiguredAPIKey() {
+            runtimeFallbackAPIKey = configured.value
+            return configured.value
+        }
+
         return nil
     }
 
     /// Deletes the API key from the keychain (if needed for testing)
     func deleteAPIKey() {
+        runtimeFallbackAPIKey = nil
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: apiKeyIdentifier,
@@ -94,7 +164,7 @@ class KeychainManager {
             // 2. Server-side configuration fetch
             // 3. Manual configuration in app settings
             print("⚠️ WARNING: No API key found in keychain.")
-            print("📋 Set SNAPCHEF_API_KEY environment variable in Xcode:")
+            print("📋 Set SNAPCHEF_API_KEY (or APP_API_KEY) environment variable in Xcode:")
             print("   Edit Scheme → Run → Arguments → Environment Variables")
         }
     }
@@ -102,12 +172,16 @@ class KeychainManager {
     /// Rotates API key (useful if key is compromised)
     func rotateAPIKey(_ newKey: String) {
         deleteAPIKey()
-        storeAPIKey(newKey)
+        let didPersist = storeAPIKey(newKey)
         
         // Clear any cached network sessions
         URLSession.shared.configuration.urlCache?.removeAllCachedResponses()
         
-        print("🔄 API key rotated successfully")
+        if didPersist {
+            print("🔄 API key rotated successfully")
+        } else {
+            print("⚠️ API key rotation stored for runtime only; keychain persistence unavailable")
+        }
     }
     
     /// Checks if API key appears to be valid format

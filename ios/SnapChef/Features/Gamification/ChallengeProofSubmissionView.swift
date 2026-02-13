@@ -252,7 +252,9 @@ struct ChallengeProofSubmissionView: View {
             throw NSError(domain: "ChallengeProof", code: 1, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
         }
         
-        let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
+        guard let container = CloudKitRuntimeSupport.makeContainer() else {
+            throw SnapChefError.syncError("CloudKit unavailable in this runtime")
+        }
         let database = container.publicCloudDatabase
         
         // Create UserChallenge record

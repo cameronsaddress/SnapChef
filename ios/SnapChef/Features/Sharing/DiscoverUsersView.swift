@@ -67,8 +67,173 @@ class SimpleDiscoverUsersManager: ObservableObject {
     private let cacheTTL: TimeInterval = Double.greatestFiniteMagnitude // Never expire - keep data forever
     private var lastRefreshTime: Date?
     private let minimumRefreshInterval: TimeInterval = 30 // 30 seconds
+    private var currentCategory: DiscoverUsersView.DiscoverCategory = .suggested
+
+    private func fallbackUsers(for category: DiscoverUsersView.DiscoverCategory) -> [UserProfile] {
+        let now = Date()
+
+        let suggested = [
+            UserProfile(id: "local_alex", username: "alexplates", displayName: "Alex Plates", profileImageURL: nil, followerCount: 12400, followingCount: 312, recipesCreated: 186, isVerified: true, isFollowing: false, bio: "Weeknight meals under 20 minutes.", joinedDate: now.addingTimeInterval(-86400 * 320), lastActive: now.addingTimeInterval(-60 * 18), cuisineSpecialty: "Quick Meals", cookingLevel: "Pro", profileImage: nil),
+            UserProfile(id: "local_maya", username: "mayaspice", displayName: "Maya Spice", profileImageURL: nil, followerCount: 9800, followingCount: 220, recipesCreated: 142, isVerified: false, isFollowing: false, bio: "Flavor-heavy, pantry-friendly recipes.", joinedDate: now.addingTimeInterval(-86400 * 240), lastActive: now.addingTimeInterval(-60 * 35), cuisineSpecialty: "Global Fusion", cookingLevel: "Advanced", profileImage: nil),
+            UserProfile(id: "local_ryan", username: "ryanroasts", displayName: "Ryan Roasts", profileImageURL: nil, followerCount: 7600, followingCount: 145, recipesCreated: 97, isVerified: false, isFollowing: false, bio: "Big trays, low effort, huge flavor.", joinedDate: now.addingTimeInterval(-86400 * 180), lastActive: now.addingTimeInterval(-60 * 42), cuisineSpecialty: "Roasting", cookingLevel: "Intermediate", profileImage: nil)
+        ]
+
+        let trending = [
+            UserProfile(id: "local_lena", username: "lenasizzle", displayName: "Lena Sizzle", profileImageURL: nil, followerCount: 22300, followingCount: 410, recipesCreated: 228, isVerified: true, isFollowing: false, bio: "High-protein comfort food.", joinedDate: now.addingTimeInterval(-86400 * 410), lastActive: now.addingTimeInterval(-60 * 7), cuisineSpecialty: "High Protein", cookingLevel: "Pro", profileImage: nil),
+            UserProfile(id: "local_jules", username: "julesbakes", displayName: "Jules Bakes", profileImageURL: nil, followerCount: 17900, followingCount: 298, recipesCreated: 211, isVerified: true, isFollowing: false, bio: "Desserts that actually work at home.", joinedDate: now.addingTimeInterval(-86400 * 510), lastActive: now.addingTimeInterval(-60 * 11), cuisineSpecialty: "Desserts", cookingLevel: "Pro", profileImage: nil),
+            UserProfile(id: "local_kai", username: "kaifirewok", displayName: "Kai Firewok", profileImageURL: nil, followerCount: 15100, followingCount: 260, recipesCreated: 165, isVerified: false, isFollowing: false, bio: "One-pan meals with big crunch.", joinedDate: now.addingTimeInterval(-86400 * 270), lastActive: now.addingTimeInterval(-60 * 26), cuisineSpecialty: "Wok Cooking", cookingLevel: "Advanced", profileImage: nil)
+        ]
+
+        let newChefs = [
+            UserProfile(id: "local_nia", username: "niakitchen", displayName: "Nia Kitchen", profileImageURL: nil, followerCount: 1200, followingCount: 94, recipesCreated: 34, isVerified: false, isFollowing: false, bio: "Fresh takes on family classics.", joinedDate: now.addingTimeInterval(-86400 * 18), lastActive: now.addingTimeInterval(-60 * 9), cuisineSpecialty: "Family Meals", cookingLevel: "Intermediate", profileImage: nil),
+            UserProfile(id: "local_omar", username: "omartastes", displayName: "Omar Tastes", profileImageURL: nil, followerCount: 980, followingCount: 76, recipesCreated: 29, isVerified: false, isFollowing: false, bio: "Street-food flavor at home.", joinedDate: now.addingTimeInterval(-86400 * 11), lastActive: now.addingTimeInterval(-60 * 13), cuisineSpecialty: "Street Food", cookingLevel: "Intermediate", profileImage: nil),
+            UserProfile(id: "local_sam", username: "sammealprep", displayName: "Sam Meal Prep", profileImageURL: nil, followerCount: 860, followingCount: 55, recipesCreated: 26, isVerified: false, isFollowing: false, bio: "Budget meal prep for busy weeks.", joinedDate: now.addingTimeInterval(-86400 * 7), lastActive: now.addingTimeInterval(-60 * 21), cuisineSpecialty: "Meal Prep", cookingLevel: "Beginner", profileImage: nil)
+        ]
+
+        let verified = (suggested + trending).filter(\.isVerified)
+
+        switch category {
+        case .suggested:
+            return suggested
+        case .trending:
+            return trending
+        case .newChefs:
+            return newChefs
+        case .verified:
+            return verified
+        }
+    }
+
+    private func applyLocalFallback(for category: DiscoverUsersView.DiscoverCategory) {
+        users = fallbackUsers(for: category)
+        searchResults = []
+        hasMore = false
+        showingSkeletonViews = false
+        isLoading = false
+    }
+
+    // MARK: - CloudKit Read-Only Discovery
+
+    private func publicUserQuery(for category: DiscoverUsersView.DiscoverCategory) -> CKQuery {
+        switch category {
+        case .suggested:
+            let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
+            let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+            query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+            return query
+        case .trending:
+            let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
+            let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+            query.sortDescriptors = [NSSortDescriptor(key: CKField.User.recipesShared, ascending: false)]
+            return query
+        case .newChefs:
+            let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
+            let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+            query.sortDescriptors = [NSSortDescriptor(key: CKField.User.createdAt, ascending: false)]
+            return query
+        case .verified:
+            let predicate = NSPredicate(
+                format: "%K == %d AND %K == %d",
+                CKField.User.isVerified, 1,
+                CKField.User.isProfilePublic, 1
+            )
+            let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+            query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+            return query
+        }
+    }
+
+    private func fetchPublicUsers(for category: DiscoverUsersView.DiscoverCategory, limit: Int) async throws -> [CloudKitUser] {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            throw UnifiedAuthError.cloudKitNotAvailable
+        }
+
+        guard let container = CloudKitRuntimeSupport.makeContainer() else {
+            throw UnifiedAuthError.cloudKitNotAvailable
+        }
+        do {
+            let status = try await container.accountStatus()
+            guard status == .available else {
+                throw UnifiedAuthError.cloudKitNotAvailable
+            }
+        } catch {
+            throw UnifiedAuthError.cloudKitNotAvailable
+        }
+
+        let query = publicUserQuery(for: category)
+        do {
+            let results = try await container.publicCloudDatabase.records(matching: query)
+            let users = results.matchResults.compactMap { result in
+                switch result.1 {
+                case .success(let record):
+                    return CloudKitUser(from: record)
+                case .failure:
+                    return nil
+                }
+            }
+            return Array(users.prefix(limit))
+        } catch {
+            if let ckError = error as? CKError,
+               ckError.code == .networkUnavailable || ckError.code == .networkFailure {
+                throw UnifiedAuthError.networkError
+            }
+            throw UnifiedAuthError.cloudKitError(error)
+        }
+    }
+
+    private func searchPublicUsers(query: String, limit: Int = 50) async throws -> [CloudKitUser] {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return [] }
+
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            throw UnifiedAuthError.cloudKitNotAvailable
+        }
+
+        guard let container = CloudKitRuntimeSupport.makeContainer() else {
+            throw UnifiedAuthError.cloudKitNotAvailable
+        }
+        do {
+            let status = try await container.accountStatus()
+            guard status == .available else {
+                throw UnifiedAuthError.cloudKitNotAvailable
+            }
+        } catch {
+            throw UnifiedAuthError.cloudKitNotAvailable
+        }
+
+        let predicate = NSPredicate(
+            format: "(%K CONTAINS[cd] %@ OR %K CONTAINS[cd] %@) AND %K == %d",
+            CKField.User.username, trimmedQuery,
+            CKField.User.displayName, trimmedQuery,
+            CKField.User.isProfilePublic, 1
+        )
+
+        let queryObj = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
+        queryObj.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
+
+        do {
+            let results = try await container.publicCloudDatabase.records(matching: queryObj)
+            let users = results.matchResults.compactMap { result in
+                switch result.1 {
+                case .success(let record):
+                    return CloudKitUser(from: record)
+                case .failure:
+                    return nil
+                }
+            }
+            return Array(users.prefix(limit))
+        } catch {
+            if let ckError = error as? CKError,
+               ckError.code == .networkUnavailable || ckError.code == .networkFailure {
+                throw UnifiedAuthError.networkError
+            }
+            throw UnifiedAuthError.cloudKitError(error)
+        }
+    }
     
     func loadUsers(for category: DiscoverUsersView.DiscoverCategory) async {
+        currentCategory = category
+
         // Check if we have fresh cached data
         if !users.isEmpty && !needsRefresh() {
             print("📱 Using cached discover users (\(users.count) users)")
@@ -95,13 +260,13 @@ class SimpleDiscoverUsersManager: ObservableObject {
             
             switch category {
             case .suggested:
-                fetchedUsers = try await UnifiedAuthManager.shared.getSuggestedUsers(limit: 20)
+                fetchedUsers = try await fetchPublicUsers(for: category, limit: 20)
             case .trending:
-                fetchedUsers = try await UnifiedAuthManager.shared.getTrendingUsers(limit: 20)
+                fetchedUsers = try await fetchPublicUsers(for: category, limit: 20)
             case .newChefs:
-                fetchedUsers = try await UnifiedAuthManager.shared.getNewUsers(limit: 20)
+                fetchedUsers = try await fetchPublicUsers(for: category, limit: 20)
             case .verified:
-                fetchedUsers = try await UnifiedAuthManager.shared.getVerifiedUsers(limit: 20)
+                fetchedUsers = try await fetchPublicUsers(for: category, limit: 20)
             }
             
             // Convert to UserProfile with parallel follow state checking
@@ -153,7 +318,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
                 }
             }
             
-            users = convertedUsers
+            users = sanitizedUniqueUsers(convertedUsers)
             // Maintain memory limits after setting users
             maintainMemoryLimits()
             
@@ -163,7 +328,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
             
         } catch {
             print("❌ Failed to load users: \(error)")
-            users = []
+            applyLocalFallback(for: category)
         }
         
         showingSkeletonViews = false
@@ -227,13 +392,13 @@ class SimpleDiscoverUsersManager: ObservableObject {
             
             switch category {
             case .suggested:
-                fetchedUsers = try await UnifiedAuthManager.shared.getSuggestedUsers(limit: 20)
+                fetchedUsers = try await fetchPublicUsers(for: category, limit: 20)
             case .trending:
-                fetchedUsers = try await UnifiedAuthManager.shared.getTrendingUsers(limit: 20)
+                fetchedUsers = try await fetchPublicUsers(for: category, limit: 20)
             case .newChefs:
-                fetchedUsers = try await UnifiedAuthManager.shared.getNewUsers(limit: 20)
+                fetchedUsers = try await fetchPublicUsers(for: category, limit: 20)
             case .verified:
-                fetchedUsers = try await UnifiedAuthManager.shared.getVerifiedUsers(limit: 20)
+                fetchedUsers = try await fetchPublicUsers(for: category, limit: 20)
             }
             
             // Convert to UserProfile with parallel follow state checking
@@ -285,7 +450,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
                 }
             }
             
-            users = convertedUsers
+            users = sanitizedUniqueUsers(convertedUsers)
             // Maintain memory limits after setting users
             maintainMemoryLimits()
             saveCachedUsers(users, for: category)
@@ -305,7 +470,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
             isSearching = true
             
             do {
-                let cloudKitResults = try await UnifiedAuthManager.shared.searchUsers(query: query)
+                let cloudKitResults = try await searchPublicUsers(query: query, limit: maxSearchResults)
                 
                 var convertedResults: [UserProfile] = []
                 for cloudKitUser in cloudKitResults {
@@ -317,16 +482,21 @@ class SimpleDiscoverUsersManager: ObservableObject {
                     
                     convertedResults.append(userProfile)
                 }
+                let sanitizedResults = self.sanitizedUniqueUsers(convertedResults)
                 
                 await MainActor.run {
-                    searchResults = convertedResults
+                    searchResults = sanitizedResults
                     isSearching = false
                 }
                 
             } catch {
                 print("❌ Search failed: \(error)")
                 await MainActor.run {
-                    searchResults = []
+                    let allFallbackUsers = fallbackUsers(for: currentCategory)
+                    searchResults = allFallbackUsers.filter {
+                        $0.username.localizedCaseInsensitiveContains(query) ||
+                        $0.displayName.localizedCaseInsensitiveContains(query)
+                    }
                     isSearching = false
                 }
             }
@@ -411,10 +581,11 @@ class SimpleDiscoverUsersManager: ObservableObject {
     }
     
     private func convertToUserProfile(_ cloudKitUser: CloudKitUser) -> UserProfile {
+        let resolvedID = canonicalUserID(for: cloudKitUser)
         let finalUsername = cloudKitUser.username ?? cloudKitUser.displayName.lowercased().replacingOccurrences(of: " ", with: "")
         
         return UserProfile(
-            id: cloudKitUser.recordID ?? "",
+            id: resolvedID,
             username: finalUsername,
             displayName: cloudKitUser.displayName,
             profileImageURL: cloudKitUser.profileImageURL,
@@ -430,6 +601,46 @@ class SimpleDiscoverUsersManager: ObservableObject {
             cookingLevel: nil,
             profileImage: nil
         )
+    }
+
+    private func canonicalUserID(for cloudKitUser: CloudKitUser) -> String {
+        if let recordID = cloudKitUser.recordID?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !recordID.isEmpty {
+            return recordID
+        }
+
+        let fallbackSource = [
+            cloudKitUser.username,
+            cloudKitUser.displayName,
+            cloudKitUser.email
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty })
+
+        guard let fallbackSource else { return "" }
+        let sanitized = fallbackSource
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+
+        guard !sanitized.isEmpty else { return "" }
+        return "user-\(sanitized)"
+    }
+
+    private func sanitizedUniqueUsers(_ input: [UserProfile]) -> [UserProfile] {
+        var seenIDs = Set<String>()
+        var result: [UserProfile] = []
+
+        for user in input {
+            let trimmedID = user.id.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedID.isEmpty else { continue }
+            guard !seenIDs.contains(trimmedID) else { continue }
+            seenIDs.insert(trimmedID)
+            result.append(user)
+        }
+
+        return result
     }
     
     /// Clear all cached data (for account deletion)
@@ -554,7 +765,10 @@ struct DiscoverUsersView: View {
                                         },
                                         onTap: {
                                             // Navigate to user profile
-                                            manager.selectedUser = user
+                                            let trimmedID = user.id.trimmingCharacters(in: .whitespacesAndNewlines)
+                                            if !trimmedID.isEmpty {
+                                                manager.selectedUser = user
+                                            }
                                         }
                                     )
                                 }
@@ -591,11 +805,16 @@ struct DiscoverUsersView: View {
             }
         }
         .sheet(item: $manager.selectedUser) { user in
-            UserProfileView(
-                userID: user.id,
-                userName: user.username  // Always use username, not displayName
-            )
-            .environmentObject(appState)
+            if CloudKitRuntimeSupport.hasCloudKitEntitlement,
+               !user.id.hasPrefix("local_") {
+                UserProfileView(
+                    userID: user.id,
+                    userName: user.username  // Always use username, not displayName
+                )
+                .environmentObject(appState)
+            } else {
+                LocalChefPreviewView(user: user)
+            }
         }
         .sheet(isPresented: $showAuthSheet) {
             UnifiedAuthView()
@@ -614,6 +833,158 @@ struct DiscoverUsersView: View {
                 $0.displayName.localizedCaseInsensitiveContains(searchText)
             }
         }
+    }
+}
+
+// MARK: - Local Chef Preview (Simulator / Offline)
+struct LocalChefPreviewView: View {
+    let user: UserProfile
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                MagicalBackground()
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 22) {
+                        VStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(hex: "#f6d365"),
+                                                Color(hex: "#fda085")
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 104, height: 104)
+
+                                Text(String(user.displayName.prefix(1)).uppercased())
+                                    .font(.system(size: 44, weight: .heavy, design: .rounded))
+                                    .foregroundColor(.white)
+                            }
+
+                            VStack(spacing: 6) {
+                                HStack(spacing: 8) {
+                                    Text(user.displayName)
+                                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+
+                                    if user.isVerified {
+                                        Image(systemName: "checkmark.seal.fill")
+                                            .font(.system(size: 18, weight: .semibold))
+                                            .foregroundColor(Color(hex: "#43e97b"))
+                                    }
+                                }
+
+                                Text("@\(user.username)")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.75))
+
+                                if let bio = user.bio, !bio.isEmpty {
+                                    Text(bio)
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.white.opacity(0.72))
+                                        .multilineTextAlignment(.center)
+                                        .padding(.top, 4)
+                                }
+                            }
+                        }
+                        .padding(.top, 14)
+
+                        HStack(spacing: 0) {
+                            statPill(value: "\(user.followerCount)", label: "Followers")
+                            statPill(value: "\(user.followingCount)", label: "Following")
+                            statPill(value: "\(user.recipesCreated)", label: "Recipes")
+                        }
+                        .padding(.vertical, 16)
+                        .padding(.horizontal, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(Color.white.opacity(0.08))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 18)
+                                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                                )
+                        )
+
+                        VStack(spacing: 10) {
+                            Text("Preview Mode")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.9))
+
+                            Text("Follow, likes, and real profiles require iCloud + CloudKit. Run on a real device (or enable CloudKit for simulator testing) to see live chefs.")
+                                .font(.system(size: 13))
+                                .foregroundColor(.white.opacity(0.7))
+                                .multilineTextAlignment(.center)
+
+                            Button {
+                                UnifiedAuthManager.shared.promptAuthForFeature(.socialSharing)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "person.crop.circle.badge.checkmark")
+                                        .font(.system(size: 16, weight: .semibold))
+                                    Text("Sign In")
+                                        .font(.system(size: 16, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(14)
+                                .shadow(color: Color(hex: "#667eea").opacity(0.35), radius: 14, y: 8)
+                            }
+                            .padding(.top, 8)
+                        }
+                        .padding(20)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(Color.white.opacity(0.06))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 18)
+                                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                                )
+                        )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 30)
+                }
+            }
+            .navigationTitle("Chef Preview")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
+        }
+    }
+
+    private func statPill(value: String, label: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -771,7 +1142,7 @@ struct UserDiscoveryCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     // Name and Username
                     HStack {
-                        Text(user.username)
+                        Text(user.displayName)
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.white)
                             .lineLimit(1)
@@ -790,24 +1161,13 @@ struct UserDiscoveryCard: View {
 
                     // Stats
                     HStack(spacing: 12) {
-                        Text({
-                            let text = user.followerText
-                            print("🔍 DEBUG DiscoverUsersView Card - User: \(user.username)")
-                            print("    └─ Followers field: user.followerCount = \(user.followerCount)")
-                            print("    └─ UserProfile struct field mapping from CloudKit: CKField.User.followerCount")
-                            return text
-                        }())
+                        Text(user.followerText)
                             .font(.system(size: 13))
                             .foregroundColor(.white.opacity(0.8))
                             .lineLimit(1)
                             .fixedSize(horizontal: false, vertical: true)
 
-                        Text({
-                            let text = "\(user.recipesCreated) recipes"
-                            print("    └─ Recipes field: user.recipesCreated = \(user.recipesCreated)")
-                            print("    └─ UserProfile struct field mapping from CloudKit: CKField.User.recipesCreated")
-                            return text
-                        }())
+                        Text("\(user.recipesCreated) recipes")
                             .font(.system(size: 13))
                             .foregroundColor(.white.opacity(0.8))
                             .lineLimit(1)

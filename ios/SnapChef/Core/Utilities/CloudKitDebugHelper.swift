@@ -6,8 +6,16 @@ struct CloudKitDebugHelper {
     
     /// Test if CloudKit is available and accessible
     static func testCloudKitAvailability() async -> Bool {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            print("⚠️ CloudKit debug availability check skipped (runtime entitlement unavailable)")
+            return false
+        }
+
         do {
-            let container = CKContainer.default()
+            guard let container = CloudKitRuntimeSupport.makeContainer() else {
+                print("⚠️ CloudKit debug availability check skipped (container unavailable)")
+                return false
+            }
             let accountStatus = try await container.accountStatus()
             
             print("🔍 CloudKit Account Status: \(accountStatus)")
@@ -40,9 +48,17 @@ struct CloudKitDebugHelper {
     
     /// Test user discovery queries individually
     static func testUserDiscoveryQueries() async {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            print("⚠️ CloudKit debug user discovery tests skipped (runtime entitlement unavailable)")
+            return
+        }
+
         print("🧪 Testing CloudKit User Discovery Queries...")
-        
-        let container = CKContainer.default()
+
+        guard let container = CloudKitRuntimeSupport.makeContainer() else {
+            print("⚠️ CloudKit debug user discovery tests skipped (container unavailable)")
+            return
+        }
         let database = container.publicCloudDatabase
         
         // Test 1: Basic user query
@@ -139,9 +155,17 @@ struct CloudKitDebugHelper {
     
     /// Check what fields are actually queryable by attempting queries
     static func checkFieldQueryability() async {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            print("⚠️ CloudKit field queryability check skipped (runtime entitlement unavailable)")
+            return
+        }
+
         print("🔍 Checking CloudKit field queryability...")
-        
-        let container = CKContainer.default()
+
+        guard let container = CloudKitRuntimeSupport.makeContainer() else {
+            print("⚠️ CloudKit field queryability check skipped (container unavailable)")
+            return
+        }
         let database = container.publicCloudDatabase
         
         let userFields = [

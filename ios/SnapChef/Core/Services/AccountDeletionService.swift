@@ -16,7 +16,6 @@ class AccountDeletionService: ObservableObject {
     @Published var deletionErrors: [DeletionError] = []
     
     private let cloudKitActor = CloudKitActor()
-    private let database = CKContainer.default().publicCloudDatabase
     
     enum DeletionProgress {
         case idle
@@ -63,18 +62,22 @@ class AccountDeletionService: ObservableObject {
         
         if isAuthenticated {
             print("🗑️ Starting account deletion for authenticated user: \(userID!)")
-            
-            // Step 1: Delete all CloudKit records for authenticated user
-            let cloudKitResults = await deleteAllCloudKitData(for: userID!)
-            recordsDeleted = cloudKitResults.recordsByType
-            totalDeleted = cloudKitResults.totalDeleted
-            
-            // Step 2: Verify deletion for authenticated user
-            deletionProgress = .verifyingDeletion
-            let verificationPassed = await verifyDeletion(userID: userID!)
-            
-            if !verificationPassed {
-                print("⚠️ CloudKit verification failed, but continuing with local cleanup")
+
+            if CloudKitRuntimeSupport.hasCloudKitEntitlement {
+                // Step 1: Delete all CloudKit records for authenticated user
+                let cloudKitResults = await deleteAllCloudKitData(for: userID!)
+                recordsDeleted = cloudKitResults.recordsByType
+                totalDeleted = cloudKitResults.totalDeleted
+
+                // Step 2: Verify deletion for authenticated user
+                deletionProgress = .verifyingDeletion
+                let verificationPassed = await verifyDeletion(userID: userID!)
+
+                if !verificationPassed {
+                    print("⚠️ CloudKit verification failed, but continuing with local cleanup")
+                }
+            } else {
+                print("⚠️ CloudKit unavailable in current runtime. Skipping remote deletion and clearing local state.")
             }
         } else {
             print("🗑️ Starting data deletion for anonymous user")
@@ -232,12 +235,12 @@ class AccountDeletionService: ObservableObject {
             
             // Query for followerID matches
             let followerQuery = CKQuery(recordType: "Follow", predicate: NSPredicate(format: "followerID == %@", userID))
-            let followerRecords = try await cloudKitActor.performQuery(followerQuery, in: database)
+            let followerRecords = try await cloudKitActor.executeQuery(followerQuery)
             allRecordsToDelete.append(contentsOf: followerRecords)
             
             // Query for followingID matches
             let followingQuery = CKQuery(recordType: "Follow", predicate: NSPredicate(format: "followingID == %@", userID))
-            let followingRecords = try await cloudKitActor.performQuery(followingQuery, in: database)
+            let followingRecords = try await cloudKitActor.executeQuery(followingQuery)
             allRecordsToDelete.append(contentsOf: followingRecords)
             
             // Remove duplicates based on recordID
@@ -254,7 +257,7 @@ class AccountDeletionService: ObservableObject {
             var deletedCount = 0
             for batch in uniqueRecords.chunked(into: 100) {
                 let recordIDs = batch.map { $0.recordID }
-                try await cloudKitActor.deleteRecords(recordIDs, in: database)
+                try await cloudKitActor.deleteRecords(recordIDs)
                 deletedCount += recordIDs.count
             }
             
@@ -275,12 +278,12 @@ class AccountDeletionService: ObservableObject {
             
             // Query for inviterID matches
             let inviterQuery = CKQuery(recordType: "TeamInvite", predicate: NSPredicate(format: "inviterID == %@", userID))
-            let inviterRecords = try await cloudKitActor.performQuery(inviterQuery, in: database)
+            let inviterRecords = try await cloudKitActor.executeQuery(inviterQuery)
             allRecordsToDelete.append(contentsOf: inviterRecords)
             
             // Query for inviteeID matches
             let inviteeQuery = CKQuery(recordType: "TeamInvite", predicate: NSPredicate(format: "inviteeID == %@", userID))
-            let inviteeRecords = try await cloudKitActor.performQuery(inviteeQuery, in: database)
+            let inviteeRecords = try await cloudKitActor.executeQuery(inviteeQuery)
             allRecordsToDelete.append(contentsOf: inviteeRecords)
             
             // Remove duplicates based on recordID
@@ -297,7 +300,7 @@ class AccountDeletionService: ObservableObject {
             var deletedCount = 0
             for batch in uniqueRecords.chunked(into: 100) {
                 let recordIDs = batch.map { $0.recordID }
-                try await cloudKitActor.deleteRecords(recordIDs, in: database)
+                try await cloudKitActor.deleteRecords(recordIDs)
                 deletedCount += recordIDs.count
             }
             
@@ -314,7 +317,7 @@ class AccountDeletionService: ObservableObject {
     private func deleteRecords(recordType: String, predicate: NSPredicate) async -> Int {
         do {
             let query = CKQuery(recordType: recordType, predicate: predicate)
-            let records = try await cloudKitActor.performQuery(query, in: database)
+            let records = try await cloudKitActor.executeQuery(query)
             
             guard !records.isEmpty else {
                 print("📋 No \(recordType) records found to delete")
@@ -325,7 +328,7 @@ class AccountDeletionService: ObservableObject {
             var deletedCount = 0
             for batch in records.chunked(into: 100) {
                 let recordIDs = batch.map { $0.recordID }
-                try await cloudKitActor.deleteRecords(recordIDs, in: database)
+                try await cloudKitActor.deleteRecords(recordIDs)
                 deletedCount += recordIDs.count
             }
             
@@ -562,7 +565,7 @@ class AccountDeletionService: ObservableObject {
             // Check if any recipes still exist
             let recipePredicate = NSPredicate(format: "ownerID == %@", userID)
             let recipeQuery = CKQuery(recordType: "Recipe", predicate: recipePredicate)
-            let recipeRecords = try await cloudKitActor.performQuery(recipeQuery, in: database)
+            let recipeRecords = try await cloudKitActor.executeQuery(recipeQuery)
             
             if !recipeRecords.isEmpty {
                 print("⚠️ Verification failed: \(recipeRecords.count) recipes still exist")
@@ -572,7 +575,7 @@ class AccountDeletionService: ObservableObject {
             // Check if any likes still exist  
             let likePredicate = NSPredicate(format: "userID == %@", userID)
             let likeQuery = CKQuery(recordType: "RecipeLike", predicate: likePredicate)
-            let likeRecords = try await cloudKitActor.performQuery(likeQuery, in: database)
+            let likeRecords = try await cloudKitActor.executeQuery(likeQuery)
             
             if !likeRecords.isEmpty {
                 print("⚠️ Verification failed: \(likeRecords.count) likes still exist")
@@ -581,10 +584,10 @@ class AccountDeletionService: ObservableObject {
             
             // Check follow relationships using separate queries to avoid predicate parsing issues
             let followerQuery = CKQuery(recordType: "Follow", predicate: NSPredicate(format: "followerID == %@", userID))
-            let followerRecords = try await cloudKitActor.performQuery(followerQuery, in: database)
+            let followerRecords = try await cloudKitActor.executeQuery(followerQuery)
             
             let followingQuery = CKQuery(recordType: "Follow", predicate: NSPredicate(format: "followingID == %@", userID))
-            let followingRecords = try await cloudKitActor.performQuery(followingQuery, in: database)
+            let followingRecords = try await cloudKitActor.executeQuery(followingQuery)
             
             let totalFollowRecords = followerRecords.count + followingRecords.count
             if totalFollowRecords > 0 {
@@ -594,10 +597,10 @@ class AccountDeletionService: ObservableObject {
             
             // Check TeamInvite records using separate queries
             let inviterQuery = CKQuery(recordType: "TeamInvite", predicate: NSPredicate(format: "inviterID == %@", userID))
-            let inviterRecords = try await cloudKitActor.performQuery(inviterQuery, in: database)
+            let inviterRecords = try await cloudKitActor.executeQuery(inviterQuery)
             
             let inviteeQuery = CKQuery(recordType: "TeamInvite", predicate: NSPredicate(format: "inviteeID == %@", userID))
-            let inviteeRecords = try await cloudKitActor.performQuery(inviteeQuery, in: database)
+            let inviteeRecords = try await cloudKitActor.executeQuery(inviteeQuery)
             
             let totalInviteRecords = inviterRecords.count + inviteeRecords.count
             if totalInviteRecords > 0 {
@@ -624,11 +627,7 @@ class AccountDeletionService: ObservableObject {
 // MARK: - CloudKitActor Extensions for Deletion
 
 extension CloudKitActor {
-    func performQuery(_ query: CKQuery, in database: CKDatabase) async throws -> [CKRecord] {
-        try await executeQuery(query)
-    }
-    
-    func deleteRecords(_ recordIDs: [CKRecord.ID], in database: CKDatabase) async throws {
+    func deleteRecords(_ recordIDs: [CKRecord.ID]) async throws {
         for recordID in recordIDs {
             try await deleteRecordByID(recordID)
         }

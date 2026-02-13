@@ -935,7 +935,8 @@ struct RecipeDetailView: View {
         guard let cloudKitRecipe = cloudKitRecipe, !cloudKitRecipe.ownerID.isEmpty else { return }
 
         do {
-            let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+            guard let container = CloudKitRuntimeSupport.makeContainer() else { return }
+            let database = container.publicCloudDatabase
             let record = try await database.record(for: CKRecord.ID(recordName: cloudKitRecipe.ownerID))
             let user = CloudKitUser(from: record)
             await MainActor.run {

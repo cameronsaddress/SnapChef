@@ -4,6 +4,123 @@ import Photos
 import AVFoundation
 import CloudKit
 
+struct ShareMomentumSnapshot: Equatable {
+    let platform: String
+    let sharedAt: Date
+}
+
+struct ViralFunnelProgress: Equatable {
+    static let milestones: [Int] = [1, 3, 5, 8, 12, 20, 35, 50]
+
+    let conversions: Int
+    let achievedMilestone: Int
+    let nextMilestone: Int?
+    let progressToNext: Double
+    let conversionsToNext: Int
+
+    init(conversions: Int) {
+        let safeConversions = max(0, conversions)
+        self.conversions = safeConversions
+        self.achievedMilestone = Self.milestones.last(where: { safeConversions >= $0 }) ?? 0
+        self.nextMilestone = Self.milestones.first(where: { safeConversions < $0 })
+
+        if let nextMilestone {
+            let prior = Self.milestones.last(where: { $0 < nextMilestone }) ?? 0
+            let span = max(nextMilestone - prior, 1)
+            let advanced = safeConversions - prior
+            self.progressToNext = min(max(Double(advanced) / Double(span), 0), 1)
+            self.conversionsToNext = max(nextMilestone - safeConversions, 0)
+        } else {
+            self.progressToNext = 1
+            self.conversionsToNext = 0
+        }
+    }
+
+    var goalTitle: String {
+        if let nextMilestone {
+            return "Goal: \(nextMilestone) conversions"
+        }
+        return "Top funnel tier reached"
+    }
+
+    var goalSubtitle: String {
+        if let nextMilestone {
+            return "\(conversionsToNext) more to hit \(nextMilestone)"
+        }
+        return "Maintain momentum and compound rewards"
+    }
+}
+
+enum ViralMilestoneTracker {
+    private static let unlockedMilestoneKey = "growth_viral_last_unlocked_milestone"
+
+    static func unlockedMilestone(for conversions: Int) -> Int? {
+        let achieved = ViralFunnelProgress(conversions: conversions).achievedMilestone
+        guard achieved > 0 else { return nil }
+
+        let lastUnlocked = UserDefaults.standard.integer(forKey: unlockedMilestoneKey)
+        guard achieved > lastUnlocked else { return nil }
+
+        UserDefaults.standard.set(achieved, forKey: unlockedMilestoneKey)
+        return achieved
+    }
+
+    static func reset() {
+        UserDefaults.standard.removeObject(forKey: unlockedMilestoneKey)
+    }
+}
+
+enum ShareMomentumStore {
+    private enum Keys {
+        static let platform = "growth_share_momentum_platform"
+        static let sharedAt = "growth_share_momentum_shared_at"
+    }
+
+    static func record(platform: String, at date: Date = Date()) {
+        let sanitized = platform.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sanitized.isEmpty else { return }
+        UserDefaults.standard.set(sanitized, forKey: Keys.platform)
+        UserDefaults.standard.set(date, forKey: Keys.sharedAt)
+    }
+
+    static func latest(maxAge: TimeInterval = 60 * 60 * 24) -> ShareMomentumSnapshot? {
+        guard let platform = UserDefaults.standard.string(forKey: Keys.platform),
+              let sharedAt = UserDefaults.standard.object(forKey: Keys.sharedAt) as? Date else {
+            return nil
+        }
+        guard Date().timeIntervalSince(sharedAt) <= maxAge else {
+            clear()
+            return nil
+        }
+        return ShareMomentumSnapshot(platform: platform, sharedAt: sharedAt)
+    }
+
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: Keys.platform)
+        UserDefaults.standard.removeObject(forKey: Keys.sharedAt)
+    }
+}
+
+enum ViralCoachMarksProgress {
+    private static let completedKey = "growth_viral_coach_completed"
+
+    static var isCompleted: Bool {
+        UserDefaults.standard.bool(forKey: completedKey)
+    }
+
+    static func shouldPresent(hasMomentum: Bool) -> Bool {
+        hasMomentum && !isCompleted
+    }
+
+    static func markCompleted() {
+        UserDefaults.standard.set(true, forKey: completedKey)
+    }
+
+    static func reset() {
+        UserDefaults.standard.removeObject(forKey: completedKey)
+    }
+}
+
 @MainActor
 class SocialShareManager: ObservableObject {
     static let shared = SocialShareManager()
@@ -104,6 +221,7 @@ class SocialShareManager: ObservableObject {
             }
             
             shareResult = .success("Successfully shared to \(platform)")
+            ShareMomentumStore.record(platform: platformDisplayName(platform))
             NotificationCenter.default.post(
                 name: .snapchefShareCompleted,
                 object: nil,
@@ -182,8 +300,39 @@ class SocialShareManager: ObservableObject {
             )
         }
 
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            return InviteCenterSnapshot(
+                referralCode: code,
+                inviteURL: inviteURL,
+                totalConversions: 0,
+                pendingRewards: 0,
+                claimedRewards: 0,
+                pendingCoins: 0,
+                earnedCoins: 0,
+                inviteeAppliedCode: inviteeAppliedCode,
+                inviteeOpenCount: inviteeOpenCount,
+                isAuthenticated: true,
+                sourceError: "CloudKit unavailable in this build."
+            )
+        }
+
         let currentUserID = currentAuthenticatedUserID()
-        let publicDB = CKContainer(identifier: cloudKitContainerID).publicCloudDatabase
+        guard let container = CloudKitRuntimeSupport.makeContainer(identifier: cloudKitContainerID) else {
+            return InviteCenterSnapshot(
+                referralCode: code,
+                inviteURL: inviteURL,
+                totalConversions: 0,
+                pendingRewards: 0,
+                claimedRewards: 0,
+                pendingCoins: 0,
+                earnedCoins: 0,
+                inviteeAppliedCode: inviteeAppliedCode,
+                inviteeOpenCount: inviteeOpenCount,
+                isAuthenticated: true,
+                sourceError: "CloudKit container unavailable in this build."
+            )
+        }
+        let publicDB = container.publicCloudDatabase
         let predicate = NSPredicate(format: "%K == %@", ReferralRewardConfig.fieldReferralCode, code)
         let query = CKQuery(recordType: ReferralRewardConfig.cloudKitRecordType, predicate: predicate)
 
@@ -336,6 +485,15 @@ class SocialShareManager: ObservableObject {
             didHandle = true
         }
 
+        if let tab = extractTabDestination(from: url) {
+            NotificationCenter.default.post(
+                name: .snapchefNavigateToTab,
+                object: nil,
+                userInfo: ["tab": tab.rawValue]
+            )
+            didHandle = true
+        }
+
         if let challengeID = extractChallengeID(from: url) {
             pendingDeepLink = .challenge(challengeID)
             didHandle = true
@@ -405,9 +563,11 @@ class SocialShareManager: ObservableObject {
     func claimReferrerRewardsIfEligible() async {
         guard UnifiedAuthManager.shared.isAuthenticated else { return }
         guard let currentUserID = currentAuthenticatedUserID() else { return }
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return }
 
         let code = currentReferralCode()
-        let publicDB = CKContainer(identifier: cloudKitContainerID).publicCloudDatabase
+        guard let container = CloudKitRuntimeSupport.makeContainer(identifier: cloudKitContainerID) else { return }
+        let publicDB = container.publicCloudDatabase
         let predicate = NSPredicate(
             format: "%K == %@ AND %K == %d",
             ReferralRewardConfig.fieldReferralCode,
@@ -491,6 +651,28 @@ class SocialShareManager: ObservableObject {
     }
 
     // MARK: - Referral Parsing
+
+    private func extractTabDestination(from url: URL) -> AppTab? {
+        guard url.scheme?.lowercased() == "snapchef" else { return nil }
+
+        let host = (url.host ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch host {
+        case "home":
+            return .home
+        case "camera", "snap":
+            return .camera
+        case "detective":
+            return .detective
+        case "recipes":
+            return .recipes
+        case "feed", "social", "community":
+            return .socialFeed
+        case "profile", "me":
+            return .profile
+        default:
+            return nil
+        }
+    }
     
     private func extractRecipeID(from url: URL) -> String? {
         let pathParts = url.pathComponents.filter { $0 != "/" }
@@ -703,8 +885,10 @@ class SocialShareManager: ObservableObject {
 
     private func upsertReferralConversionRecord(referralCode: String, convertedAt: Date) async {
         guard let invitedUserID = currentAuthenticatedUserID() else { return }
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return }
 
-        let publicDB = CKContainer(identifier: cloudKitContainerID).publicCloudDatabase
+        guard let container = CloudKitRuntimeSupport.makeContainer(identifier: cloudKitContainerID) else { return }
+        let publicDB = container.publicCloudDatabase
         let predicate = NSPredicate(
             format: "%K == %@ AND %K == %@",
             ReferralRewardConfig.fieldReferralCode,

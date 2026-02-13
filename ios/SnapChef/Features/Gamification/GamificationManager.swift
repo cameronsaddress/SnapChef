@@ -222,7 +222,7 @@ final class GamificationManager: ObservableObject {
             .assign(to: &$activeChallenges)
 
         // Also sync with CloudKit if authenticated
-        if UnifiedAuthManager.shared.isAuthenticated {
+        if UnifiedAuthManager.shared.isAuthenticated && CloudKitRuntimeSupport.hasCloudKitEntitlement {
             Task {
                 await syncChallengesFromCloudKit()
             }
@@ -241,6 +241,7 @@ final class GamificationManager: ObservableObject {
 
     @MainActor
     func syncChallengesFromCloudKit() async {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return }
         do {
             // Sync challenges from CloudKit
             try await CloudKitManager.shared.syncChallenges()
@@ -256,7 +257,7 @@ final class GamificationManager: ObservableObject {
             // Sync user's challenge progress and joined status
             // Only fetch active challenges (not completed or left)
             let predicate = NSPredicate(format: "userID == %@ AND status == %@", userID, "active")
-            let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+            guard let container = CloudKitRuntimeSupport.makeContainer() else { return }
             let privateDB = container.privateCloudDatabase
 
             let query = CKQuery(recordType: "UserChallenge", predicate: predicate)
@@ -557,7 +558,12 @@ final class GamificationManager: ObservableObject {
     }
 
     func syncChallengeProgress(for challengeID: String, progress: Double) async {
-        guard let userID = AuthenticationManager().currentUser?.id else { return }
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return }
+        guard let userID = UnifiedAuthManager.shared.currentUser?.recordID?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !userID.isEmpty else {
+            return
+        }
 
         let userChallenge = UserChallenge(
             userID: userID,
@@ -645,7 +651,7 @@ final class GamificationManager: ObservableObject {
         // Save to CloudKit UserChallenge record
         Task {
             do {
-                let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+                guard let container = CloudKitRuntimeSupport.makeContainer() else { return }
                 let privateDB = container.privateCloudDatabase
                 
                 // Create UserChallenge record
@@ -708,7 +714,7 @@ final class GamificationManager: ObservableObject {
             }
             
             do {
-                let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+                guard let container = CloudKitRuntimeSupport.makeContainer() else { return }
                 let privateDB = container.privateCloudDatabase
                 
                 // Query for the UserChallenge record
@@ -825,8 +831,15 @@ final class GamificationManager: ObservableObject {
         // Update CloudKit leaderboard
         Task {
             do {
+                guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return }
+                guard let userID = UnifiedAuthManager.shared.currentUser?.recordID?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                    !userID.isEmpty else {
+                    return
+                }
+
                 try await CloudKitManager.shared.updateLeaderboardEntry(
-                    for: AuthenticationManager().currentUser?.id ?? "",
+                    for: userID,
                     points: challenge.points,
                     challengesCompleted: userStats.challengesCompleted
                 )
@@ -958,7 +971,7 @@ final class GamificationManager: ObservableObject {
                 do {
                     guard let userID = UserDefaults.standard.string(forKey: "currentUserID") else { return }
 
-                    let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+                    guard let container = CloudKitRuntimeSupport.makeContainer() else { return }
                     let privateDB = container.privateCloudDatabase
 
                     // Create achievement record

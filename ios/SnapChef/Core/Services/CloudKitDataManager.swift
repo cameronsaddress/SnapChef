@@ -17,15 +17,29 @@ final class CloudKitDataManager: ObservableObject {
         NSClassFromString("XCTestCase") != nil
     }
 
-    private lazy var container: CKContainer = {
-        CKContainer(identifier: "iCloud.com.snapchefapp.app")
+    private lazy var container: CKContainer? = {
+        CloudKitRuntimeSupport.makeContainer()
     }()
-    private lazy var publicDB: CKDatabase = {
-        container.publicCloudDatabase
-    }()
-    private lazy var privateDB: CKDatabase = {
-        container.privateCloudDatabase
-    }()
+
+    private func requirePublicDB(for operation: String) throws -> CKDatabase {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            throw SnapChefError.syncError("CloudKit unavailable for \(operation)")
+        }
+        guard let container else {
+            throw SnapChefError.syncError("CloudKit container unavailable for \(operation)")
+        }
+        return container.publicCloudDatabase
+    }
+
+    private func requirePrivateDB(for operation: String) throws -> CKDatabase {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            throw SnapChefError.syncError("CloudKit unavailable for \(operation)")
+        }
+        guard let container else {
+            throw SnapChefError.syncError("CloudKit container unavailable for \(operation)")
+        }
+        return container.privateCloudDatabase
+    }
 
     // Published properties for dynamic UI updates
     @Published var isSyncing = false
@@ -40,6 +54,7 @@ final class CloudKitDataManager: ObservableObject {
 
     private init() {
         guard !Self.isRunningTests else { return }
+        CloudKitRuntimeSupport.logDiagnosticsIfNeeded()
         if CloudKitRuntimeSupport.hasCloudKitEntitlement {
             Task { @MainActor in
                 await ensureSubscriptionsConfigured()
@@ -54,6 +69,7 @@ final class CloudKitDataManager: ObservableObject {
 
     func syncUserPreferences() async throws {
         guard let userID = getCurrentUserID() else { return }
+        let privateDB = try requirePrivateDB(for: "syncUserPreferences")
 
         // Load from UserDefaults
         let preferences = loadLocalPreferences()
@@ -101,6 +117,7 @@ final class CloudKitDataManager: ObservableObject {
 
     func fetchUserPreferences() async throws -> FoodPreferences? {
         guard let userID = getCurrentUserID() else { return nil }
+        let privateDB = try requirePrivateDB(for: "fetchUserPreferences")
 
         let predicate = NSPredicate(format: "userID == %@", userID)
         let query = CKQuery(recordType: "FoodPreference", predicate: predicate)
@@ -173,6 +190,7 @@ final class CloudKitDataManager: ObservableObject {
 
         // Fire and forget
         Task {
+            guard let privateDB = try? requirePrivateDB(for: "trackCameraSession") else { return }
             let logger = CloudKitDebugLogger.shared
             let startTime = Date()
             logger.logSaveStart(recordType: "CameraSession", database: privateDB.debugName)
@@ -206,6 +224,7 @@ final class CloudKitDataManager: ObservableObject {
         record["timestamp"] = Date()
 
         Task {
+            guard let privateDB = try? requirePrivateDB(for: "trackRecipeGeneration") else { return }
             let logger = CloudKitDebugLogger.shared
             let startTime = Date()
             logger.logSaveStart(recordType: "RecipeGeneration", database: privateDB.debugName)
@@ -235,6 +254,7 @@ final class CloudKitDataManager: ObservableObject {
     }
 
     func endAppSession() async {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return }
         guard let userID = getCurrentUserID(),
               let sessionID = UserDefaults.standard.string(forKey: "currentSessionID"),
               let startTime = UserDefaults.standard.object(forKey: "sessionStartTime") as? Date else { return }
@@ -258,6 +278,7 @@ final class CloudKitDataManager: ObservableObject {
         record["appVersion"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
 
         Task {
+            guard let privateDB = try? requirePrivateDB(for: "endAppSession") else { return }
             let logger = CloudKitDebugLogger.shared
             let startTime = Date()
             logger.logSaveStart(recordType: "AppSession", database: privateDB.debugName)
@@ -308,6 +329,7 @@ final class CloudKitDataManager: ObservableObject {
         record["timestamp"] = Date()
 
         Task {
+            guard let privateDB = try? requirePrivateDB(for: "trackSearch") else { return }
             let logger = CloudKitDebugLogger.shared
             let startTime = Date()
             logger.logSaveStart(recordType: "SearchHistory", database: privateDB.debugName)
@@ -340,6 +362,7 @@ final class CloudKitDataManager: ObservableObject {
         record["resolved"] = 0
 
         Task {
+            guard let privateDB = try? requirePrivateDB(for: "logError") else { return }
             let logger = CloudKitDebugLogger.shared
             let startTime = Date()
             logger.logSaveStart(recordType: "ErrorLog", database: privateDB.debugName)
@@ -361,6 +384,7 @@ final class CloudKitDataManager: ObservableObject {
 
     func registerDevice() async throws {
         guard let userID = getCurrentUserID() else { return }
+        let privateDB = try requirePrivateDB(for: "registerDevice")
 
         let deviceID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
 
@@ -419,7 +443,10 @@ final class CloudKitDataManager: ObservableObject {
     }
 
     private func cloudKitAccountStatus() async -> CKAccountStatus {
-        await withCheckedContinuation { continuation in
+        guard let container else {
+            return .couldNotDetermine
+        }
+        return await withCheckedContinuation { continuation in
             container.accountStatus { status, error in
                 if let error {
                     print("⚠️ CloudKit account status check failed: \(error)")
@@ -430,6 +457,10 @@ final class CloudKitDataManager: ObservableObject {
     }
 
     private func setupSubscriptions(for userID: String, completion: @escaping @Sendable (Bool) -> Void) {
+        guard let privateDB = try? requirePrivateDB(for: "setupSubscriptions") else {
+            completion(false)
+            return
+        }
         // Subscribe to preference changes
         let preferencePredicate = NSPredicate(format: "userID == %@", userID)
         let preferenceSubscription = CKQuerySubscription(

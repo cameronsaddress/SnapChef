@@ -217,6 +217,8 @@ extension Recipe {
 }
 
 // MARK: - Enhanced Error Handling for CloudKit Operations
+// Deprecated: CloudKitRecipeManager has been superseded by CloudKitService/RecipeModule.
+#if false
 extension CloudKitRecipeManager {
     func safeUploadRecipe(
         _ recipe: Recipe,
@@ -237,6 +239,7 @@ extension CloudKitRecipeManager {
         }
     }
 }
+#endif
 
 // MARK: - Error-Aware Camera Permissions
 @MainActor

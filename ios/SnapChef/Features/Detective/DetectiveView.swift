@@ -2,6 +2,15 @@ import SwiftUI
 import UIKit
 import Foundation
 
+private let detectiveDebugLoggingEnabled = false
+
+private func detectiveDebugLog(_ message: @autoclosure () -> String) {
+#if DEBUG
+    guard detectiveDebugLoggingEnabled else { return }
+    print(message())
+#endif
+}
+
 // MARK: - Detective View
 struct DetectiveView: View {
     @EnvironmentObject var appState: AppState
@@ -23,9 +32,6 @@ struct DetectiveView: View {
     @State private var showingAfterPhotoCapture = false
     @State private var selectedRecipeForPhoto: DetectiveRecipe?
     @State private var afterPhoto: UIImage?
-    
-    // Track detective uses for premium limit
-    @AppStorage("detectiveFeatureUses") private var detectiveUses: Int = 0
     
     // MARK: - Computed Properties for Type Inference
     private var gridColumns: [GridItem] {
@@ -143,15 +149,15 @@ struct DetectiveView: View {
                 }
             }
             .onAppear {
-                print("🔍 DEBUG: DetectiveView appeared - Start")
+                detectiveDebugLog("🔍 DEBUG: DetectiveView appeared - Start")
                 DispatchQueue.main.async {
-                    print("🔍 DEBUG: DetectiveView - Async block started")
+                    detectiveDebugLog("🔍 DEBUG: DetectiveView - Async block started")
                     // Initialize saved recipe IDs from appState
                     savedRecipeIds = Set(appState.savedRecipes.map { $0.id })
                     print("🔍 DetectiveView: Loaded \(savedRecipeIds.count) saved recipes")
-                    print("🔍 DEBUG: DetectiveView - Async block completed")
+                    detectiveDebugLog("🔍 DEBUG: DetectiveView - Async block completed")
                 }
-                print("🔍 DEBUG: DetectiveView appeared - End")
+                detectiveDebugLog("🔍 DEBUG: DetectiveView appeared - End")
             }
         }
     }
@@ -358,13 +364,13 @@ struct DetectiveView: View {
                 )
         )
         .onAppear {
-            print("🔍 DEBUG: DetectiveAnalysisProgress appeared - Start")
+            detectiveDebugLog("🔍 DEBUG: DetectiveAnalysisProgress appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: DetectiveAnalysisProgress - Async block started")
+                detectiveDebugLog("🔍 DEBUG: DetectiveAnalysisProgress - Async block started")
                 startProgressAnimation()
-                print("🔍 DEBUG: DetectiveAnalysisProgress - Async block completed")
+                detectiveDebugLog("🔍 DEBUG: DetectiveAnalysisProgress - Async block completed")
             }
-            print("🔍 DEBUG: DetectiveAnalysisProgress appeared - End")
+            detectiveDebugLog("🔍 DEBUG: DetectiveAnalysisProgress appeared - End")
         }
     }
     
@@ -1691,13 +1697,13 @@ struct CameraDetectiveView: View {
             }
         }
         .onAppear {
-            print("🔍 DEBUG: CameraDetectiveView appeared - Start")
+            detectiveDebugLog("🔍 DEBUG: CameraDetectiveView appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: CameraDetectiveView - Async block started")
+                detectiveDebugLog("🔍 DEBUG: CameraDetectiveView - Async block started")
                 cameraModel.requestCameraPermission()
-                print("🔍 DEBUG: CameraDetectiveView - Async block completed")
+                detectiveDebugLog("🔍 DEBUG: CameraDetectiveView - Async block completed")
             }
-            print("🔍 DEBUG: CameraDetectiveView appeared - End")
+            detectiveDebugLog("🔍 DEBUG: CameraDetectiveView appeared - End")
         }
         .onDisappear {
             cameraModel.stopSession()
@@ -1772,15 +1778,15 @@ struct DetectiveCameraCaptureButton: View {
             }
         }, perform: {})
         .onAppear {
-            print("🔍 DEBUG: DetectiveCameraCaptureButton appeared - Start")
+            detectiveDebugLog("🔍 DEBUG: DetectiveCameraCaptureButton appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: DetectiveCameraCaptureButton - Async block started")
+                detectiveDebugLog("🔍 DEBUG: DetectiveCameraCaptureButton - Async block started")
                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                     pulseScale = 1.1
                 }
-                print("🔍 DEBUG: DetectiveCameraCaptureButton - Async block completed")
+                detectiveDebugLog("🔍 DEBUG: DetectiveCameraCaptureButton - Async block completed")
             }
-            print("🔍 DEBUG: DetectiveCameraCaptureButton appeared - End")
+            detectiveDebugLog("🔍 DEBUG: DetectiveCameraCaptureButton appeared - End")
         }
     }
 }
@@ -1845,9 +1851,9 @@ struct DetectiveScanningOverlay: View {
             }
         }
         .onAppear {
-            print("🔍 DEBUG: DetectiveScanningOverlay appeared - Start")
+            detectiveDebugLog("🔍 DEBUG: DetectiveScanningOverlay appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: DetectiveScanningOverlay - Async block started")
+                detectiveDebugLog("🔍 DEBUG: DetectiveScanningOverlay - Async block started")
                 withAnimation(.linear(duration: 2).repeatForever(autoreverses: true)) {
                     scanLineOffset = 200
                 }
@@ -1855,9 +1861,9 @@ struct DetectiveScanningOverlay: View {
                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                     cornerAnimation = true
                 }
-                print("🔍 DEBUG: DetectiveScanningOverlay - Async block completed")
+                detectiveDebugLog("🔍 DEBUG: DetectiveScanningOverlay - Async block completed")
             }
-            print("🔍 DEBUG: DetectiveScanningOverlay appeared - End")
+            detectiveDebugLog("🔍 DEBUG: DetectiveScanningOverlay appeared - End")
         }
     }
     

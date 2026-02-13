@@ -20,6 +20,11 @@ struct AIProcessingView: View {
     @State private var completionBurstScale: CGFloat = 0.85
     @State private var lastMilestonePhase: CameraProcessingPhase = .idle
     @State private var statusResetTask: Task<Void, Never>?
+    @State private var predictedProgress = CameraProcessingPhase.idle.progressFraction
+    @State private var predictedDuration: TimeInterval = 7.0
+    @State private var predictedRemainingSeconds: Int?
+    @State private var processingStartedAt = Date()
+    @State private var progressTimer: Timer?
 
     // Photo properties
     let fridgeImage: UIImage?
@@ -65,6 +70,10 @@ struct AIProcessingView: View {
         default:
             return true
         }
+    }
+
+    private var visualProgress: Double {
+        min(1.0, max(backendProgress, predictedProgress))
     }
 
     var body: some View {
@@ -331,14 +340,23 @@ struct AIProcessingView: View {
                         .accessibilityLabel("Processing status")
                         .accessibilityValue(processingMilestone.phase.displayTitle)
 
-                    ProgressView(value: backendProgress, total: 1.0)
+                    ProgressView(value: visualProgress, total: 1.0)
                         .progressViewStyle(.linear)
                         .tint(statusAccentColor)
                         .frame(width: 240)
                         .opacity(textOpacity)
-                        .animation(.spring(response: MotionTuning.seconds(0.28), dampingFraction: 0.9), value: backendProgress)
+                        .animation(.spring(response: MotionTuning.seconds(0.28), dampingFraction: 0.9), value: visualProgress)
                         .accessibilityLabel("Recipe generation progress")
-                        .accessibilityValue("\(Int(backendProgress * 100)) percent")
+                        .accessibilityValue("\(Int(visualProgress * 100)) percent")
+
+                    if let remaining = predictedRemainingSeconds, canLaunchWaitingGame {
+                        Text(remaining > 0 ? "About \(remaining)s remaining" : "Almost done...")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.75))
+                            .monospacedDigit()
+                            .opacity(textOpacity)
+                            .transition(.opacity)
+                    }
                     
                     VStack(spacing: 6) {
                         Text("Pro tip")
@@ -422,29 +440,42 @@ struct AIProcessingView: View {
         }
         .onAppear {
             // Start animations
-            withAnimation(.easeInOut(duration: MotionTuning.seconds(2)).repeatForever(autoreverses: true)) {
-                isAnimating = true
-            }
-
-            withAnimation(.easeInOut(duration: MotionTuning.seconds(6)).repeatForever(autoreverses: true)) {
-                ambientShift = true
-            }
-
-            withAnimation(.easeInOut(duration: MotionTuning.seconds(1)).repeatForever(autoreverses: true)) {
-                sparkleScale = 1.2
-            }
-            
-            withAnimation(.easeInOut(duration: MotionTuning.seconds(1.7)).repeatForever(autoreverses: true)) {
-                tipPulse = true
-            }
-
-            withAnimation(.easeInOut(duration: MotionTuning.seconds(0.6))) {
+            if reduceMotion {
+                isAnimating = false
+                ambientShift = false
+                sparkleScale = 1.0
+                tipPulse = false
                 textOpacity = 1.0
+            } else {
+                withAnimation(.easeInOut(duration: MotionTuning.seconds(2)).repeatForever(autoreverses: true)) {
+                    isAnimating = true
+                }
+
+                withAnimation(.easeInOut(duration: MotionTuning.seconds(6)).repeatForever(autoreverses: true)) {
+                    ambientShift = true
+                }
+
+                withAnimation(.easeInOut(duration: MotionTuning.seconds(1)).repeatForever(autoreverses: true)) {
+                    sparkleScale = 1.2
+                }
+
+                withAnimation(.easeInOut(duration: MotionTuning.seconds(1.7)).repeatForever(autoreverses: true)) {
+                    tipPulse = true
+                }
+
+                withAnimation(.easeInOut(duration: MotionTuning.seconds(0.6))) {
+                    textOpacity = 1.0
+                }
             }
 
             GrowthLoopManager.shared.trackWaitingGameShown(hasBothPhotos: hasBothPhotos)
             startButtonShakeTimer()
             lastMilestonePhase = processingMilestone.phase
+            predictedDuration = estimatedDurationSeconds()
+            processingStartedAt = Date()
+            predictedProgress = processingMilestone.phase.progressFraction
+            predictedRemainingSeconds = Int(ceil(predictedDuration))
+            startProgressTimer()
             applyMilestone(phase: processingMilestone.phase)
             startTipRotation()
         }
@@ -460,6 +491,8 @@ struct AIProcessingView: View {
             autoAdvanceTask = nil
             statusResetTask?.cancel()
             statusResetTask = nil
+            progressTimer?.invalidate()
+            progressTimer = nil
             if !didLaunchGame {
                 GrowthLoopManager.shared.trackWaitingGameDismissed()
             }
@@ -467,6 +500,7 @@ struct AIProcessingView: View {
     }
 
     private func startButtonShakeTimer() {
+        guard !reduceMotion else { return }
         buttonShakeTimer?.invalidate()
         buttonShakeTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
             Task { @MainActor in
@@ -494,6 +528,7 @@ struct AIProcessingView: View {
     }
 
     private func startTipRotation() {
+        guard !reduceMotion else { return }
         tipTimer?.invalidate()
         tipTimer = Timer.scheduledTimer(withTimeInterval: MotionTuning.seconds(2.6), repeats: true) { _ in
             Task { @MainActor in
@@ -504,10 +539,59 @@ struct AIProcessingView: View {
         }
     }
 
+    private func estimatedDurationSeconds() -> TimeInterval {
+        let baseline = GrowthLoopManager.shared.estimatedRecipeWaitLatency
+        let multiplier = hasBothPhotos ? 1.15 : 1.0
+        return min(max(baseline * multiplier, 2.8), 22.0)
+    }
+
+    private func startProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
+            Task { @MainActor in
+                updatePredictedProgress()
+            }
+        }
+        if let progressTimer {
+            RunLoop.main.add(progressTimer, forMode: .common)
+        }
+    }
+
+    private func updatePredictedProgress() {
+        switch processingMilestone.phase {
+        case .completed:
+            predictedProgress = 1.0
+            predictedRemainingSeconds = 0
+            return
+        case .failed:
+            predictedProgress = max(predictedProgress, processingMilestone.phase.progressFraction)
+            predictedRemainingSeconds = nil
+            return
+        default:
+            break
+        }
+
+        let elapsed = Date().timeIntervalSince(processingStartedAt)
+        let trajectory = min(max(elapsed / max(predictedDuration, 0.5), 0), 0.92)
+        if trajectory > predictedProgress {
+            withAnimation(.linear(duration: reduceMotion ? 0 : 0.18)) {
+                predictedProgress = trajectory
+            }
+        }
+
+        let remaining = max(Int(ceil(predictedDuration - elapsed)), 0)
+        predictedRemainingSeconds = remaining
+    }
+
     private func applyMilestone(phase: CameraProcessingPhase) {
-        withAnimation(.easeInOut(duration: MotionTuning.seconds(0.35))) {
+        withAnimation(
+            reduceMotion
+                ? .linear(duration: 0)
+                : .easeInOut(duration: MotionTuning.seconds(0.35))
+        ) {
             backendProgress = phase.progressFraction
         }
+        predictedProgress = max(predictedProgress, phase.progressFraction * 0.92)
 
         if phase != lastMilestonePhase {
             statusResetTask?.cancel()
@@ -515,6 +599,8 @@ struct AIProcessingView: View {
             lastMilestonePhase = phase
             switch phase {
             case .completed:
+                predictedProgress = 1.0
+                predictedRemainingSeconds = 0
                 if !reduceMotion {
                     withAnimation(.spring(response: MotionTuning.seconds(0.48), dampingFraction: 0.7)) {
                         completionBurst = true
@@ -522,30 +608,52 @@ struct AIProcessingView: View {
                     }
                 }
                 UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                withAnimation(.spring(response: MotionTuning.seconds(0.36), dampingFraction: 0.65)) {
+                withAnimation(
+                    reduceMotion
+                        ? .linear(duration: 0)
+                        : .spring(response: MotionTuning.seconds(0.36), dampingFraction: 0.65)
+                ) {
                     statusBadgePulse = true
                 }
                 statusResetTask = Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 650_000_000)
-                    withAnimation(.easeOut(duration: MotionTuning.seconds(0.3))) {
+                    withAnimation(
+                        reduceMotion
+                            ? .linear(duration: 0)
+                            : .easeOut(duration: MotionTuning.seconds(0.3))
+                    ) {
                         statusBadgePulse = false
                         completionBurst = false
                         completionBurstScale = 0.85
                     }
                 }
             case .failed:
+                predictedRemainingSeconds = nil
                 UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                withAnimation(.easeInOut(duration: MotionTuning.seconds(0.22))) {
+                withAnimation(
+                    reduceMotion
+                        ? .linear(duration: 0)
+                        : .easeInOut(duration: MotionTuning.seconds(0.22))
+                ) {
                     statusBadgePulse = true
                 }
                 statusResetTask = Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 500_000_000)
-                    withAnimation(.easeOut(duration: MotionTuning.seconds(0.25))) {
+                    withAnimation(
+                        reduceMotion
+                            ? .linear(duration: 0)
+                            : .easeOut(duration: MotionTuning.seconds(0.25))
+                    ) {
                         statusBadgePulse = false
                     }
                 }
             default:
-                withAnimation(.easeInOut(duration: MotionTuning.seconds(0.2))) {
+                predictedDuration = estimatedDurationSeconds()
+                withAnimation(
+                    reduceMotion
+                        ? .linear(duration: 0)
+                        : .easeInOut(duration: MotionTuning.seconds(0.2))
+                ) {
                     statusBadgePulse = phase == .waitingForRecipes || phase == .uploadingPhotos
                     completionBurst = false
                     completionBurstScale = 0.85

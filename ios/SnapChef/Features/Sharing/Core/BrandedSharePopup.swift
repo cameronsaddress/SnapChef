@@ -557,10 +557,21 @@ struct BrandedSharePopup: View {
         
         UIPasteboard.general.setItems(pasteboardItems, options: pasteboardOptions)
         
-        // Include Facebook App ID in URL scheme for proper attribution
-        let facebookAppId = "YOUR_FACEBOOK_APP_ID"  // Will be replaced with actual ID
-        
-        if let url = URL(string: "instagram-stories://share?source_application=\(facebookAppId)") {
+        let configuredFacebookAppId: String? = {
+            guard let appId = Bundle.main.object(forInfoDictionaryKey: "FacebookAppID") as? String else {
+                return nil
+            }
+            let trimmed = appId.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty,
+                  !trimmed.contains("YOUR_"),
+                  !trimmed.hasPrefix("$(") else {
+                return nil
+            }
+            return trimmed
+        }()
+
+        if let configuredFacebookAppId,
+           let url = URL(string: "instagram-stories://share?source_application=\(configuredFacebookAppId)") {
             UIApplication.shared.open(url) { success in
                 if !success {
                     // Try without Facebook App ID as fallback

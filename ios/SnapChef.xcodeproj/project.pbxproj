@@ -459,6 +459,8 @@
 		FBA1C719280079FC83D76F2E /* SDKInitializer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SDKInitializer.swift; path = SnapChef/Features/Sharing/Core/SDKInitializer.swift; sourceTree = "<group>"; };
 		FBC05392351018737EED0737 /* RecipeLikeManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RecipeLikeManager.swift; path = SnapChef/Core/Services/RecipeLikeManager.swift; sourceTree = "<group>"; };
 		FE10EDDC2438467DBDDE607B /* CloudKitAuthView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudKitAuthView.swift; path = SnapChef/Features/Authentication/CloudKitAuthView.swift; sourceTree = "<group>"; };
+		B7A11C0F4D6E7A8901234567 /* SnapChef.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = SnapChef.xcconfig; sourceTree = "<group>"; };
+		B7A11C0F4D6E7A8901234568 /* LocalSecrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = LocalSecrets.xcconfig.example; sourceTree = "<group>"; };
 		A1F0B001C0FFEE0000000011 /* NotificationPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPolicyTests.swift; sourceTree = "<group>"; };
 		A1F0B001C0FFEE0000000012 /* SnapChefTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SnapChefTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1F0B001C0FFEE0000000013 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
@@ -515,6 +517,7 @@
 			children = (
 				027AD74E091AC56960637058 /* Products */,
 				C5652B40604108248A1E9076 /* Frameworks */,
+				B7A11C0F4D6E7A8901234569 /* Config */,
 				F4737935B5BA6D0B9ABCEB27 /* SnapChef */,
 				A1F0B001C0FFEE0000000021 /* SnapChefTests */,
 				FAE14391640BA3821562690E /*  */,
@@ -533,6 +536,15 @@
 				2186F45DBCD7974F4B5B5860 /* LocalRecipeDatabase.swift */,
 			);
 			name = AIPersonality;
+			sourceTree = "<group>";
+		};
+		B7A11C0F4D6E7A8901234569 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				B7A11C0F4D6E7A8901234567 /* SnapChef.xcconfig */,
+				B7A11C0F4D6E7A8901234568 /* LocalSecrets.xcconfig.example */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		18F8D28B70FB15FE022669AB /* Platforms */ = {
@@ -1582,13 +1594,14 @@
 /* Begin XCBuildConfiguration section */
 		506E7A0E369F7C89CA737788 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B7A11C0F4D6E7A8901234567 /* SnapChef.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = SnapChef/SnapChef.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SnapChef/Info.plist;
@@ -1605,7 +1618,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.snapchefapp.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -1744,13 +1757,14 @@
 		};
 		D8C8648598E80D50933E1963 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B7A11C0F4D6E7A8901234567 /* SnapChef.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = "SnapChef/SnapChef-Debug.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SnapChef/Info.plist;
@@ -1767,7 +1781,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.snapchefapp.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

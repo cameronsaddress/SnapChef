@@ -1,6 +1,7 @@
 import SwiftUI
 import os.log
 import CloudKit
+import Foundation
 
 // MARK: - Comprehensive Error Types
 enum SnapChefError: LocalizedError, Equatable {
@@ -120,16 +121,35 @@ enum SnapChefError: LocalizedError, Equatable {
         switch self {
         case .networkError(_, _):
             return "We're having trouble connecting. Please check your internet and try again."
-        case .apiError(_, let statusCode, _):
+        case .apiError(let message, let statusCode, _):
+            let normalizedMessage = normalizedAPIMessage(message)
             if let code = statusCode {
                 switch code {
                 case 429: return "Too many requests. Please wait a moment and try again."
+                case 400, 404, 405, 409, 413, 415, 422:
+                    if let normalizedMessage {
+                        return normalizedMessage
+                    }
+                    return "We couldn't process this request. Please retake the photo and try again."
                 case 500...599: return "Our servers are having issues. Please try again in a few minutes."
-                case 401, 403: return "Authentication expired. Please sign in again."
-                default: return "Our chef is taking a break. Please try again in a moment."
+                case 401, 403:
+                    if let normalizedMessage,
+                       normalizedMessage.localizedCaseInsensitiveContains("api-key")
+                        || normalizedMessage.localizedCaseInsensitiveContains("api key") {
+                        return "Service authentication is invalid. Please try again shortly."
+                    }
+                    return "Authentication expired. Please sign in again."
+                default:
+                    if let normalizedMessage {
+                        return normalizedMessage
+                    }
+                    return "Service temporarily unavailable. Please try again shortly."
                 }
             }
-            return "Our chef is taking a break. Please try again in a moment."
+            if let normalizedMessage {
+                return normalizedMessage
+            }
+            return "Service temporarily unavailable. Please try again shortly."
         case .timeoutError(_, _):
             return "The request took too long. Please check your connection and try again."
         case .rateLimitError(_, let retryAfter):
@@ -183,6 +203,36 @@ enum SnapChefError: LocalizedError, Equatable {
         case .unknown(_, _):
             return "Something unexpected happened. Please try again."
         }
+    }
+
+    private func normalizedAPIMessage(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        var candidate = trimmed
+        if candidate.lowercased().hasPrefix("server error:") {
+            candidate = candidate.dropFirst("server error:".count)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        if let data = candidate.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let detail = json["detail"] as? String, !detail.isEmpty {
+                return detail
+            }
+            if let message = json["message"] as? String, !message.isEmpty {
+                return message
+            }
+            if let error = json["error"] as? String, !error.isEmpty {
+                return error
+            }
+        }
+
+        if candidate.count > 240 {
+            return nil
+        }
+
+        return candidate
     }
 
     var actionTitle: String {
@@ -424,12 +474,150 @@ class NetworkMonitor: ObservableObject {
 // MARK: - Crash Reporting Service
 actor CrashReportingService {
     static let shared = CrashReportingService()
-    
-    private init() {}
-    
+
+    private struct CriticalErrorReport: Codable {
+        let id: UUID
+        let timestamp: Date
+        let payload: [String: String]
+    }
+
+    private struct CrashUploadEnvelope: Codable {
+        let reportId: String
+        let timestamp: String
+        let payload: [String: String]
+        let appVersion: String
+        let buildNumber: String
+    }
+
+    private let reportFileName = "critical_error_reports.json"
+    private let maxStoredReports = 200
+    private let crashReportEndpointURL: URL?
+    private let crashReportAPIKey: String?
+    private let uploadSession: URLSession
+
+    private init() {
+        crashReportEndpointURL = Self.configuredURLValue("SNAPCHEF_CRASH_REPORT_URL")
+        crashReportAPIKey = Self.configuredStringValue("SNAPCHEF_CRASH_REPORT_API_KEY")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 20
+        uploadSession = URLSession(configuration: configuration)
+    }
+
     func reportCriticalError(_ data: [String: String]) async {
-        // Implementation for crash reporting
-        print("Critical error reported: \(data)")
+        var reports = loadStoredReports()
+        let report = CriticalErrorReport(
+            id: UUID(),
+            timestamp: Date(),
+            payload: data
+        )
+        reports.append(report)
+
+        if reports.count > maxStoredReports {
+            reports.removeFirst(reports.count - maxStoredReports)
+        }
+
+        saveReports(reports)
+
+        if let endpoint = crashReportEndpointURL {
+            let uploaded = await upload(report, to: endpoint)
+            #if DEBUG
+            if uploaded {
+                print("✅ Uploaded critical error report: \(report.id.uuidString)")
+            } else {
+                print("⚠️ Failed to upload critical error report: \(report.id.uuidString)")
+            }
+            #endif
+        }
+
+        #if DEBUG
+        print("🚨 Stored critical error report: \(report.id.uuidString)")
+        #endif
+    }
+
+    func recentCriticalErrorReports(limit: Int = 20) -> [[String: String]] {
+        let reports = loadStoredReports()
+        guard !reports.isEmpty else { return [] }
+        return reports.suffix(max(1, limit)).map { report in
+            var payload = report.payload
+            payload["report_id"] = report.id.uuidString
+            payload["stored_at"] = ISO8601DateFormatter().string(from: report.timestamp)
+            return payload
+        }
+    }
+
+    private func reportsFileURL() -> URL? {
+        do {
+            let appSupport = try FileManager.default.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
+            return appSupport.appendingPathComponent(reportFileName)
+        } catch {
+            return nil
+        }
+    }
+
+    private func loadStoredReports() -> [CriticalErrorReport] {
+        guard let fileURL = reportsFileURL(),
+              let data = try? Data(contentsOf: fileURL) else {
+            return []
+        }
+        return (try? JSONDecoder().decode([CriticalErrorReport].self, from: data)) ?? []
+    }
+
+    private func saveReports(_ reports: [CriticalErrorReport]) {
+        guard let fileURL = reportsFileURL(),
+              let data = try? JSONEncoder().encode(reports) else {
+            return
+        }
+        try? data.write(to: fileURL, options: [.atomic])
+    }
+
+    private func upload(_ report: CriticalErrorReport, to endpoint: URL) async -> Bool {
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let crashReportAPIKey, !crashReportAPIKey.isEmpty {
+            request.setValue(crashReportAPIKey, forHTTPHeaderField: "X-App-API-Key")
+        }
+
+        let envelope = CrashUploadEnvelope(
+            reportId: report.id.uuidString,
+            timestamp: ISO8601DateFormatter().string(from: report.timestamp),
+            payload: report.payload,
+            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
+            buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
+        )
+
+        do {
+            request.httpBody = try JSONEncoder().encode(envelope)
+            let (_, response) = try await uploadSession.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return false }
+            return (200...299).contains(http.statusCode)
+        } catch {
+            return false
+        }
+    }
+
+    private static func configuredURLValue(_ key: String) -> URL? {
+        guard let raw = configuredStringValue(key) else { return nil }
+        return URL(string: raw)
+    }
+
+    private static func configuredStringValue(_ key: String) -> String? {
+        let envValue = ProcessInfo.processInfo.environment[key]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let plistValue = (Bundle.main.object(forInfoDictionaryKey: key) as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let candidate = (envValue?.isEmpty == false ? envValue : nil)
+            ?? (plistValue?.isEmpty == false ? plistValue : nil)
+        guard let candidate else { return nil }
+        guard !candidate.contains("$(") else { return nil }
+        return candidate
     }
 }
 

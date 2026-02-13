@@ -216,6 +216,18 @@ final class NotificationPolicyTests: XCTestCase {
 
         XCTAssertTrue(canSchedule)
     }
+
+    func testTransactionalCriticalPolicyEnforcesMonthlyCap() {
+        XCTAssertTrue(NotificationDeliveryPolicy.transactionalCritical.enforcesMonthlyCap)
+        XCTAssertTrue(NotificationDeliveryPolicy.transactionalCritical.enforcesOneShotDelivery)
+    }
+    
+    func testMonthlyAndTransactionalPoliciesEnforceMonthlyCap() {
+        XCTAssertTrue(NotificationDeliveryPolicy.monthlyEngagement.enforcesMonthlyCap)
+        XCTAssertTrue(NotificationDeliveryPolicy.transactionalNudge.enforcesMonthlyCap)
+        XCTAssertTrue(NotificationDeliveryPolicy.transactionalCritical.enforcesMonthlyCap)
+        XCTAssertTrue(NotificationDeliveryPolicy.transactional.enforcesMonthlyCap)
+    }
 }
 
 final class GrowthLoopManagerTests: XCTestCase {
@@ -357,10 +369,16 @@ final class SocialShareManagerTests: XCTestCase {
     override func setUp() {
         super.setUp()
         defaults.set("REF12345", forKey: referralCodeKey)
+        ShareMomentumStore.clear()
+        ViralMilestoneTracker.reset()
+        ViralCoachMarksProgress.reset()
     }
 
     override func tearDown() {
         defaults.removeObject(forKey: referralCodeKey)
+        ShareMomentumStore.clear()
+        ViralMilestoneTracker.reset()
+        ViralCoachMarksProgress.reset()
         super.tearDown()
     }
 
@@ -412,6 +430,75 @@ final class SocialShareManagerTests: XCTestCase {
         XCTAssertEqual(result.totalConversions, 0)
         XCTAssertEqual(result.pendingRewards, 0)
         XCTAssertEqual(result.claimedRewards, 0)
+    }
+
+    func testShareMomentumStoreReturnsRecentShare() {
+        ShareMomentumStore.record(platform: "TikTok", at: Date())
+        let latest = ShareMomentumStore.latest(maxAge: 600)
+
+        XCTAssertEqual(latest?.platform, "TikTok")
+        XCTAssertNotNil(latest?.sharedAt)
+    }
+
+    func testShareMomentumStoreExpiresStaleShare() {
+        let staleDate = Date().addingTimeInterval(-2_000)
+        ShareMomentumStore.record(platform: "Instagram", at: staleDate)
+        let latest = ShareMomentumStore.latest(maxAge: 300)
+
+        XCTAssertNil(latest)
+    }
+
+    func testViralFunnelProgressTracksNextMilestone() {
+        let progress = ViralFunnelProgress(conversions: 4)
+
+        XCTAssertEqual(progress.achievedMilestone, 3)
+        XCTAssertEqual(progress.nextMilestone, 5)
+        XCTAssertEqual(progress.conversionsToNext, 1)
+        XCTAssertTrue(progress.progressToNext > 0)
+        XCTAssertTrue(progress.progressToNext < 1)
+    }
+
+    func testViralFunnelProgressHandlesTopTier() {
+        let progress = ViralFunnelProgress(conversions: 120)
+
+        XCTAssertEqual(progress.nextMilestone, nil)
+        XCTAssertEqual(progress.conversionsToNext, 0)
+        XCTAssertEqual(progress.progressToNext, 1, accuracy: 0.001)
+        XCTAssertEqual(progress.goalTitle, "Top funnel tier reached")
+    }
+
+    func testViralMilestoneTrackerUnlocksOncePerMilestone() {
+        XCTAssertNil(ViralMilestoneTracker.unlockedMilestone(for: 0))
+        XCTAssertEqual(ViralMilestoneTracker.unlockedMilestone(for: 1), 1)
+        XCTAssertNil(ViralMilestoneTracker.unlockedMilestone(for: 2))
+        XCTAssertEqual(ViralMilestoneTracker.unlockedMilestone(for: 3), 3)
+        XCTAssertNil(ViralMilestoneTracker.unlockedMilestone(for: 3))
+    }
+
+    func testViralMilestoneTrackerResetAllowsReplay() {
+        XCTAssertEqual(ViralMilestoneTracker.unlockedMilestone(for: 5), 5)
+        XCTAssertNil(ViralMilestoneTracker.unlockedMilestone(for: 5))
+
+        ViralMilestoneTracker.reset()
+
+        XCTAssertEqual(ViralMilestoneTracker.unlockedMilestone(for: 5), 5)
+    }
+
+    func testViralCoachMarksProgressRequiresMomentum() {
+        XCTAssertFalse(ViralCoachMarksProgress.shouldPresent(hasMomentum: false))
+        XCTAssertTrue(ViralCoachMarksProgress.shouldPresent(hasMomentum: true))
+    }
+
+    func testViralCoachMarksProgressStopsAfterCompletionUntilReset() {
+        XCTAssertTrue(ViralCoachMarksProgress.shouldPresent(hasMomentum: true))
+
+        ViralCoachMarksProgress.markCompleted()
+
+        XCTAssertFalse(ViralCoachMarksProgress.shouldPresent(hasMomentum: true))
+
+        ViralCoachMarksProgress.reset()
+
+        XCTAssertTrue(ViralCoachMarksProgress.shouldPresent(hasMomentum: true))
     }
 }
 
@@ -505,6 +592,24 @@ final class RootTabWiringTests: XCTestCase {
                 .environmentObject(CloudKitDataManager.shared)
                 .environmentObject(NotificationManager.shared)
         )
+    }
+
+    func testAppTabDefinitionsRemainDeterministic() {
+        XCTAssertEqual(AppTab.allCases.map(\.rawValue), [0, 1, 2, 3, 4, 5])
+        XCTAssertEqual(AppTab.allCases.map(\.tabBarTitle), ["Home", "Snap", "Detective", "Recipes", "Feed", "Profile"])
+        XCTAssertEqual(Set(AppTab.allCases.map(\.icon)).count, AppTab.allCases.count)
+        XCTAssertEqual(AppTab.allCases.map(\.momentTitle), ["Home", "Snap Time", "Detective Mode", "Recipes", "Social Feed", "Profile"])
+    }
+
+    func testOnlyCameraAndDetectiveRequireCameraPermission() {
+        for tab in AppTab.allCases {
+            switch tab {
+            case .camera, .detective:
+                XCTAssertTrue(tab.requiresCameraPermission, "\(tab) should require camera permission")
+            default:
+                XCTAssertFalse(tab.requiresCameraPermission, "\(tab) should not require camera permission")
+            }
+        }
     }
 
     func testRootTabsInitializeIndependently() {
@@ -622,6 +727,40 @@ final class RootTabWiringTests: XCTestCase {
         XCTAssertNotNil(controller.view)
     }
 
+    func testMainTabViewHandlesNavigateToTabNotificationsWithoutCrashing() {
+        let root = MainTabView()
+            .environmentObject(AppState())
+            .environmentObject(UnifiedAuthManager.shared)
+            .environmentObject(DeviceManager())
+            .environmentObject(GamificationManager())
+            .environmentObject(SocialShareManager.shared)
+            .environmentObject(CloudKitService.shared)
+            .environmentObject(CloudKitDataManager.shared)
+            .environmentObject(NotificationManager.shared)
+
+        let controller = UIHostingController(rootView: root)
+        XCTAssertNotNil(controller.view)
+        controller.view.setNeedsLayout()
+        controller.view.layoutIfNeeded()
+
+        for tab in AppTab.allCases {
+            NotificationCenter.default.post(
+                name: .snapchefNavigateToTab,
+                object: nil,
+                userInfo: ["tab": tab.rawValue]
+            )
+        }
+        NotificationCenter.default.post(
+            name: .snapchefNavigateToTab,
+            object: nil,
+            userInfo: ["tab": 999]
+        )
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        controller.view.layoutIfNeeded()
+        XCTAssertNotNil(controller.view)
+    }
+
     func testCameraToResultsHarnessRendersTransitionPath() {
         let root = CameraToResultsHarness(recipe: makeMockRecipe())
             .environmentObject(AppState())
@@ -638,5 +777,76 @@ final class RootTabWiringTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.12))
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
+    }
+}
+
+final class ProductionGuardrailTests: XCTestCase {
+    func testInternalTestCaptureIsDisabledByDefault() {
+        let enabled = CameraView.shouldEnableInternalTestCapture(
+            arguments: [],
+            environment: [:],
+            isDebugBuild: true
+        )
+        XCTAssertFalse(enabled)
+    }
+
+    func testInternalTestCaptureRequiresLaunchArgumentInDebugBuild() {
+        let enabled = CameraView.shouldEnableInternalTestCapture(
+            arguments: ["--snapchef-enable-test-capture"],
+            environment: [:],
+            isDebugBuild: true
+        )
+        XCTAssertFalse(enabled)
+    }
+
+    func testInternalTestCaptureLaunchArgumentAndEnvBackwardCompatibility() {
+        let enabled = CameraView.shouldEnableInternalTestCapture(
+            arguments: ["--snapchef-enable-test-capture"],
+            environment: ["SNAPCHEF_ENABLE_TEST_CAPTURE": "1"],
+            isDebugBuild: true
+        )
+        XCTAssertFalse(enabled)
+    }
+
+    func testInternalTestCaptureIgnoresEnvFlagWithoutLaunchArgument() {
+        let enabled = CameraView.shouldEnableInternalTestCapture(
+            arguments: [],
+            environment: ["SNAPCHEF_ENABLE_TEST_CAPTURE": "1"],
+            isDebugBuild: true
+        )
+        XCTAssertFalse(enabled)
+    }
+
+    func testInternalTestCaptureAlwaysDisabledOutsideDebugBuild() {
+        let enabled = CameraView.shouldEnableInternalTestCapture(
+            arguments: ["--snapchef-enable-test-capture"],
+            environment: ["SNAPCHEF_ENABLE_TEST_CAPTURE": "1"],
+            isDebugBuild: false
+        )
+        XCTAssertFalse(enabled)
+    }
+
+    func testAPIErrorMessageParsesJSONPayloadForUserFacingMessage() {
+        let error = SnapChefError.apiError("{\"detail\":\"Invalid or missing X-App-API-Key header\"}", statusCode: 401)
+        XCTAssertEqual(error.userFriendlyMessage, "Service authentication is invalid. Please try again shortly.")
+    }
+
+    func testAPIErrorMessageUsesServerMessageWhenStatusUnknown() {
+        let error = SnapChefError.apiError("{\"message\":\"Chef backend warming up\"}", statusCode: 418)
+        XCTAssertEqual(error.userFriendlyMessage, "Chef backend warming up")
+    }
+
+    func testOnlyCameraAndDetectiveTabsRequireCameraPermission() {
+        let requiringPermission = AppTab.allCases.filter(\.requiresCameraPermission)
+        XCTAssertEqual(Set(requiringPermission), Set([.camera, .detective]))
+    }
+
+    func testAppTabRawValuesRemainStable() {
+        XCTAssertEqual(AppTab.home.rawValue, 0)
+        XCTAssertEqual(AppTab.camera.rawValue, 1)
+        XCTAssertEqual(AppTab.detective.rawValue, 2)
+        XCTAssertEqual(AppTab.recipes.rawValue, 3)
+        XCTAssertEqual(AppTab.socialFeed.rawValue, 4)
+        XCTAssertEqual(AppTab.profile.rawValue, 5)
     }
 }

@@ -836,7 +836,7 @@ final class GamificationViewModel: ObservableObject {
     
     // Subscription management
     @Published var subscriptionManager = SubscriptionManager.shared
-    @Published var freeUsesRemaining: Int = 10
+    @Published var freeUsesRemaining: Int = 3
     
     init() {
         initializeChallengeSystem()

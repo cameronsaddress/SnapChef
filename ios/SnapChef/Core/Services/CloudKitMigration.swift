@@ -1,3 +1,7 @@
+// Deprecated/maintenance-only: CloudKit migrations should run from a separate admin tool,
+// not inside the production app runtime.
+#if false
+
 import Foundation
 import CloudKit
 
@@ -5,7 +9,7 @@ import CloudKit
 @MainActor
 class CloudKitMigration {
     static let shared = CloudKitMigration()
-    private let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+    private let database = CloudKitRuntimeSupport.makeContainer().publicCloudDatabase
     
     private init() {}
     
@@ -230,8 +234,9 @@ class CloudKitMigration {
                     userRecord[CKField.User.username] = generatedUsername
                     
                     // If displayName is missing or "Anonymous Chef", update it too
-                    let currentDisplayName = userRecord[CKField.User.displayName] as? String
-                    if currentDisplayName == nil || currentDisplayName == "Anonymous Chef" || currentDisplayName!.isEmpty {
+                    let currentDisplayName = (userRecord[CKField.User.displayName] as? String)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if currentDisplayName?.isEmpty ?? true || currentDisplayName == "Anonymous Chef" {
                         userRecord[CKField.User.displayName] = generatedUsername.capitalized
                     }
                     
@@ -263,3 +268,5 @@ class CloudKitMigration {
         print("✅ Full migration complete!")
     }
 }
+
+#endif

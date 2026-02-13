@@ -7,8 +7,8 @@ import AppTrackingTransparency
 @MainActor
 final class DeviceManager: ObservableObject {
     @Published var deviceId: String = ""
-    @Published var freeUsesRemaining: Int = 10 // Increased for testing
-    @Published var freeSavesRemaining: Int = 10 // Increased for testing
+    @Published var freeUsesRemaining: Int = 3
+    @Published var freeSavesRemaining: Int = 3
     @Published var hasUnlimitedAccess: Bool = false
     @Published var isBlocked: Bool = false
     
@@ -23,9 +23,12 @@ final class DeviceManager: ObservableObject {
     private let deviceIdKey = "com.snapchef.deviceId"
     private let freeUsesKey = "com.snapchef.freeUses"
     private let freeSavesKey = "com.snapchef.freeSaves"
+    private let defaultFreeUses = 3
+    private let defaultFreeSaves = 3
 
     init() {
         loadDeviceId()
+        loadFreeUses()
         loadFreeSaves()
         loadPerformanceSettings()
         setupLowPowerModeObserver()
@@ -46,14 +49,23 @@ final class DeviceManager: ObservableObject {
         }
     }
 
-    private func loadFreeSaves() {
-        let savedCount = UserDefaults.standard.integer(forKey: freeSavesKey)
-        if savedCount > 0 {
-            freeSavesRemaining = savedCount
+    private func loadFreeUses() {
+        let savedCount = UserDefaults.standard.object(forKey: freeUsesKey) as? Int
+        if let savedCount {
+            freeUsesRemaining = max(0, savedCount)
         } else {
-            // First time - set to 10 free saves for testing
-            freeSavesRemaining = 10
-            UserDefaults.standard.set(10, forKey: freeSavesKey)
+            freeUsesRemaining = defaultFreeUses
+            UserDefaults.standard.set(defaultFreeUses, forKey: freeUsesKey)
+        }
+    }
+
+    private func loadFreeSaves() {
+        let savedCount = UserDefaults.standard.object(forKey: freeSavesKey) as? Int
+        if let savedCount {
+            freeSavesRemaining = max(0, savedCount)
+        } else {
+            freeSavesRemaining = defaultFreeSaves
+            UserDefaults.standard.set(defaultFreeSaves, forKey: freeSavesKey)
         }
     }
 
@@ -91,65 +103,42 @@ final class DeviceManager: ObservableObject {
 
     func consumeFreeUse() async -> Bool {
         guard freeUsesRemaining > 0 else { return false }
-
-        // For development, mock the API response
-        #if DEBUG
-        // Simulate API delay
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-
-        // Decrement the free uses locally
-        self.freeUsesRemaining -= 1
-        self.isBlocked = false
-
-        return true
-        #else
         do {
             let response = try await NetworkManager.shared.consumeFreeUse(deviceId: deviceId)
 
             self.freeUsesRemaining = response.remainingUses
             self.isBlocked = response.isBlocked
+            UserDefaults.standard.set(self.freeUsesRemaining, forKey: self.freeUsesKey)
 
             return !response.isBlocked && response.success
         } catch {
-            print("Error consuming free use: \(error)")
-            return false
+            print("Error consuming free use from backend, falling back to local quota: \(error)")
+            self.freeUsesRemaining = max(0, self.freeUsesRemaining - 1)
+            self.isBlocked = self.freeUsesRemaining <= 0
+            UserDefaults.standard.set(self.freeUsesRemaining, forKey: self.freeUsesKey)
+            return !self.isBlocked
         }
-        #endif
     }
 
     func consumeFreeSave() async -> Bool {
         guard freeSavesRemaining > 0 else { return false }
-
-        // For development, mock the API response
-        #if DEBUG
-        // Simulate API delay
-        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
-
-        // Decrement the free saves locally
-        self.freeSavesRemaining -= 1
-        UserDefaults.standard.set(self.freeSavesRemaining, forKey: self.freeSavesKey)
-
-        return true
-        #else
-        // In production, this would call the API
         self.freeSavesRemaining -= 1
         UserDefaults.standard.set(self.freeSavesRemaining, forKey: self.freeSavesKey)
         return true
-        #endif
     }
 
     private func fetchDeviceStatus() async {
         do {
             let status = try await NetworkManager.shared.getDeviceStatus(deviceId: deviceId)
 
-            // For testing, override with 10 free uses
-            self.freeUsesRemaining = 10
+            self.freeUsesRemaining = max(0, status.freeUsesRemaining)
             self.isBlocked = status.isBlocked
             self.hasUnlimitedAccess = status.hasSubscription
+            UserDefaults.standard.set(self.freeUsesRemaining, forKey: self.freeUsesKey)
         } catch {
             print("Error fetching device status: \(error)")
-            // If network fails, ensure we have 10 free uses for testing
-            self.freeUsesRemaining = 10
+            // Keep local quota state when backend status is unavailable.
+            self.isBlocked = self.freeUsesRemaining <= 0
         }
     }
 

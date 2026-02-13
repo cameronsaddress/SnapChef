@@ -447,7 +447,6 @@ struct StudioCameraBottomDock: View {
     let fridgePhoto: UIImage?
     @Binding var triggerAnimation: Bool
     let onCapture: () -> Void
-    let onDebugTest: () -> Void
 
     var body: some View {
         VStack(spacing: 18) {
@@ -493,21 +492,6 @@ struct StudioCameraBottomDock: View {
                 isDisabled: isProcessing || !isSessionReady,
                 triggerAnimation: $triggerAnimation
             )
-
-            #if DEBUG
-            Button(action: onDebugTest) {
-                Label("Run Test Capture", systemImage: "photo.on.rectangle.angled")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(
-                        Capsule()
-                            .fill(Color.orange.opacity(0.9))
-                    )
-            }
-            .buttonStyle(.plain)
-            #endif
         }
         .padding(.bottom, 46)
     }

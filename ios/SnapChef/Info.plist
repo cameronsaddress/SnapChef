@@ -100,13 +100,19 @@
     <key>TikTokClientSecret</key>
     <string>$(TIKTOK_CLIENT_SECRET)</string>
     <key>API_BASE_URL</key>
-    <string>https://api-dev.snapchef.app</string>
+    <string>$(API_BASE_URL)</string>
     <key>SNAPCHEF_API_KEY</key>
     <string>$(SNAPCHEF_API_KEY)</string>
+    <key>APP_API_KEY</key>
+    <string>$(APP_API_KEY)</string>
+    <key>SNAPCHEF_CRASH_REPORT_URL</key>
+    <string>$(SNAPCHEF_CRASH_REPORT_URL)</string>
+    <key>SNAPCHEF_CRASH_REPORT_API_KEY</key>
+    <string>$(SNAPCHEF_CRASH_REPORT_API_KEY)</string>
     <key>FacebookAppID</key>
-    <string>YOUR_FACEBOOK_APP_ID</string>
+    <string>$(FACEBOOK_APP_ID)</string>
     <key>FacebookClientToken</key>
-    <string>YOUR_FACEBOOK_CLIENT_TOKEN</string>
+    <string>$(FACEBOOK_CLIENT_TOKEN)</string>
     <key>FacebookDisplayName</key>
     <string>SnapChef</string>
 </dict>

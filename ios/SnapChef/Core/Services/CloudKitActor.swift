@@ -11,21 +11,55 @@ import Foundation
 /// Actor that handles all CloudKit operations in a thread-safe manner
 /// This prevents dispatch queue assertion failures by ensuring consistent execution context
 actor CloudKitActor {
-    private lazy var container: CKContainer = {
-        CKContainer.default()
+    private let containerIdentifier: String
+
+    private lazy var container: CKContainer? = {
+        CloudKitRuntimeSupport.makeContainer(identifier: containerIdentifier)
     }()
-    private lazy var database: CKDatabase = {
-        container.publicCloudDatabase
-    }()
+
+    private var database: CKDatabase? {
+        container?.publicCloudDatabase
+    }
+
+    private func unavailableRuntimeError(for operation: String) -> Error {
+        NSError(
+            domain: "CloudKitRuntimeSupport",
+            code: 1,
+            userInfo: [
+                NSLocalizedDescriptionKey: "CloudKit unavailable for \(operation) in current runtime."
+            ]
+        )
+    }
+
+    private func requireDatabase(for operation: String) throws -> CKDatabase {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            throw unavailableRuntimeError(for: operation)
+        }
+        guard let database else {
+            throw unavailableRuntimeError(for: operation)
+        }
+        return database
+    }
+
+    private func requireContainer(for operation: String) throws -> CKContainer {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            throw unavailableRuntimeError(for: operation)
+        }
+        guard let container else {
+            throw unavailableRuntimeError(for: operation)
+        }
+        return container
+    }
     
     init(containerIdentifier: String = CloudKitConfig.containerIdentifier) {
-        _ = containerIdentifier
+        self.containerIdentifier = containerIdentifier
     }
     
     // MARK: - Record Operations
     
     /// Fetch a single record by ID using operation-based API to avoid dispatch queue issues
     func fetchRecord(with id: CKRecord.ID) async throws -> CKRecord {
+        let database = try requireDatabase(for: "fetchRecord")
         return try await withCheckedThrowingContinuation { continuation in
             let operation = CKFetchRecordsOperation(recordIDs: [id])
             
@@ -58,6 +92,7 @@ actor CloudKitActor {
     
     /// Save a single record using operation-based API to avoid dispatch queue issues
     func saveRecord(_ record: CKRecord) async throws -> CKRecord {
+        let database = try requireDatabase(for: "saveRecord")
         return try await withCheckedThrowingContinuation { continuation in
             let operation = CKModifyRecordsOperation(recordsToSave: [record], recordIDsToDelete: nil)
             
@@ -91,6 +126,7 @@ actor CloudKitActor {
     
     /// Delete a record by ID
     func deleteRecordByID(_ id: CKRecord.ID) async throws {
+        let database = try requireDatabase(for: "deleteRecordByID")
         try await database.deleteRecord(withID: id)
     }
     
@@ -98,6 +134,7 @@ actor CloudKitActor {
     
     /// Execute a query using operation-based API to avoid dispatch queue issues
     func executeQuery(_ query: CKQuery, in zone: CKRecordZone.ID? = nil) async throws -> [CKRecord] {
+        let database = try requireDatabase(for: "executeQuery")
         return try await withCheckedThrowingContinuation { continuation in
             let operation = CKQueryOperation(query: query)
             var records: [CKRecord] = []
@@ -146,6 +183,7 @@ actor CloudKitActor {
     
     /// Execute a query with desired keys using operation-based API
     func executeQuery(_ query: CKQuery, desiredKeys: [String]?, resultsLimit: Int = CKQueryOperation.maximumResults) async throws -> [CKRecord] {
+        let database = try requireDatabase(for: "executeQuery(desiredKeys:resultsLimit:)")
         return try await withCheckedThrowingContinuation { continuation in
             let operation = CKQueryOperation(query: query)
             var records: [CKRecord] = []
@@ -196,6 +234,7 @@ actor CloudKitActor {
     
     /// Modify multiple records at once
     func modifyRecords(recordsToSave: [CKRecord]?, recordIDsToDelete: [CKRecord.ID]?) async throws -> ([CKRecord], [CKRecord.ID]) {
+        let database = try requireDatabase(for: "modifyRecords")
         let (saveResults, deleteResults) = try await database.modifyRecords(
             saving: recordsToSave ?? [],
             deleting: recordIDsToDelete ?? []
@@ -222,11 +261,13 @@ actor CloudKitActor {
     
     /// Create a subscription
     func createSubscription(_ subscription: CKSubscription) async throws -> CKSubscription {
+        let database = try requireDatabase(for: "createSubscription")
         return try await database.save(subscription)
     }
     
     /// Delete a subscription
     func deleteSubscription(with id: CKSubscription.ID) async throws {
+        let database = try requireDatabase(for: "deleteSubscription")
         try await database.deleteSubscription(withID: id)
     }
     
@@ -234,11 +275,13 @@ actor CloudKitActor {
     
     /// Fetch the current user record ID
     func fetchUserRecordID() async throws -> CKRecord.ID {
+        let container = try requireContainer(for: "fetchUserRecordID")
         return try await container.userRecordID()
     }
     
     /// Check if user is signed into iCloud
     func checkAccountStatus() async throws -> CKAccountStatus {
+        let container = try requireContainer(for: "checkAccountStatus")
         return try await container.accountStatus()
     }
 }

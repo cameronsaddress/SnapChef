@@ -3,6 +3,12 @@
 import Foundation
 import UIKit
 
+private func apiDebugLog(_ message: @autoclosure () -> String) {
+    #if DEBUG
+    print(message())
+    #endif
+}
+
 // MARK: - UIImage Extension for Resizing
 extension UIImage {
     /// Resizes the image to fit within the specified maximum dimension while maintaining aspect ratio
@@ -164,15 +170,58 @@ final class SnapChefAPIManager {
         return instance
     }()
 
-    private let serverBaseURL = "https://snapchef-server.onrender.com"
+    private static let fallbackServerBaseURL = "https://snapchef-server.onrender.com"
+    private let serverBaseURL: String
     private let session: URLSession
+    private var lastWarmupAttemptAt: Date?
+    private let warmupCooldownSeconds: TimeInterval = 90
 
     private init() {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 120 // 2 minutes timeout
         configuration.timeoutIntervalForResource = 120
+        self.serverBaseURL = Self.resolvedServerBaseURL()
         self.session = URLSession(configuration: configuration)
     } // Private initializer for singleton
+
+    private static func resolvedServerBaseURL() -> String {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String else {
+            return fallbackServerBaseURL
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return fallbackServerBaseURL }
+        return trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+    }
+
+    func ensureCredentialsConfigured() throws {
+        guard appAPIKeyCredential() != nil else {
+            throw APIError.unauthorized("Missing SNAPCHEF_API_KEY (or APP_API_KEY). Configure the app API key in build settings or runtime environment.")
+        }
+    }
+
+    /// Pre-warm Render by touching /health before expensive camera uploads.
+    func warmupBackendIfNeeded(force: Bool = false) async {
+        let now = Date()
+        if !force, let lastWarmupAttemptAt,
+           now.timeIntervalSince(lastWarmupAttemptAt) < warmupCooldownSeconds {
+            return
+        }
+        lastWarmupAttemptAt = now
+
+        guard let url = URL(string: "\(serverBaseURL)/health") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 8
+
+        do {
+            let (_, response) = try await session.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse {
+                apiDebugLog("🔥 Backend warmup /health status: \(httpResponse.statusCode)")
+            }
+        } catch {
+            apiDebugLog("⚠️ Backend warmup failed: \(error.localizedDescription)")
+        }
+    }
 
     enum RecipeGenerationMilestone: Sendable {
         case requestPrepared
@@ -181,6 +230,58 @@ final class SnapChefAPIManager {
         case responseDecoded
         case completed
         case failed
+    }
+
+    private struct APICredential {
+        let headerField: String
+        let headerValue: String
+        let mode: String
+    }
+
+    private func appAPIKeyCredential() -> APICredential? {
+        if let apiKey = KeychainManager.shared.getAPIKey()?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !apiKey.isEmpty {
+            return APICredential(
+                headerField: "X-App-API-Key",
+                headerValue: apiKey,
+                mode: "legacy_api_key"
+            )
+        }
+        return nil
+    }
+
+    private func bearerCredential() -> APICredential? {
+        if let authToken = KeychainManager.shared.getAuthToken()?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !authToken.isEmpty {
+            return APICredential(
+                headerField: "Authorization",
+                headerValue: "Bearer \(authToken)",
+                mode: "bearer_token"
+            )
+        }
+
+        return nil
+    }
+
+    private func preferredCredential() -> APICredential? {
+        appAPIKeyCredential() ?? bearerCredential()
+    }
+
+    private func applyAuthenticationHeaders(
+        to request: inout URLRequest,
+        requiresAppAPIKey: Bool = false
+    ) throws {
+        let credential = requiresAppAPIKey ? appAPIKeyCredential() : preferredCredential()
+        guard let credential else {
+            let message = requiresAppAPIKey
+                ? "Missing SNAPCHEF_API_KEY (or APP_API_KEY). Configure the app API key to call SnapChef rendering endpoints."
+                : "API credentials missing. Sign in again or configure the API key."
+            throw APIError.unauthorized(message)
+        }
+        request.setValue(credential.headerValue, forHTTPHeaderField: credential.headerField)
+        request.setValue(credential.mode, forHTTPHeaderField: "X-SnapChef-Auth-Mode")
     }
 
     /// Creates a multipart/form-data URLRequest for the API.
@@ -202,11 +303,7 @@ final class SnapChefAPIManager {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
-        // Set the authentication header using the securely stored key
-        guard let apiKey = KeychainManager.shared.getAPIKey() else {
-            throw APIError.unauthorized("API key not found. Please reinstall the app.")
-        }
-        request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
+        try applyAuthenticationHeaders(to: &request, requiresAppAPIKey: true)
         
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -226,11 +323,11 @@ final class SnapChefAPIManager {
         // Append dietary_restrictions (as a JSON array string)
         if !dietaryRestrictions.isEmpty {
             guard let restrictionsData = try? JSONSerialization.data(withJSONObject: dietaryRestrictions, options: []) else {
-                print("Failed to serialize dietary restrictions")
+                apiDebugLog("Failed to serialize dietary restrictions")
                 throw APIError.invalidRequestData
             }
             guard let restrictionsString = String(data: restrictionsData, encoding: .utf8) else {
-                print("Failed to convert dietary restrictions to string")
+                apiDebugLog("Failed to convert dietary restrictions to string")
                 throw APIError.invalidRequestData
             }
             appendFormField(name: "dietary_restrictions", value: restrictionsString)
@@ -265,11 +362,11 @@ final class SnapChefAPIManager {
         // Append existing recipe names to avoid duplicates
         if !existingRecipeNames.isEmpty {
             guard let existingRecipesData = try? JSONSerialization.data(withJSONObject: existingRecipeNames, options: []) else {
-                print("Failed to serialize existing recipe names")
+                apiDebugLog("Failed to serialize existing recipe names")
                 throw APIError.invalidRequestData
             }
             guard let existingRecipesString = String(data: existingRecipesData, encoding: .utf8) else {
-                print("Failed to convert existing recipes to string")
+                apiDebugLog("Failed to convert existing recipes to string")
                 throw APIError.invalidRequestData
             }
             appendFormField(name: "existing_recipe_names", value: existingRecipesString)
@@ -278,11 +375,11 @@ final class SnapChefAPIManager {
         // Append food preferences
         if !foodPreferences.isEmpty {
             guard let preferencesData = try? JSONSerialization.data(withJSONObject: foodPreferences, options: []) else {
-                print("Failed to serialize food preferences")
+                apiDebugLog("Failed to serialize food preferences")
                 throw APIError.invalidRequestData
             }
             guard let preferencesString = String(data: preferencesData, encoding: .utf8) else {
-                print("Failed to convert food preferences to string")
+                apiDebugLog("Failed to convert food preferences to string")
                 throw APIError.invalidRequestData
             }
             appendFormField(name: "food_preferences", value: preferencesString)
@@ -292,18 +389,18 @@ final class SnapChefAPIManager {
         let resizedImage = image.resized(withMaxDimension: 2_048)
 
         // Log original and resized dimensions
-        print("Original image size: \(image.size.width)x\(image.size.height)")
-        print("Resized image size: \(resizedImage.size.width)x\(resizedImage.size.height)")
+        apiDebugLog("Original image size: \(image.size.width)x\(image.size.height)")
+        apiDebugLog("Resized image size: \(resizedImage.size.width)x\(resizedImage.size.height)")
 
         // Append image_file with 80% JPEG compression
         guard let imageData = resizedImage.jpegData(compressionQuality: 0.8) else {
-            print("Failed to get JPEG data from image")
+            apiDebugLog("Failed to get JPEG data from image")
             throw APIError.invalidRequestData
         }
 
         // Log final file size
         let fileSizeMB = Double(imageData.count) / (1_024 * 1_024)
-        print("Final image file size: \(String(format: "%.2f", fileSizeMB)) MB")
+        apiDebugLog("Final image file size: \(String(format: "%.2f", fileSizeMB)) MB")
         httpBody.append("--\(boundary)\r\n")
         httpBody.append("Content-Disposition: form-data; name=\"image_file\"; filename=\"photo.jpg\"\r\n")
         httpBody.append("Content-Type: image/jpeg\r\n\r\n")
@@ -340,10 +437,8 @@ final class SnapChefAPIManager {
             return
         }
 
-        print("📡 API Request to: \(url.absoluteString)")
-        let apiKey = KeychainManager.shared.getAPIKey()
-        print("📡 API Key: \(apiKey != nil ? "[Found - \(apiKey!.prefix(10))...]" : "Not found")")
-        print("📡 API Key Length: \(apiKey?.count ?? 0) characters")
+        apiDebugLog("📡 API Request to: \(url.absoluteString)")
+        apiDebugLog("📡 API key configured: \(KeychainManager.shared.getAPIKey() != nil)")
 
         let request: URLRequest
         do {
@@ -369,129 +464,26 @@ final class SnapChefAPIManager {
             return
         }
 
-        print("📡 Sending request with session ID: \(sessionId)")
-        print("📡 Request headers: \(request.allHTTPHeaderFields ?? [:])")
-        print("📡 Request body size: \(request.httpBody?.count ?? 0) bytes")
+        apiDebugLog("📡 Sending request with session ID: \(sessionId)")
+        apiDebugLog("📡 Request body size: \(request.httpBody?.count ?? 0) bytes")
 
-        let startTime = Date()
-        session.dataTask(with: request) { data, response, error in
-            let elapsed = Date().timeIntervalSince(startTime)
-            print("📡 Request completed in \(String(format: "%.2f", elapsed)) seconds")
-
-            if let error = error {
-                lifecycle?(.failed)
-                print("❌ API Network Error: \(error.localizedDescription)")
-                print("❌ Error details: \(error)")
-                print("❌ Error domain: \((error as NSError).domain)")
-                print("❌ Error code: \((error as NSError).code)")
-
-                // Check if it's a timeout error
-                if (error as NSError).code == NSURLErrorTimedOut {
-                    print("❌ Request timed out after \(elapsed) seconds")
-                    completion(.failure(APIError.serverError(statusCode: -1, message: "Request timed out. The server may be slow or unresponsive.")))
-                } else {
-                    completion(.failure(error))
-                }
-                return
-            }
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                lifecycle?(.failed)
-                print("❌ Invalid response type")
-                completion(.failure(APIError.noData))
-                return
-            }
-
-            print("📡 Response status code: \(httpResponse.statusCode)")
-            print("📡 Response headers: \(httpResponse.allHeaderFields)")
-            lifecycle?(.responseReceived)
-
-            // Handle authentication failure specifically
-            if httpResponse.statusCode == 401 {
-                lifecycle?(.failed)
-                completion(.failure(APIError.authenticationError))
-                return
-            }
-
-            guard (200...299).contains(httpResponse.statusCode) else {
-                lifecycle?(.failed)
-                let responseData = data.map { String(data: $0, encoding: .utf8) ?? "" } ?? "N/A"
-                completion(.failure(APIError.serverError(statusCode: httpResponse.statusCode, message: responseData)))
-                return
-            }
-
-            guard let data = data else {
-                lifecycle?(.failed)
-                completion(.failure(APIError.noData))
-                return
-            }
-
+        lifecycle?(.requestSent)
+        Task {
             do {
-                let apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
-                lifecycle?(.responseDecoded)
-                print("✅ Successfully decoded API response")
-                print("✅ Image analysis - is_food_image: \(apiResponse.data.image_analysis.is_food_image), confidence: \(apiResponse.data.image_analysis.confidence)")
-                print("✅ Found \(apiResponse.data.recipes.count) recipes")
-                print("✅ Found \(apiResponse.data.ingredients.count) ingredients")
-                
-                // 🔍 DEBUG: Log raw JSON response for enhanced fields analysis
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("🔍 RAW SERVER RESPONSE:")
-                    print("🔍 \(responseString)")
-                } else {
-                    print("🔍 Could not convert response data to string")
-                }
-                
-                // 🔍 DEBUG: Log enhanced fields in each recipe from server response
-                for (index, recipe) in apiResponse.data.recipes.enumerated() {
-                    print("🔍 RECIPE \(index + 1) ENHANCED FIELDS FROM SERVER:")
-                    print("🔍   - cooking_techniques: \(recipe.cooking_techniques?.isEmpty == false ? "\(recipe.cooking_techniques!)" : "EMPTY/NIL")")
-                    print("🔍   - flavor_profile: \(recipe.flavor_profile != nil ? "PRESENT" : "NIL")")
-                    if let fp = recipe.flavor_profile {
-                        print("🔍     • sweet: \(fp.sweet ?? -1), salty: \(fp.salty ?? -1), sour: \(fp.sour ?? -1), bitter: \(fp.bitter ?? -1), umami: \(fp.umami ?? -1)")
-                    }
-                    print("🔍   - secret_ingredients: \(recipe.secret_ingredients?.isEmpty == false ? "\(recipe.secret_ingredients!)" : "EMPTY/NIL")")
-                    print("🔍   - pro_tips: \(recipe.pro_tips?.isEmpty == false ? "\(recipe.pro_tips!)" : "EMPTY/NIL")")
-                    print("🔍   - visual_clues: \(recipe.visual_clues?.isEmpty == false ? "\(recipe.visual_clues!)" : "EMPTY/NIL")")
-                    print("🔍   - share_caption: \(recipe.share_caption?.isEmpty == false ? "\"\(recipe.share_caption!)\"" : "EMPTY/NIL")")
-                }
-                
-                // Check if the image analysis indicates this is not a food image
-                if !apiResponse.data.image_analysis.is_food_image {
-                    lifecycle?(.failed)
-                    let friendlyMessage = "Hmm, this doesn't look like a fridge or pantry photo. Let's try again with a clear shot of your ingredients! 📸"
-                    completion(.failure(APIError.notFoodImage(friendlyMessage)))
-                    return
-                }
-                
-                // Check if we detected ingredients but got no recipes
-                if apiResponse.data.ingredients.isEmpty {
-                    lifecycle?(.failed)
-                    let friendlyMessage = "I couldn't spot any ingredients in this photo. Try taking a clearer shot of your fridge or pantry with better lighting! 💡"
-                    completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
-                    return
-                }
-                
-                // Check if we have ingredients but no recipes (another edge case)
-                if !apiResponse.data.ingredients.isEmpty && apiResponse.data.recipes.isEmpty {
-                    lifecycle?(.failed)
-                    let friendlyMessage = "I found some ingredients but couldn't create recipes. This might be due to very limited ingredients or dietary restrictions being too specific. Try with more ingredients or adjust your preferences! 🥘"
-                    completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
-                    return
-                }
-                
+                let response = try await self.executeRecipeGenerationRequest(
+                    request: request,
+                    lifecycle: lifecycle,
+                    debugContext: "single_image",
+                    notFoodImageMessage: "Hmm, this doesn't look like a fridge or pantry photo. Let's try again with a clear shot of your ingredients! 📸",
+                    noIngredientsMessage: "I couldn't spot any ingredients in this photo. Try taking a clearer shot of your fridge or pantry with better lighting! 💡"
+                )
                 lifecycle?(.completed)
-                completion(.success(apiResponse))
+                completion(.success(response))
             } catch {
                 lifecycle?(.failed)
-                print("❌ Decoding Error: \(error)")
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("❌ Raw response: \(responseString)")
-                }
-                completion(.failure(APIError.decodingError(error.localizedDescription)))
+                completion(.failure(error))
             }
-        }.resume()
-        lifecycle?(.requestSent)
+        }
     }
 
     /// Send both fridge and pantry images for recipe generation
@@ -520,11 +512,9 @@ final class SnapChefAPIManager {
             return
         }
 
-        print("📡 API Request to: \(url.absoluteString)")
-        let apiKey = KeychainManager.shared.getAPIKey()
-        print("📡 API Key: \(apiKey != nil ? "[Found - \(apiKey!.prefix(10))...]" : "Not found")")
-        print("📡 API Key Length: \(apiKey?.count ?? 0) characters")
-        print("📡 Sending both fridge and pantry images")
+        apiDebugLog("📡 API Request to: \(url.absoluteString)")
+        apiDebugLog("📡 API key configured: \(KeychainManager.shared.getAPIKey() != nil)")
+        apiDebugLog("📡 Sending both fridge and pantry images")
 
         let request: URLRequest
         do {
@@ -551,107 +541,26 @@ final class SnapChefAPIManager {
             return
         }
 
-        print("📡 Sending request with session ID: \(sessionId)")
-        print("📡 Request headers: \(request.allHTTPHeaderFields ?? [:])")
-        print("📡 Request body size: \(request.httpBody?.count ?? 0) bytes")
+        apiDebugLog("📡 Sending request with session ID: \(sessionId)")
+        apiDebugLog("📡 Request body size: \(request.httpBody?.count ?? 0) bytes")
 
-        let startTime = Date()
-        session.dataTask(with: request) { data, response, error in
-            let elapsed = Date().timeIntervalSince(startTime)
-            print("📡 Request completed in \(String(format: "%.2f", elapsed)) seconds")
-
-            if let error = error {
-                lifecycle?(.failed)
-                print("❌ API Network Error: \(error.localizedDescription)")
-                print("❌ Error details: \(error)")
-                print("❌ Error domain: \((error as NSError).domain)")
-                print("❌ Error code: \((error as NSError).code)")
-
-                // Check if it's a timeout error
-                if (error as NSError).code == NSURLErrorTimedOut {
-                    print("❌ Request timed out after \(elapsed) seconds")
-                    completion(.failure(APIError.serverError(statusCode: -1, message: "Request timed out. The server may be slow or unresponsive.")))
-                } else {
-                    completion(.failure(error))
-                }
-                return
-            }
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                lifecycle?(.failed)
-                print("❌ Invalid response type")
-                completion(.failure(APIError.noData))
-                return
-            }
-
-            print("📡 Response status code: \(httpResponse.statusCode)")
-            print("📡 Response headers: \(httpResponse.allHeaderFields)")
-            lifecycle?(.responseReceived)
-
-            // Handle authentication failure specifically
-            if httpResponse.statusCode == 401 {
-                lifecycle?(.failed)
-                completion(.failure(APIError.authenticationError))
-                return
-            }
-
-            guard (200...299).contains(httpResponse.statusCode) else {
-                lifecycle?(.failed)
-                let responseData = data.map { String(data: $0, encoding: .utf8) ?? "" } ?? "N/A"
-                completion(.failure(APIError.serverError(statusCode: httpResponse.statusCode, message: responseData)))
-                return
-            }
-
-            guard let data = data else {
-                lifecycle?(.failed)
-                completion(.failure(APIError.noData))
-                return
-            }
-
+        lifecycle?(.requestSent)
+        Task {
             do {
-                let apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
-                lifecycle?(.responseDecoded)
-                print("✅ Successfully decoded API response for both images")
-                print("✅ Image analysis - is_food_image: \(apiResponse.data.image_analysis.is_food_image), confidence: \(apiResponse.data.image_analysis.confidence)")
-                print("✅ Found \(apiResponse.data.recipes.count) recipes")
-                print("✅ Found \(apiResponse.data.ingredients.count) ingredients")
-                
-                // Check if the image analysis indicates this is not a food image
-                if !apiResponse.data.image_analysis.is_food_image {
-                    lifecycle?(.failed)
-                    let friendlyMessage = "Hmm, one or both of these photos don't look like fridge or pantry shots. Let's try again with clear photos of your ingredients! 📸"
-                    completion(.failure(APIError.notFoodImage(friendlyMessage)))
-                    return
-                }
-                
-                // Check if we detected ingredients but got no recipes
-                if apiResponse.data.ingredients.isEmpty {
-                    lifecycle?(.failed)
-                    let friendlyMessage = "I couldn't spot any ingredients in these photos. Try taking clearer shots of your fridge and pantry with better lighting! 💡"
-                    completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
-                    return
-                }
-                
-                // Check if we have ingredients but no recipes
-                if !apiResponse.data.ingredients.isEmpty && apiResponse.data.recipes.isEmpty {
-                    lifecycle?(.failed)
-                    let friendlyMessage = "I found some ingredients but couldn't create recipes. This might be due to very limited ingredients or dietary restrictions being too specific. Try with more ingredients or adjust your preferences! 🥘"
-                    completion(.failure(APIError.noIngredientsDetected(friendlyMessage)))
-                    return
-                }
-                
+                let response = try await self.executeRecipeGenerationRequest(
+                    request: request,
+                    lifecycle: lifecycle,
+                    debugContext: "dual_image",
+                    notFoodImageMessage: "Hmm, one or both of these photos don't look like fridge or pantry shots. Let's try again with clear photos of your ingredients! 📸",
+                    noIngredientsMessage: "I couldn't spot any ingredients in these photos. Try taking clearer shots of your fridge and pantry with better lighting! 💡"
+                )
                 lifecycle?(.completed)
-                completion(.success(apiResponse))
+                completion(.success(response))
             } catch {
                 lifecycle?(.failed)
-                print("❌ Decoding Error: \(error)")
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("❌ Raw response: \(responseString)")
-                }
-                completion(.failure(APIError.decodingError(error.localizedDescription)))
+                completion(.failure(error))
             }
-        }.resume()
-        lifecycle?(.requestSent)
+        }
     }
 
     /// Create multipart request with both fridge and pantry images
@@ -674,11 +583,7 @@ final class SnapChefAPIManager {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
-        // Set the authentication header using the securely stored key
-        guard let apiKey = KeychainManager.shared.getAPIKey() else {
-            throw APIError.unauthorized("API key not found. Please reinstall the app.")
-        }
-        request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
+        try applyAuthenticationHeaders(to: &request, requiresAppAPIKey: true)
         
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -698,11 +603,11 @@ final class SnapChefAPIManager {
         // Append dietary_restrictions (as a JSON array string)
         if !dietaryRestrictions.isEmpty {
             guard let restrictionsData = try? JSONSerialization.data(withJSONObject: dietaryRestrictions, options: []) else {
-                print("Failed to serialize dietary restrictions")
+                apiDebugLog("Failed to serialize dietary restrictions")
                 throw APIError.invalidRequestData
             }
             guard let restrictionsString = String(data: restrictionsData, encoding: .utf8) else {
-                print("Failed to convert dietary restrictions to string")
+                apiDebugLog("Failed to convert dietary restrictions to string")
                 throw APIError.invalidRequestData
             }
             appendFormField(name: "dietary_restrictions", value: restrictionsString)
@@ -737,11 +642,11 @@ final class SnapChefAPIManager {
         // Append existing recipe names to avoid duplicates
         if !existingRecipeNames.isEmpty {
             guard let existingRecipesData = try? JSONSerialization.data(withJSONObject: existingRecipeNames, options: []) else {
-                print("Failed to serialize existing recipe names")
+                apiDebugLog("Failed to serialize existing recipe names")
                 throw APIError.invalidRequestData
             }
             guard let existingRecipesString = String(data: existingRecipesData, encoding: .utf8) else {
-                print("Failed to convert existing recipes to string")
+                apiDebugLog("Failed to convert existing recipes to string")
                 throw APIError.invalidRequestData
             }
             appendFormField(name: "existing_recipe_names", value: existingRecipesString)
@@ -750,11 +655,11 @@ final class SnapChefAPIManager {
         // Append food preferences
         if !foodPreferences.isEmpty {
             guard let preferencesData = try? JSONSerialization.data(withJSONObject: foodPreferences, options: []) else {
-                print("Failed to serialize food preferences")
+                apiDebugLog("Failed to serialize food preferences")
                 throw APIError.invalidRequestData
             }
             guard let preferencesString = String(data: preferencesData, encoding: .utf8) else {
-                print("Failed to convert food preferences to string")
+                apiDebugLog("Failed to convert food preferences to string")
                 throw APIError.invalidRequestData
             }
             appendFormField(name: "food_preferences", value: preferencesString)
@@ -765,12 +670,12 @@ final class SnapChefAPIManager {
         let resizedPantryImage = pantryImage.resized(withMaxDimension: 2_048)
 
         // Log original and resized dimensions
-        print("Fridge image - Original: \(fridgeImage.size.width)x\(fridgeImage.size.height), Resized: \(resizedFridgeImage.size.width)x\(resizedFridgeImage.size.height)")
-        print("Pantry image - Original: \(pantryImage.size.width)x\(pantryImage.size.height), Resized: \(resizedPantryImage.size.width)x\(resizedPantryImage.size.height)")
+        apiDebugLog("Fridge image - Original: \(fridgeImage.size.width)x\(fridgeImage.size.height), Resized: \(resizedFridgeImage.size.width)x\(resizedFridgeImage.size.height)")
+        apiDebugLog("Pantry image - Original: \(pantryImage.size.width)x\(pantryImage.size.height), Resized: \(resizedPantryImage.size.width)x\(resizedPantryImage.size.height)")
 
         // Append fridge image file with 80% JPEG compression
         guard let fridgeImageData = resizedFridgeImage.jpegData(compressionQuality: 0.8) else {
-            print("Failed to convert fridge image to JPEG data")
+            apiDebugLog("Failed to convert fridge image to JPEG data")
             throw APIError.invalidRequestData
         }
 
@@ -780,11 +685,11 @@ final class SnapChefAPIManager {
         httpBody.append(fridgeImageData)
         httpBody.append("\r\n")
 
-        print("Fridge image data size: \(fridgeImageData.count) bytes (\(String(format: "%.2f", Double(fridgeImageData.count) / 1_024 / 1_024)) MB)")
+        apiDebugLog("Fridge image data size: \(fridgeImageData.count) bytes (\(String(format: "%.2f", Double(fridgeImageData.count) / 1_024 / 1_024)) MB)")
 
         // Append pantry image file with 80% JPEG compression
         guard let pantryImageData = resizedPantryImage.jpegData(compressionQuality: 0.8) else {
-            print("Failed to convert pantry image to JPEG data")
+            apiDebugLog("Failed to convert pantry image to JPEG data")
             throw APIError.invalidRequestData
         }
 
@@ -794,13 +699,13 @@ final class SnapChefAPIManager {
         httpBody.append(pantryImageData)
         httpBody.append("\r\n")
 
-        print("Pantry image data size: \(pantryImageData.count) bytes (\(String(format: "%.2f", Double(pantryImageData.count) / 1_024 / 1_024)) MB)")
+        apiDebugLog("Pantry image data size: \(pantryImageData.count) bytes (\(String(format: "%.2f", Double(pantryImageData.count) / 1_024 / 1_024)) MB)")
 
         // Close the multipart form
         httpBody.append("--\(boundary)--\r\n")
 
         request.httpBody = httpBody
-        print("Total request body size: \(httpBody.count) bytes (\(String(format: "%.2f", Double(httpBody.count) / 1_024 / 1_024)) MB)")
+        apiDebugLog("Total request body size: \(httpBody.count) bytes (\(String(format: "%.2f", Double(httpBody.count) / 1_024 / 1_024)) MB)")
 
         return request
     }
@@ -856,9 +761,13 @@ final class SnapChefAPIManager {
                 if let error = handleHTTPStatusCode(httpResponse.statusCode, data: data) {
                     
                     // Don't retry on certain errors
-                    if case .authenticationError = error,
-                       case .unauthorizedError = error,
-                       case .validationError = error {
+                    if case .authenticationError = error {
+                        throw error
+                    }
+                    if case .unauthorizedError = error {
+                        throw error
+                    }
+                    if case .validationError = error {
                         throw error
                     }
                     
@@ -869,8 +778,8 @@ final class SnapChefAPIManager {
                     ErrorAnalytics.logError(error, context: "api_retry_attempt_\(attempt + 1)_\(operationId)")
                     
                     if attempt < maxRetries - 1 {
-                        let delay = calculateBackoffDelay(attempt: attempt, baseDelay: baseDelay)
-                        print("[API] Retrying in \(delay)s (attempt \(attempt + 1)/\(maxRetries))")
+                        let delay = retryDelay(for: attempt + 1, statusCode: httpResponse.statusCode, response: httpResponse, responseData: data)
+                        apiDebugLog("[API] Retrying in \(delay)s (attempt \(attempt + 1)/\(maxRetries))")
                         try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                         continue
                     } else {
@@ -881,7 +790,7 @@ final class SnapChefAPIManager {
                 // Success case - decode response
                 do {
                     let decoded = try JSONDecoder().decode(responseType, from: data)
-                    print("[API] Request succeeded on attempt \(attempt + 1)")
+                    apiDebugLog("[API] Request succeeded on attempt \(attempt + 1)")
                     return decoded
                 } catch {
                     let decodingError = SnapChefError.apiError(
@@ -921,7 +830,7 @@ final class SnapChefAPIManager {
                     
                     if attempt < maxRetries - 1 {
                         let delay = calculateBackoffDelay(attempt: attempt, baseDelay: baseDelay)
-                        print("[API] Network error, retrying in \(delay)s (attempt \(attempt + 1)/\(maxRetries))")
+                        apiDebugLog("[API] Network error, retrying in \(delay)s (attempt \(attempt + 1)/\(maxRetries))")
                         try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                         continue
                     } else {
@@ -931,7 +840,7 @@ final class SnapChefAPIManager {
                     // Other errors (e.g., SnapChefError already)
                     if attempt < maxRetries - 1 {
                         let delay = calculateBackoffDelay(attempt: attempt, baseDelay: baseDelay)
-                        print("[API] Error, retrying in \(delay)s (attempt \(attempt + 1)/\(maxRetries))")
+                        apiDebugLog("[API] Error, retrying in \(delay)s (attempt \(attempt + 1)/\(maxRetries))")
                         try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                         continue
                     } else {
@@ -1050,6 +959,177 @@ final class SnapChefAPIManager {
         return nil
     }
 
+    private func shouldRetryRequest(error: Error?, statusCode: Int?) -> Bool {
+        if let statusCode {
+            return statusCode == 429 || (500...599).contains(statusCode)
+        }
+
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .timedOut,
+                 .notConnectedToInternet,
+                 .networkConnectionLost,
+                 .cannotFindHost,
+                 .cannotConnectToHost,
+                 .dnsLookupFailed:
+                return true
+            default:
+                return false
+            }
+        }
+
+        return false
+    }
+
+    private func retryBackoffDelay(for attempt: Int) -> TimeInterval {
+        let exponent = Double(max(0, attempt - 1))
+        return min(0.8 * pow(2.0, exponent), 3.2)
+    }
+
+    private func retryDelay(
+        for attempt: Int,
+        statusCode: Int?,
+        response: HTTPURLResponse? = nil,
+        responseData: Data? = nil
+    ) -> TimeInterval {
+        let baseline = retryBackoffDelay(for: attempt)
+
+        if let retryAfter = retryAfterSeconds(response: response, responseData: responseData) {
+            return min(max(retryAfter, baseline), 30)
+        }
+
+        guard let statusCode else { return baseline }
+        switch statusCode {
+        case 503:
+            return min(max(Double(attempt) * 2.5, baseline), 12)
+        case 429:
+            return min(max(Double(attempt) * 1.8, baseline), 10)
+        case 500...599:
+            return min(max(Double(attempt) * 1.2, baseline), 8)
+        default:
+            return baseline
+        }
+    }
+
+    private func retryAfterSeconds(response: HTTPURLResponse?, responseData: Data?) -> TimeInterval? {
+        if let retryAfterHeader = response?.value(forHTTPHeaderField: "Retry-After")?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !retryAfterHeader.isEmpty {
+            if let seconds = TimeInterval(retryAfterHeader), seconds > 0 {
+                return seconds
+            }
+
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.dateFormat = "EEE',' dd MMM yyyy HH':'mm':'ss z"
+            if let date = formatter.date(from: retryAfterHeader) {
+                return max(0, date.timeIntervalSinceNow)
+            }
+        }
+
+        if let responseData, let retryAfter = extractRetryAfter(from: responseData), retryAfter > 0 {
+            return retryAfter
+        }
+
+        return nil
+    }
+
+    private func normalizeRequestError(_ error: Error) -> Error {
+        if let apiError = error as? APIError {
+            return apiError
+        }
+        if let urlError = error as? URLError, urlError.code == .timedOut {
+            return APIError.serverError(statusCode: -1, message: "Request timed out. The server may be slow or unresponsive.")
+        }
+        return error
+    }
+
+    private func executeRecipeGenerationRequest(
+        request: URLRequest,
+        lifecycle: (@Sendable (RecipeGenerationMilestone) -> Void)?,
+        debugContext: String,
+        notFoodImageMessage: String,
+        noIngredientsMessage: String
+    ) async throws -> APIResponse {
+        let maxAttempts = 4
+        var attempt = 1
+
+        while true {
+            let startTime = Date()
+            do {
+                let (data, response) = try await session.data(for: request)
+                let elapsed = Date().timeIntervalSince(startTime)
+                apiDebugLog("📡 \(debugContext) request attempt \(attempt) completed in \(String(format: "%.2f", elapsed)) seconds")
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw APIError.noData
+                }
+
+                apiDebugLog("📡 \(debugContext) status code: \(httpResponse.statusCode)")
+                lifecycle?(.responseReceived)
+
+                if httpResponse.statusCode == 401 {
+                    let fallback = String(data: data, encoding: .utf8) ?? "Invalid or missing API credentials."
+                    let message = extractErrorMessage(from: data) ?? fallback
+                    throw APIError.unauthorized(message)
+                }
+
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    if shouldRetryRequest(error: nil, statusCode: httpResponse.statusCode), attempt < maxAttempts {
+                        let delay = retryDelay(
+                            for: attempt,
+                            statusCode: httpResponse.statusCode,
+                            response: httpResponse,
+                            responseData: data
+                        )
+                        apiDebugLog("🔁 Retrying \(debugContext) request (\(attempt + 1)/\(maxAttempts)) in \(String(format: "%.1f", delay))s due to HTTP \(httpResponse.statusCode)")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        attempt += 1
+                        continue
+                    }
+                    let fallback = String(data: data, encoding: .utf8) ?? "N/A"
+                    let responseMessage = extractErrorMessage(from: data) ?? fallback
+                    throw APIError.serverError(statusCode: httpResponse.statusCode, message: responseMessage)
+                }
+
+                let apiResponse: APIResponse
+                do {
+                    apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
+                } catch {
+                    throw APIError.decodingError(error.localizedDescription)
+                }
+
+                lifecycle?(.responseDecoded)
+                apiDebugLog("✅ \(debugContext) response decoded")
+                apiDebugLog("✅ Image analysis - is_food_image: \(apiResponse.data.image_analysis.is_food_image), confidence: \(apiResponse.data.image_analysis.confidence)")
+                apiDebugLog("✅ Found \(apiResponse.data.recipes.count) recipes")
+                apiDebugLog("✅ Found \(apiResponse.data.ingredients.count) ingredients")
+
+                if !apiResponse.data.image_analysis.is_food_image {
+                    throw APIError.notFoodImage(notFoodImageMessage)
+                }
+                if apiResponse.data.ingredients.isEmpty {
+                    throw APIError.noIngredientsDetected(noIngredientsMessage)
+                }
+                if !apiResponse.data.ingredients.isEmpty && apiResponse.data.recipes.isEmpty {
+                    throw APIError.noIngredientsDetected("I found some ingredients but couldn't create recipes. This might be due to very limited ingredients or dietary restrictions being too specific. Try with more ingredients or adjust your preferences! 🥘")
+                }
+
+                return apiResponse
+            } catch {
+                if shouldRetryRequest(error: error, statusCode: nil), attempt < maxAttempts {
+                    let delay = retryDelay(for: attempt, statusCode: nil)
+                    apiDebugLog("🔁 Retrying \(debugContext) request (\(attempt + 1)/\(maxAttempts)) in \(String(format: "%.1f", delay))s due to network error: \(error.localizedDescription)")
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    attempt += 1
+                    continue
+                }
+                throw normalizeRequestError(error)
+            }
+        }
+    }
+
     /// Convert SnapChefError to APIError for backward compatibility
     private func convertSnapChefErrorToAPIError(_ snapChefError: SnapChefError) -> APIError {
         switch snapChefError {
@@ -1088,8 +1168,8 @@ final class SnapChefAPIManager {
             throw APIError.invalidURL
         }
         
-        print("🔍 Detective API Request to: \(url.absoluteString)")
-        print("🔍 Using LLM Provider: \(llmProvider.rawValue)")
+        apiDebugLog("🔍 Detective API Request to: \(url.absoluteString)")
+        apiDebugLog("🔍 Using LLM Provider: \(llmProvider.rawValue)")
         
         let request = try createDetectiveMultipartRequest(
             url: url,
@@ -1098,68 +1178,70 @@ final class SnapChefAPIManager {
             llmProvider: llmProvider
         )
         
-        print("🔍 Sending detective analysis request with session ID: \(sessionID)")
-        print("🔍 Request headers: \(request.allHTTPHeaderFields ?? [:])")
-        print("🔍 Request body size: \(request.httpBody?.count ?? 0) bytes")
-        
-        let startTime = Date()
-        
-        return try await withCheckedThrowingContinuation { continuation in
-            session.dataTask(with: request) { data, response, error in
+        apiDebugLog("🔍 Sending detective analysis request with session ID: \(sessionID)")
+        apiDebugLog("🔍 Request body size: \(request.httpBody?.count ?? 0) bytes")
+
+        let maxAttempts = 4
+        var attempt = 1
+
+        while true {
+            let startTime = Date()
+            do {
+                let (data, response) = try await session.data(for: request)
                 let elapsed = Date().timeIntervalSince(startTime)
-                print("🔍 Detective request completed in \(String(format: "%.2f", elapsed)) seconds")
-                
-                if let error = error {
-                    print("❌ Detective API Network Error: \(error.localizedDescription)")
-                    continuation.resume(throwing: error)
-                    return
-                }
-                
+                apiDebugLog("🔍 Detective request attempt \(attempt) completed in \(String(format: "%.2f", elapsed)) seconds")
+
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    print("❌ Invalid response type")
-                    continuation.resume(throwing: APIError.noData)
-                    return
+                    throw APIError.noData
                 }
-                
-                print("🔍 Detective response status code: \(httpResponse.statusCode)")
-                
-                // Handle authentication failure
+
+                apiDebugLog("🔍 Detective response status code: \(httpResponse.statusCode)")
+
                 if httpResponse.statusCode == 401 {
-                    continuation.resume(throwing: APIError.authenticationError)
-                    return
+                    let fallback = String(data: data, encoding: .utf8) ?? "Invalid or missing API credentials."
+                    let message = self.extractErrorMessage(from: data) ?? fallback
+                    throw APIError.unauthorized(message)
                 }
-                
+
                 guard (200...299).contains(httpResponse.statusCode) else {
-                    let responseData = data.map { String(data: $0, encoding: .utf8) ?? "" } ?? "N/A"
-                    continuation.resume(throwing: APIError.serverError(statusCode: httpResponse.statusCode, message: responseData))
-                    return
-                }
-                
-                guard let data = data else {
-                    continuation.resume(throwing: APIError.noData)
-                    return
-                }
-                
-                do {
-                    let detectiveResponse = try JSONDecoder().decode(DetectiveRecipeResponse.self, from: data)
-                    print("✅ Successfully decoded detective response")
-                    print("✅ Success: \(detectiveResponse.success)")
-                    
-                    if let recipe = detectiveResponse.detectiveRecipe {
-                        print("✅ Recipe: \(recipe.name)")
-                        print("✅ Confidence: \(recipe.confidenceScore)%")
-                        print("✅ Original dish: \(recipe.originalDishName)")
+                    if shouldRetryRequest(error: nil, statusCode: httpResponse.statusCode), attempt < maxAttempts {
+                        let delay = retryDelay(
+                            for: attempt,
+                            statusCode: httpResponse.statusCode,
+                            response: httpResponse,
+                            responseData: data
+                        )
+                        apiDebugLog("🔁 Retrying detective analysis (\(attempt + 1)/\(maxAttempts)) in \(String(format: "%.1f", delay))s due to HTTP \(httpResponse.statusCode)")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        attempt += 1
+                        continue
                     }
-                    
-                    continuation.resume(returning: detectiveResponse)
-                } catch {
-                    print("❌ Detective Decoding Error: \(error)")
-                    if let responseString = String(data: data, encoding: .utf8) {
-                        print("❌ Raw response: \(responseString)")
-                    }
-                    continuation.resume(throwing: APIError.decodingError(error.localizedDescription))
+                    let fallback = String(data: data, encoding: .utf8) ?? "N/A"
+                    let responseMessage = self.extractErrorMessage(from: data) ?? fallback
+                    throw APIError.serverError(statusCode: httpResponse.statusCode, message: responseMessage)
                 }
-            }.resume()
+
+                let detectiveResponse = try JSONDecoder().decode(DetectiveRecipeResponse.self, from: data)
+                apiDebugLog("✅ Successfully decoded detective response")
+                apiDebugLog("✅ Success: \(detectiveResponse.success)")
+
+                if let recipe = detectiveResponse.detectiveRecipe {
+                    apiDebugLog("✅ Recipe: \(recipe.name)")
+                    apiDebugLog("✅ Confidence: \(recipe.confidenceScore)%")
+                    apiDebugLog("✅ Original dish: \(recipe.originalDishName)")
+                }
+
+                return detectiveResponse
+            } catch {
+                if shouldRetryRequest(error: error, statusCode: nil), attempt < maxAttempts {
+                    let delay = retryDelay(for: attempt, statusCode: nil)
+                    apiDebugLog("🔁 Retrying detective analysis (\(attempt + 1)/\(maxAttempts)) in \(String(format: "%.1f", delay))s due to network error: \(error.localizedDescription)")
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    attempt += 1
+                    continue
+                }
+                throw normalizeRequestError(error)
+            }
         }
     }
     
@@ -1172,12 +1254,8 @@ final class SnapChefAPIManager {
     ) throws -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        
-        // Set the authentication header
-        guard let apiKey = KeychainManager.shared.getAPIKey() else {
-            throw APIError.unauthorized("API key not found. Please reinstall the app.")
-        }
-        request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
+
+        try applyAuthenticationHeaders(to: &request, requiresAppAPIKey: true)
         
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -1198,7 +1276,7 @@ final class SnapChefAPIManager {
         
         // Resize image to optimize for analysis
         let resizedImage = image.resized(withMaxDimension: 2_048)
-        print("🔍 Detective image - Original: \(image.size.width)x\(image.size.height), Resized: \(resizedImage.size.width)x\(resizedImage.size.height)")
+        apiDebugLog("🔍 Detective image - Original: \(image.size.width)x\(image.size.height), Resized: \(resizedImage.size.width)x\(resizedImage.size.height)")
         
         // Append image file with high quality for better analysis
         guard let imageData = resizedImage.jpegData(compressionQuality: 0.9) else {
@@ -1206,7 +1284,7 @@ final class SnapChefAPIManager {
         }
         
         let fileSizeMB = Double(imageData.count) / (1_024 * 1_024)
-        print("🔍 Detective image file size: \(String(format: "%.2f", fileSizeMB)) MB")
+        apiDebugLog("🔍 Detective image file size: \(String(format: "%.2f", fileSizeMB)) MB")
         
         httpBody.append("--\(boundary)\r\n")
         httpBody.append("Content-Disposition: form-data; name=\"meal_image\"; filename=\"meal.jpg\"\r\n")
@@ -1371,13 +1449,13 @@ final class SnapChefAPIManager {
         }
 
         // 🔍 DEBUG: Log enhanced fields during conversion
-        print("🔍 CONVERTING API RECIPE '\(apiRecipe.name)' TO RECIPE MODEL:")
-        print("🔍   - Raw cooking_techniques from API: \(apiRecipe.cooking_techniques ?? [])")
-        print("🔍   - Raw secret_ingredients from API: \(apiRecipe.secret_ingredients ?? [])")
-        print("🔍   - Raw pro_tips from API: \(apiRecipe.pro_tips ?? [])")
-        print("🔍   - Raw visual_clues from API: \(apiRecipe.visual_clues ?? [])")
-        print("🔍   - Raw share_caption from API: \"\(apiRecipe.share_caption ?? "")\"")
-        print("🔍   - Converted flavor_profile: \(flavorProfile != nil ? "PRESENT" : "NIL")")
+        apiDebugLog("🔍 CONVERTING API RECIPE '\(apiRecipe.name)' TO RECIPE MODEL:")
+        apiDebugLog("🔍   - Raw cooking_techniques from API: \(apiRecipe.cooking_techniques ?? [])")
+        apiDebugLog("🔍   - Raw secret_ingredients from API: \(apiRecipe.secret_ingredients ?? [])")
+        apiDebugLog("🔍   - Raw pro_tips from API: \(apiRecipe.pro_tips ?? [])")
+        apiDebugLog("🔍   - Raw visual_clues from API: \(apiRecipe.visual_clues ?? [])")
+        apiDebugLog("🔍   - Raw share_caption from API: \"\(apiRecipe.share_caption ?? "")\"")
+        apiDebugLog("🔍   - Converted flavor_profile: \(flavorProfile != nil ? "PRESENT" : "NIL")")
 
         // Get the current user's ID for ownership
         let currentUserID = UnifiedAuthManager.shared.currentUser?.recordID
@@ -1408,13 +1486,13 @@ final class SnapChefAPIManager {
         )
         
         // 🔍 DEBUG: Log the final converted Recipe model values
-        print("🔍 FINAL CONVERTED RECIPE MODEL VALUES:")
-        print("🔍   - cookingTechniques: \(convertedRecipe.cookingTechniques.isEmpty ? "EMPTY" : "\(convertedRecipe.cookingTechniques)")")
-        print("🔍   - flavorProfile: \(convertedRecipe.flavorProfile != nil ? "PRESENT" : "NIL")")
-        print("🔍   - secretIngredients: \(convertedRecipe.secretIngredients.isEmpty ? "EMPTY" : "\(convertedRecipe.secretIngredients)")")
-        print("🔍   - proTips: \(convertedRecipe.proTips.isEmpty ? "EMPTY" : "\(convertedRecipe.proTips)")")
-        print("🔍   - visualClues: \(convertedRecipe.visualClues.isEmpty ? "EMPTY" : "\(convertedRecipe.visualClues)")")
-        print("🔍   - shareCaption: \(convertedRecipe.shareCaption.isEmpty ? "EMPTY" : "\"\(convertedRecipe.shareCaption)\"")")
+        apiDebugLog("🔍 FINAL CONVERTED RECIPE MODEL VALUES:")
+        apiDebugLog("🔍   - cookingTechniques: \(convertedRecipe.cookingTechniques.isEmpty ? "EMPTY" : "\(convertedRecipe.cookingTechniques)")")
+        apiDebugLog("🔍   - flavorProfile: \(convertedRecipe.flavorProfile != nil ? "PRESENT" : "NIL")")
+        apiDebugLog("🔍   - secretIngredients: \(convertedRecipe.secretIngredients.isEmpty ? "EMPTY" : "\(convertedRecipe.secretIngredients)")")
+        apiDebugLog("🔍   - proTips: \(convertedRecipe.proTips.isEmpty ? "EMPTY" : "\(convertedRecipe.proTips)")")
+        apiDebugLog("🔍   - visualClues: \(convertedRecipe.visualClues.isEmpty ? "EMPTY" : "\(convertedRecipe.visualClues)")")
+        apiDebugLog("🔍   - shareCaption: \(convertedRecipe.shareCaption.isEmpty ? "EMPTY" : "\"\(convertedRecipe.shareCaption)\"")")
         
         return convertedRecipe
     }

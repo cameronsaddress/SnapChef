@@ -4,6 +4,15 @@ import CloudKit
 import UIKit
 import PhotosUI
 
+private let profileDebugLoggingEnabled = false
+
+private func profileDebugLog(_ message: @autoclosure () -> String) {
+#if DEBUG
+    guard profileDebugLoggingEnabled else { return }
+    print(message())
+#endif
+}
+
 enum SubscriptionTier: String, CaseIterable {
     case free = "Free"
     case basic = "Basic"
@@ -34,6 +43,7 @@ struct ProfileView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var authManager: UnifiedAuthManager
     @EnvironmentObject var deviceManager: DeviceManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     // Using UnifiedAuthManager from environment
     @EnvironmentObject var gamificationManager: GamificationManager
     @State private var showingSubscriptionView = false
@@ -46,6 +56,13 @@ struct ProfileView: View {
     @State private var profileImageScale: CGFloat = 0
     @State private var userStats: UserStats?
     @State private var isLoadingStats = false
+    @State private var inviteSnapshot: SocialShareManager.InviteCenterSnapshot?
+    @State private var isLoadingInviteSnapshot = false
+    @State private var copiedInviteLink = false
+
+    private var recentShareMomentum: ShareMomentumSnapshot? {
+        ShareMomentumStore.latest(maxAge: 60 * 60 * 24 * 3)
+    }
 
     var body: some View {
         ZStack {
@@ -87,29 +104,52 @@ struct ProfileView: View {
                     InviteCenterQuickCard(
                         referralCode: SocialShareManager.shared.currentReferralCode(),
                         onTap: {
+                            NotificationCenter.default.post(name: .snapchefInviteCenterOpened, object: nil)
                             showingInviteCenter = true
                         }
                     )
+                    .viralCoachSpotlightAnchor(.profileInviteCenter)
                     .staggeredFade(index: 5, isShowing: contentVisible)
 
                     GrowthHubQuickCard {
+                        NotificationCenter.default.post(name: .snapchefGrowthHubOpened, object: nil)
                         showingGrowthHub = true
                     }
+                    .viralCoachSpotlightAnchor(.profileGrowthHub)
                     .staggeredFade(index: 6, isShowing: contentVisible)
+
+                    ViralFunnelQuickCard(
+                        momentumPlatform: recentShareMomentum?.platform,
+                        conversions: inviteSnapshot?.totalConversions ?? 0,
+                        pendingCoins: inviteSnapshot?.pendingCoins ?? 0,
+                        earnedCoins: inviteSnapshot?.earnedCoins ?? 0,
+                        isLoading: isLoadingInviteSnapshot,
+                        copiedInviteLink: copiedInviteLink,
+                        onCopyInvite: copyInviteLink,
+                        onOpenInviteCenter: {
+                            NotificationCenter.default.post(name: .snapchefInviteCenterOpened, object: nil)
+                            showingInviteCenter = true
+                        },
+                        onOpenGrowthHub: {
+                            NotificationCenter.default.post(name: .snapchefGrowthHubOpened, object: nil)
+                            showingGrowthHub = true
+                        }
+                    )
+                    .staggeredFade(index: 7, isShowing: contentVisible)
 
                     // Sign Out Button (only if authenticated)
                     if authManager.isAuthenticated {
                         EnhancedSignOutButton(action: {
                             authManager.signOut()
                         })
-                        .staggeredFade(index: 7, isShowing: contentVisible)
+                        .staggeredFade(index: 8, isShowing: contentVisible)
                         .padding(.top, 10)
                     }
                     
                     // Delete Account Button (shown for all users, including anonymous)
                     // Anonymous users may have local data to delete
                     DeleteAccountButton(authManager: authManager, appState: appState)
-                        .staggeredFade(index: 8, isShowing: contentVisible)
+                        .staggeredFade(index: 9, isShowing: contentVisible)
                         .padding(.top, authManager.isAuthenticated ? 8 : 10)
                 }
                 .padding(.horizontal, 20)
@@ -131,23 +171,32 @@ struct ProfileView: View {
                     print("Failed to refresh user data: \(error)")
                 }
             }
+            await refreshInviteSnapshot(force: false)
         }
         .onAppear {
-            print("🔍 DEBUG: ProfileView appeared - Start")
+            profileDebugLog("🔍 DEBUG: ProfileView appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: ProfileView - Async block started")
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                profileDebugLog("🔍 DEBUG: ProfileView - Async block started")
+                withAnimation(MotionTuning.settleSpring(response: 0.5, damping: 0.82)) {
                     profileImageScale = 1
                 }
-                withAnimation(.easeOut(duration: 0.5).delay(0.2)) {
+                withAnimation(MotionTuning.crispCurve(0.4, delay: 0.16)) {
                     contentVisible = true
                 }
                 
                 // Load user stats if authenticated
                 loadUserStats()
-                print("🔍 DEBUG: ProfileView - Async block completed")
+                Task {
+                    await refreshInviteSnapshot(force: false)
+                }
+                profileDebugLog("🔍 DEBUG: ProfileView - Async block completed")
             }
-            print("🔍 DEBUG: ProfileView appeared - End")
+            profileDebugLog("🔍 DEBUG: ProfileView appeared - End")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .snapchefShareCompleted)) { _ in
+            Task {
+                await refreshInviteSnapshot(force: true)
+            }
         }
         .sheet(isPresented: $showingSubscriptionView) {
             SubscriptionView()
@@ -211,6 +260,43 @@ struct ProfileView: View {
                 self.userStats = stats
                 self.isLoadingStats = false
             }
+        }
+    }
+
+    private func refreshInviteSnapshot(force: Bool) async {
+        guard !isLoadingInviteSnapshot else { return }
+        if inviteSnapshot != nil && !force { return }
+
+        isLoadingInviteSnapshot = true
+        let snapshot = await SocialShareManager.shared.fetchInviteCenterSnapshot()
+        if reduceMotion {
+            inviteSnapshot = snapshot
+        } else {
+            withAnimation(MotionTuning.crispCurve(0.22)) {
+                inviteSnapshot = snapshot
+            }
+        }
+        isLoadingInviteSnapshot = false
+
+        if let unlocked = ViralMilestoneTracker.unlockedMilestone(for: snapshot.totalConversions) {
+            NotificationCenter.default.post(
+                name: .snapchefViralMilestoneUnlocked,
+                object: nil,
+                userInfo: [
+                    "milestone": unlocked,
+                    "conversions": snapshot.totalConversions
+                ]
+            )
+        }
+    }
+
+    private func copyInviteLink() {
+        UIPasteboard.general.string = SocialShareManager.shared.referralInviteURL().absoluteString
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        NotificationCenter.default.post(name: .snapchefInviteLinkCopied, object: nil)
+        copiedInviteLink = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            copiedInviteLink = false
         }
     }
 }
@@ -523,12 +609,6 @@ struct EnhancedProfileHeader: View {
                 // Status pills
                 HStack(spacing: 12) {
                     StatusPill(text: "🔥 \(currentStreak) day streak", color: Color(hex: "#f093fb"))
-                        .onTapGesture {
-                            // Manual streak update for testing
-                            Task {
-                                await updateStreakManually()
-                            }
-                        }
                     StatusPill(text: calculateUserStatus(), color: Color(hex: "#4facfe"))
                 }
 
@@ -659,9 +739,9 @@ struct EnhancedProfileHeader: View {
                 }
         }
         .onAppear {
-            print("🔍 DEBUG: EnhancedProfileHeader appeared - Start")
+            profileDebugLog("🔍 DEBUG: EnhancedProfileHeader appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: EnhancedProfileHeader - Async block started")
+                profileDebugLog("🔍 DEBUG: EnhancedProfileHeader - Async block started")
                 withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
                     rotationAngle = 360
                 }
@@ -669,9 +749,9 @@ struct EnhancedProfileHeader: View {
                 withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
                     glowAnimation = true
                 }
-                print("🔍 DEBUG: EnhancedProfileHeader - Async block completed")
+                profileDebugLog("🔍 DEBUG: EnhancedProfileHeader - Async block completed")
             }
-            print("🔍 DEBUG: EnhancedProfileHeader appeared - End")
+            profileDebugLog("🔍 DEBUG: EnhancedProfileHeader appeared - End")
         }
         .onChange(of: authManager.currentUser?.username) { _ in
             // Refresh when CloudKit username changes
@@ -695,40 +775,6 @@ struct EnhancedProfileHeader: View {
     }
     
     // MARK: - Data Loading Methods
-    
-    private func updateStreakManually() async {
-        print("🔄 Manually updating streak...")
-        
-        // Get or calculate the streak
-        let streakManager = StreakManager.shared
-        var newStreak = 1
-        
-        // Check if we have a daily snap streak
-        if let dailyStreak = streakManager.currentStreaks[.dailySnap] {
-            newStreak = max(1, dailyStreak.currentStreak)
-        }
-        
-        // Update CloudKit
-        let updates = UserStatUpdates(
-            currentStreak: newStreak,
-            longestStreak: max(newStreak, authManager.currentUser?.longestStreak ?? 0)
-        )
-        
-        do {
-            try await authManager.updateUserStats(updates)
-            print("✅ Manually updated streak to \(newStreak) in CloudKit")
-            
-            // Refresh the current user data
-            await authManager.refreshCurrentUser()
-            
-            // Force UI refresh
-            await MainActor.run {
-                refreshTrigger += 1
-            }
-        } catch {
-            print("❌ Failed to manually update streak: \(error)")
-        }
-    }
     
     private func loadUserStats() {
         guard authManager.isAuthenticated else {
@@ -977,17 +1023,17 @@ struct EnhancedSubscriptionCard: View {
         .buttonStyle(PlainButtonStyle())
         .particleExplosion(trigger: $particleTrigger)
         .onAppear {
-            print("🔍 DEBUG: EnhancedSubscriptionCard appeared - Start")
+            profileDebugLog("🔍 DEBUG: EnhancedSubscriptionCard appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: EnhancedSubscriptionCard - Async block started")
+                profileDebugLog("🔍 DEBUG: EnhancedSubscriptionCard - Async block started")
                 if tier != .premium {
                     withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
                         shimmerPhase = 2
                     }
                 }
-                print("🔍 DEBUG: EnhancedSubscriptionCard - Async block completed")
+                profileDebugLog("🔍 DEBUG: EnhancedSubscriptionCard - Async block completed")
             }
-            print("🔍 DEBUG: EnhancedSubscriptionCard appeared - End")
+            profileDebugLog("🔍 DEBUG: EnhancedSubscriptionCard appeared - End")
         }
     }
 }
@@ -1020,15 +1066,15 @@ struct PremiumBadge: View {
         )
         .scaleEffect(isAnimating ? 1.05 : 1)
         .onAppear {
-            print("🔍 DEBUG: PremiumBadge appeared - Start")
+            profileDebugLog("🔍 DEBUG: PremiumBadge appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: PremiumBadge - Async block started")
+                profileDebugLog("🔍 DEBUG: PremiumBadge - Async block started")
                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                     isAnimating = true
                 }
-                print("🔍 DEBUG: PremiumBadge - Async block completed")
+                profileDebugLog("🔍 DEBUG: PremiumBadge - Async block completed")
             }
-            print("🔍 DEBUG: PremiumBadge appeared - End")
+            profileDebugLog("🔍 DEBUG: PremiumBadge appeared - End")
         }
     }
 }
@@ -1176,6 +1222,167 @@ struct GrowthHubQuickCard: View {
                 pulse = true
             }
         }
+    }
+}
+
+struct ViralFunnelQuickCard: View {
+    let momentumPlatform: String?
+    let conversions: Int
+    let pendingCoins: Int
+    let earnedCoins: Int
+    let isLoading: Bool
+    let copiedInviteLink: Bool
+    let onCopyInvite: () -> Void
+    let onOpenInviteCenter: () -> Void
+    let onOpenGrowthHub: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+
+    private var goal: ViralFunnelProgress {
+        ViralFunnelProgress(conversions: conversions)
+    }
+
+    private var momentumLabel: String {
+        guard let raw = momentumPlatform?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return "No recent share yet"
+        }
+        let lower = raw.lowercased()
+        if lower == "tiktok" { return "Live on TikTok" }
+        if lower == "whatsapp" { return "Live on WhatsApp" }
+        if lower == "instagramstory" { return "Live on Instagram Story" }
+        return "Live on \(raw.capitalized)"
+    }
+
+    var body: some View {
+        StudioMomentumCardContainer {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Viral Funnel")
+                            .font(StudioMomentumTypography.title)
+                            .foregroundColor(.white)
+                        Text(momentumLabel)
+                            .font(StudioMomentumTypography.subtitle)
+                            .foregroundColor(.white.opacity(0.78))
+                    }
+                    Spacer()
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(0.85)
+                    } else {
+                        Image(systemName: "bolt.circle.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(Color(hex: "#f6d365"))
+                            .scaleEffect(pulse ? 1.08 : 1.0)
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    funnelStat(value: "\(conversions)", label: "Conversions")
+                    funnelStat(value: "\(pendingCoins)", label: "Pending")
+                    funnelStat(value: "\(earnedCoins)", label: "Earned")
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(goal.goalTitle)
+                            .font(StudioMomentumTypography.goalTitle)
+                            .foregroundColor(.white.opacity(0.86))
+                        Spacer()
+                        if let next = goal.nextMilestone {
+                            Text("\(goal.conversionsToNext) to \(next)")
+                                .font(StudioMomentumTypography.goalMono)
+                                .foregroundColor(.white.opacity(0.7))
+                        } else {
+                            Text("Maxed")
+                                .font(StudioMomentumTypography.goalTitle)
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                    }
+                    ProgressView(value: goal.progressToNext, total: 1)
+                        .progressViewStyle(.linear)
+                        .tint(.white.opacity(0.95))
+                        .scaleEffect(x: 1, y: 1.12, anchor: .center)
+                    Text(goal.goalSubtitle)
+                        .font(StudioMomentumTypography.goalBody)
+                        .foregroundColor(.white.opacity(0.78))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color.white.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                HStack(spacing: 10) {
+                    Button(action: onCopyInvite) {
+                        HStack(spacing: 8) {
+                            Image(systemName: copiedInviteLink ? "checkmark.circle.fill" : "link")
+                                .font(.system(size: 13, weight: .bold))
+                            Text(copiedInviteLink ? "Copied" : "Copy Invite")
+                                .font(StudioMomentumTypography.action)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(StudioMomentumVisual.chipOpacity))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onOpenInviteCenter) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.2.wave.2.fill")
+                                .font(.system(size: 13, weight: .bold))
+                            Text("Invite Center")
+                                .font(StudioMomentumTypography.action)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(0.19))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onOpenGrowthHub) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 36, height: 36)
+                            .background(Color.white.opacity(0.22))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+        }
+        .padding(.horizontal, 20)
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: MotionTuning.seconds(1.4)).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
+    }
+
+    private func funnelStat(value: String, label: String) -> some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(StudioMomentumTypography.statValue)
+                .foregroundColor(.white)
+                .monospacedDigit()
+            Text(label)
+                .font(StudioMomentumTypography.statLabel)
+                .foregroundColor(.white.opacity(0.74))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -2649,15 +2856,15 @@ struct FoodPreferencesCard: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onAppear {
-            print("🔍 DEBUG: FoodPreferencesCard appeared - Start")
+            profileDebugLog("🔍 DEBUG: FoodPreferencesCard appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: FoodPreferencesCard - Async block started")
+                profileDebugLog("🔍 DEBUG: FoodPreferencesCard - Async block started")
                 withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
                     isAnimating = true
                 }
-                print("🔍 DEBUG: FoodPreferencesCard - Async block completed")
+                profileDebugLog("🔍 DEBUG: FoodPreferencesCard - Async block completed")
             }
-            print("🔍 DEBUG: FoodPreferencesCard appeared - End")
+            profileDebugLog("🔍 DEBUG: FoodPreferencesCard appeared - End")
         }
         .fullScreenCover(isPresented: $showingPreferencesView) {
             FoodPreferencesView()
@@ -2915,14 +3122,14 @@ struct CollectionProgressView: View {
             )
         }
         .onAppear {
-            print("🔍 DEBUG: CollectionProgressView appeared - Start")
+            profileDebugLog("🔍 DEBUG: CollectionProgressView appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: CollectionProgressView - Async block started")
+                profileDebugLog("🔍 DEBUG: CollectionProgressView - Async block started")
                 withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.5)) {
                     animateProgress = true
                 }
                 loadUserStats()
-                print("🔍 DEBUG: CollectionProgressView - Async block completed")
+                profileDebugLog("🔍 DEBUG: CollectionProgressView - Async block completed")
             }
             
             // Load user's liked recipes for accurate count
@@ -2940,7 +3147,7 @@ struct CollectionProgressView: View {
                     }
                 }
             }
-            print("🔍 DEBUG: CollectionProgressView appeared - End")
+            profileDebugLog("🔍 DEBUG: CollectionProgressView appeared - End")
         }
         .onChange(of: authManager.isAuthenticated) { _ in
             // Refresh data when authentication changes
@@ -3254,17 +3461,17 @@ struct ProfileAchievementBadge: View {
                 .lineLimit(2)
         }
         .onAppear {
-            print("🔍 DEBUG: ProfileAchievementBadge appeared - Start")
+            profileDebugLog("🔍 DEBUG: ProfileAchievementBadge appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: ProfileAchievementBadge - Async block started")
+                profileDebugLog("🔍 DEBUG: ProfileAchievementBadge - Async block started")
                 if isUnlocked {
                     withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
                         isAnimating = true
                     }
                 }
-                print("🔍 DEBUG: ProfileAchievementBadge - Async block completed")
+                profileDebugLog("🔍 DEBUG: ProfileAchievementBadge - Async block completed")
             }
-            print("🔍 DEBUG: ProfileAchievementBadge appeared - End")
+            profileDebugLog("🔍 DEBUG: ProfileAchievementBadge appeared - End")
         }
     }
 }
@@ -3501,9 +3708,9 @@ struct ActiveChallengesSection: View {
         .onAppear {
             loadUserChallenges()
             
-            // Copy exact logic from ChallengeHubView
-            // Create mock challenges if needed
-            if gamificationManager.activeChallenges.isEmpty {
+            // Optional debug-only mock seeding for local development.
+            if ChallengeService.shouldSeedMockChallenges(),
+               gamificationManager.activeChallenges.isEmpty {
                 Task {
                     await ChallengeService.shared.createMockChallenges()
                 }

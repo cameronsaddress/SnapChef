@@ -160,7 +160,7 @@ final class ChallengeNotificationManager: ObservableObject {
                 "challengeType": challenge.type.rawValue
             ],
             trigger: trigger,
-            deliveryPolicy: .transactional
+            deliveryPolicy: .transactionalNudge
         )
     }
 
@@ -181,7 +181,7 @@ final class ChallengeNotificationManager: ObservableObject {
             userInfo: ["challengeId": challenge.id],
             trigger: nil,
             priority: .high,
-            deliveryPolicy: .transactional
+            deliveryPolicy: .transactionalCritical
         )
     }
 
@@ -239,7 +239,7 @@ final class ChallengeNotificationManager: ObservableObject {
             ],
             trigger: nil,
             priority: .medium,
-            deliveryPolicy: .transactional
+            deliveryPolicy: .transactionalCritical
         )
     }
 

@@ -141,7 +141,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, @preconcurrency UNUserNotifi
                 userInfo: userInfo,
                 trigger: trigger,
                 priority: .low,
-                deliveryPolicy: .transactional
+                // User explicitly tapped Snooze, so this follow-up should not be dropped by monthly nudge caps.
+                deliveryPolicy: .transactionalCritical
             )
 
             if didSchedule {

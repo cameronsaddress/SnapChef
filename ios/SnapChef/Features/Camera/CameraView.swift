@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import AuthenticationServices
+import Foundation
 
 private let cameraDebugLoggingEnabled = false
 
@@ -20,6 +21,7 @@ struct CameraView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
     @EnvironmentObject var cloudKitDataManager: CloudKitDataManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var cloudKitRecipeManager = CloudKitService.shared
     @Binding var selectedTab: Int
     var isPresented: Binding<Bool>?  // Optional binding to dismiss the camera
@@ -55,6 +57,7 @@ struct CameraView: View {
     @State private var transitionHeroOpacity: Double = 0
     @State private var transitionProgress: Double = 0.1
     @State private var transitionAura = false
+    @State private var showEntryCinematic = false
 
     // Two-step capture flow state
     enum CaptureMode {
@@ -101,6 +104,19 @@ struct CameraView: View {
     @State private var successMessage = ""
     @State private var showPremiumPrompt = false
     @State private var premiumPromptReason: PremiumUpgradePrompt.UpgradeReason = .dailyLimitReached
+
+    // Backward-compatibility shim for tests and legacy call sites.
+    // Internal test capture is permanently disabled in production flows.
+    static func shouldEnableInternalTestCapture(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isDebugBuild: Bool = _isDebugAssertConfiguration()
+    ) -> Bool {
+        let _ = arguments
+        let _ = environment
+        let _ = isDebugBuild
+        return false
+    }
 
     var flashIcon: String {
         switch cameraModel.flashMode {
@@ -156,8 +172,7 @@ struct CameraView: View {
                         isProcessing: isProcessing,
                         fridgePhoto: fridgePhoto,
                         triggerAnimation: $captureAnimation,
-                        onCapture: capturePhoto,
-                        onDebugTest: sendTestFridgeImage
+                        onCapture: capturePhoto
                     )
                 }
             }
@@ -204,6 +219,19 @@ struct CameraView: View {
             cameraDebugLog("🔍 DEBUG: CameraView appeared - Start")
             // Reset closing state when view appears
             isClosing = false
+            if deviceManager.animationsEnabled && !reduceMotion {
+                withAnimation(MotionTuning.crispCurve(0.16)) {
+                    showEntryCinematic = true
+                }
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: MotionTuning.nanoseconds(0.55))
+                    withAnimation(MotionTuning.softExit(0.2)) {
+                        showEntryCinematic = false
+                    }
+                }
+            } else {
+                showEntryCinematic = false
+            }
             DispatchQueue.main.async {
                 cameraDebugLog("🔍 DEBUG: CameraView - Async block started")
                 // Performance optimization: Progressive loading
@@ -267,6 +295,7 @@ struct CameraView: View {
         )
         .overlay(resultsTransitionOverlay)
         .overlay(captureFlashOverlay)
+        .overlay(entryCinematicOverlay)
         .overlay(
             Group {
                 if showWelcomeMessage {
@@ -550,7 +579,56 @@ struct CameraView: View {
         }
     }
 
+    @ViewBuilder
+    private var entryCinematicOverlay: some View {
+        if showEntryCinematic {
+            ZStack {
+                RadialGradient(
+                    colors: [
+                        Color(hex: "#38f9d7").opacity(0.44),
+                        Color(hex: "#4facfe").opacity(0.24),
+                        .clear
+                    ],
+                    center: .center,
+                    startRadius: 8,
+                    endRadius: 300
+                )
+                .ignoresSafeArea()
+                .blendMode(.screen)
+
+                VStack(spacing: 10) {
+                    Image(systemName: "camera.aperture")
+                        .font(.system(size: 38, weight: .bold))
+                        .foregroundColor(.white.opacity(0.95))
+                    Text("Snap Mode")
+                        .font(.system(size: 18, weight: .heavy, design: .rounded))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(
+                    Capsule()
+                        .fill(Color.black.opacity(0.35))
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.24), lineWidth: 1)
+                        )
+                )
+                .shadow(color: Color(hex: "#38f9d7").opacity(0.38), radius: 18, y: 8)
+            }
+            .allowsHitTesting(false)
+            .transition(.opacity.combined(with: .scale(scale: 1.02)))
+        }
+    }
+
     private func capturePhoto() {
+        do {
+            try SnapChefAPIManager.shared.ensureCredentialsConfigured()
+        } catch {
+            currentError = mapAPIErrorToSnapChefError(error)
+            return
+        }
+
         // Trigger capture animation
         captureAnimation = true
 
@@ -578,69 +656,6 @@ struct CameraView: View {
         }
     }
     
-    // Test function for development - sends a test fridge image
-    private func sendTestFridgeImage() {
-        // List of available test images
-        let testImages = ["fridge", "fridge1", "fridge2", "fridge3", "fridge4", "fridge5"]
-        let randomImage = testImages.randomElement() ?? "fridge2"
-        
-        // Try multiple methods to load the test image
-        var testImage: UIImage?
-        
-        // Method 1: Try with .jpg extension
-        testImage = UIImage(named: "\(randomImage).jpg")
-        
-        // Method 2: Try without extension
-        if testImage == nil {
-            testImage = UIImage(named: randomImage)
-        }
-        
-        // Method 3: Try loading from bundle directly
-        if testImage == nil {
-            if let imagePath = Bundle.main.path(forResource: randomImage, ofType: "jpg") {
-                testImage = UIImage(contentsOfFile: imagePath)
-                print("✅ Loaded test image from bundle path: \(imagePath)")
-            }
-        }
-        
-        // If still no image, show error
-        guard let loadedImage = testImage else {
-            print("❌ Test image '\(randomImage)' not found in bundle")
-            print("📁 Trying to list available resources...")
-            
-            // Debug: Try to list what's actually available
-            if let resourcePath = Bundle.main.resourcePath {
-                do {
-                    let items = try FileManager.default.contentsOfDirectory(atPath: resourcePath)
-                    let jpgFiles = items.filter { $0.hasSuffix(".jpg") }
-                    print("📷 Available JPG files in bundle: \(jpgFiles)")
-                } catch {
-                    print("❌ Could not list bundle resources: \(error)")
-                }
-            }
-            
-            currentError = .imageProcessingError("Test image '\(randomImage)' not found. Please check Resources folder.")
-            return
-        }
-        
-        print("📸 Successfully loaded test image: \(randomImage).jpg")
-        print("📐 Image size: \(loadedImage.size.width) x \(loadedImage.size.height)")
-        
-        // Haptic feedback
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        
-        // Process the test image directly
-        capturedImage = loadedImage
-        processImage(loadedImage)
-        
-        // Track as test snap (not daily snap)
-        Task {
-            print("🧪 Test mode: Processing test fridge image '\(randomImage).jpg'")
-            print("📤 Sending to Render server for recipe generation...")
-        }
-    }
-
     private func processImage(_ image: UIImage) {
         cameraDebugLog("🔍 DEBUG: processImage called for single image")
         cameraDebugLog("🔍 DEBUG: Setting isProcessing = true for single image")
@@ -674,6 +689,16 @@ struct CameraView: View {
                 }
             }
 
+            do {
+                try SnapChefAPIManager.shared.ensureCredentialsConfigured()
+            } catch {
+                self.updateProcessingMilestone(.failed)
+                self.isProcessing = false
+                self.currentError = self.mapAPIErrorToSnapChefError(error)
+                self.cameraModel.requestCameraPermission()
+                return
+            }
+
             // No need to consume free uses - we track daily count in SubscriptionManager
 
             // Generate session ID
@@ -686,7 +711,7 @@ struct CameraView: View {
                 flashEnabled: cameraModel.flashMode == .on,
                 ingredientsDetected: [],
                 recipesGenerated: 0,
-                aiModel: UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "grok",
+                aiModel: UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini",
                 processingTime: 0
             )
             let startTime = Date()
@@ -1001,24 +1026,7 @@ struct CameraView: View {
                         self.updateProcessingMilestone(.failed)
                         self.isProcessing = false
 
-                        // Convert API errors to user-friendly SnapChef errors with appropriate recovery strategies
-                        if case APIError.authenticationError = error {
-                            // API auth error - this is about the backend API key, not user auth
-                            self.currentError = .apiError("Server authentication failed. Please try again later.", recovery: .retry)
-                        } else if case APIError.notFoodImage(let message) = error {
-                            // Use imageProcessingError for non-food images with retry recovery
-                            self.currentError = .imageProcessingError(message, recovery: .retry)
-                        } else if case APIError.noIngredientsDetected(let message) = error {
-                            // Use recipeGenerationError for ingredient detection issues with retry recovery
-                            self.currentError = .recipeGenerationError(message, recovery: .retry)
-                        } else if case APIError.serverError(_, let message) = error {
-                            self.currentError = .apiError("Server error: \(message)", recovery: .retry)
-                        } else if case APIError.unauthorized(let message) = error {
-                            // This is about missing API key in the app, not user authentication
-                            self.currentError = .apiError(message, recovery: .retry)
-                        } else {
-                            self.currentError = .unknown(error.localizedDescription, recovery: .retry)
-                        }
+                        self.currentError = self.mapAPIErrorToSnapChefError(error)
 
                         // Restart camera session on error
                         self.cameraModel.requestCameraPermission()
@@ -1067,6 +1075,16 @@ struct CameraView: View {
             }
             cameraDebugLog("🔍 DEBUG: Subscription check passed, continuing with API call")
 
+            do {
+                try SnapChefAPIManager.shared.ensureCredentialsConfigured()
+            } catch {
+                self.updateProcessingMilestone(.failed)
+                self.isProcessing = false
+                self.currentError = self.mapAPIErrorToSnapChefError(error)
+                self.cameraModel.requestCameraPermission()
+                return
+            }
+
             // Generate session ID
             let sessionId = UUID().uuidString
 
@@ -1077,7 +1095,7 @@ struct CameraView: View {
                 flashEnabled: cameraModel.flashMode == .on,
                 ingredientsDetected: [],
                 recipesGenerated: 0,
-                aiModel: UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "grok",
+                aiModel: UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini",
                 processingTime: 0
             )
             let startTime = Date()
@@ -1382,24 +1400,7 @@ struct CameraView: View {
                         self.updateProcessingMilestone(.failed)
                         self.isProcessing = false
 
-                        // Convert API errors to user-friendly SnapChef errors with appropriate recovery strategies
-                        if case APIError.authenticationError = error {
-                            // API auth error - this is about the backend API key, not user auth
-                            self.currentError = .apiError("Server authentication failed. Please try again later.", recovery: .retry)
-                        } else if case APIError.notFoodImage(let message) = error {
-                            // Use imageProcessingError for non-food images with retry recovery
-                            self.currentError = .imageProcessingError(message, recovery: .retry)
-                        } else if case APIError.noIngredientsDetected(let message) = error {
-                            // Use recipeGenerationError for ingredient detection issues with retry recovery
-                            self.currentError = .recipeGenerationError(message, recovery: .retry)
-                        } else if case APIError.serverError(_, let message) = error {
-                            self.currentError = .apiError("Server error: \(message)", recovery: .retry)
-                        } else if case APIError.unauthorized(let message) = error {
-                            // This is about missing API key in the app, not user authentication
-                            self.currentError = .apiError(message, recovery: .retry)
-                        } else {
-                            self.currentError = .unknown(error.localizedDescription, recovery: .retry)
-                        }
+                        self.currentError = self.mapAPIErrorToSnapChefError(error)
 
                         // Restart camera session on error
                         self.cameraModel.requestCameraPermission()
@@ -1409,18 +1410,122 @@ struct CameraView: View {
         }
     }
 
-    private func processTestImage() {
-        // Load the test fridge image from bundle
-        guard let testImage = UIImage(named: "fridge.jpg") else {
-            print("Failed to load test fridge image")
-            return
+    private func mapAPIErrorToSnapChefError(_ error: Error) -> SnapChefError {
+        if let existing = error as? SnapChefError {
+            return existing
         }
 
-        // Increment snap counter for test button too
-        appState.incrementSnapsTaken()
+        guard let apiError = error as? APIError else {
+            return .unknown(error.localizedDescription, recovery: .retry)
+        }
 
-        // Process it the same way as a captured photo
-        processImage(testImage)
+        switch apiError {
+        case .authenticationError:
+            return .apiError(
+                "Server authentication failed. Please verify the app API key configuration.",
+                statusCode: 401,
+                recovery: .retry
+            )
+        case .unauthorized(let message):
+            return .apiError(
+                normalizedServerMessage(message),
+                statusCode: 401,
+                recovery: .retry
+            )
+        case .notFoodImage(let message):
+            return .imageProcessingError(message, recovery: .retry)
+        case .noIngredientsDetected(let message):
+            return .recipeGenerationError(message, recovery: .retry)
+        case .serverError(let statusCode, let message):
+            if statusCode == -1 || message.localizedCaseInsensitiveContains("timed out") {
+                return .timeoutError("Request timed out. Please try again.")
+            }
+            let normalizedMessage = normalizedServerMessage(message)
+            if statusCode == 503 {
+                let retryDelay = retryAfterSeconds(fromMessage: normalizedMessage) ?? 20
+                let fallbackMessage = normalizedMessage.isEmpty
+                    ? "Our AI service is waking up. Please retry in a moment."
+                    : normalizedMessage
+                return .apiError(
+                    fallbackMessage,
+                    statusCode: statusCode,
+                    recovery: .retryAfter(retryDelay)
+                )
+            }
+            if statusCode == 429 {
+                let retryDelay = retryAfterSeconds(fromMessage: normalizedMessage) ?? 15
+                return .rateLimitError(
+                    normalizedMessage.isEmpty ? "Too many requests. Please wait a moment and try again." : normalizedMessage,
+                    retryAfter: retryDelay
+                )
+            }
+            return .apiError(
+                normalizedMessage,
+                statusCode: statusCode,
+                recovery: .retry
+            )
+        case .decodingError:
+            return .apiError(
+                "Unexpected server response. Please try again in a moment.",
+                statusCode: 502,
+                recovery: .retry
+            )
+        case .invalidURL:
+            return .apiError("Service URL is invalid. Please contact support.", statusCode: 500, recovery: .contactSupport)
+        case .invalidRequestData:
+            return .validationError("Photo data could not be prepared. Try retaking the photo.", fields: ["image"])
+        case .noData:
+            return .apiError("No response received from the server. Please retry.", statusCode: 502, recovery: .retry)
+        }
+    }
+
+    private func normalizedServerMessage(_ rawMessage: String) -> String {
+        let trimmed = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return "Service temporarily unavailable. Please try again shortly."
+        }
+
+        var candidate = trimmed
+        if candidate.lowercased().hasPrefix("server error:") {
+            candidate = candidate.dropFirst("server error:".count)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        if let data = candidate.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let detail = json["detail"] as? String, !detail.isEmpty {
+                return detail
+            }
+            if let message = json["message"] as? String, !message.isEmpty {
+                return message
+            }
+            if let error = json["error"] as? String, !error.isEmpty {
+                return error
+            }
+        }
+
+        return candidate
+    }
+
+    private func retryAfterSeconds(fromMessage message: String) -> TimeInterval? {
+        let pattern = #"(\d+)\s*(second|seconds|sec|s|minute|minutes|min|m)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
+            return nil
+        }
+        let range = NSRange(message.startIndex..<message.endIndex, in: message)
+        guard let match = regex.firstMatch(in: message, options: [], range: range),
+              match.numberOfRanges >= 3,
+              let valueRange = Range(match.range(at: 1), in: message),
+              let unitRange = Range(match.range(at: 2), in: message),
+              let value = Double(message[valueRange]) else {
+            return nil
+        }
+
+        let unit = message[unitRange].lowercased()
+        if unit.hasPrefix("m") {
+            return value * 60
+        }
+        return value
     }
 
     private func resetCaptureFlow() {
@@ -1849,6 +1954,8 @@ extension CameraView {
     private func setupViewProgressively() {
         // Start with basic camera setup
         Task {
+            await SnapChefAPIManager.shared.warmupBackendIfNeeded()
+
             // Small delay to ensure view is fully loaded
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
             await MainActor.run {
@@ -2003,12 +2110,31 @@ struct CaptureButtonEnhanced: View {
     let isDisabled: Bool
     @Binding var triggerAnimation: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isPressed = false
     @State private var ringScale: CGFloat = 1
+    @State private var readyPulse = false
 
     var body: some View {
         Button(action: action) {
             ZStack {
+                if !isDisabled {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(hex: "#38f9d7").opacity(readyPulse ? 0.42 : 0.2),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 6,
+                                endRadius: 74
+                            )
+                        )
+                        .frame(width: 130, height: 130)
+                        .scaleEffect(readyPulse ? 1.08 : 0.9)
+                }
+
                 // Outer ring with animation
                 Circle()
                     .stroke(
@@ -2063,6 +2189,21 @@ struct CaptureButtonEnhanced: View {
                     try? await Task.sleep(nanoseconds: 600_000_000) // 0.6 seconds
                     triggerAnimation = false
                     ringScale = 1
+                }
+            }
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(MotionTuning.crispCurve(1.4).repeatForever(autoreverses: true)) {
+                readyPulse = true
+            }
+        }
+        .onChange(of: isDisabled) { disabled in
+            if disabled || reduceMotion {
+                readyPulse = false
+            } else {
+                withAnimation(MotionTuning.crispCurve(1.4).repeatForever(autoreverses: true)) {
+                    readyPulse = true
                 }
             }
         }

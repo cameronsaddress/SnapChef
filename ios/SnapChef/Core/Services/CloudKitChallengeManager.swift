@@ -12,22 +12,56 @@ class CloudKitChallengeManager: ObservableObject {
         NSClassFromString("XCTestCase") != nil
     }
 
-    private lazy var container: CKContainer = {
-        CKContainer(identifier: "iCloud.com.snapchefapp.app")
+    private lazy var container: CKContainer? = {
+        guard cloudKitEnabled else { return nil }
+        return CloudKitRuntimeSupport.makeContainer()
     }()
-    private lazy var publicDB: CKDatabase = {
-        container.publicCloudDatabase
-    }()
-    private lazy var privateDB: CKDatabase = {
-        container.privateCloudDatabase
-    }()
+
+    private var publicDB: CKDatabase? {
+        container?.publicCloudDatabase
+    }
+
+    private var privateDB: CKDatabase? {
+        container?.privateCloudDatabase
+    }
 
     @Published var activeChallenges: [Challenge] = []
     @Published var userChallenges: [CloudKitUserChallenge] = []
     @Published var teams: [CloudKitTeam] = []
 
+    private var cloudKitEnabled: Bool {
+        CloudKitRuntimeSupport.hasCloudKitEntitlement
+    }
+
+    private func requireCloudKitEnabled(for operation: String) throws {
+        guard cloudKitEnabled else {
+            print("⚠️ CloudKitChallengeManager.\(operation): CloudKit unavailable in this runtime")
+            throw CloudKitTeamError.cloudKitUnavailable
+        }
+    }
+
+    private func requirePublicDB(for operation: String) throws -> CKDatabase {
+        try requireCloudKitEnabled(for: operation)
+        guard let publicDB else {
+            throw CloudKitTeamError.cloudKitUnavailable
+        }
+        return publicDB
+    }
+
+    private func requirePrivateDB(for operation: String) throws -> CKDatabase {
+        try requireCloudKitEnabled(for: operation)
+        guard let privateDB else {
+            throw CloudKitTeamError.cloudKitUnavailable
+        }
+        return privateDB
+    }
+
     private init() {
         guard !Self.isRunningTests else { return }
+        guard cloudKitEnabled else {
+            print("⚠️ CloudKitChallengeManager running in local-only mode: challenge sync disabled")
+            return
+        }
         Task {
             await syncChallenges()
         }
@@ -37,6 +71,8 @@ class CloudKitChallengeManager: ObservableObject {
 
     /// Upload a challenge to CloudKit
     func uploadChallenge(_ challenge: Challenge) async throws -> String {
+        let publicDB = try requirePublicDB(for: "uploadChallenge")
+
         let logger = CloudKitDebugLogger.shared
         let startTime = Date()
         logger.logSaveStart(recordType: "Challenge", database: publicDB.debugName)
@@ -78,6 +114,8 @@ class CloudKitChallengeManager: ObservableObject {
 
     /// Sync all active challenges from CloudKit
     func syncChallenges() async {
+        guard cloudKitEnabled else { return }
+        guard let publicDB = try? requirePublicDB(for: "syncChallenges") else { return }
         let logger = CloudKitDebugLogger.shared
         let startTime = Date()
         
@@ -116,6 +154,8 @@ class CloudKitChallengeManager: ObservableObject {
 
     /// Track user's challenge progress
     func updateUserProgress(challengeID: String, progress: Double) async throws {
+        let privateDB = try requirePrivateDB(for: "updateUserProgress")
+
         guard let userID = getCurrentUserID() else { return }
         
         let logger = CloudKitDebugLogger.shared
@@ -174,6 +214,9 @@ class CloudKitChallengeManager: ObservableObject {
 
     /// Get user's challenge progress
     func getUserChallengeProgress() async throws -> [CloudKitUserChallenge] {
+        guard cloudKitEnabled else { return [] }
+        let privateDB = try requirePrivateDB(for: "getUserChallengeProgress")
+
         guard let userID = getCurrentUserID() else { return [] }
         
         let logger = CloudKitDebugLogger.shared
@@ -222,6 +265,8 @@ class CloudKitChallengeManager: ObservableObject {
 
     /// Create a new team
     func createTeam(name: String, description: String, challengeID: String) async throws -> CloudKitTeam {
+        let publicDB = try requirePublicDB(for: "createTeam")
+
         guard let userID = getCurrentUserID() else { throw CloudKitTeamError.notAuthenticated }
         
         let logger = CloudKitDebugLogger.shared
@@ -276,6 +321,8 @@ class CloudKitChallengeManager: ObservableObject {
 
     /// Join a team
     func joinTeam(inviteCode: String) async throws -> CloudKitTeam {
+        let publicDB = try requirePublicDB(for: "joinTeam")
+
         guard let userID = getCurrentUserID() else { throw CloudKitTeamError.notAuthenticated }
         
         let logger = CloudKitDebugLogger.shared
@@ -343,6 +390,8 @@ class CloudKitChallengeManager: ObservableObject {
 
     /// Update team points
     func updateTeamPoints(teamID: String, additionalPoints: Int) async throws {
+        let publicDB = try requirePublicDB(for: "updateTeamPoints")
+
         let logger = CloudKitDebugLogger.shared
         let startTime = Date()
         let recordID = CKRecord.ID(recordName: teamID)
@@ -381,6 +430,8 @@ class CloudKitChallengeManager: ObservableObject {
 
     /// Get team leaderboard
     func getTeamLeaderboard(challengeID: String) async throws -> [CloudKitTeam] {
+        let publicDB = try requirePublicDB(for: "getTeamLeaderboard")
+
         let logger = CloudKitDebugLogger.shared
         let startTime = Date()
         
@@ -414,6 +465,8 @@ class CloudKitChallengeManager: ObservableObject {
 
     /// Track achievement earned
     func trackAchievement(type: String, name: String, description: String) async throws {
+        let privateDB = try requirePrivateDB(for: "trackAchievement")
+
         guard let userID = getCurrentUserID() else { return }
         
         let logger = CloudKitDebugLogger.shared
@@ -443,6 +496,8 @@ class CloudKitChallengeManager: ObservableObject {
 
     /// Update leaderboard
     func updateLeaderboard(points: Int) async throws {
+        let publicDB = try requirePublicDB(for: "updateLeaderboard")
+
         guard let userID = getCurrentUserID(),
               let userName = UnifiedAuthManager.shared.currentUser?.displayName else { return }
         
@@ -567,6 +622,10 @@ class CloudKitChallengeManager: ObservableObject {
     }
 
     private func incrementChallengeCompletions(_ challengeID: String) async {
+        guard let publicDB = try? requirePublicDB(for: "incrementChallengeCompletions") else {
+            return
+        }
+
         let logger = CloudKitDebugLogger.shared
         let startTime = Date()
         let recordID = CKRecord.ID(recordName: challengeID)
@@ -601,6 +660,8 @@ class CloudKitChallengeManager: ObservableObject {
     }
 
     private func notifyTeamMembers(teamID: String, message: String) async {
+        guard cloudKitEnabled else { return }
+
         // Implementation for team notifications
         // This would integrate with push notifications
         print("📢 Team notification: \(message)")
@@ -639,6 +700,7 @@ enum CloudKitTeamError: LocalizedError {
     case invalidInviteCode
     case alreadyMember
     case teamFull
+    case cloudKitUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -650,6 +712,8 @@ enum CloudKitTeamError: LocalizedError {
             return "You're already a member of this team"
         case .teamFull:
             return "This team is full"
+        case .cloudKitUnavailable:
+            return "Cloud features are unavailable on this build/runtime."
         }
     }
 }

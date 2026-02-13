@@ -2,6 +2,55 @@ import Foundation
 import CloudKit
 import SwiftUI
 
+/// Statistics about recipe sync status between the local cache and CloudKit.
+struct SyncStats {
+    let totalCloudKitRecipes: Int
+    let totalLocalRecipes: Int
+    let missingRecipes: Int
+    let recipesWithPhotos: Int
+    let recipesNeedingPhotos: Int
+
+    var isUpToDate: Bool {
+        missingRecipes == 0
+    }
+
+    var completionPercentage: Double {
+        guard totalCloudKitRecipes > 0 else { return 100.0 }
+        return (Double(totalLocalRecipes) / Double(totalCloudKitRecipes)) * 100.0
+    }
+}
+
+/// Result of a recipe sync operation.
+struct SyncResult {
+    let newRecipesSynced: Int
+    let photosDownloaded: Int
+    let duration: TimeInterval
+    let success: Bool
+}
+
+enum RecipeError: LocalizedError {
+    case invalidRecord
+    case invalidJSON
+    case invalidShareLink
+    case notFound
+    case uploadFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidRecord:
+            return "Invalid recipe record format"
+        case .invalidJSON:
+            return "Failed to parse JSON data"
+        case .invalidShareLink:
+            return "Invalid recipe share link"
+        case .notFound:
+            return "Recipe not found"
+        case .uploadFailed:
+            return "Failed to upload recipe"
+        }
+    }
+}
+
 /// Recipe module for CloudKit operations
 /// Handles recipe upload, fetch, sync, and user recipe management
 @MainActor
@@ -18,6 +67,12 @@ final class RecipeModule: ObservableObject {
     @Published var userSavedRecipeIDs: Set<String> = []
     @Published var userCreatedRecipeIDs: Set<String> = []
     @Published var userFavoritedRecipeIDs: Set<String> = []
+
+    private enum CacheKeys {
+        static let saved = "user_saved_recipe_ids"
+        static let created = "user_created_recipe_ids"
+        static let favorited = "user_favorited_recipe_ids"
+    }
     
     // MARK: - Initialization
     init(container: CKContainer, publicDB: CKDatabase, privateDB: CKDatabase, parent: CloudKitService) {
@@ -26,6 +81,26 @@ final class RecipeModule: ObservableObject {
         self.privateDatabase = privateDB
         self.parent = parent
         loadUserRecipeReferences()
+    }
+
+    private func loadCachedRecipeReferences() {
+        let defaults = UserDefaults.standard
+        if let savedIDs = defaults.array(forKey: CacheKeys.saved) as? [String] {
+            userSavedRecipeIDs = Set(savedIDs)
+        }
+        if let createdIDs = defaults.array(forKey: CacheKeys.created) as? [String] {
+            userCreatedRecipeIDs = Set(createdIDs)
+        }
+        if let favoritedIDs = defaults.array(forKey: CacheKeys.favorited) as? [String] {
+            userFavoritedRecipeIDs = Set(favoritedIDs)
+        }
+    }
+
+    private func persistRecipeReferences() {
+        let defaults = UserDefaults.standard
+        defaults.set(Array(userSavedRecipeIDs), forKey: CacheKeys.saved)
+        defaults.set(Array(userCreatedRecipeIDs), forKey: CacheKeys.created)
+        defaults.set(Array(userFavoritedRecipeIDs), forKey: CacheKeys.favorited)
     }
     
     // MARK: - Recipe Upload (Single Instance)
@@ -49,7 +124,8 @@ final class RecipeModule: ObservableObject {
         record["title"] = recipe.name
         record["description"] = recipe.description
         record["createdAt"] = Date()
-        record["isPublic"] = 1
+        // Recipes saved to the user's private database are not globally public by default.
+        record["isPublic"] = Int64(0)
         record["fromLLM"] = fromLLM ? 1 : 0
         
         // Encode complex data as JSON
@@ -540,109 +616,82 @@ final class RecipeModule: ObservableObject {
     /// Add recipe reference to user profile
     func addRecipeToUserProfile(_ recipeID: String, type: RecipeListType) async throws {
         guard let userID = getCurrentUserID() else { return }
-        
-        // Fetch user profile or create new one
-        let profileRecord = try await fetchOrCreateUserProfile(userID)
-        
-        // Get current recipe IDs (handle nil fields for new profiles and filter placeholders)
-        var savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-        var createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-        var favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-        
-        // Add recipe ID to appropriate list
-        switch type {
-        case .saved:
-            if !savedIDs.contains(recipeID) {
-                savedIDs.append(recipeID)
-                userSavedRecipeIDs.insert(recipeID)
-            }
-        case .created:
-            if !createdIDs.contains(recipeID) {
-                createdIDs.append(recipeID)
-                userCreatedRecipeIDs.insert(recipeID)
-            }
-        case .favorited:
-            if !favoritedIDs.contains(recipeID) {
-                favoritedIDs.append(recipeID)
-                userFavoritedRecipeIDs.insert(recipeID)
-            }
-        }
-        
-        // Update record - CloudKit requires non-empty arrays for list fields
-        profileRecord["savedRecipeIDs"] = savedIDs.isEmpty ? ["_placeholder_"] : savedIDs
-        profileRecord["createdRecipeIDs"] = createdIDs.isEmpty ? ["_placeholder_"] : createdIDs
-        profileRecord["favoritedRecipeIDs"] = favoritedIDs.isEmpty ? ["_placeholder_"] : favoritedIDs
-        profileRecord["lastUpdated"] = Date()
-        
-        // Save to CloudKit
-        _ = try await privateDatabase.save(profileRecord)
-        
-        // Update save count on recipe
+
         if type == .saved {
-            await incrementSaveCount(for: recipeID)
+            let wasInserted = try await upsertSavedRecipeReference(userID: userID, recipeID: recipeID)
+            userSavedRecipeIDs.insert(recipeID)
+            persistRecipeReferences()
+
+            if wasInserted {
+                await incrementSaveCount(for: recipeID)
+                print("✅ Added recipe \(recipeID) to SavedRecipe references")
+            } else {
+                print("ℹ️ SavedRecipe reference already exists for recipe \(recipeID)")
+            }
+            return
         }
-        
-        print("✅ Added recipe \(recipeID) to user's \(type) list")
+
+        // Created / favorited lists are persisted locally (UserDefaults) and derived from CloudKit queries when needed.
+        // This avoids schema drift from ad-hoc profile list fields.
+        switch type {
+        case .created:
+            userCreatedRecipeIDs.insert(recipeID)
+        case .favorited:
+            userFavoritedRecipeIDs.insert(recipeID)
+        case .saved:
+            break
+        }
+        persistRecipeReferences()
     }
     
     /// Remove recipe reference from user profile
     func removeRecipeFromUserProfile(_ recipeID: String, type: RecipeListType) async throws {
         guard let userID = getCurrentUserID() else { return }
-        
-        let profileRecord = try await fetchOrCreateUserProfile(userID)
-        
-        // Get current recipe IDs (handle nil fields for new profiles and filter placeholders)
-        var savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-        var createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-        var favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-        
-        // Remove recipe ID from appropriate list
+
+        if type == .saved {
+            let wasRemoved = try await removeSavedRecipeReference(userID: userID, recipeID: recipeID)
+            userSavedRecipeIDs.remove(recipeID)
+            persistRecipeReferences()
+
+            if wasRemoved {
+                await decrementSaveCount(for: recipeID)
+                print("✅ Removed recipe \(recipeID) from SavedRecipe references")
+            } else {
+                print("ℹ️ SavedRecipe reference did not exist for recipe \(recipeID)")
+            }
+            return
+        }
+
+        // Created / favorited lists are persisted locally.
         switch type {
         case .saved:
-            savedIDs.removeAll { $0 == recipeID }
-            userSavedRecipeIDs.remove(recipeID)
+            break
         case .created:
-            createdIDs.removeAll { $0 == recipeID }
             userCreatedRecipeIDs.remove(recipeID)
         case .favorited:
-            favoritedIDs.removeAll { $0 == recipeID }
             userFavoritedRecipeIDs.remove(recipeID)
         }
-        
-        // Update record - CloudKit requires non-empty arrays for list fields
-        profileRecord["savedRecipeIDs"] = savedIDs.isEmpty ? ["_placeholder_"] : savedIDs
-        profileRecord["createdRecipeIDs"] = createdIDs.isEmpty ? ["_placeholder_"] : createdIDs
-        profileRecord["favoritedRecipeIDs"] = favoritedIDs.isEmpty ? ["_placeholder_"] : favoritedIDs
-        profileRecord["lastUpdated"] = Date()
-        
-        // Save to CloudKit
-        _ = try await privateDatabase.save(profileRecord)
-        
-        print("✅ Removed recipe \(recipeID) from user's \(type) list")
+        persistRecipeReferences()
     }
     
     /// Load user's recipe references
     func loadUserRecipeReferences() {
+        // Load locally cached references for instant availability.
+        loadCachedRecipeReferences()
+
         Task {
+            guard UnifiedAuthManager.shared.isAuthenticated else { return }
             guard let userID = getCurrentUserID() else { return }
-            
+
             do {
-                let profileRecord = try await fetchOrCreateUserProfile(userID)
-                
-                // Get IDs and filter out placeholder values
-                let savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                let createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                let favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                
+                let savedFromReferences = try await fetchSavedRecipeIDsFromReferences(userID: userID)
+                let mergedSaved = userSavedRecipeIDs.union(savedFromReferences)
                 await MainActor.run {
-                    self.userSavedRecipeIDs = Set(savedIDs)
-                    self.userCreatedRecipeIDs = Set(createdIDs)
-                    self.userFavoritedRecipeIDs = Set(favoritedIDs)
+                    self.userSavedRecipeIDs = mergedSaved
+                    self.persistRecipeReferences()
                 }
-                
-                print("✅ Loaded user recipe references: \(savedIDs.count) saved, \(createdIDs.count) created, \(favoritedIDs.count) favorited")
             } catch {
-                print("❌ Failed to load user recipe references: \(error)")
+                print("⚠️ Failed to refresh SavedRecipe references: \(error)")
             }
         }
     }
@@ -650,114 +699,95 @@ final class RecipeModule: ObservableObject {
     /// Get user's saved recipes (optimized)
     func getUserSavedRecipes() async throws -> [Recipe] {
         print("📖 Getting user's saved recipes...")
-        
-        // Ensure references are loaded first
-        if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
-            guard let userID = getCurrentUserID() else {
-                print("⚠️ No user ID found for loading saved recipes")
-                return []
-            }
-            
-            print("📱 Loading recipe references for user: \(userID)")
-            
-            do {
-                let profileRecord = try await fetchOrCreateUserProfile(userID)
-                
-                // Get IDs and filter out placeholder values
-                let savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                let createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                let favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                
-                await MainActor.run {
-                    self.userSavedRecipeIDs = Set(savedIDs)
-                    self.userCreatedRecipeIDs = Set(createdIDs)
-                    self.userFavoritedRecipeIDs = Set(favoritedIDs)
-                }
-                
-                print("✅ Loaded recipe references: \(savedIDs.count) saved, \(createdIDs.count) created, \(favoritedIDs.count) favorited")
-            } catch {
-                print("❌ Failed to load recipe references: \(error)")
-            }
-        } else {
-            print("📱 Using cached references: \(userSavedRecipeIDs.count) saved")
+        guard let userID = getCurrentUserID() else {
+            return []
         }
         
-        let recipes = try await fetchRecipes(by: Array(userSavedRecipeIDs))
+        var savedIDs = userSavedRecipeIDs
+        
+        do {
+            let savedFromReferences = try await fetchSavedRecipeIDsFromReferences(userID: userID)
+            savedIDs.formUnion(savedFromReferences)
+            print("✅ Loaded \(savedFromReferences.count) saved recipe references from CloudKit")
+        } catch {
+            print("⚠️ Failed to load SavedRecipe references: \(error)")
+        }
+
+        // Note: legacy "savedRecipeIDs" profile fields were removed to prevent schema drift.
+        // Saved recipes are now sourced from SavedRecipe reference records.
+
+        userSavedRecipeIDs = savedIDs
+        
+        guard !savedIDs.isEmpty else {
+            return []
+        }
+        
+        let recipes = try await fetchRecipes(by: Array(savedIDs))
         print("📖 Retrieved \(recipes.count) saved recipes")
         return recipes
     }
     
     /// Get user's created recipes (optimized)
     func getUserCreatedRecipes() async throws -> [Recipe] {
-        print("🍳 Getting user's created recipes...")
-        
-        // Ensure references are loaded first
-        if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
-            guard let userID = getCurrentUserID() else {
-                print("⚠️ No user ID found for loading created recipes")
-                return []
-            }
-            
-            print("📱 Loading recipe references for user: \(userID)")
-            
-            do {
-                let profileRecord = try await fetchOrCreateUserProfile(userID)
-                
-                // Get IDs and filter out placeholder values
-                let savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                let createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                let favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                
-                await MainActor.run {
-                    self.userSavedRecipeIDs = Set(savedIDs)
-                    self.userCreatedRecipeIDs = Set(createdIDs)
-                    self.userFavoritedRecipeIDs = Set(favoritedIDs)
+        guard UnifiedAuthManager.shared.isAuthenticated else { return [] }
+        guard let userID = getCurrentUserID() else { return [] }
+
+        let predicate = NSPredicate(format: "%K == %@", CKField.Recipe.ownerID, userID)
+        let query = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: CKField.Recipe.createdAt, ascending: false)]
+
+        var recipes: [Recipe] = []
+        var createdIDs = Set<String>()
+
+        // Prefer private recipes, but fall back to public if needed.
+        do {
+            let results = try await privateDatabase.records(matching: query, resultsLimit: 50)
+            for (_, result) in results.matchResults {
+                if case .success(let record) = result,
+                   let recipe = try? parseRecipeFromRecord(record) {
+                    recipes.append(recipe)
+                    createdIDs.insert(recipe.id.uuidString)
+                    cachedRecipes[recipe.id.uuidString] = recipe
                 }
-                
-                print("✅ Loaded recipe references: \(savedIDs.count) saved, \(createdIDs.count) created, \(favoritedIDs.count) favorited")
-            } catch {
-                print("❌ Failed to load recipe references: \(error)")
             }
-        } else {
-            print("📱 Using cached references: \(userCreatedRecipeIDs.count) created")
+        } catch {
+            // Ignore private-db failures; we still attempt public.
         }
-        
-        let recipes = try await fetchRecipes(by: Array(userCreatedRecipeIDs))
-        print("🍳 Retrieved \(recipes.count) created recipes")
-        return recipes
+
+        do {
+            let results = try await publicDatabase.records(matching: query, resultsLimit: 50)
+            for (_, result) in results.matchResults {
+                if case .success(let record) = result,
+                   let recipe = try? parseRecipeFromRecord(record) {
+                    recipes.append(recipe)
+                    createdIDs.insert(recipe.id.uuidString)
+                    cachedRecipes[recipe.id.uuidString] = recipe
+                }
+            }
+        } catch {
+            // If both fail, bubble up the public error (more likely the shared source).
+            if recipes.isEmpty { throw error }
+        }
+
+        // Deduplicate by id and keep newest ordering.
+        var unique: [UUID: Recipe] = [:]
+        for recipe in recipes {
+            unique[recipe.id] = recipe
+        }
+        let sorted = unique.values.sorted { $0.createdAt > $1.createdAt }
+
+        userCreatedRecipeIDs = createdIDs
+        persistRecipeReferences()
+
+        return sorted
     }
     
     /// Get user's favorited recipes (optimized)
     func getUserFavoritedRecipes() async throws -> [Recipe] {
-        print("❤️ Getting user's favorited recipes...")
-        
-        // Ensure references are loaded first
-        if userSavedRecipeIDs.isEmpty && userCreatedRecipeIDs.isEmpty && userFavoritedRecipeIDs.isEmpty {
-            guard let userID = getCurrentUserID() else { return [] }
-            
-            do {
-                let profileRecord = try await fetchOrCreateUserProfile(userID)
-                
-                // Get IDs and filter out placeholder values
-                let savedIDs = ((profileRecord["savedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                let createdIDs = ((profileRecord["createdRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                let favoritedIDs = ((profileRecord["favoritedRecipeIDs"] as? [String]) ?? []).filter { $0 != "_placeholder_" }
-                
-                await MainActor.run {
-                    self.userSavedRecipeIDs = Set(savedIDs)
-                    self.userCreatedRecipeIDs = Set(createdIDs)
-                    self.userFavoritedRecipeIDs = Set(favoritedIDs)
-                }
-                
-                print("✅ Loaded recipe references: \(savedIDs.count) saved, \(createdIDs.count) created, \(favoritedIDs.count) favorited")
-            } catch {
-                print("❌ Failed to load recipe references: \(error)")
-            }
-        }
-        
-        let recipes = try await fetchRecipes(by: Array(userFavoritedRecipeIDs))
-        print("❤️ Retrieved \(recipes.count) favorited recipes")
-        return recipes
+        // Favorited recipe IDs are stored locally for UX speed; CloudKit schema does not guarantee a dedicated favorites list.
+        // If needed, this can be upgraded to a CloudKit record type similar to SavedRecipe.
+        guard !userFavoritedRecipeIDs.isEmpty else { return [] }
+        return try await fetchRecipes(by: Array(userFavoritedRecipeIDs))
     }
     
     // MARK: - Recipe Sharing
@@ -901,6 +931,77 @@ final class RecipeModule: ObservableObject {
         }
         return UserDefaults.standard.string(forKey: "currentUserRecordID")
     }
+
+    private func savedRecipeRecordID(userID: String, recipeID: String) -> CKRecord.ID {
+        let sanitizedUserID = userID.replacingOccurrences(of: "/", with: "_")
+        let sanitizedRecipeID = recipeID.replacingOccurrences(of: "/", with: "_")
+        return CKRecord.ID(recordName: "saved_\(sanitizedUserID)_\(sanitizedRecipeID)")
+    }
+
+    private func upsertSavedRecipeReference(userID: String, recipeID: String) async throws -> Bool {
+        let recordID = savedRecipeRecordID(userID: userID, recipeID: recipeID)
+
+        do {
+            _ = try await privateDatabase.record(for: recordID)
+            return false
+        } catch let ckError as CKError where ckError.code == .unknownItem {
+            let record = CKRecord(recordType: CloudKitConfig.savedRecipeRecordType, recordID: recordID)
+            record[CKField.SavedRecipe.userID] = userID
+            record[CKField.SavedRecipe.recipeID] = recipeID
+            record[CKField.SavedRecipe.savedAt] = Date()
+            _ = try await privateDatabase.save(record)
+            return true
+        }
+    }
+
+    private func removeSavedRecipeReference(userID: String, recipeID: String) async throws -> Bool {
+        let recordID = savedRecipeRecordID(userID: userID, recipeID: recipeID)
+
+        do {
+            _ = try await privateDatabase.deleteRecord(withID: recordID)
+            return true
+        } catch let ckError as CKError where ckError.code == .unknownItem {
+            let predicate = NSPredicate(
+                format: "%K == %@ AND %K == %@",
+                CKField.SavedRecipe.userID, userID,
+                CKField.SavedRecipe.recipeID, recipeID
+            )
+            let query = CKQuery(recordType: CloudKitConfig.savedRecipeRecordType, predicate: predicate)
+            let (matchResults, _) = try await privateDatabase.records(matching: query, resultsLimit: 20)
+
+            var deletedAny = false
+            for (matchRecordID, result) in matchResults {
+                guard case .success = result else { continue }
+                do {
+                    _ = try await privateDatabase.deleteRecord(withID: matchRecordID)
+                    deletedAny = true
+                } catch {
+                    print("⚠️ Failed deleting legacy SavedRecipe record \(matchRecordID.recordName): \(error)")
+                }
+            }
+            return deletedAny
+        }
+    }
+
+    private func fetchSavedRecipeIDsFromReferences(userID: String) async throws -> Set<String> {
+        let predicate = NSPredicate(format: "%K == %@", CKField.SavedRecipe.userID, userID)
+        let query = CKQuery(recordType: CloudKitConfig.savedRecipeRecordType, predicate: predicate)
+
+        let (matchResults, _) = try await privateDatabase.records(
+            matching: query,
+            desiredKeys: [CKField.SavedRecipe.recipeID],
+            resultsLimit: 500
+        )
+
+        var savedIDs = Set<String>()
+        for (_, result) in matchResults {
+            guard case .success(let record) = result,
+                  let recipeID = record[CKField.SavedRecipe.recipeID] as? String,
+                  !recipeID.isEmpty else { continue }
+            savedIDs.insert(recipeID)
+        }
+        return savedIDs
+    }
     
     private func checkRecipeExists(_ name: String, _ description: String) async -> String? {
         // Only use title for query since description is not queryable
@@ -917,23 +1018,6 @@ final class RecipeModule: ObservableObject {
         }
         
         return nil
-    }
-    
-    private func fetchOrCreateUserProfile(_ userID: String) async throws -> CKRecord {
-        let recordID = CKRecord.ID(recordName: "profile_\(userID)")
-        
-        do {
-            // Try to fetch existing profile
-            return try await privateDatabase.record(for: recordID)
-        } catch {
-            // Create new profile
-            let record = CKRecord(recordType: CloudKitConfig.userRecordType, recordID: recordID)
-            record["userID"] = userID
-            record["createdAt"] = Date()
-            record["lastActiveAt"] = Date()
-            
-            return try await privateDatabase.save(record)
-        }
     }
     
     private func parseRecipeFromRecord(_ record: CKRecord) throws -> Recipe {
@@ -1040,6 +1124,31 @@ final class RecipeModule: ObservableObject {
         } catch {
             // This is expected for user's own recipes that are only in private database
             print("ℹ️ Could not increment save count for recipe \(recipeID) - likely a private recipe. This is normal.")
+        }
+    }
+
+    private func decrementSaveCount(for recipeID: String) async {
+        let recordID = CKRecord.ID(recordName: recipeID)
+
+        do {
+            let record = try await privateDatabase.record(for: recordID)
+            let currentCount = record["saveCount"] as? Int64 ?? 0
+            record["saveCount"] = max(0, currentCount - 1)
+            _ = try await privateDatabase.save(record)
+            print("✅ Save count decremented in private database for recipe: \(recipeID)")
+            return
+        } catch {
+            print("⚠️ Recipe not found in private database for decrement, trying public: \(error)")
+        }
+
+        do {
+            let record = try await publicDatabase.record(for: recordID)
+            let currentCount = record["saveCount"] as? Int64 ?? 0
+            record["saveCount"] = max(0, currentCount - 1)
+            _ = try await publicDatabase.save(record)
+            print("✅ Save count decremented in public database for recipe: \(recipeID)")
+        } catch {
+            print("ℹ️ Could not decrement save count for recipe \(recipeID) - likely local-only record.")
         }
     }
     

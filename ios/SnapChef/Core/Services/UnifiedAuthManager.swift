@@ -50,7 +50,12 @@ final class UnifiedAuthManager: ObservableObject {
         NSClassFromString("XCTestCase") != nil
     }
     private lazy var cloudKitContainer: CKContainer = {
-        CKContainer.default()
+        guard let container = CloudKitRuntimeSupport.makeContainer() else {
+            // There is no safe fallback CKContainer when entitlements are missing. This should never be
+            // accessed when `CloudKitRuntimeSupport.hasCloudKitEntitlement == false`.
+            fatalError("CloudKit container requested without required entitlements")
+        }
+        return container
     }()
     private lazy var cloudKitDatabase: CKDatabase = {
         cloudKitContainer.publicCloudDatabase
@@ -58,6 +63,20 @@ final class UnifiedAuthManager: ObservableObject {
     private lazy var cloudKitActor = CloudKitActor()  // Swift 6 compliant CloudKit operations
     internal let profileManager = KeychainProfileManager.shared
     private let tikTokAuthManager = TikTokAuthManager.shared
+
+    private func hasCloudKitAccess(for operation: String) -> Bool {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            print("⚠️ UnifiedAuthManager.\(operation): CloudKit unavailable in this runtime")
+            return false
+        }
+        return true
+    }
+
+    private func requireCloudKitAccess(for operation: String) throws {
+        guard hasCloudKitAccess(for: operation) else {
+            throw UnifiedAuthError.cloudKitNotAvailable
+        }
+    }
     
     // MARK: - Auth completion callback
     var authCompletionHandler: (() -> Void)?
@@ -114,6 +133,8 @@ final class UnifiedAuthManager: ObservableObject {
     // MARK: - CloudKit Authentication
     
     func signInWithApple(authorization: ASAuthorization) async throws {
+        try requireCloudKitAccess(for: "signInWithApple")
+
         guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
             throw UnifiedAuthError.invalidCredential
         }
@@ -174,6 +195,11 @@ final class UnifiedAuthManager: ObservableObject {
             // Check if record has correct type
             if existingRecord.recordType == CloudKitConfig.userRecordType {
                 // Update last login - only if record type is correct
+                let storedUserID = (existingRecord[CKField.User.userID] as? String)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if storedUserID == nil || storedUserID?.isEmpty == true {
+                    existingRecord[CKField.User.userID] = cloudKitUserID
+                }
                 existingRecord[CKField.User.lastLoginAt] = Date()
                 try await cloudKitDatabase.save(existingRecord)
                 
@@ -229,6 +255,7 @@ final class UnifiedAuthManager: ObservableObject {
             newRecord[CKField.User.authProvider] = "apple"
             newRecord[CKField.User.appleUserId] = appleUserID  // Store Apple Sign In ID
             newRecord[CKField.User.email] = email ?? ""
+            newRecord[CKField.User.userID] = cloudKitUserID
             
             // Generate username - this is the ONLY name we use
             let generatedUsername = generateUsername(from: email, fullName: fullName)
@@ -441,6 +468,8 @@ final class UnifiedAuthManager: ObservableObject {
     }
     
     func checkUsernameAvailability(_ username: String) async throws -> Bool {
+        try requireCloudKitAccess(for: "checkUsernameAvailability")
+
         let predicate = NSPredicate(format: "%K == %@", CKField.User.username, username.lowercased())
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         
@@ -531,6 +560,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Get suggested users for discovery
     func getSuggestedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        guard hasCloudKitAccess(for: "getSuggestedUsers") else {
+            return []
+        }
+
         // Check CloudKit availability first
         do {
             let status = try await cloudKitContainer.accountStatus()
@@ -579,6 +612,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Get trending users based on recent activity
     func getTrendingUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        guard hasCloudKitAccess(for: "getTrendingUsers") else {
+            return []
+        }
+
         let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.recipesShared, ascending: false)]
@@ -613,6 +650,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Get verified users
     func getVerifiedUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        guard hasCloudKitAccess(for: "getVerifiedUsers") else {
+            return []
+        }
+
         let predicate = NSPredicate(format: "%K == %d AND %K == %d", 
                                   CKField.User.isVerified, 1,
                                   CKField.User.isProfilePublic, 1)
@@ -649,6 +690,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Get new users (recently joined) for discovery
     func getNewUsers(limit: Int = 20) async throws -> [CloudKitUser] {
+        guard hasCloudKitAccess(for: "getNewUsers") else {
+            return []
+        }
+
         let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.createdAt, ascending: false)]
@@ -684,6 +729,9 @@ final class UnifiedAuthManager: ObservableObject {
     /// Search users by username or display name
     func searchUsers(query: String) async throws -> [CloudKitUser] {
         guard !query.isEmpty else {
+            return []
+        }
+        guard hasCloudKitAccess(for: "searchUsers") else {
             return []
         }
         
@@ -756,6 +804,7 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Fix CloudKit user record that has missing username
     func fixUserUsername(userID: String, username: String) async throws {
+        try requireCloudKitAccess(for: "fixUserUsername")
         print("🔧 Fixing username for user \(userID) to '\(username)'")
         
         // Try both record ID formats
@@ -793,6 +842,10 @@ final class UnifiedAuthManager: ObservableObject {
     // MARK: - Profile Update Activity
     
     private func createProfileUpdateActivity() async {
+        guard hasCloudKitAccess(for: "createProfileUpdateActivity") else {
+            return
+        }
+
         guard let currentUser = currentUser,
               let userID = currentUser.recordID else { return }
         
@@ -816,6 +869,10 @@ final class UnifiedAuthManager: ObservableObject {
     }
     
     func notifyProfilePhotoUpdate(for userID: String) async {
+        guard hasCloudKitAccess(for: "notifyProfilePhotoUpdate") else {
+            return
+        }
+
         do {
             // Create a special activity type that triggers cache refresh
             let activity = CKRecord(recordType: "Activity")
@@ -844,6 +901,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Update profile photo in CloudKit
     func updateProfilePhoto(_ asset: CKAsset, for userID: String) async {
+        guard hasCloudKitAccess(for: "updateProfilePhoto") else {
+            return
+        }
+
         do {
             let database = cloudKitDatabase
             
@@ -870,6 +931,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Fetch profile photo from CloudKit
     func fetchProfilePhoto(for userID: String) async -> UIImage? {
+        guard hasCloudKitAccess(for: "fetchProfilePhoto") else {
+            return nil
+        }
+
         do {
             let database = cloudKitDatabase
             
@@ -895,6 +960,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Delete profile photo from CloudKit
     func deleteProfilePhoto(for userID: String) async {
+        guard hasCloudKitAccess(for: "deleteProfilePhoto") else {
+            return
+        }
+
         do {
             let database = cloudKitDatabase
             
@@ -923,6 +992,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Check if the current user is following another user
     func isFollowing(userID: String) async -> Bool {
+        guard hasCloudKitAccess(for: "isFollowing") else {
+            return false
+        }
+
         guard let currentUser = currentUser,
               let currentUserID = currentUser.recordID else {
             return false
@@ -952,6 +1025,8 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Follow a user
     func followUser(userID: String) async throws {
+        try requireCloudKitAccess(for: "followUser")
+
         guard let currentUser = currentUser,
               let currentUserID = currentUser.recordID else {
             throw UnifiedAuthError.notAuthenticated
@@ -992,6 +1067,8 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Unfollow a user
     func unfollowUser(userID: String) async throws {
+        try requireCloudKitAccess(for: "unfollowUser")
+
         guard let currentUser = currentUser,
               let currentUserID = currentUser.recordID else {
             throw UnifiedAuthError.notAuthenticated
@@ -1042,6 +1119,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Helper method to update the followed/unfollowed user's follower count
     private func updateFollowedUserFollowerCount(userID: String, increment: Bool) async {
+        guard hasCloudKitAccess(for: "updateFollowedUserFollowerCount") else {
+            return
+        }
+
         do {
             // Normalize the user ID and add "user_" prefix for CloudKit record
             let normalizedID = normalizeUserID(userID)
@@ -1212,6 +1293,10 @@ final class UnifiedAuthManager: ObservableObject {
     // MARK: - Private Helpers
     
     private func loadCloudKitUser(recordID: String, silent: Bool = false) async {
+        guard hasCloudKitAccess(for: "loadCloudKitUser") else {
+            return
+        }
+
         do {
             // First verify CloudKit account is still available
             let accountStatus = try await cloudKitContainer.accountStatus()
@@ -1327,6 +1412,8 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Update user statistics in CloudKit
     func updateUserStats(_ updates: UserStatUpdates) async throws {
+        try requireCloudKitAccess(for: "updateUserStats")
+
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID else {
             throw UnifiedAuthError.notAuthenticated
@@ -1475,6 +1562,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Refresh current user data from CloudKit - Swift 6 compliant
     func refreshCurrentUser() async {
+        guard hasCloudKitAccess(for: "refreshCurrentUser") else {
+            return
+        }
+
         guard let currentUser = currentUser else { return }
         
         print("🔍 DEBUG refreshCurrentUser: Starting ")
@@ -1528,6 +1619,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Update recipe counts for the current user - Swift 6 compliant
     func updateRecipeCounts() async {
+        guard hasCloudKitAccess(for: "updateRecipeCounts") else {
+            return
+        }
+
         guard let currentUser = currentUser,
               let userID = currentUser.recordID else { 
             print("⚠️ updateRecipeCounts: No user ID available")
@@ -1554,6 +1649,8 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Refresh current user data from CloudKit - Swift 6 compliant
     func refreshCurrentUserData() async throws {
+        try requireCloudKitAccess(for: "refreshCurrentUserData")
+
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID else {
             throw UnifiedAuthError.notAuthenticated
@@ -1578,6 +1675,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Synchronized method to refresh all social data without race conditions
     func refreshAllSocialData() async {
+        guard hasCloudKitAccess(for: "refreshAllSocialData") else {
+            return
+        }
+
         // Cancel any existing refresh task
         refreshTask?.cancel()
         
@@ -1646,6 +1747,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Update social counts (followers/following) - Swift 6 compliant
     func updateSocialCounts() async {
+        guard hasCloudKitAccess(for: "updateSocialCounts") else {
+            return
+        }
+
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID,
               !recordID.isEmpty else { 
@@ -1678,6 +1783,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Internal method to update social counts without refreshing user (prevents circular calls) - Swift 6 compliant
     private func updateSocialCountsWithoutRefresh() async {
+        guard hasCloudKitAccess(for: "updateSocialCountsWithoutRefresh") else {
+            return
+        }
+
         guard let currentUser = currentUser,
               let recordID = currentUser.recordID,
               !recordID.isEmpty else { 
@@ -1713,6 +1822,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Get list of users followed by a specific user
     func getUsersFollowedBy(userID: String) async -> [CloudKitUser] {
+        guard hasCloudKitAccess(for: "getUsersFollowedBy") else {
+            return []
+        }
+
         do {
             // Ensure userID has "user_" prefix for CloudKit query
             let fullUserID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
@@ -1865,62 +1978,68 @@ public struct CloudKitUser: Identifiable {
     public var experiencePoints: Int
     
     public init(from record: CKRecord) {
-        // Remove "user_" prefix if present to get the actual CloudKit user ID
+        func intValue(forKey key: String) -> Int {
+            if let value = record[key] as? Int64 { return Int(value) }
+            if let value = record[key] as? Int { return value }
+            if let value = record[key] as? NSNumber { return value.intValue }
+            return 0
+        }
+
+        func int64Value(forKey key: String) -> Int64 {
+            if let value = record[key] as? Int64 { return value }
+            if let value = record[key] as? Int { return Int64(value) }
+            if let value = record[key] as? NSNumber { return value.int64Value }
+            return 0
+        }
+
         let fullRecordID = record.recordID.recordName
-        if fullRecordID.hasPrefix("user_") {
-            self.recordID = String(fullRecordID.dropFirst(5))  // Remove "user_" prefix
+        let rawRecordID: String = fullRecordID.hasPrefix("user_")
+            ? String(fullRecordID.dropFirst(5))
+            : fullRecordID
+        self.recordID = rawRecordID
+
+        let storedUsername = (record[CKField.User.username] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let storedDisplayName = (record[CKField.User.displayName] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let storedUsername, !storedUsername.isEmpty {
+            self.username = storedUsername.lowercased()
         } else {
-            self.recordID = fullRecordID
+            let suffix = String(rawRecordID.suffix(4))
+            self.username = "user\(suffix)"
         }
-        
-        // CRITICAL FIX: Extract username and displayName properly
-        let rawUsername = record[CKField.User.username] as? String
-        let _ = record[CKField.User.displayName] as? String
-        
-        // print("🔍 DEBUG CloudKitUser init: Processing user record \(fullRecordID)")
-        // print("    └─ Raw username field: '\(rawUsername ?? "nil")'")
-        // print("    └─ Raw displayName field: '\(rawDisplayName ?? "nil")'")
-        
-        // ONLY use username field - ignore displayName completely
-        if let username = rawUsername, !username.isEmpty {
-            // This is the user's actual chosen username - use it!
-            self.username = username.lowercased()
-            self.displayName = username  // Display name always matches username
-            print("    └─ ✅ Using CloudKit username field: '\(username)'")
+
+        if let storedDisplayName, !storedDisplayName.isEmpty {
+            self.displayName = storedDisplayName
+        } else if let storedUsername, !storedUsername.isEmpty {
+            self.displayName = storedUsername
         } else {
-            // No username in CloudKit - this is a problem that needs fixing
-            // Generate a temporary one but log it as an error
-            let idSuffix = String(recordID?.suffix(4) ?? "0000")
-            self.username = "user\(idSuffix)".lowercased()
-            self.displayName = "User\(idSuffix)"
-            print("    └─ ❌ ERROR: No username in CloudKit! Generated fallback: '\(self.username ?? "nil")'")
-            print("    └─ This user needs to set their username in ProfileView")
+            let suffix = String(rawRecordID.suffix(4))
+            self.displayName = "Chef \(suffix)"
         }
-        
-        print("    └─ Final username: '\(self.username ?? "nil")'")
-        print("    └─ Final displayName: '\(self.displayName)'")
+
         self.email = record[CKField.User.email] as? String ?? ""
         self.profileImageURL = record[CKField.User.profileImageURL] as? String
         self.authProvider = record[CKField.User.authProvider] as? String ?? "unknown"
-        self.totalPoints = Int(record[CKField.User.totalPoints] as? Int64 ?? 0)
-        let streakValue = record[CKField.User.currentStreak] as? Int64 ?? 0
-        print("    └─ currentStreak from CloudKit: '\(streakValue)'")
-        self.currentStreak = Int(streakValue)
-        self.longestStreak = Int(record[CKField.User.longestStreak] as? Int64 ?? 0)
-        self.challengesCompleted = Int(record[CKField.User.challengesCompleted] as? Int64 ?? 0)
-        self.recipesShared = Int(record[CKField.User.recipesShared] as? Int64 ?? 0)
-        self.recipesCreated = Int(record[CKField.User.recipesCreated] as? Int64 ?? 0)
-        self.coinBalance = Int(record[CKField.User.coinBalance] as? Int64 ?? 0)
-        self.followerCount = Int(record[CKField.User.followerCount] as? Int64 ?? 0)
-        self.followingCount = Int(record[CKField.User.followingCount] as? Int64 ?? 0)
-        self.isVerified = (record[CKField.User.isVerified] as? Int64 ?? 0) == 1
-        self.isProfilePublic = (record[CKField.User.isProfilePublic] as? Int64 ?? 1) == 1
-        self.showOnLeaderboard = (record[CKField.User.showOnLeaderboard] as? Int64 ?? 1) == 1
+        self.totalPoints = intValue(forKey: CKField.User.totalPoints)
+        self.currentStreak = intValue(forKey: CKField.User.currentStreak)
+        self.longestStreak = intValue(forKey: CKField.User.longestStreak)
+        self.challengesCompleted = intValue(forKey: CKField.User.challengesCompleted)
+        self.recipesShared = intValue(forKey: CKField.User.recipesShared)
+        self.recipesCreated = intValue(forKey: CKField.User.recipesCreated)
+        self.coinBalance = intValue(forKey: CKField.User.coinBalance)
+        self.followerCount = intValue(forKey: CKField.User.followerCount)
+        self.followingCount = intValue(forKey: CKField.User.followingCount)
+        let verifiedFlag = int64Value(forKey: CKField.User.isVerified)
+        self.isVerified = verifiedFlag == 1 || (record[CKField.User.isVerified] as? Bool == true)
+        self.isProfilePublic = int64Value(forKey: CKField.User.isProfilePublic) != 0
+        self.showOnLeaderboard = int64Value(forKey: CKField.User.showOnLeaderboard) != 0
         self.subscriptionTier = record[CKField.User.subscriptionTier] as? String ?? "free"
         self.createdAt = record[CKField.User.createdAt] as? Date ?? Date()
         self.lastLoginAt = record[CKField.User.lastLoginAt] as? Date ?? Date()
         self.lastActiveAt = record[CKField.User.lastActiveAt] as? Date ?? Date()
-        self.bio = record["bio"] as? String ?? ""
+        self.bio = record[CKField.User.bio] as? String ?? ""
         
         // Additional properties initialization
         self.profilePictureData = nil // Will be loaded separately if needed

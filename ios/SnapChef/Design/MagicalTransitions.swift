@@ -279,11 +279,16 @@ struct StaggeredFade: ViewModifier {
     func body(content: Content) -> some View {
         content
             .opacity(isShowing ? 1 : 0)
-            .scaleEffect(isShowing ? 1 : 0.8)
-            .offset(y: isShowing ? 0 : 20)
+            .scaleEffect(isShowing ? 1 : 0.92)
+            .offset(y: isShowing ? 0 : 18)
             .animation(
-                .spring(response: 0.5, dampingFraction: 0.8)
-                    .delay(Double(index) * 0.05),
+                isShowing
+                    ? MotionTuning.settleSpring(
+                        response: 0.44,
+                        damping: 0.84,
+                        delay: Double(index) * 0.045
+                    )
+                    : MotionTuning.softExit(0.2),
                 value: isShowing
             )
     }

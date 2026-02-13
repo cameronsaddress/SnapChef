@@ -31,9 +31,6 @@ class UserCacheManager: ObservableObject {
     /// Reference to CloudKit actor for safe operations
     private let cloudKitActor = CloudKitActor()
     
-    /// CloudKit database reference
-    private let publicDatabase = CKContainer(identifier: "iCloud.com.snapchefapp.app").publicCloudDatabase
-    
     // MARK: - Initialization
     
     private init() {

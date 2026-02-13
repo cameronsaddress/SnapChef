@@ -396,7 +396,10 @@ final class SyncQueueManager: ObservableObject {
                 serverRecord[CKField.Recipe.description] = localRecipe.recipe.description
                 // ... update other fields
                 
-                let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
+                guard let container = CloudKitRuntimeSupport.makeContainer() else {
+                    print("⚠️ CloudKit unavailable - skipping server-side conflict resolution upload")
+                    return
+                }
                 let savedRecord = try await container.publicCloudDatabase.save(serverRecord)
                 localStore.markRecipeSynced(id: localRecipe.id, cloudKitRecordID: savedRecord.recordID.recordName)
                 print("✅ Conflict resolved: Local version won for \(localRecipe.recipe.name)")

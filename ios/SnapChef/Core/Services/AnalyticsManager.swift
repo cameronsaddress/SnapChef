@@ -132,7 +132,11 @@ final class GrowthRemoteConfig: @unchecked Sendable {
 
         userDefaults.set(Date(), forKey: Keys.lastFetchAttempt)
 
-        let publicDatabase = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+        guard let container = CloudKitRuntimeSupport.makeContainer() else {
+            userDefaults.set("CloudKit container unavailable in runtime build", forKey: Keys.lastFetchError)
+            return
+        }
+        let publicDatabase = container.publicCloudDatabase
         let candidateRecordIDs = [
             CKRecord.ID(recordName: "growth_remote_config"),
             CKRecord.ID(recordName: "growth-config"),

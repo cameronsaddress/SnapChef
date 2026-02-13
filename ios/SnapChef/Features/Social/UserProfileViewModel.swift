@@ -1,6 +1,15 @@
 import Foundation
 import CloudKit
 
+private let userProfileDebugLoggingEnabled = false
+
+private func userProfileDebugLog(_ message: @autoclosure () -> String) {
+#if DEBUG
+    guard userProfileDebugLoggingEnabled else { return }
+    Swift.print(message())
+#endif
+}
+
 @MainActor
 class UserProfileViewModel: ObservableObject {
     @Published var userProfile: CloudKitUser?
@@ -16,141 +25,190 @@ class UserProfileViewModel: ObservableObject {
 
     private let cloudKitAuth = UnifiedAuthManager.shared
     private let cloudKitUserManager = CloudKitUserManager.shared
-    private let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+    private lazy var database: CKDatabase? = {
+        CloudKitRuntimeSupport.makeContainer()?.publicCloudDatabase
+    }()
 
     func loadUserProfile(userID: String) async {
+        let normalizedUserID = userID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedUserID.isEmpty else {
+            isLoading = false
+            userProfile = nil
+            userRecipes = []
+            achievements = []
+            dynamicStats = nil
+            totalLikes = 0
+            totalCookingTime = 0
+            return
+        }
+
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            isLoading = false
+            userProfile = nil
+            userRecipes = []
+            achievements = []
+            dynamicStats = nil
+            totalLikes = 0
+            totalCookingTime = 0
+            return
+        }
+
         isLoading = true
-        print("🔍 DEBUG UserProfile: Starting loadUserProfile for userID: '\(userID)'")
-        print("🔍 DEBUG UserProfile: UserID length: \(userID.count)")
-        print("🔍 DEBUG UserProfile: UserID contains non-ASCII: \(userID.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil)")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Starting loadUserProfile for userID: '\(normalizedUserID)'")
+        userProfileDebugLog("🔍 DEBUG UserProfile: UserID length: \(normalizedUserID.count)")
+        userProfileDebugLog("🔍 DEBUG UserProfile: UserID contains non-ASCII: \(normalizedUserID.rangeOfCharacter(from: CharacterSet.alphanumerics.inverted) != nil)")
 
         do {
             // Try to load user profile from UserProfile record type first
-            if let userProfileRecord = try await cloudKitUserManager.fetchUserProfile(userID: userID) {
-                print("✅ DEBUG UserProfile: Found UserProfile record for userID: '\(userID)'")
-                print("🔍 DEBUG UserProfile: UserProfile record ID: \(userProfileRecord.recordID.recordName)")
+            if let userProfileRecord = try await cloudKitUserManager.fetchUserProfile(userID: normalizedUserID) {
+                userProfileDebugLog("✅ DEBUG UserProfile: Found UserProfile record for userID: '\(normalizedUserID)'")
+                userProfileDebugLog("🔍 DEBUG UserProfile: UserProfile record ID: \(userProfileRecord.recordID.recordName)")
                 // Convert UserProfile record to CloudKitUser for compatibility
                 self.userProfile = UserProfileConverter.convertUserProfileToCloudKitUser(userProfileRecord)
                 
                 // Check if following
                 if cloudKitAuth.isAuthenticated {
-                    print("🔍 DEBUG UserProfile: Checking follow status for userID: '\(userID)'")
-                    self.isFollowing = await checkIfFollowing(userID: userID)
+                    userProfileDebugLog("🔍 DEBUG UserProfile: Checking follow status for userID: '\(normalizedUserID)'")
+                    self.isFollowing = await checkIfFollowing(userID: normalizedUserID)
                 }
 
                 // Load user's recipes
-                print("🔍 DEBUG UserProfile: About to load recipes for userID: '\(userID)'")
-                await loadUserRecipes(userID: userID)
+                userProfileDebugLog("🔍 DEBUG UserProfile: About to load recipes for userID: '\(normalizedUserID)'")
+                await loadUserRecipes(userID: normalizedUserID)
 
                 // Update social counts for accurate display
-                print("🔍 DEBUG UserProfile: Updating social counts for accurate display")
+                userProfileDebugLog("🔍 DEBUG UserProfile: Updating social counts for accurate display")
                 await cloudKitAuth.updateSocialCounts()
 
                 // Load and apply dynamic stats first
-                print("🔍 DEBUG UserProfile: About to load user stats for userID: '\(userID)'")
-                await loadUserStats(userID: userID)
+                userProfileDebugLog("🔍 DEBUG UserProfile: About to load user stats for userID: '\(normalizedUserID)'")
+                await loadUserStats(userID: normalizedUserID)
                 
                 // Load achievements after stats are calculated
-                print("🔍 DEBUG UserProfile: About to load achievements")
+                userProfileDebugLog("🔍 DEBUG UserProfile: About to load achievements")
                 loadAchievements()
             } else {
-                print("⚠️ DEBUG UserProfile: UserProfile record not found, trying User record type for userID: '\(userID)'")
+                userProfileDebugLog("⚠️ DEBUG UserProfile: UserProfile record not found, trying User record type for userID: '\(normalizedUserID)'")
                 // Fallback: Try to load from User record type directly by record ID
-                await loadFromUserRecordType(userID: userID)
+                await loadFromUserRecordType(userID: normalizedUserID)
             }
         } catch {
-            print("❌ DEBUG UserProfile: Failed to load user profile from UserProfile: \(error)")
-            print("❌ DEBUG UserProfile: Error type: \(type(of: error))")
+            userProfileDebugLog("❌ DEBUG UserProfile: Failed to load user profile from UserProfile: \(error)")
+            userProfileDebugLog("❌ DEBUG UserProfile: Error type: \(type(of: error))")
             // Fallback: Try to load from User record type directly
-            await loadFromUserRecordType(userID: userID)
+            await loadFromUserRecordType(userID: normalizedUserID)
         }
 
-        print("🔍 DEBUG UserProfile: Finished loadUserProfile for userID: '\(userID)'")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Finished loadUserProfile for userID: '\(normalizedUserID)'")
         isLoading = false
     }
     
     private func loadFromUserRecordType(userID: String) async {
+        let normalizedUserID = userID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedUserID.isEmpty else {
+            return
+        }
+        guard let database else { return }
+
+        let canonicalUserID: String = {
+            if normalizedUserID.hasPrefix("user_") {
+                return String(normalizedUserID.dropFirst(5))
+            }
+            return normalizedUserID
+        }()
+
+        let recordNamesToTry: [String] = {
+            var names: [String] = []
+            names.append("user_\(canonicalUserID)")
+            names.append(canonicalUserID)
+            if normalizedUserID != canonicalUserID && normalizedUserID != "user_\(canonicalUserID)" {
+                names.append(normalizedUserID)
+            }
+            var seen = Set<String>()
+            return names.filter { seen.insert($0).inserted }
+        }()
+
         do {
-            print("🔄 DEBUG UserProfile: Attempting to load from User record type with ID: '\(userID)'")
-            let recordID = CKRecord.ID(recordName: userID)
-            print("🔍 DEBUG UserProfile: Created recordID: \(recordID)")
-            let userRecord = try await database.record(for: recordID)
+            userProfileDebugLog("🔄 DEBUG UserProfile: Attempting to load from User record type with ID: '\(normalizedUserID)'")
+            var userRecord: CKRecord?
+            for recordName in recordNamesToTry {
+                do {
+                    let recordID = CKRecord.ID(recordName: recordName)
+                    userProfileDebugLog("🔍 DEBUG UserProfile: Trying recordID: \(recordID.recordName)")
+                    userRecord = try await database.record(for: recordID)
+                    break
+                } catch {
+                    continue
+                }
+            }
+
+            guard let userRecord else {
+                userProfileDebugLog("❌ DEBUG UserProfile: Could not fetch User record for userID '\(normalizedUserID)'")
+                return
+            }
             
-            print("✅ DEBUG UserProfile: Found User record for userID: '\(userID)'")
-            print("🔍 DEBUG UserProfile: User record ID: \(userRecord.recordID.recordName)")
+            userProfileDebugLog("✅ DEBUG UserProfile: Found User record for userID: '\(normalizedUserID)'")
+            userProfileDebugLog("🔍 DEBUG UserProfile: User record ID: \(userRecord.recordID.recordName)")
             self.userProfile = CloudKitUser(from: userRecord)
             
             // Check if following
             if cloudKitAuth.isAuthenticated {
-                print("🔍 DEBUG UserProfile: Checking follow status for userID: '\(userID)'")
-                self.isFollowing = await checkIfFollowing(userID: userID)
+                userProfileDebugLog("🔍 DEBUG UserProfile: Checking follow status for userID: '\(normalizedUserID)'")
+                self.isFollowing = await checkIfFollowing(userID: canonicalUserID)
             }
 
             // Load user's recipes
-            print("🔍 DEBUG UserProfile: About to load recipes from User record fallback for userID: '\(userID)'")
-            await loadUserRecipes(userID: userID)
+            userProfileDebugLog("🔍 DEBUG UserProfile: About to load recipes from User record fallback for userID: '\(normalizedUserID)'")
+            await loadUserRecipes(userID: canonicalUserID)
 
             // Load and apply dynamic stats first
-            print("🔍 DEBUG UserProfile: About to load user stats from User record fallback for userID: '\(userID)'")
-            await loadUserStats(userID: userID)
+            userProfileDebugLog("🔍 DEBUG UserProfile: About to load user stats from User record fallback for userID: '\(normalizedUserID)'")
+            await loadUserStats(userID: canonicalUserID)
             
             // Load achievements after stats are calculated
-            print("🔍 DEBUG UserProfile: About to load achievements from User record fallback")
+            userProfileDebugLog("🔍 DEBUG UserProfile: About to load achievements from User record fallback")
             loadAchievements()
         } catch {
-            print("❌ DEBUG UserProfile: Failed to load from User record type: \(error)")
-            print("❌ DEBUG UserProfile: Error type: \(type(of: error))")
-            print("❌ DEBUG UserProfile: This might be due to record ID format mismatch or record not existing")
+            userProfileDebugLog("❌ DEBUG UserProfile: Failed to load from User record type: \(error)")
+            userProfileDebugLog("❌ DEBUG UserProfile: Error type: \(type(of: error))")
+            userProfileDebugLog("❌ DEBUG UserProfile: This might be due to record ID format mismatch or record not existing")
         }
     }
 
     func toggleFollow(userID: String) async {
+        let normalizedUserID = userID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedUserID.isEmpty else { return }
+
         isLoadingFollow = true
 
         do {
             if isFollowing {
-                try await cloudKitAuth.unfollowUser(userID: userID)
+                try await cloudKitAuth.unfollowUser(userID: normalizedUserID)
                 isFollowing = false
             } else {
-                try await cloudKitAuth.followUser(userID: userID)
+                try await cloudKitAuth.followUser(userID: normalizedUserID)
                 isFollowing = true
             }
         } catch {
-            print("Failed to toggle follow: \(error)")
+            userProfileDebugLog("Failed to toggle follow: \(error)")
         }
 
         isLoadingFollow = false
     }
 
     private func loadUserRecipes(userID: String) async {
-        print("🔍 DEBUG UserProfile: Starting loadUserRecipes for userID: '\(userID)'")
-        
+        guard let database else { return }
         let predicate = NSPredicate(format: "%K == %@", CKField.Recipe.ownerID, userID)
-        print("🔍 DEBUG UserProfile: Recipe query predicate: \(predicate)")
-        print("🔍 DEBUG UserProfile: Recipe field being queried: '\(CKField.Recipe.ownerID)'")
-        print("🔍 DEBUG UserProfile: UserID being searched: '\(userID)'")
-        
         let query = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.Recipe.createdAt, ascending: false)]
-        print("🔍 DEBUG UserProfile: Query record type: \(CloudKitConfig.recipeRecordType)")
 
         do {
-            print("🔍 DEBUG UserProfile: Executing recipe query...")
             let results = try await database.records(matching: query)
-            print("🔍 DEBUG UserProfile: Query completed, processing results...")
-            print("🔍 DEBUG UserProfile: Total match results: \(results.matchResults.count)")
             
             var recipes: [RecipeData] = []
-            var successCount = 0
-            var errorCount = 0
 
-            for (recordID, result) in results.matchResults {
-                print("🔍 DEBUG UserProfile: Processing result for record: \(recordID)")
+            for (_, result) in results.matchResults {
                 if case .success(let record) = result {
-                    successCount += 1
-                    let ownerID = record[CKField.Recipe.ownerID] as? String ?? "Unknown"
-                    print("🔍 DEBUG UserProfile: Recipe \(record.recordID.recordName) has ownerID: '\(ownerID)'")
-                    
                     let recipe = RecipeData(
                         id: record.recordID.recordName,
                         title: record[CKField.Recipe.title] as? String ?? "Untitled",
@@ -159,27 +217,18 @@ class UserProfileViewModel: ObservableObject {
                         createdAt: record[CKField.Recipe.createdAt] as? Date ?? Date()
                     )
                     recipes.append(recipe)
-                    print("🔍 DEBUG UserProfile: Added recipe: '\(recipe.title)' with \(recipe.likeCount) likes")
-                } else if case .failure(let error) = result {
-                    errorCount += 1
-                    print("❌ DEBUG UserProfile: Failed to process record \(recordID): \(error)")
                 }
             }
 
-            print("🔍 DEBUG UserProfile: Recipe processing complete - Success: \(successCount), Errors: \(errorCount)")
-            print("🔍 DEBUG UserProfile: Final recipes array count: \(recipes.count)")
-            
             self.userRecipes = recipes
-            print("✅ DEBUG UserProfile: Set userRecipes with \(recipes.count) recipes for userID: '\(userID)'")
+            userProfileDebugLog("✅ Loaded \(recipes.count) recipes for profile user \(userID)")
         } catch {
-            print("❌ DEBUG UserProfile: Failed to load user recipes: \(error)")
-            print("❌ DEBUG UserProfile: Error type: \(type(of: error))")
-            print("❌ DEBUG UserProfile: UserID that failed: '\(userID)'")
+            userProfileDebugLog("❌ Failed to load user recipes for \(userID): \(error)")
         }
     }
 
     private func loadAchievements() {
-        print("🔍 DEBUG UserProfile: Starting loadAchievements")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Starting loadAchievements")
         
         // Calculate achievements based on user data - these update dynamically
         let recipeCount = userRecipes.count
@@ -187,13 +236,13 @@ class UserProfileViewModel: ObservableObject {
         let isVerified = userProfile?.isVerified ?? false
         let challengesCompleted = userProfile?.challengesCompleted ?? 0
         
-        print("🔍 DEBUG UserProfile: Achievement calculation data:")
-        print("  - Recipe count: \(recipeCount)")
-        print("  - Follower count: \(followerCount)")
-        print("  - Is verified: \(isVerified)")
-        print("  - Challenges completed: \(challengesCompleted)")
-        print("  - Total likes: \(totalLikes)")
-        print("  - UserID from profile: \(userProfile?.recordID ?? "nil")")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Achievement calculation data:")
+        userProfileDebugLog("  - Recipe count: \(recipeCount)")
+        userProfileDebugLog("  - Follower count: \(followerCount)")
+        userProfileDebugLog("  - Is verified: \(isVerified)")
+        userProfileDebugLog("  - Challenges completed: \(challengesCompleted)")
+        userProfileDebugLog("  - Total likes: \(totalLikes)")
+        userProfileDebugLog("  - UserID from profile: \(userProfile?.recordID ?? "nil")")
         
         achievements = [
             UserAchievement(id: "first_recipe", title: "First Recipe", icon: "🍳", isUnlocked: recipeCount >= 1),
@@ -206,8 +255,8 @@ class UserProfileViewModel: ObservableObject {
         ]
         
         let unlockedCount = achievements.filter { $0.isUnlocked }.count
-        print("✅ DEBUG UserProfile: Loaded \(unlockedCount) unlocked achievements out of \(achievements.count) total")
-        print("🔍 DEBUG UserProfile: Unlocked achievements: \(achievements.filter { $0.isUnlocked }.map { $0.title }.joined(separator: ", "))")
+        userProfileDebugLog("✅ DEBUG UserProfile: Loaded \(unlockedCount) unlocked achievements out of \(achievements.count) total")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Unlocked achievements: \(achievements.filter { $0.isUnlocked }.map { $0.title }.joined(separator: ", "))")
     }
 
     private func calculateStats(userID: String) async {
@@ -219,49 +268,41 @@ class UserProfileViewModel: ObservableObject {
     }
     
     private func calculateTotalLikes(userID: String) async {
-        print("🔍 DEBUG UserProfile: Starting calculateTotalLikes for userID: '\(userID)'")
-        
+        guard let database else {
+            let fallbackLikes = userRecipes.reduce(0) { $0 + $1.likeCount }
+            self.totalLikes = fallbackLikes
+            userProfileDebugLog("⚠️ CloudKit unavailable - falling back to local like count for \(userID): \(fallbackLikes)")
+            return
+        }
         let predicate = NSPredicate(format: "%K == %@", CKField.Recipe.ownerID, userID)
-        print("🔍 DEBUG UserProfile: Total likes predicate: \(predicate)")
-        print("🔍 DEBUG UserProfile: Using field: '\(CKField.Recipe.ownerID)' with userID: '\(userID)'")
-        
         let query = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: predicate)
         
         do {
-            print("🔍 DEBUG UserProfile: Executing total likes query...")
             let results = try await database.records(matching: query)
-            print("🔍 DEBUG UserProfile: Total likes query returned \(results.matchResults.count) results")
             
             var totalLikes = 0
-            var processedRecipes = 0
             
-            for (recordID, result) in results.matchResults {
+            for (_, result) in results.matchResults {
                 if case .success(let record) = result {
-                    processedRecipes += 1
                     let likeCount = Int(record[CKField.Recipe.likeCount] as? Int64 ?? 0)
-                    let recipeOwnerID = record[CKField.Recipe.ownerID] as? String ?? "Unknown"
-                    print("🔍 DEBUG UserProfile: Recipe \(recordID) (owner: '\(recipeOwnerID)') has \(likeCount) likes")
                     totalLikes += likeCount
                 }
             }
             
-            print("🔍 DEBUG UserProfile: Processed \(processedRecipes) recipes for total likes calculation")
-            print("✅ DEBUG UserProfile: Calculated total likes: \(totalLikes) for userID: '\(userID)'")
-            
             self.totalLikes = totalLikes
         } catch {
-            print("❌ DEBUG UserProfile: Failed to calculate total likes: \(error)")
-            print("❌ DEBUG UserProfile: Error type: \(type(of: error))")
-            print("❌ DEBUG UserProfile: UserID that failed: '\(userID)'")
-            
             // Fallback to recipes already loaded
             let fallbackLikes = userRecipes.reduce(0) { $0 + $1.likeCount }
             self.totalLikes = fallbackLikes
-            print("🔍 DEBUG UserProfile: Using fallback total likes: \(fallbackLikes) from \(userRecipes.count) loaded recipes")
+            userProfileDebugLog("⚠️ Falling back to local like count for \(userID): \(fallbackLikes)")
         }
     }
     
     private func calculateTotalCookingTime(userID: String) async {
+        guard let database else {
+            self.totalCookingTime = userRecipes.count * 30
+            return
+        }
         let predicate = NSPredicate(format: "%K == %@", CKField.Recipe.ownerID, userID)
         let query = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: predicate)
         
@@ -278,7 +319,7 @@ class UserProfileViewModel: ObservableObject {
             
             self.totalCookingTime = totalTime
         } catch {
-            print("❌ Failed to calculate cooking time: \(error)")
+            userProfileDebugLog("❌ Failed to calculate cooking time: \(error)")
             // Fallback calculation
             self.totalCookingTime = userRecipes.count * 30
         }
@@ -286,26 +327,26 @@ class UserProfileViewModel: ObservableObject {
     
     /// Load comprehensive user stats from CloudKit
     func loadUserStats(userID: String) async {
-        print("🔍 DEBUG UserProfile: Starting loadUserStats for userID: '\(userID)'")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Starting loadUserStats for userID: '\(userID)'")
         isLoadingStats = true
         
         do {
-            print("🔍 DEBUG UserProfile: Fetching user stats from CloudKitUserManager...")
+            userProfileDebugLog("🔍 DEBUG UserProfile: Fetching user stats from CloudKitUserManager...")
             let stats = try await cloudKitUserManager.getUserStats(for: userID)
             self.dynamicStats = stats
-            print("🔍 DEBUG UserProfile: Retrieved stats - followers: \(stats.followerCount), following: \(stats.followingCount), recipes: \(stats.recipeCount), streak: \(stats.currentStreak)")
+            userProfileDebugLog("🔍 DEBUG UserProfile: Retrieved stats - followers: \(stats.followerCount), following: \(stats.followingCount), recipes: \(stats.recipeCount), streak: \(stats.currentStreak)")
             
             // Calculate challenges completed from UserChallenge records
-            print("🔍 DEBUG UserProfile: Calculating challenges completed...")
+            userProfileDebugLog("🔍 DEBUG UserProfile: Calculating challenges completed...")
             let challengesCompleted = await calculateChallengesCompleted(userID: userID)
             
             // Calculate total points from user profile and any additional sources
-            print("🔍 DEBUG UserProfile: Calculating total points...")
+            userProfileDebugLog("🔍 DEBUG UserProfile: Calculating total points...")
             let totalPoints = await calculateTotalPoints(userID: userID)
             
             // Update the user profile with dynamic stats if we have it
             if var profile = self.userProfile {
-                print("🔍 DEBUG UserProfile: Updating profile with dynamic stats...")
+                userProfileDebugLog("🔍 DEBUG UserProfile: Updating profile with dynamic stats...")
                 profile.followerCount = stats.followerCount
                 profile.followingCount = stats.followingCount
                 profile.recipesCreated = stats.recipeCount  // Fixed: Using recipesCreated instead of recipesShared
@@ -313,172 +354,142 @@ class UserProfileViewModel: ObservableObject {
                 profile.challengesCompleted = challengesCompleted
                 profile.totalPoints = totalPoints
                 self.userProfile = profile
-                print("✅ DEBUG UserProfile: Updated profile with dynamic stats - followers: \(stats.followerCount), following: \(stats.followingCount), recipes: \(stats.recipeCount), challenges: \(challengesCompleted), points: \(totalPoints)")
+                userProfileDebugLog("✅ DEBUG UserProfile: Updated profile with dynamic stats - followers: \(stats.followerCount), following: \(stats.followingCount), recipes: \(stats.recipeCount), challenges: \(challengesCompleted), points: \(totalPoints)")
             } else {
-                print("⚠️ DEBUG UserProfile: No user profile to update with dynamic stats")
+                userProfileDebugLog("⚠️ DEBUG UserProfile: No user profile to update with dynamic stats")
             }
             
             // Calculate additional stats for display
-            print("🔍 DEBUG UserProfile: Calculating additional stats...")
+            userProfileDebugLog("🔍 DEBUG UserProfile: Calculating additional stats...")
             await calculateStats(userID: userID)
             
         } catch {
-            print("❌ DEBUG UserProfile: Failed to load user stats: \(error)")
-            print("❌ DEBUG UserProfile: Error type: \(type(of: error))")
-            print("❌ DEBUG UserProfile: UserID that failed: '\(userID)'")
+            userProfileDebugLog("❌ DEBUG UserProfile: Failed to load user stats: \(error)")
+            userProfileDebugLog("❌ DEBUG UserProfile: Error type: \(type(of: error))")
+            userProfileDebugLog("❌ DEBUG UserProfile: UserID that failed: '\(userID)'")
         }
         
-        print("🔍 DEBUG UserProfile: Finished loadUserStats for userID: '\(userID)'")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Finished loadUserStats for userID: '\(userID)'")
         isLoadingStats = false
     }
     
     /// Calculate challenges completed for a user
     private func calculateChallengesCompleted(userID: String) async -> Int {
-        print("🔍 DEBUG UserProfile: Starting calculateChallengesCompleted for userID: '\(userID)'")
-        
+        guard let database else { return 0 }
         let predicate = NSPredicate(format: "%K == %@ AND %K == %@", 
                                   CKField.UserChallenge.userID, userID,
                                   CKField.UserChallenge.status, "completed")
-        print("🔍 DEBUG UserProfile: Challenges predicate: \(predicate)")
-        print("🔍 DEBUG UserProfile: Using userID field: '\(CKField.UserChallenge.userID)' with value: '\(userID)'")
-        print("🔍 DEBUG UserProfile: Using status field: '\(CKField.UserChallenge.status)' with value: 'completed'")
-        
         let query = CKQuery(recordType: CloudKitConfig.userChallengeRecordType, predicate: predicate)
-        print("🔍 DEBUG UserProfile: Query record type: \(CloudKitConfig.userChallengeRecordType)")
         
         do {
-            print("🔍 DEBUG UserProfile: Executing challenges query...")
             let results = try await database.records(matching: query)
             let challengeCount = results.matchResults.count
-            print("✅ DEBUG UserProfile: Found \(challengeCount) completed challenges for userID: '\(userID)'")
-            
-            // Log details of each challenge found
-            for (recordID, result) in results.matchResults {
-                if case .success(let record) = result {
-                    let challengeUserID = record[CKField.UserChallenge.userID] as? String ?? "Unknown"
-                    let status = record[CKField.UserChallenge.status] as? String ?? "Unknown"
-                    print("🔍 DEBUG UserProfile: Challenge \(recordID) - userID: '\(challengeUserID)', status: '\(status)'")
-                }
-            }
             
             return challengeCount
         } catch {
-            print("❌ DEBUG UserProfile: Failed to calculate challenges completed: \(error)")
-            print("❌ DEBUG UserProfile: Error type: \(type(of: error))")
-            print("❌ DEBUG UserProfile: UserID that failed: '\(userID)'")
+            userProfileDebugLog("❌ Failed to calculate completed challenges for \(userID): \(error)")
             return 0
         }
     }
     
     /// Calculate total points for a user
     private func calculateTotalPoints(userID: String) async -> Int {
-        print("🔍 DEBUG UserProfile: Starting calculateTotalPoints for userID: '\(userID)'")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Starting calculateTotalPoints for userID: '\(userID)'")
         
         // First try to get points from user profile
         do {
-            print("🔍 DEBUG UserProfile: Fetching user profile for points calculation...")
+            userProfileDebugLog("🔍 DEBUG UserProfile: Fetching user profile for points calculation...")
             if let userProfileRecord = try await cloudKitUserManager.fetchUserProfile(userID: userID) {
                 let profilePoints = userProfileRecord["totalPoints"] as? Int ?? 0
-                print("🔍 DEBUG UserProfile: Profile points: \(profilePoints)")
+                userProfileDebugLog("🔍 DEBUG UserProfile: Profile points: \(profilePoints)")
                 
                 // Also calculate points from completed challenges
-                print("🔍 DEBUG UserProfile: Calculating points from challenges...")
+                userProfileDebugLog("🔍 DEBUG UserProfile: Calculating points from challenges...")
                 let challengePoints = await calculatePointsFromChallenges(userID: userID)
                 
                 let finalPoints = max(profilePoints, challengePoints)
-                print("✅ DEBUG UserProfile: Total points calculation - Profile: \(profilePoints), Challenges: \(challengePoints), Final: \(finalPoints)")
+                userProfileDebugLog("✅ DEBUG UserProfile: Total points calculation - Profile: \(profilePoints), Challenges: \(challengePoints), Final: \(finalPoints)")
                 return finalPoints
             } else {
-                print("⚠️ DEBUG UserProfile: No user profile record found for points calculation")
+                userProfileDebugLog("⚠️ DEBUG UserProfile: No user profile record found for points calculation")
             }
         } catch {
-            print("❌ DEBUG UserProfile: Failed to get profile points: \(error)")
-            print("❌ DEBUG UserProfile: Error type: \(type(of: error))")
-            print("❌ DEBUG UserProfile: UserID that failed: '\(userID)'")
+            userProfileDebugLog("❌ DEBUG UserProfile: Failed to get profile points: \(error)")
+            userProfileDebugLog("❌ DEBUG UserProfile: Error type: \(type(of: error))")
+            userProfileDebugLog("❌ DEBUG UserProfile: UserID that failed: '\(userID)'")
         }
         
-        print("🔍 DEBUG UserProfile: Returning 0 points for userID: '\(userID)'")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Returning 0 points for userID: '\(userID)'")
         return 0
     }
     
     /// Calculate points earned from challenges
     private func calculatePointsFromChallenges(userID: String) async -> Int {
-        print("🔍 DEBUG UserProfile: Starting calculatePointsFromChallenges for userID: '\(userID)'")
-        
+        guard let database else { return 0 }
         let predicate = NSPredicate(format: "%K == %@ AND %K == %@", 
                                   CKField.UserChallenge.userID, userID,
                                   CKField.UserChallenge.status, "completed")
-        print("🔍 DEBUG UserProfile: Challenge points predicate: \(predicate)")
-        print("🔍 DEBUG UserProfile: Using userID field: '\(CKField.UserChallenge.userID)' with value: '\(userID)'")
-        
         let query = CKQuery(recordType: CloudKitConfig.userChallengeRecordType, predicate: predicate)
-        print("🔍 DEBUG UserProfile: Challenge points query record type: \(CloudKitConfig.userChallengeRecordType)")
         
         do {
-            print("🔍 DEBUG UserProfile: Executing challenge points query...")
             let results = try await database.records(matching: query)
-            print("🔍 DEBUG UserProfile: Challenge points query returned \(results.matchResults.count) results")
             
             var totalPoints = 0
-            var processedChallenges = 0
             
-            for (recordID, result) in results.matchResults {
+            for (_, result) in results.matchResults {
                 if case .success(let record) = result {
-                    processedChallenges += 1
                     let earnedPoints = Int(record[CKField.UserChallenge.earnedPoints] as? Int64 ?? 0)
-                    let challengeUserID = record[CKField.UserChallenge.userID] as? String ?? "Unknown"
-                    let status = record[CKField.UserChallenge.status] as? String ?? "Unknown"
-                    print("🔍 DEBUG UserProfile: Challenge \(recordID) - userID: '\(challengeUserID)', status: '\(status)', points: \(earnedPoints)")
                     totalPoints += earnedPoints
                 }
             }
             
-            print("🔍 DEBUG UserProfile: Processed \(processedChallenges) challenges")
-            print("✅ DEBUG UserProfile: Calculated \(totalPoints) total points from challenges for userID: '\(userID)'")
-            
             return totalPoints
         } catch {
-            print("❌ DEBUG UserProfile: Failed to calculate points from challenges: \(error)")
-            print("❌ DEBUG UserProfile: Error type: \(type(of: error))")
-            print("❌ DEBUG UserProfile: UserID that failed: '\(userID)'")
+            userProfileDebugLog("❌ Failed to calculate challenge points for \(userID): \(error)")
             return 0
         }
     }
     
     /// Check if current user is following the target user
     private func checkIfFollowing(userID: String) async -> Bool {
-        print("🔍 DEBUG UserProfile: Starting checkIfFollowing for userID: '\(userID)'")
+        let normalizedUserID = userID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedUserID.isEmpty else {
+            return false
+        }
+        guard let database else { return false }
+
+        userProfileDebugLog("🔍 DEBUG UserProfile: Starting checkIfFollowing for userID: '\(normalizedUserID)'")
         
         guard let currentUserID = try? await cloudKitUserManager.getCurrentUserID() else {
-            print("⚠️ DEBUG UserProfile: Could not get current user ID for follow check")
+            userProfileDebugLog("⚠️ DEBUG UserProfile: Could not get current user ID for follow check")
             return false
         }
         
-        print("🔍 DEBUG UserProfile: Current user ID: '\(currentUserID)', Target user ID: '\(userID)'")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Current user ID: '\(currentUserID)', Target user ID: '\(normalizedUserID)'")
         
-        guard currentUserID != userID else {
-            print("🔍 DEBUG UserProfile: Current user is same as target user, not following self")
+        guard currentUserID != normalizedUserID else {
+            userProfileDebugLog("🔍 DEBUG UserProfile: Current user is same as target user, not following self")
             return false
         }
         
         let predicate = NSPredicate(format: "%K == %@ AND %K == %@ AND %K == %d",
                                   CKField.Follow.followerID, currentUserID,
-                                  CKField.Follow.followingID, userID,
+                                  CKField.Follow.followingID, normalizedUserID,
                                   CKField.Follow.isActive, 1)
-        print("🔍 DEBUG UserProfile: Follow check predicate: \(predicate)")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Follow check predicate: \(predicate)")
         
         let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
-        print("🔍 DEBUG UserProfile: Follow query record type: \(CloudKitConfig.followRecordType)")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Follow query record type: \(CloudKitConfig.followRecordType)")
         
         do {
-            print("🔍 DEBUG UserProfile: Executing follow check query...")
+            userProfileDebugLog("🔍 DEBUG UserProfile: Executing follow check query...")
             let results = try await database.records(matching: query)
             let isFollowing = !results.matchResults.isEmpty
-            print("✅ DEBUG UserProfile: Follow check result: \(isFollowing) (found \(results.matchResults.count) follow records)")
+            userProfileDebugLog("✅ DEBUG UserProfile: Follow check result: \(isFollowing) (found \(results.matchResults.count) follow records)")
             return isFollowing
         } catch {
-            print("❌ DEBUG UserProfile: Error checking follow status: \(error)")
-            print("❌ DEBUG UserProfile: Error type: \(type(of: error))")
+            userProfileDebugLog("❌ DEBUG UserProfile: Error checking follow status: \(error)")
+            userProfileDebugLog("❌ DEBUG UserProfile: Error type: \(type(of: error))")
             return false
         }
     }
@@ -504,20 +515,40 @@ class FollowListViewModel: ObservableObject {
     @Published var users: [CloudKitUser] = []
     @Published var isLoading = false
 
-    private let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+    private lazy var database: CKDatabase? = {
+        CloudKitRuntimeSupport.makeContainer()?.publicCloudDatabase
+    }()
 
     func loadUsers(userID: String, mode: FollowListView.FollowMode) async {
+        let normalizedUserID = userID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedUserID.isEmpty else {
+            users = []
+            isLoading = false
+            return
+        }
+
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            users = []
+            isLoading = false
+            return
+        }
+        guard let database else {
+            users = []
+            isLoading = false
+            return
+        }
+
         isLoading = true
 
         let predicate: NSPredicate
         switch mode {
         case .followers:
             predicate = NSPredicate(format: "%K == %@ AND %K == %d",
-                                  CKField.Follow.followingID, userID,
+                                  CKField.Follow.followingID, normalizedUserID,
                                   CKField.Follow.isActive, 1)
         case .following:
             predicate = NSPredicate(format: "%K == %@ AND %K == %d",
-                                  CKField.Follow.followerID, userID,
+                                  CKField.Follow.followerID, normalizedUserID,
                                   CKField.Follow.isActive, 1)
         }
 
@@ -542,7 +573,7 @@ class FollowListViewModel: ObservableObject {
             // Load user details for each ID
             await loadUserDetails(userIDs: userIDs)
         } catch {
-            print("Failed to load follow list: \(error)")
+            userProfileDebugLog("Failed to load follow list: \(error)")
         }
 
         isLoading = false
@@ -560,7 +591,7 @@ class FollowListViewModel: ObservableObject {
                     loadedUsers.append(user)
                 }
             } catch {
-                print("Failed to load user \(userID): \(error)")
+                userProfileDebugLog("Failed to load user \(userID): \(error)")
             }
         }
 
@@ -572,9 +603,9 @@ class FollowListViewModel: ObservableObject {
 struct UserProfileConverter {
     /// Convert UserProfile record to CloudKitUser format
     static func convertUserProfileToCloudKitUser(_ record: CKRecord) -> CloudKitUser {
-        print("🔍 DEBUG UserProfile: Starting UserProfile to CloudKitUser conversion")
-        print("🔍 DEBUG UserProfile: Source record ID: \(record.recordID.recordName)")
-        print("🔍 DEBUG UserProfile: Source record type: \(record.recordType)")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Starting UserProfile to CloudKitUser conversion")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Source record ID: \(record.recordID.recordName)")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Source record type: \(record.recordType)")
         
         // Extract data from UserProfile record
         let sourceUsername = record["username"] as? String
@@ -585,24 +616,24 @@ struct UserProfileConverter {
         let sourceFollowingCount = record["followingCount"] as? Int ?? 0
         let sourceIsVerified = record["isVerified"] as? Bool ?? false
         
-        print("🔍 DEBUG UserProfile: Source data:")
-        print("  - Username: '\(sourceUsername ?? "nil")'")
-        print("  - Display name: '\(sourceDisplayName ?? "nil")'")
-        print("  - Total points: \(sourceTotalPoints)")
-        print("  - Recipes shared: \(sourceRecipesShared)")
-        print("  - Followers count: \(sourceFollowersCount)")
-        print("  - Following count: \(sourceFollowingCount)")
-        print("  - Is verified: \(sourceIsVerified)")
+        userProfileDebugLog("🔍 DEBUG UserProfile: Source data:")
+        userProfileDebugLog("  - Username: '\(sourceUsername ?? "nil")'")
+        userProfileDebugLog("  - Display name: '\(sourceDisplayName ?? "nil")'")
+        userProfileDebugLog("  - Total points: \(sourceTotalPoints)")
+        userProfileDebugLog("  - Recipes shared: \(sourceRecipesShared)")
+        userProfileDebugLog("  - Followers count: \(sourceFollowersCount)")
+        userProfileDebugLog("  - Following count: \(sourceFollowingCount)")
+        userProfileDebugLog("  - Is verified: \(sourceIsVerified)")
         
         // Create CloudKitUser using the record directly
         let convertedUser = CloudKitUser(from: record)
         
-        print("✅ DEBUG UserProfile: Converted CloudKitUser:")
-        print("  - ID: '\(convertedUser.recordID ?? "nil")'")
-        print("  - Username: '\(convertedUser.username ?? "nil")'")
-        print("  - Display name: '\(convertedUser.displayName)'")
-        print("  - Total points: \(convertedUser.totalPoints)")
-        print("  - Recipes shared: \(convertedUser.recipesShared)")
+        userProfileDebugLog("✅ DEBUG UserProfile: Converted CloudKitUser:")
+        userProfileDebugLog("  - ID: '\(convertedUser.recordID ?? "nil")'")
+        userProfileDebugLog("  - Username: '\(convertedUser.username ?? "nil")'")
+        userProfileDebugLog("  - Display name: '\(convertedUser.displayName)'")
+        userProfileDebugLog("  - Total points: \(convertedUser.totalPoints)")
+        userProfileDebugLog("  - Recipes shared: \(convertedUser.recipesShared)")
         
         return convertedUser
     }

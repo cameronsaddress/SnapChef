@@ -13,7 +13,6 @@ struct UserProfileView: View {
     @State private var selectedTab = 0
     @State private var showingFollowers = false
     @State private var showingFollowing = false
-    @State private var fetchedDisplayName: String?
 
     var body: some View {
         NavigationStack {
@@ -35,8 +34,10 @@ struct UserProfileView: View {
                             statsSection(user: user)
 
                             // Follow/Following Button
-                            if user.recordID != cloudKitAuth.currentUser?.recordID {
-                                followButton(user: user)
+                            if let profileRecordID = user.recordID,
+                               !profileRecordID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                               profileRecordID != cloudKitAuth.currentUser?.recordID {
+                                followButton(userID: profileRecordID)
                             }
 
                             // Content Tabs
@@ -56,12 +57,7 @@ struct UserProfileView: View {
                     }
                 }
             }
-            .navigationTitle({
-                print("🔍 DEBUG UserProfileView - Navigation bar title:")
-                print("    └─ Value passed as userName parameter: \(userName)")
-                print("    └─ This comes from the calling view (DiscoverUsersView or other)")
-                return userName
-            }())
+            .navigationTitle(profileNavTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -72,15 +68,10 @@ struct UserProfileView: View {
                 }
             }
         }
-        .onAppear {
-            print("🔍 DEBUG: UserProfileView appeared")
-        }
         .task {
             await viewModel.loadUserProfile(userID: userID)
             // Update social counts when profile view appears
             await UnifiedAuthManager.shared.updateSocialCounts()
-            // Fetch the actual display name from CloudKit
-            fetchedDisplayName = await fetchUserDisplayName(for: userID)
         }
         .sheet(isPresented: $showingFollowers) {
             FollowListView(userID: userID, mode: .followers)
@@ -90,6 +81,73 @@ struct UserProfileView: View {
             FollowListView(userID: userID, mode: .following)
                 .environmentObject(appState)
         }
+    }
+
+    private var profileNavTitle: String {
+        if let user = viewModel.userProfile {
+            return resolvedDisplayName(for: user)
+        }
+        let trimmed = userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == "Anonymous Chef" {
+            return "Chef"
+        }
+        return trimmed
+    }
+
+    private func isGeneratedHandle(_ rawHandle: String) -> Bool {
+        let handle = rawHandle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard handle.hasPrefix("user") else { return false }
+        return handle.count <= 10
+    }
+
+    private func sanitizedHandle(from raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let withoutAt = trimmed.hasPrefix("@") ? String(trimmed.dropFirst()) : trimmed
+        let normalized = withoutAt.lowercased()
+        let cleaned = normalized.replacingOccurrences(
+            of: #"[^a-z0-9_-]+"#,
+            with: "",
+            options: .regularExpression
+        )
+        return cleaned.isEmpty ? "chef" : cleaned
+    }
+
+    private func resolvedHandle(for user: CloudKitUser) -> String {
+        let cloudHandle = (user.username ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cloudHandle.isEmpty, !isGeneratedHandle(cloudHandle) {
+            return sanitizedHandle(from: cloudHandle)
+        }
+
+        let passed = userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !passed.isEmpty, passed != "Anonymous Chef" {
+            return sanitizedHandle(from: passed)
+        }
+
+        let derived = sanitizedHandle(from: user.displayName)
+        return derived
+    }
+
+    private func resolvedDisplayName(for user: CloudKitUser) -> String {
+        let cloudHandle = (user.username ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cloudHandle.isEmpty, !isGeneratedHandle(cloudHandle) {
+            return cloudHandle
+        }
+
+        let passed = userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !passed.isEmpty, passed != "Anonymous Chef" {
+            return passed
+        }
+
+        let display = user.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !display.isEmpty {
+            return display
+        }
+
+        if !cloudHandle.isEmpty {
+            return cloudHandle
+        }
+
+        return "Chef"
     }
 
     // MARK: - Profile Header
@@ -125,54 +183,13 @@ struct UserProfileView: View {
 
             // User Info
             VStack(spacing: 8) {
-                Text({
-                    // If CloudKit has a generated username like "userd31f", use the passed userName instead
-                    let cloudKitUsername = user.username ?? ""
-                    let isGeneratedUsername = cloudKitUsername.hasPrefix("user") && cloudKitUsername.count <= 10
-                    
-                    let displayText: String
-                    if isGeneratedUsername && !userName.isEmpty && userName != "Anonymous Chef" {
-                        // CloudKit has a generated username, use the passed one
-                        displayText = userName
-                        
-                        // Try to fix the CloudKit record
-                        Task {
-                            try? await UnifiedAuthManager.shared.fixUserUsername(userID: userID, username: userName)
-                        }
-                    } else if !cloudKitUsername.isEmpty {
-                        // Use CloudKit username if it's real
-                        displayText = cloudKitUsername
-                    } else {
-                        // Fallback
-                        displayText = userName.isEmpty ? "Chef" : userName
-                    }
-                    
-                    print("🔍 DEBUG UserProfileView - Full name display:")
-                    print("    └─ userName parameter: \(userName)")
-                    print("    └─ CloudKit username: \(cloudKitUsername)")
-                    print("    └─ Is generated: \(isGeneratedUsername)")
-                    print("    └─ Displayed value: \(displayText)")
-                    return displayText
-                }())
+                Text(resolvedDisplayName(for: user))
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
-                if let username = user.username {
-                    Text({
-                        // Same logic - if it's a generated username, use the passed userName
-                        let isGeneratedUsername = username.hasPrefix("user") && username.count <= 10
-                        let displayUsername = (isGeneratedUsername && !userName.isEmpty && userName != "Anonymous Chef") ? userName : username
-                        let text = "@\(displayUsername)"
-                        print("🔍 DEBUG UserProfileView - Username below circle:")
-                        print("    └─ CloudKit username: \(username)")
-                        print("    └─ userName parameter: \(userName)")
-                        print("    └─ Is generated: \(isGeneratedUsername)")
-                        print("    └─ Displayed value: \(text)")
-                        return text
-                    }())
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
-                }
+                Text("@\(resolvedHandle(for: user))")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
 
                 // Member Since
                 Text("Member since \(user.createdAt.formatted(date: .abbreviated, time: .omitted))")
@@ -189,13 +206,7 @@ struct UserProfileView: View {
             // Followers
             Button(action: { showingFollowers = true }) {
                 VStack(spacing: 4) {
-                    Text({
-                        let count = "\(user.followerCount)"
-                        print("🔍 DEBUG UserProfileView - Followers count:")
-                        print("    └─ Field: user.followerCount = \(user.followerCount)")
-                        print("    └─ CloudKit mapping: CKField.User.followerCount")
-                        return count
-                    }())
+                    Text("\(user.followerCount)")
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     Text("Followers")
@@ -209,13 +220,7 @@ struct UserProfileView: View {
             // Following
             Button(action: { showingFollowing = true }) {
                 VStack(spacing: 4) {
-                    Text({
-                        let count = "\(user.followingCount)"
-                        print("🔍 DEBUG UserProfileView - Following count:")
-                        print("    └─ Field: user.followingCount = \(user.followingCount)")
-                        print("    └─ CloudKit mapping: CKField.User.followingCount")
-                        return count
-                    }())
+                    Text("\(user.followingCount)")
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     Text("Following")
@@ -228,13 +233,7 @@ struct UserProfileView: View {
 
             // Recipes
             VStack(spacing: 4) {
-                Text({
-                    let count = "\(user.recipesCreated)"
-                    print("🔍 DEBUG UserProfileView - Recipes count:")
-                    print("    └─ Field: user.recipesCreated = \(user.recipesCreated)")
-                    print("    └─ CloudKit mapping: CKField.User.recipesCreated")
-                    return count
-                }())
+                Text("\(user.recipesCreated)")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                 Text("Recipes")
@@ -256,10 +255,10 @@ struct UserProfileView: View {
     }
 
     // MARK: - Follow Button
-    private func followButton(user: CloudKitUser) -> some View {
+    private func followButton(userID: String) -> some View {
         Button(action: {
             Task {
-                await viewModel.toggleFollow(userID: user.recordID!)
+                await viewModel.toggleFollow(userID: userID)
             }
         }) {
             HStack(spacing: 8) {
@@ -428,52 +427,6 @@ struct UserProfileView: View {
         }
     }
 
-    // MARK: - Helper Methods
-    private func fetchUserDisplayName(for userID: String) async -> String? {
-        print("🔍 DEBUG UserProfileView: Fetching display name for userID: \(userID)")
-        
-        // If we already have the user data from viewModel, use that
-        if let user = viewModel.userProfile {
-            let result = user.username ?? user.displayName
-            if result != "Anonymous Chef" {
-                print("✅ DEBUG UserProfileView: Using cached display name: \(result)")
-                return result
-            }
-        }
-        
-        do {
-            // Try to fetch user record from CloudKit
-            let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
-            let recordID = CKRecord.ID(recordName: userID)
-            let userRecord = try await database.record(for: recordID)
-            
-            // Get username or display name
-            let username = userRecord[CKField.User.username] as? String
-            let displayName = userRecord[CKField.User.displayName] as? String
-            
-            // If both are nil or empty, try to use the userName passed from the parent view
-            var result = username ?? displayName
-            
-            // If still nil, check if we have a userName parameter that's not "Anonymous Chef"
-            if result == nil || result == "Anonymous Chef" {
-                // userName is passed from DiscoverUsersView and contains the actual name
-                if !userName.isEmpty && userName != "Anonymous Chef" {
-                    result = userName
-                }
-            }
-            
-            print("✅ DEBUG UserProfileView: Fetched display name: \(result ?? "nil") (username: \(username ?? "nil"), displayName: \(displayName ?? "nil"), userName param: \(userName))")
-            return result
-        } catch {
-            print("❌ DEBUG UserProfileView: Failed to fetch display name: \(error)")
-            // Fallback to userName parameter if available
-            if !userName.isEmpty && userName != "Anonymous Chef" {
-                return userName
-            }
-            return nil
-        }
-    }
-    
     // MARK: - Stats Tab
     private func statsTab(user: CloudKitUser) -> some View {
         VStack(spacing: 16) {

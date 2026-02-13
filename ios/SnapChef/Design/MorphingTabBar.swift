@@ -1,18 +1,119 @@
 import SwiftUI
 
+enum AppTab: Int, CaseIterable {
+    case home = 0
+    case camera = 1
+    case detective = 2
+    case recipes = 3
+    case socialFeed = 4
+    case profile = 5
+
+    var icon: String {
+        switch self {
+        case .home: return "house.fill"
+        case .camera: return "camera.fill"
+        case .detective: return "magnifyingglass"
+        case .recipes: return "book.fill"
+        case .socialFeed: return "heart.text.square.fill"
+        case .profile: return "person.fill"
+        }
+    }
+
+    var tabBarTitle: String {
+        switch self {
+        case .home: return "Home"
+        case .camera: return "Snap"
+        case .detective: return "Detective"
+        case .recipes: return "Recipes"
+        case .socialFeed: return "Feed"
+        case .profile: return "Profile"
+        }
+    }
+
+    var tabBarColor: Color {
+        switch self {
+        case .home: return Color(hex: "#667eea")
+        case .camera: return Color(hex: "#f093fb")
+        case .detective: return Color(hex: "#9b59b6")
+        case .recipes: return Color(hex: "#4facfe")
+        case .socialFeed: return Color(hex: "#f77062")
+        case .profile: return Color(hex: "#43e97b")
+        }
+    }
+
+    var momentTitle: String {
+        switch self {
+        case .home: return "Home"
+        case .camera: return "Snap Time"
+        case .detective: return "Detective Mode"
+        case .recipes: return "Recipes"
+        case .socialFeed: return "Social Feed"
+        case .profile: return "Profile"
+        }
+    }
+
+    var momentIcon: String {
+        switch self {
+        case .home: return "house.fill"
+        case .camera: return "camera.fill"
+        case .detective: return "magnifyingglass"
+        case .recipes: return "book.fill"
+        case .socialFeed: return "heart.text.square.fill"
+        case .profile: return "person.fill"
+        }
+    }
+
+    var momentColor: Color {
+        switch self {
+        case .home: return Color(hex: "#4facfe")
+        case .camera: return Color(hex: "#f093fb")
+        case .detective: return Color(hex: "#43e97b")
+        case .recipes: return Color(hex: "#f6d365")
+        case .socialFeed: return Color(hex: "#f77062")
+        case .profile: return Color(hex: "#84fab0")
+        }
+    }
+
+    var requiresCameraPermission: Bool {
+        switch self {
+        case .camera, .detective:
+            return true
+        case .home, .recipes, .socialFeed, .profile:
+            return false
+        }
+    }
+}
+
+enum ViralCoachSpotlightTarget: Hashable {
+    case feedCopyInvite
+    case profileInviteCenter
+    case profileGrowthHub
+    case tab(AppTab)
+}
+
+struct ViralCoachSpotlightAnchorsKey: PreferenceKey {
+    static var defaultValue: [ViralCoachSpotlightTarget: Anchor<CGRect>] { [:] }
+
+    static func reduce(
+        value: inout [ViralCoachSpotlightTarget: Anchor<CGRect>],
+        nextValue: () -> [ViralCoachSpotlightTarget: Anchor<CGRect>]
+    ) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
+extension View {
+    func viralCoachSpotlightAnchor(_ target: ViralCoachSpotlightTarget) -> some View {
+        anchorPreference(key: ViralCoachSpotlightAnchorsKey.self, value: .bounds) {
+            [target: $0]
+        }
+    }
+}
+
 struct MorphingTabBar: View {
     @Binding var selectedTab: Int
     @Namespace private var animation
     let onTabSelection: ((Int) -> Void)?
-
-    let tabs = [
-        ("house.fill", "Home", Color(hex: "#667eea")),
-        ("camera.fill", "Snap", Color(hex: "#f093fb")),
-        ("magnifyingglass", "Detective", Color(hex: "#9b59b6")),
-        ("book.fill", "Recipes", Color(hex: "#4facfe")),
-        ("heart.text.square.fill", "Feed", Color(hex: "#f77062")),
-        ("person.fill", "Profile", Color(hex: "#43e97b"))
-    ]
     
     init(selectedTab: Binding<Int>, onTabSelection: ((Int) -> Void)? = nil) {
         self._selectedTab = selectedTab
@@ -21,23 +122,25 @@ struct MorphingTabBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(0..<tabs.count, id: \.self) { index in
+            ForEach(AppTab.allCases, id: \.rawValue) { tab in
+                let index = tab.rawValue
                 MorphingTabItem(
-                    icon: tabs[index].0,
-                    title: tabs[index].1,
-                    color: tabs[index].2,
+                    icon: tab.icon,
+                    title: tab.tabBarTitle,
+                    color: tab.tabBarColor,
                     isSelected: selectedTab == index,
                     namespace: animation,
                     action: {
                         if let onTabSelection = onTabSelection {
                             onTabSelection(index)
                         } else {
-                            withAnimation(.spring(response: MotionTuning.seconds(0.3), dampingFraction: 0.7)) {
+                            withAnimation(MotionTuning.settleSpring(response: 0.3, damping: 0.8)) {
                                 selectedTab = index
                             }
                         }
                     }
                 )
+                .viralCoachSpotlightAnchor(.tab(tab))
             }
         }
         .padding(.horizontal, 20)
@@ -57,18 +160,21 @@ struct MorphingTabItem: View {
     let namespace: Namespace.ID
     let action: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var iconRotation: Double = 0
     @State private var labelPulse = false
 
     var body: some View {
         Button(action: {
             action()
-            withAnimation(.spring(response: MotionTuning.seconds(0.5), dampingFraction: 0.62)) {
-                iconRotation += isSelected ? 320 : 12
-                labelPulse = true
-            }
-            withAnimation(.easeOut(duration: MotionTuning.seconds(0.24)).delay(MotionTuning.seconds(0.08))) {
-                labelPulse = false
+            if !reduceMotion {
+                withAnimation(MotionTuning.settleSpring(response: 0.44, damping: 0.72)) {
+                    iconRotation += isSelected ? 320 : 12
+                    labelPulse = true
+                }
+                withAnimation(MotionTuning.softExit(0.22, delay: 0.08)) {
+                    labelPulse = false
+                }
             }
         }) {
             VStack(spacing: 4) {
@@ -113,6 +219,7 @@ struct MorphingTabItem: View {
 
 // MARK: - Glassmorphic Tab Bar Background
 struct GlassmorphicTabBarBackground: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shimmerPhase: CGFloat = -1
 
     var body: some View {
@@ -166,8 +273,12 @@ struct GlassmorphicTabBarBackground: View {
                 )
         }
         .onAppear {
-            withAnimation(.linear(duration: MotionTuning.seconds(3)).repeatForever(autoreverses: false)) {
-                shimmerPhase = 2
+            if reduceMotion {
+                shimmerPhase = 0.3
+            } else {
+                withAnimation(.linear(duration: MotionTuning.seconds(3)).repeatForever(autoreverses: false)) {
+                    shimmerPhase = 2
+                }
             }
         }
     }

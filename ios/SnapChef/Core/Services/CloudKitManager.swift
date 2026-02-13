@@ -9,10 +9,11 @@ class CloudKitManager: ObservableObject {
     static let shared = CloudKitManager()
 
     // MARK: - Properties
-    private let container: CKContainer
-    private let privateDatabase: CKDatabase
-    private let publicDatabase: CKDatabase
+    private let container: CKContainer?
+    private let privateDatabase: CKDatabase?
+    private let publicDatabase: CKDatabase?
     private var subscriptions = Set<AnyCancellable>()
+    private let cloudKitEnabled: Bool
 
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
@@ -29,17 +30,58 @@ class CloudKitManager: ObservableObject {
 
     // MARK: - Initialization
     private init() {
-        // Initialize CloudKit container with the app's bundle identifier
-        self.container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-        self.privateDatabase = container.privateCloudDatabase
-        self.publicDatabase = container.publicCloudDatabase
+        cloudKitEnabled = CloudKitRuntimeSupport.hasCloudKitEntitlement
+
+        if cloudKitEnabled {
+            self.container = CloudKitRuntimeSupport.makeContainer()
+        } else {
+            self.container = nil
+        }
+        self.privateDatabase = container?.privateCloudDatabase
+        self.publicDatabase = container?.publicCloudDatabase
+
+        guard cloudKitEnabled, container != nil else {
+            print("⚠️ CloudKitManager running in local-only mode: sync disabled")
+            return
+        }
 
         setupSubscriptions()
         checkAccountStatus()
     }
 
+    private func requireContainer(for operation: String) throws -> CKContainer {
+        guard cloudKitEnabled else {
+            throw SnapChefError.syncError("CloudKit unavailable for \(operation)")
+        }
+        guard let container else {
+            throw SnapChefError.syncError("CloudKit container unavailable for \(operation)")
+        }
+        return container
+    }
+
+    private func requirePrivateDatabase(for operation: String) throws -> CKDatabase {
+        guard cloudKitEnabled else {
+            throw SnapChefError.syncError("CloudKit unavailable for \(operation)")
+        }
+        guard let privateDatabase else {
+            throw SnapChefError.syncError("CloudKit database unavailable for \(operation)")
+        }
+        return privateDatabase
+    }
+
+    private func requirePublicDatabase(for operation: String) throws -> CKDatabase {
+        guard cloudKitEnabled else {
+            throw SnapChefError.syncError("CloudKit unavailable for \(operation)")
+        }
+        guard let publicDatabase else {
+            throw SnapChefError.syncError("CloudKit database unavailable for \(operation)")
+        }
+        return publicDatabase
+    }
+
     // MARK: - Account Status
     private func checkAccountStatus() {
+        guard let container else { return }
         container.accountStatus { [weak self] status, error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -72,6 +114,7 @@ class CloudKitManager: ObservableObject {
         // This would typically be done in CloudKit Dashboard, but we'll define the schema here for reference
         Task {
             do {
+                let privateDatabase = try requirePrivateDatabase(for: "setupCloudKitSchema")
                 // Create zone for private data
                 let zoneID = CKRecordZone.ID(zoneName: "ChallengesZone", ownerName: CKCurrentUserDefaultName)
                 let zone = CKRecordZone(zoneID: zoneID)
@@ -86,6 +129,7 @@ class CloudKitManager: ObservableObject {
 
     // MARK: - Subscriptions
     private func setupSubscriptions() {
+        guard let publicDatabase = try? requirePublicDatabase(for: "setupSubscriptions") else { return }
         // Subscribe to challenge changes
         let challengePredicate = NSPredicate(value: true)
         let challengeSubscription = CKQuerySubscription(
@@ -112,6 +156,10 @@ class CloudKitManager: ObservableObject {
 
     /// Sync all challenges from CloudKit to Core Data
     func syncChallenges() async throws {
+        guard cloudKitEnabled else {
+            await MainActor.run { isSyncing = false }
+            return
+        }
         await MainActor.run { isSyncing = true }
 
         do {
@@ -140,6 +188,7 @@ class CloudKitManager: ObservableObject {
 
     /// Fetch all public challenges from CloudKit
     private func fetchPublicChallenges() async throws -> [CKRecord] {
+        let publicDatabase = try requirePublicDatabase(for: "fetchPublicChallenges")
         let query = CKQuery(recordType: challengeRecordType, predicate: NSPredicate(value: true))
         query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
 
@@ -210,6 +259,7 @@ class CloudKitManager: ObservableObject {
 
     /// Sync user's private challenge data (progress, participation)
     private func syncPrivateChallengeData() async throws {
+        let privateDatabase = try requirePrivateDatabase(for: "syncPrivateChallengeData")
         // Fetch user's challenge participation and progress
         let participantQuery = CKQuery(
             recordType: userChallengeRecordType,
@@ -234,6 +284,7 @@ class CloudKitManager: ObservableObject {
 
     /// Create or update a challenge in CloudKit
     func saveChallenge(_ challenge: Challenge) async throws {
+        let publicDatabase = try requirePublicDatabase(for: "saveChallenge")
         let record = CKRecord(recordType: challengeRecordType)
         record["id"] = challenge.id
         record["title"] = challenge.title
@@ -264,6 +315,7 @@ class CloudKitManager: ObservableObject {
 
     /// Create or update user challenge participation
     func saveUserChallenge(_ userChallenge: UserChallenge) async throws {
+        let privateDatabase = try requirePrivateDatabase(for: "saveUserChallenge")
         let record = CKRecord(recordType: userChallengeRecordType)
         record["userID"] = userChallenge.userID
 
@@ -292,6 +344,7 @@ class CloudKitManager: ObservableObject {
 
     /// Update or create leaderboard entry
     func updateLeaderboardEntry(for userID: String, points: Int, challengesCompleted: Int) async throws {
+        let publicDatabase = try requirePublicDatabase(for: "updateLeaderboardEntry")
         // Check if entry exists
         let predicate = NSPredicate(format: "userID == %@", userID)
         let query = CKQuery(recordType: leaderboardRecordType, predicate: predicate)
@@ -338,6 +391,7 @@ class CloudKitManager: ObservableObject {
 
     /// Save achievement earned by user
     func saveAchievement(_ achievement: Achievement) async throws {
+        let privateDatabase = try requirePrivateDatabase(for: "saveAchievement")
         let record = CKRecord(recordType: achievementRecordType)
         record["id"] = achievement.id
         record["userID"] = achievement.userID
@@ -354,6 +408,7 @@ class CloudKitManager: ObservableObject {
 
     /// Save coin transaction
     func saveCoinTransaction(_ transaction: CoinTransaction) async throws {
+        let privateDatabase = try requirePrivateDatabase(for: "saveCoinTransaction")
         let record = CKRecord(recordType: coinTransactionRecordType)
         record["userID"] = transaction.userID
         record["amount"] = Int64(transaction.amount)
@@ -371,6 +426,7 @@ class CloudKitManager: ObservableObject {
 
     /// Fetch leaderboard entries
     func fetchLeaderboard(limit: Int = 100, timeframe: LeaderboardTimeframe = .allTime) async throws -> [LeaderboardEntry] {
+        let publicDatabase = try requirePublicDatabase(for: "fetchLeaderboard")
         let sortKey = timeframe == .weekly ? "weeklyPoints" : timeframe == .monthly ? "monthlyPoints" : "totalPoints"
         let query = CKQuery(recordType: leaderboardRecordType, predicate: NSPredicate(value: true))
         query.sortDescriptors = [NSSortDescriptor(key: sortKey, ascending: false)]
@@ -404,6 +460,7 @@ class CloudKitManager: ObservableObject {
     }
 
     private func incrementParticipantCount(for challengeId: UUID) async {
+        guard let publicDatabase = try? requirePublicDatabase(for: "incrementParticipantCount") else { return }
         do {
             let recordID = CKRecord.ID(recordName: challengeId.uuidString)
             let record = try await publicDatabase.record(for: recordID)

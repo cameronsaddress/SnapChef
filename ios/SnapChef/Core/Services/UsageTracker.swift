@@ -165,7 +165,7 @@ final class UsageTracker: ObservableObject {
     /// Check if user can use Recipe Detective feature
     func canUseDetective() -> Bool {
         if isPremiumUser() {
-            // Premium users have daily limit of 25
+            // Premium users have a daily limit.
             return detectiveAnalysesUsed < DetectiveLimits.DETECTIVE_DAILY_LIMIT_PREMIUM
         }
         

@@ -26,7 +26,16 @@ public final class TikTokContentPostingAPI: ObservableObject {
     private let baseURL = "https://open.tiktokapis.com"
     private let apiVersion = "v2"
     private var accessToken: String?
-    private var clientKey: String = "YOUR_CLIENT_KEY" // Should be stored securely
+    private var configuredClientKey: String? {
+        sanitizedConfigValue(Bundle.main.object(forInfoDictionaryKey: "TikTokClientKey") as? String)
+    }
+
+    private var configuredClientSecret: String? {
+        if let keychainSecret = sanitizedConfigValue(KeychainManager.shared.getTikTokClientSecret()) {
+            return keychainSecret
+        }
+        return sanitizedConfigValue(Bundle.main.object(forInfoDictionaryKey: "TikTokClientSecret") as? String)
+    }
 
     // MARK: - Network Session
     private let session: URLSession
@@ -53,7 +62,11 @@ public final class TikTokContentPostingAPI: ObservableObject {
 
     /// Check if we have a valid access token
     public var hasValidToken: Bool {
-        return accessToken != nil && !accessToken!.isEmpty
+        guard let token = accessToken?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !token.isEmpty else {
+            return false
+        }
+        return true
     }
 
     /// Ensures we have a valid access token, refreshing if necessary
@@ -62,6 +75,16 @@ public final class TikTokContentPostingAPI: ObservableObject {
     private func ensureValidToken() async throws -> String {
         // Delegate to TikTokAuthManager for proper token management
         return try await TikTokAuthManager.shared.ensureValidToken()
+    }
+
+    private func sanitizedConfigValue(_ value: String?) -> String? {
+        guard let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return nil
+        }
+        if raw.hasPrefix("$(") || raw.contains("YOUR_") {
+            return nil
+        }
+        return raw
     }
 
     // MARK: - Caption Builder
@@ -332,13 +355,18 @@ public final class TikTokContentPostingAPI: ObservableObject {
     /// - Parameter refreshToken: Refresh token
     /// - Returns: New access token
     public func refreshToken(_ refreshToken: String) async throws -> String {
+        guard let clientKey = configuredClientKey,
+              let clientSecret = configuredClientSecret else {
+            throw TikTokAPIError.unauthorized("TikTok posting is not configured. Set TikTok client key/secret before using direct upload.")
+        }
+
         guard let url = URL(string: "\(baseURL)/\(apiVersion)/oauth/token/") else {
             throw TikTokAPIError.invalidURL("Invalid URL")
         }
 
         let requestBody = TokenRefreshRequest(
             client_key: clientKey,
-            client_secret: "YOUR_CLIENT_SECRET", // Should be stored securely
+            client_secret: clientSecret,
             grant_type: "refresh_token",
             refresh_token: refreshToken
         )

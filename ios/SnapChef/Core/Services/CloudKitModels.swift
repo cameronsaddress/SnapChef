@@ -317,6 +317,142 @@ struct CloudKitLeaderboardEntry {
 
 // MARK: - Model Extensions for CloudKit
 extension Challenge {
+    init?(from record: CKRecord) {
+        let id = (record[CKField.Challenge.id] as? String)
+            ?? record.recordID.recordName
+
+        guard let title = record[CKField.Challenge.title] as? String,
+              let description = record[CKField.Challenge.description] as? String,
+              let typeRaw = record[CKField.Challenge.type] as? String,
+              let type = ChallengeType(rawValue: typeRaw) else {
+            return nil
+        }
+
+        let category = record[CKField.Challenge.category] as? String ?? "cooking"
+
+        let difficulty: DifficultyLevel = {
+            if let int64Value = record[CKField.Challenge.difficulty] as? Int64 {
+                return DifficultyLevel(rawValue: Int(int64Value)) ?? .medium
+            }
+            if let intValue = record[CKField.Challenge.difficulty] as? Int {
+                return DifficultyLevel(rawValue: intValue) ?? .medium
+            }
+            return .medium
+        }()
+
+        let points: Int = {
+            if let int64Value = record[CKField.Challenge.points] as? Int64 {
+                return Int(int64Value)
+            }
+            if let intValue = record[CKField.Challenge.points] as? Int {
+                return intValue
+            }
+            return 0
+        }()
+
+        let coins: Int = {
+            if let int64Value = record[CKField.Challenge.coins] as? Int64 {
+                return Int(int64Value)
+            }
+            if let intValue = record[CKField.Challenge.coins] as? Int {
+                return intValue
+            }
+            return 0
+        }()
+
+        let startDate = record[CKField.Challenge.startDate] as? Date ?? Date()
+        guard let endDate = record[CKField.Challenge.endDate] as? Date else {
+            return nil
+        }
+
+        let requirements: [String] = {
+            if let requirements = record[CKField.Challenge.requirements] as? [String] {
+                return requirements
+            }
+
+            if let requirementsString = record[CKField.Challenge.requirements] as? String {
+                if let data = Data(base64Encoded: requirementsString),
+                   let decoded = try? JSONDecoder().decode([String].self, from: data) {
+                    return decoded
+                }
+                if let decoded = try? JSONDecoder().decode([String].self, from: Data(requirementsString.utf8)) {
+                    return decoded
+                }
+                if requirementsString.contains("|") {
+                    return requirementsString
+                        .split(separator: "|")
+                        .map { String($0) }
+                }
+            }
+
+            return []
+        }()
+
+        let participants: Int = {
+            if let int64Value = record[CKField.Challenge.participantCount] as? Int64 {
+                return Int(int64Value)
+            }
+            if let intValue = record[CKField.Challenge.participantCount] as? Int {
+                return intValue
+            }
+            return 0
+        }()
+
+        let completions: Int = {
+            if let int64Value = record[CKField.Challenge.completionCount] as? Int64 {
+                return Int(int64Value)
+            }
+            if let intValue = record[CKField.Challenge.completionCount] as? Int {
+                return intValue
+            }
+            return 0
+        }()
+
+        let isActive: Bool = {
+            if let int64Value = record[CKField.Challenge.isActive] as? Int64 {
+                return int64Value == 1
+            }
+            if let boolValue = record[CKField.Challenge.isActive] as? Bool {
+                return boolValue
+            }
+            return true
+        }()
+
+        let isPremium: Bool = {
+            if let int64Value = record[CKField.Challenge.isPremium] as? Int64 {
+                return int64Value == 1
+            }
+            if let boolValue = record[CKField.Challenge.isPremium] as? Bool {
+                return boolValue
+            }
+            return false
+        }()
+
+        let imageURL = record[CKField.Challenge.imageURL] as? String
+
+        self.init(
+            id: id,
+            title: title,
+            description: description,
+            type: type,
+            category: category,
+            difficulty: difficulty,
+            points: points,
+            coins: coins,
+            startDate: startDate,
+            endDate: endDate,
+            requirements: requirements,
+            currentProgress: 0,
+            isCompleted: false,
+            isActive: isActive,
+            isJoined: false,
+            participants: participants,
+            completions: completions,
+            imageURL: imageURL,
+            isPremium: isPremium
+        )
+    }
+
     func toCKRecord() -> CKRecord {
         let record = CKRecord(recordType: CloudKitConfig.challengeRecordType)
         record[CKField.Challenge.id] = id

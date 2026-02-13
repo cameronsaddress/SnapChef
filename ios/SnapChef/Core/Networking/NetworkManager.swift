@@ -4,25 +4,44 @@ import UIKit
 @MainActor
 class NetworkManager {
     static let shared = NetworkManager()
+    private static let fallbackBaseURL = "https://snapchef-server.onrender.com"
 
-    private var baseURL: String = ""
+    private var baseURL: String = NetworkManager.fallbackBaseURL
     private var session: URLSession
-    private let keychain = KeychainService()
-    private let authTokenKey = "com.snapchef.authToken"
+    private let maxRetryAttempts = 3
+    private let retryableHTTPStatusCodes: Set<Int> = [408, 425, 429, 500, 502, 503, 504]
 
     private init() {
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 30
+        // Render cold-starts can exceed 30 seconds; align with SnapChefAPIManager.
+        configuration.timeoutIntervalForRequest = 120
+        configuration.timeoutIntervalForResource = 120
         configuration.waitsForConnectivity = true
         self.session = URLSession(configuration: configuration)
     }
 
     func configure() {
-        #if DEBUG
-        baseURL = "https://api-dev.snapchef.app"
-        #else
-        baseURL = "https://api.snapchef.app"
-        #endif
+        if let configuredBaseURL = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String,
+           let normalized = normalizeBaseURL(configuredBaseURL) {
+            baseURL = normalized
+        } else {
+            baseURL = NetworkManager.fallbackBaseURL
+        }
+    }
+
+    func checkServerHealth() async -> Bool {
+        guard let url = URL(string: "\(baseURL)/health") else { return false }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 8
+
+        do {
+            let (_, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else { return false }
+            return (200...299).contains(httpResponse.statusCode)
+        } catch {
+            return false
+        }
     }
 
     // MARK: - Recipe Generation
@@ -100,27 +119,9 @@ class NetworkManager {
         }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        applyDefaultHeaders(to: &request, additionalHeaders: headers)
 
-        // Add auth token if available
-        if let token = keychain.get(authTokenKey) {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        // Add additional headers
-        for (key, value) in headers {
-            request.setValue(value, forHTTPHeaderField: key)
-        }
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.invalidResponse
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw NetworkError.httpError(httpResponse.statusCode)
-        }
+        let (data, _) = try await performDataRequest(request)
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -133,30 +134,12 @@ class NetworkManager {
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        // Add auth token if available
-        if let token = keychain.get(authTokenKey) {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        // Add additional headers
-        for (key, value) in additionalHeaders {
-            request.setValue(value, forHTTPHeaderField: key)
-        }
+        applyDefaultHeaders(to: &request, additionalHeaders: additionalHeaders)
 
         let encoder = JSONEncoder()
         request.httpBody = try encoder.encode(body)
 
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.invalidResponse
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw NetworkError.httpError(httpResponse.statusCode)
-        }
+        let (data, _) = try await performDataRequest(request)
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -169,28 +152,106 @@ class NetworkManager {
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        // Add auth token if available
-        if let token = keychain.get(authTokenKey) {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        applyDefaultHeaders(to: &request)
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.invalidResponse
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw NetworkError.httpError(httpResponse.statusCode)
-        }
+        let (data, _) = try await performDataRequest(request)
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(T.self, from: data)
+    }
+
+    private func normalizeBaseURL(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.hasSuffix("/") {
+            return String(trimmed.dropLast())
+        }
+        return trimmed
+    }
+
+    private func applyDefaultHeaders(
+        to request: inout URLRequest,
+        additionalHeaders: [String: String] = [:]
+    ) {
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        // App API key (required by Render broker for most endpoints).
+        if let apiKey = KeychainManager.shared.getAPIKey()?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !apiKey.isEmpty {
+            request.setValue(apiKey, forHTTPHeaderField: "X-App-API-Key")
+        }
+
+        // Bearer auth (optional).
+        if let token = KeychainManager.shared.getAuthToken()?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        // Call-site overrides last.
+        for (key, value) in additionalHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+    }
+
+    private func performDataRequest(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        var attempt = 1
+
+        while true {
+            do {
+                let (data, response) = try await session.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw NetworkError.invalidResponse
+                }
+
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    if shouldRetry(statusCode: httpResponse.statusCode, error: nil), attempt < maxRetryAttempts {
+                        try await Task.sleep(nanoseconds: retryDelayNanoseconds(for: attempt))
+                        attempt += 1
+                        continue
+                    }
+                    throw NetworkError.httpError(httpResponse.statusCode)
+                }
+
+                return (data, httpResponse)
+            } catch {
+                if shouldRetry(statusCode: nil, error: error), attempt < maxRetryAttempts {
+                    try await Task.sleep(nanoseconds: retryDelayNanoseconds(for: attempt))
+                    attempt += 1
+                    continue
+                }
+                throw error
+            }
+        }
+    }
+
+    private func shouldRetry(statusCode: Int?, error: Error?) -> Bool {
+        if let statusCode {
+            return retryableHTTPStatusCodes.contains(statusCode)
+        }
+
+        guard let urlError = error as? URLError else { return false }
+        switch urlError.code {
+        case .timedOut,
+             .notConnectedToInternet,
+             .networkConnectionLost,
+             .cannotFindHost,
+             .cannotConnectToHost,
+             .dnsLookupFailed:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func retryDelayNanoseconds(for attempt: Int) -> UInt64 {
+        let delay = min(0.6 * pow(2.0, Double(attempt - 1)), 2.4)
+        return UInt64(delay * 1_000_000_000)
     }
 }
 

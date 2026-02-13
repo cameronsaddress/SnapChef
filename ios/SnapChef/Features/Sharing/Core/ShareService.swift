@@ -275,6 +275,7 @@ class ShareService: ObservableObject {
 
             // Track success
             trackShareCompleted(platform: platform, content: content)
+            ShareMomentumStore.record(platform: platform.rawValue)
             NotificationCenter.default.post(
                 name: .snapchefShareCompleted,
                 object: nil,
@@ -299,6 +300,7 @@ class ShareService: ObservableObject {
                 "source": source
             ]
         )
+        ShareMomentumStore.record(platform: platform.rawValue)
         NotificationCenter.default.post(
             name: .snapchefShareCompleted,
             object: nil,

@@ -163,7 +163,8 @@ class StreakManager: ObservableObject {
             body: "Your \(type.displayName) streak freeze expires in 1 hour!",
             category: .streakReminder,
             trigger: trigger,
-            deliveryPolicy: .transactional
+            // Freeze reminders are tied to an explicit user action and should always be delivered.
+            deliveryPolicy: .transactionalCritical
         )
 
         print("❄️ Streak frozen until \(freeze.expiresAt)")
@@ -321,7 +322,7 @@ class StreakManager: ObservableObject {
                             body: "Your \(streak.currentStreak)-day \(type.displayName) streak ends in \(hoursRemaining) hours!",
                             category: .streakReminder,
                             trigger: trigger,
-                            deliveryPolicy: .transactional
+                            deliveryPolicy: .transactionalNudge
                         )
                         
                         if success {

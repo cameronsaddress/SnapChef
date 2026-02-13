@@ -595,11 +595,21 @@ Made with SnapChef 🍳
 
         UIPasteboard.general.setItems(pasteboardItems, options: pasteboardOptions)
 
-        // Open Instagram Stories with Facebook App ID for attribution
-        // Note: Replace YOUR_FACEBOOK_APP_ID with actual app ID in production
-        let facebookAppId = "YOUR_FACEBOOK_APP_ID"  // Will be replaced with actual ID
-        
-        if let url = URL(string: "instagram-stories://share?source_application=\(facebookAppId)") {
+        let configuredFacebookAppId: String? = {
+            guard let appId = Bundle.main.object(forInfoDictionaryKey: "FacebookAppID") as? String else {
+                return nil
+            }
+            let trimmed = appId.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty,
+                  !trimmed.contains("YOUR_"),
+                  !trimmed.hasPrefix("$(") else {
+                return nil
+            }
+            return trimmed
+        }()
+
+        if let configuredFacebookAppId,
+           let url = URL(string: "instagram-stories://share?source_application=\(configuredFacebookAppId)") {
             UIApplication.shared.open(url) { success in
                 if !success {
                     // Fallback without Facebook App ID

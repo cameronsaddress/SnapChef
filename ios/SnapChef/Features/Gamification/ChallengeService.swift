@@ -373,8 +373,24 @@ enum ChallengeServiceError: LocalizedError {
 // MARK: - Mock Service for Testing
 
 extension ChallengeService {
+    static func shouldSeedMockChallenges(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isDebugBuild: Bool = _isDebugAssertConfiguration()
+    ) -> Bool {
+        guard isDebugBuild else { return false }
+        guard arguments.contains("--snapchef-seed-mock-challenges") else { return false }
+        let enabledValues = Set(["1", "true", "yes"])
+        let override = environment["SNAPCHEF_SEED_MOCK_CHALLENGES"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return enabledValues.contains(override ?? "")
+    }
+
     /// Create mock challenges and upload them to CloudKit
     func createMockChallenges() async {
+        guard Self.shouldSeedMockChallenges() else { return }
+
         let mockChallenges = [
             ChallengeDTO(
                 id: UUID().uuidString,

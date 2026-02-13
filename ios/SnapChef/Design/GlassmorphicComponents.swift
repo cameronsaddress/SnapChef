@@ -35,6 +35,103 @@ enum MotionTuning {
     static func nanoseconds(_ baseSeconds: Double) -> UInt64 {
         UInt64(seconds(baseSeconds) * 1_000_000_000)
     }
+
+    static func crispCurve(_ duration: Double, delay: Double = 0) -> Animation {
+        .timingCurve(
+            0.16,
+            0.78,
+            0.22,
+            1,
+            duration: seconds(duration)
+        )
+        .delay(seconds(delay))
+    }
+
+    static func settleSpring(
+        response: Double = 0.38,
+        damping: Double = 0.84,
+        delay: Double = 0
+    ) -> Animation {
+        .spring(
+            response: seconds(response),
+            dampingFraction: damping,
+            blendDuration: seconds(0.06)
+        )
+        .delay(seconds(delay))
+    }
+
+    static func softExit(_ duration: Double = 0.24, delay: Double = 0) -> Animation {
+        .easeOut(duration: seconds(duration))
+            .delay(seconds(delay))
+    }
+}
+
+enum StudioMomentumVisual {
+    static let primaryColor = Color(hex: "#4facfe")
+    static let secondaryColor = Color(hex: "#00f2fe")
+    static let tertiaryColor = Color(hex: "#38f9d7")
+    static let cornerRadius: CGFloat = 18
+    static let borderOpacity = 0.24
+    static let shadowOpacity = 0.25
+    static let shadowRadius: CGFloat = 14
+    static let shadowYOffset: CGFloat = 6
+    static let chipOpacity = 0.16
+
+    static func gradient(
+        primary: Color = primaryColor,
+        secondary: Color = secondaryColor
+    ) -> LinearGradient {
+        LinearGradient(
+            colors: [primary.opacity(0.82), secondary.opacity(0.56)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
+enum StudioMomentumTypography {
+    static let title = Font.system(size: 15, weight: .heavy, design: .rounded)
+    static let subtitle = Font.system(size: 12, weight: .medium, design: .rounded)
+    static let statValue = Font.system(size: 15, weight: .heavy, design: .rounded)
+    static let statLabel = Font.system(size: 10, weight: .semibold, design: .rounded)
+    static let action = Font.system(size: 13, weight: .semibold, design: .rounded)
+    static let goalTitle = Font.system(size: 12, weight: .bold, design: .rounded)
+    static let goalMono = Font.system(size: 11, weight: .semibold, design: .monospaced)
+    static let goalBody = Font.system(size: 11, weight: .medium, design: .rounded)
+}
+
+struct StudioMomentumCardContainer<Content: View>: View {
+    let primary: Color
+    let secondary: Color
+    let content: () -> Content
+
+    init(
+        primary: Color = StudioMomentumVisual.primaryColor,
+        secondary: Color = StudioMomentumVisual.secondaryColor,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.primary = primary
+        self.secondary = secondary
+        self.content = content
+    }
+
+    var body: some View {
+        content()
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: StudioMomentumVisual.cornerRadius, style: .continuous)
+                    .fill(StudioMomentumVisual.gradient(primary: primary, secondary: secondary))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: StudioMomentumVisual.cornerRadius, style: .continuous)
+                            .stroke(Color.white.opacity(StudioMomentumVisual.borderOpacity), lineWidth: 1)
+                    )
+            )
+            .shadow(
+                color: primary.opacity(StudioMomentumVisual.shadowOpacity),
+                radius: StudioMomentumVisual.shadowRadius,
+                y: StudioMomentumVisual.shadowYOffset
+            )
+    }
 }
 
 // MARK: - Glassmorphic Card

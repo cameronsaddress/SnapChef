@@ -1,6 +1,15 @@
 import SwiftUI
 import CloudKit
 
+private let activityFeedDebugLoggingEnabled = false
+
+private func activityFeedDebugLog(_ message: @autoclosure () -> String) {
+#if DEBUG
+    guard activityFeedDebugLoggingEnabled else { return }
+    print(message())
+#endif
+}
+
 // MARK: - Array Extension for Batch Processing (removed duplicate extension)
 
 // MARK: - Identifiable Wrappers for Sheet Presentation
@@ -165,7 +174,7 @@ struct ActivityItem: Identifiable {
 struct ActivityFeedView: View {
     // Use shared singleton instance for preloaded data
     @StateObject private var feedManager = {
-        print("🔍 DEBUG: Using shared ActivityFeedManager singleton")
+        activityFeedDebugLog("🔍 DEBUG: Using shared ActivityFeedManager singleton")
         return ActivityFeedManager.shared
     }()
     @EnvironmentObject var appState: AppState
@@ -200,7 +209,7 @@ struct ActivityFeedView: View {
     }
 
     var body: some View {
-        let _ = print("🔍 DEBUG: ActivityFeedView body called")
+        let _ = activityFeedDebugLog("🔍 DEBUG: ActivityFeedView body called")
         return NavigationStack {
             ZStack {
                 MagicalBackground()
@@ -310,7 +319,7 @@ struct ActivityFeedView: View {
             }
         }
         .onAppear {
-            print("🔍 DEBUG: ActivityFeedView appeared - Start")
+            activityFeedDebugLog("🔍 DEBUG: ActivityFeedView appeared - Start")
             
             // Load activities if empty, otherwise fetch newest
             Task {
@@ -323,7 +332,7 @@ struct ActivityFeedView: View {
                 }
             }
             
-            print("🔍 DEBUG: ActivityFeedView appeared - End")
+            activityFeedDebugLog("🔍 DEBUG: ActivityFeedView appeared - End")
         }
         .sheet(item: $sheetRecipe) { identifiableRecipe in
             NavigationStack {
@@ -543,8 +552,8 @@ struct ActivityFeedView: View {
     private func findLocalRecipe(by id: String) -> Recipe? {
         // Search through all local recipes
         let foundRecipe = appState.allRecipes.first { $0.id.uuidString == id }
-        if foundRecipe != nil {
-            print("✅ Found local recipe: \(foundRecipe!.name)")
+        if let foundRecipe {
+            print("✅ Found local recipe: \(foundRecipe.name)")
         } else {
             print("🔍 Recipe \(id) not found locally, will try CloudKit")
         }
@@ -759,6 +768,11 @@ class ActivityFeedManager: ObservableObject {
         let createdAt: Date
         var lastAccessedAt: Date
     }
+
+    private struct ChallengeProofValidation {
+        let isValid: Bool
+        let proofImage: UIImage?
+    }
     
     @Published var activities: [ActivityItem] = []
     
@@ -788,6 +802,9 @@ class ActivityFeedManager: ObservableObject {
     private var profilePhotoCache: [String: ImageCacheEntry] = [:]
     private var recipeImageCache: [String: ImageCacheEntry] = [:]
     private var missingRecipeImageIDs: [String: Date] = [:]
+    private var validatedRecipeIDs: Set<String> = []
+    private var missingValidatedRecipeIDs: Set<String> = []
+    private var challengeProofValidationCache: [String: ChallengeProofValidation] = [:]
     private var profilePhotoCacheHits = 0
     private var profilePhotoCacheMisses = 0
     private var recipeImageCacheHits = 0
@@ -800,12 +817,13 @@ class ActivityFeedManager: ObservableObject {
     private let profileImageCacheMaxEntries = 80
     private let recipeImageCacheMaxEntries = 120
     private let missingRecipeImageMaxEntries = 200
+    private let validationCacheMaxEntries = 220
     private let userCacheTTL: TimeInterval = Double.greatestFiniteMagnitude // Never expire - keep user data forever
     // PHASE 7: Memory management
     private let maxCacheSize = 100 // Maximum number of cached users
     private let maxActivities = 100 // Maximum activities to keep in memory (updated for better UX)
-    private var publicDatabase: CKDatabase {
-        CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+    private var publicDatabase: CKDatabase? {
+        CloudKitRuntimeSupport.makeContainer()?.publicCloudDatabase
     }
     
     // Cache configuration for persistent storage
@@ -819,7 +837,7 @@ class ActivityFeedManager: ObservableObject {
     }
 
     func loadInitialActivities() async {
-        print("🔍 DEBUG: loadInitialActivities started")
+        activityFeedDebugLog("🔍 DEBUG: loadInitialActivities started")
         
         // Cancel any existing load task
         currentLoadTask?.cancel()
@@ -831,30 +849,30 @@ class ActivityFeedManager: ObservableObject {
         }
         
         await MainActor.run {
-            print("🔍 DEBUG: Setting showingSkeletonViews = true")
+            activityFeedDebugLog("🔍 DEBUG: Setting showingSkeletonViews = true")
             showingSkeletonViews = activities.isEmpty // Only show skeleton if no existing data
-            print("🔍 DEBUG: Setting isLoading = true")
+            activityFeedDebugLog("🔍 DEBUG: Setting isLoading = true")
             isLoading = true
         }
 
-        print("🔍 DEBUG: Loading cached activities from disk")
+        activityFeedDebugLog("🔍 DEBUG: Loading cached activities from disk")
         // Load from persistent storage first
         await loadCachedActivities()
         
         // Always fetch newest activities to check for updates
-        print("🔍 DEBUG: Fetching newest activities from CloudKit")
+        activityFeedDebugLog("🔍 DEBUG: Fetching newest activities from CloudKit")
         await fetchNewestActivitiesOnly()
         
         await MainActor.run {
-            print("🔍 DEBUG: Setting showingSkeletonViews = false")
+            activityFeedDebugLog("🔍 DEBUG: Setting showingSkeletonViews = false")
             showingSkeletonViews = false
-            print("🔍 DEBUG: Setting isLoading = false")
+            activityFeedDebugLog("🔍 DEBUG: Setting isLoading = false")
             isLoading = false
         }
 
         emitImageCacheTelemetryIfNeeded(force: true)
         
-        print("🔍 DEBUG: loadInitialActivities completed with \(activities.count) activities")
+        activityFeedDebugLog("🔍 DEBUG: loadInitialActivities completed with \(activities.count) activities")
     }
 
     func loadMore() async {
@@ -896,6 +914,13 @@ class ActivityFeedManager: ObservableObject {
     
     // Fetch only activities newer than what we have locally
     func fetchNewestActivitiesOnly() async {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            if activities.isEmpty {
+                activities = generateMockActivities()
+            }
+            return
+        }
+
         guard let currentUser = UnifiedAuthManager.shared.currentUser,
               let userID = currentUser.recordID else {
             print("❌ No authenticated user for activity fetch")
@@ -1023,6 +1048,10 @@ class ActivityFeedManager: ObservableObject {
     }
 
     func markActivityAsRead(_ activityID: String) async {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            return
+        }
+
         // Mark activity as read in CloudKit
         do {
             try await cloudKitSync.markActivityAsRead(activityID)
@@ -1059,10 +1088,24 @@ class ActivityFeedManager: ObservableObject {
     }
 
     private func fetchActivitiesFromCloudKit(loadMore: Bool = false) async {
-        print("🔍 DEBUG: fetchActivitiesFromCloudKit started")
+        activityFeedDebugLog("🔍 DEBUG: fetchActivitiesFromCloudKit started")
+
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            await MainActor.run {
+                activities = generateMockActivities()
+                hasMore = false
+            }
+            return
+        }
         
         // First check if iCloud is available
-        let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
+        guard let container = CloudKitRuntimeSupport.makeContainer() else {
+            await MainActor.run {
+                activities = generateMockActivities()
+                hasMore = false
+            }
+            return
+        }
         do {
             let accountStatus = try await container.accountStatus()
             if accountStatus != .available {
@@ -1100,7 +1143,7 @@ class ActivityFeedManager: ObservableObject {
             return
         }
         
-        print("🔍 DEBUG: User authenticated with ID: \(userID)")
+        activityFeedDebugLog("🔍 DEBUG: User authenticated with ID: \(userID)")
 
         do {
             // PHASE 3 OPTIMIZATION: Enhanced parallel fetching with async let
@@ -1168,6 +1211,7 @@ class ActivityFeedManager: ObservableObject {
             // Batch fetch all unique user IDs to avoid redundant fetches
             if !limitedRecords.isEmpty {
                 await batchFetchUsers(from: limitedRecords)
+                await prefetchActivityValidationData(for: limitedRecords)
             }
             
             // Map records to activity items with error handling
@@ -1391,6 +1435,173 @@ class ActivityFeedManager: ObservableObject {
         
         print("✅ PHASE 3: Cached \(uncachedUserIDs.count) users with parallel fetching")
     }
+
+    private func activityType(from rawValue: String) -> ActivityItem.ActivityType {
+        switch rawValue.lowercased() {
+        case "follow":
+            return .follow
+        case "recipeshared":
+            return .recipeShared
+        case "recipeliked":
+            return .recipeLiked
+        case "recipecomment", "recipecommented":
+            return .recipeComment
+        case "challengecompleted":
+            return .challengeCompleted
+        case "challengeshared":
+            return .challengeShared
+        case "badgeearned":
+            return .badgeEarned
+        case "profileupdated":
+            return .profileUpdated
+        case "profilephotoupdated":
+            return .profilePhotoUpdated
+        default:
+            return .recipeShared
+        }
+    }
+
+    private func challengeProofCacheKey(actorID: String, challengeID: String) -> String {
+        "\(actorID)|\(challengeID)"
+    }
+
+    private func prefetchActivityValidationData(for records: [CKRecord]) async {
+        guard !records.isEmpty else { return }
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement,
+              let container = CloudKitRuntimeSupport.makeContainer() else {
+            return
+        }
+        let publicDatabase = container.publicCloudDatabase
+
+        var recipeIDsToValidate = Set<String>()
+        var challengePairs: [String: (actorID: String, challengeID: String)] = [:]
+
+        for record in records {
+            guard let rawType = record[CKField.Activity.type] as? String,
+                  let actorID = record[CKField.Activity.actorID] as? String else {
+                continue
+            }
+
+            let activityType = activityType(from: rawType)
+            let recipeID = record[CKField.Activity.recipeID] as? String
+
+            if let recipeID,
+               [.recipeShared, .recipeLiked, .recipeComment].contains(activityType),
+               !validatedRecipeIDs.contains(recipeID),
+               !missingValidatedRecipeIDs.contains(recipeID) {
+                recipeIDsToValidate.insert(recipeID)
+            }
+
+            if activityType == .challengeCompleted,
+               let challengeID = (record["challengeID"] as? String) ?? recipeID {
+                let key = challengeProofCacheKey(actorID: actorID, challengeID: challengeID)
+                if challengeProofValidationCache[key] == nil {
+                    challengePairs[key] = (actorID: actorID, challengeID: challengeID)
+                }
+            }
+        }
+
+        if !recipeIDsToValidate.isEmpty {
+            await withTaskGroup(of: (String, Int).self) { group in
+                for recipeID in recipeIDsToValidate {
+                    group.addTask {
+                        do {
+                            _ = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
+                            return (recipeID, 1) // Exists
+                        } catch let ckError as CKError where ckError.code == .unknownItem {
+                            return (recipeID, 0) // Missing
+                        } catch {
+                            return (recipeID, -1) // Unknown transient error
+                        }
+                    }
+                }
+
+                for await (recipeID, status) in group {
+                    if status == 1 {
+                        validatedRecipeIDs.insert(recipeID)
+                        missingValidatedRecipeIDs.remove(recipeID)
+                    } else if status == 0 {
+                        validatedRecipeIDs.remove(recipeID)
+                        missingValidatedRecipeIDs.insert(recipeID)
+                    }
+                }
+            }
+        }
+
+        if !challengePairs.isEmpty {
+            await withTaskGroup(of: (String, ChallengeProofValidation?).self) { group in
+                for (key, pair) in challengePairs {
+                    group.addTask {
+                        do {
+                            let challengeReference = CKRecord.Reference(
+                                recordID: CKRecord.ID(recordName: pair.challengeID),
+                                action: .none
+                            )
+                            let predicate = NSPredicate(
+                                format: "%K == %@ AND challengeID == %@ AND %K == %@",
+                                CKField.UserChallenge.userID, pair.actorID,
+                                challengeReference,
+                                CKField.UserChallenge.status, "completed"
+                            )
+                            let query = CKQuery(recordType: CloudKitConfig.userChallengeRecordType, predicate: predicate)
+                            let results = try await publicDatabase.records(matching: query)
+
+                            guard let (_, result) = results.matchResults.first,
+                                  case .success(let userChallengeRecord) = result else {
+                                return (key, ChallengeProofValidation(isValid: false, proofImage: nil))
+                            }
+
+                            guard userChallengeRecord["proofImage"] != nil else {
+                                return (key, ChallengeProofValidation(isValid: false, proofImage: nil))
+                            }
+
+                            var proofImage: UIImage?
+                            if let proofAsset = userChallengeRecord["proofImage"] as? CKAsset,
+                               let fileURL = proofAsset.fileURL,
+                               let data = try? Data(contentsOf: fileURL) {
+                                proofImage = UIImage(data: data)
+                            }
+
+                            return (key, ChallengeProofValidation(isValid: true, proofImage: proofImage))
+                        } catch {
+                            return (key, nil)
+                        }
+                    }
+                }
+
+                for await (key, validation) in group {
+                    if let validation {
+                        challengeProofValidationCache[key] = validation
+                    }
+                }
+            }
+        }
+
+        trimValidationCachesIfNeeded()
+    }
+
+    private func trimValidationCachesIfNeeded() {
+        if validatedRecipeIDs.count > validationCacheMaxEntries {
+            let overflow = validatedRecipeIDs.count - validationCacheMaxEntries
+            for key in validatedRecipeIDs.sorted().prefix(overflow) {
+                validatedRecipeIDs.remove(key)
+            }
+        }
+
+        if missingValidatedRecipeIDs.count > validationCacheMaxEntries {
+            let overflow = missingValidatedRecipeIDs.count - validationCacheMaxEntries
+            for key in missingValidatedRecipeIDs.sorted().prefix(overflow) {
+                missingValidatedRecipeIDs.remove(key)
+            }
+        }
+
+        if challengeProofValidationCache.count > validationCacheMaxEntries {
+            let overflow = challengeProofValidationCache.count - validationCacheMaxEntries
+            for key in challengeProofValidationCache.keys.sorted().prefix(overflow) {
+                challengeProofValidationCache.removeValue(forKey: key)
+            }
+        }
+    }
     
     
     /// Direct batch fetch of users using CloudKitActor for safety
@@ -1533,6 +1744,7 @@ class ActivityFeedManager: ObservableObject {
             )
             
             if !newRecords.isEmpty {
+                await prefetchActivityValidationData(for: newRecords)
                 var newActivities: [ActivityItem] = []
                 for record in newRecords {
                     if let activity = await mapCloudKitRecordToActivityItem(record) {
@@ -1609,6 +1821,9 @@ class ActivityFeedManager: ObservableObject {
         profilePhotoCache.removeAll()
         recipeImageCache.removeAll()
         missingRecipeImageIDs.removeAll()
+        validatedRecipeIDs.removeAll()
+        missingValidatedRecipeIDs.removeAll()
+        challengeProofValidationCache.removeAll()
         profilePhotoCacheHits = 0
         profilePhotoCacheMisses = 0
         recipeImageCacheHits = 0
@@ -1624,7 +1839,7 @@ class ActivityFeedManager: ObservableObject {
     
     /// Fetches user display name by userID, using cache when available
     private func fetchUserDisplayName(userID: String) async -> String {
-        // print("🔍 DEBUG: fetchUserDisplayName for userID: \(userID)")
+        // activityFeedDebugLog("🔍 DEBUG: fetchUserDisplayName for userID: \(userID)")
         
         // PHASE 5: Check cache with TTL validation
         if let cached = userCache[userID] {
@@ -1643,6 +1858,7 @@ class ActivityFeedManager: ObservableObject {
         
         // This should rarely happen now with batch fetching, but fallback just in case
         do {
+            guard let publicDatabase else { return "Unknown Chef" }
             // User records in CloudKit have "user_" prefix
             let userRecordID = CKRecord.ID(recordName: "user_\(userID)")
             print("🔍 Fetching user record with ID: \(userRecordID.recordName)")
@@ -1890,30 +2106,7 @@ class ActivityFeedManager: ObservableObject {
             return nil
         }
 
-        // Map activity type string to enum
-        let activityType: ActivityItem.ActivityType
-        switch typeString.lowercased() {
-        case "follow":
-            activityType = .follow
-        case "recipeshared":
-            activityType = .recipeShared
-        case "recipeliked":
-            activityType = .recipeLiked
-        case "recipecomment", "recipecommented":  // Support both types
-            activityType = .recipeComment
-        case "challengecompleted":
-            activityType = .challengeCompleted
-        case "challengeshared":
-            activityType = .challengeShared
-        case "badgeearned":
-            activityType = .badgeEarned
-        case "profileupdated":
-            activityType = .profileUpdated
-        case "profilephotoupdated":
-            activityType = .profilePhotoUpdated
-        default:
-            activityType = .recipeShared
-        }
+        let activityType = activityType(from: typeString)
 
         // If this is a profile update activity, notify other views to refresh
         // Don't display profile update activities in the feed
@@ -1938,12 +2131,18 @@ class ActivityFeedManager: ObservableObject {
         
         // Fetch actor (user) details dynamically
         let actorName = await fetchUserDisplayName(userID: actorID)
-        // print("🔍 DEBUG: Creating ActivityItem for \(actorID) with name '\(actorName)'")
+        // activityFeedDebugLog("🔍 DEBUG: Creating ActivityItem for \(actorID) with name '\(actorName)'")
         
         // Extract optional fields
-        let targetUserID = record[CKField.Activity.targetUserID] as? String
+        let targetUserID = (record[CKField.Activity.targetUserID] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         async let actorPhotoTask = fetchUserPhoto(userID: actorID)
-        let targetUserName = targetUserID != nil ? await fetchUserDisplayName(userID: targetUserID!) : nil
+        let targetUserName: String?
+        if let targetUserID, !targetUserID.isEmpty {
+            targetUserName = await fetchUserDisplayName(userID: targetUserID)
+        } else {
+            targetUserName = nil
+        }
         let recipeID = record[CKField.Activity.recipeID] as? String
         let recipeName = record[CKField.Activity.recipeName] as? String
         let challengeName = record[CKField.Activity.challengeName] as? String
@@ -1954,18 +2153,34 @@ class ActivityFeedManager: ObservableObject {
         // For recipe-related activities, validate that the recipe exists
         // Skip activities that reference non-existent recipes to avoid errors
         if let recipeID = recipeID, [.recipeShared, .recipeLiked, .recipeComment].contains(activityType) {
-            do {
-                // Quick check if recipe exists in CloudKit
-                let recipeRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
-                validatedRecipeRecord = recipeRecord
-                print("✅ Validated recipe exists for activity: \(id)")
-            } catch {
-                if let ckError = error as? CKError, ckError.code == .unknownItem {
-                    print("⚠️ Skipping activity \(id) - recipe \(recipeID) not found")
-                    return nil // Skip this activity
-                } else {
-                    print("⚠️ Error validating recipe \(recipeID) for activity \(id): \(error)")
-                    // Continue with the activity even if validation failed due to network issues
+            if validatedRecipeIDs.contains(recipeID) {
+                // Prefetched and validated earlier.
+            } else if missingValidatedRecipeIDs.contains(recipeID) {
+                print("⚠️ Skipping activity \(id) - cached missing recipe \(recipeID)")
+                return nil
+            } else {
+                do {
+                    guard let publicDatabase else {
+                        return nil
+                    }
+                    // One-off fallback path if prefetch missed this recipe.
+                    let recipeRecord = try await publicDatabase.record(for: CKRecord.ID(recordName: recipeID))
+                    validatedRecipeRecord = recipeRecord
+                    validatedRecipeIDs.insert(recipeID)
+                    missingValidatedRecipeIDs.remove(recipeID)
+                    trimValidationCachesIfNeeded()
+                    print("✅ Validated recipe exists for activity: \(id)")
+                } catch {
+                    if let ckError = error as? CKError, ckError.code == .unknownItem {
+                        print("⚠️ Skipping activity \(id) - recipe \(recipeID) not found")
+                        validatedRecipeIDs.remove(recipeID)
+                        missingValidatedRecipeIDs.insert(recipeID)
+                        trimValidationCachesIfNeeded()
+                        return nil
+                    } else {
+                        print("⚠️ Error validating recipe \(recipeID) for activity \(id): \(error)")
+                        // Continue with the activity even if validation failed due to network issues
+                    }
                 }
             }
         }
@@ -1974,40 +2189,50 @@ class ActivityFeedManager: ObservableObject {
         if activityType == .challengeCompleted {
             let challengeID = record["challengeID"] as? String ?? recipeID
             if let challengeID = challengeID {
-                // Check if there's a UserChallenge record with proof submission
-                do {
-                    // Create a CKRecord.Reference for the challenge ID
-                    let challengeReference = CKRecord.Reference(recordID: CKRecord.ID(recordName: challengeID), action: .none)
-                    let predicate = NSPredicate(format: "%K == %@ AND challengeID == %@ AND %K == %@",
-                                              CKField.UserChallenge.userID, actorID,
-                                              challengeReference,
-                                              CKField.UserChallenge.status, "completed")
-                    let query = CKQuery(recordType: CloudKitConfig.userChallengeRecordType, predicate: predicate)
-                    
-                    let results = try await publicDatabase.records(matching: query)
-                    
-                    // Only show challenge completion if there's a completed UserChallenge record with proof
-                    if results.matchResults.isEmpty {
-                        print("⚠️ Skipping challenge completion activity \(id) - no proof submission found")
+                let validationKey = challengeProofCacheKey(actorID: actorID, challengeID: challengeID)
+                if let cachedValidation = challengeProofValidationCache[validationKey] {
+                    guard cachedValidation.isValid else {
+                        print("⚠️ Skipping challenge completion activity \(id) - cached invalid proof")
                         return nil
                     }
-                    
-                    // Verify proof image exists in the UserChallenge record
-                    if let (_, result) = results.matchResults.first,
-                       case .success(let userChallengeRecord) = result {
-                        let hasProofImage = userChallengeRecord["proofImage"] != nil
-                        if !hasProofImage {
-                            print("⚠️ Skipping challenge completion activity \(id) - no proof image found")
+                    challengeProofImage = cachedValidation.proofImage
+                } else {
+                    // Fallback if prefetch missed this pair.
+                    do {
+                        guard let publicDatabase else {
                             return nil
                         }
+                        let challengeReference = CKRecord.Reference(recordID: CKRecord.ID(recordName: challengeID), action: .none)
+                        let predicate = NSPredicate(format: "%K == %@ AND challengeID == %@ AND %K == %@",
+                                                  CKField.UserChallenge.userID, actorID,
+                                                  challengeReference,
+                                                  CKField.UserChallenge.status, "completed")
+                        let query = CKQuery(recordType: CloudKitConfig.userChallengeRecordType, predicate: predicate)
+                        
+                        let results = try await publicDatabase.records(matching: query)
+                        
+                        guard let (_, result) = results.matchResults.first,
+                              case .success(let userChallengeRecord) = result,
+                              userChallengeRecord["proofImage"] != nil else {
+                            challengeProofValidationCache[validationKey] = ChallengeProofValidation(isValid: false, proofImage: nil)
+                            trimValidationCachesIfNeeded()
+                            print("⚠️ Skipping challenge completion activity \(id) - no proof submission found")
+                            return nil
+                        }
+
                         if let proofAsset = userChallengeRecord["proofImage"] as? CKAsset {
                             challengeProofImage = await imageFromAsset(proofAsset)
                         }
+                        challengeProofValidationCache[validationKey] = ChallengeProofValidation(
+                            isValid: true,
+                            proofImage: challengeProofImage
+                        )
+                        trimValidationCachesIfNeeded()
                         print("✅ Validated challenge completion with proof for activity: \(id)")
+                    } catch {
+                        print("⚠️ Error validating challenge completion for activity \(id): \(error)")
+                        return nil // Skip questionable challenge completion activities
                     }
-                } catch {
-                    print("⚠️ Error validating challenge completion for activity \(id): \(error)")
-                    return nil // Skip questionable challenge completion activities
                 }
             } else {
                 print("⚠️ Skipping challenge completion activity \(id) - no challenge ID found")
@@ -2045,7 +2270,7 @@ class ActivityFeedManager: ObservableObject {
     // MARK: - Caching Methods
     
     private func loadCachedActivities() async {
-        print("🔍 DEBUG: loadCachedActivities - checking for persistent storage")
+        activityFeedDebugLog("🔍 DEBUG: loadCachedActivities - checking for persistent storage")
         
         // Create activities directory if needed
         do {
@@ -2058,7 +2283,7 @@ class ActivityFeedManager: ObservableObject {
         let fileURL = activitiesDirectory.appendingPathComponent("activities.json")
         
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            print("🔍 DEBUG: No stored activities found")
+            activityFeedDebugLog("🔍 DEBUG: No stored activities found")
             return
         }
         
@@ -2297,15 +2522,15 @@ struct SkeletonActivityView: View {
                 )
         )
         .onAppear {
-            print("🔍 DEBUG: SkeletonActivityView appeared - Start")
+            activityFeedDebugLog("🔍 DEBUG: SkeletonActivityView appeared - Start")
             DispatchQueue.main.async {
-                print("🔍 DEBUG: SkeletonActivityView - Async block started")
+                activityFeedDebugLog("🔍 DEBUG: SkeletonActivityView - Async block started")
                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                     isAnimating = true
                 }
-                print("🔍 DEBUG: SkeletonActivityView - Async block completed")
+                activityFeedDebugLog("🔍 DEBUG: SkeletonActivityView - Async block completed")
             }
-            print("🔍 DEBUG: SkeletonActivityView appeared - End")
+            activityFeedDebugLog("🔍 DEBUG: SkeletonActivityView appeared - End")
         }
     }
 }

@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import UIKit
 
 struct DisplayChallenge {
     let emoji: String
@@ -12,6 +13,7 @@ struct HomeView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var deviceManager: DeviceManager
     @EnvironmentObject var cloudKitDataManager: CloudKitDataManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingCamera = false
     @State private var showingMysteryMeal = false
     @State private var particleTrigger = false
@@ -24,7 +26,14 @@ struct HomeView: View {
     @State private var showingCameraPermissionAlert = false
     @State private var homeEntranceActive = false
     @State private var snapButtonPulse = false
+    @State private var snapHaloBreathing = false
+    @State private var snapTapBurstScale: CGFloat = 0.92
+    @State private var snapTapBurstOpacity: Double = 0
     @State private var ambientDrift = false
+    @State private var momentumSnapshot: ShareMomentumSnapshot?
+    @State private var showMomentumCard = false
+    @State private var didCopyInviteLink = false
+    @State private var momentumDismissTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -59,7 +68,7 @@ struct HomeView: View {
                 .offset(x: ambientDrift ? 140 : 80, y: ambientDrift ? 210 : 150)
 
                 // Falling food emojis (behind all elements except background)
-                if deviceManager.shouldShowParticles {
+                if deviceManager.shouldShowParticles && !reduceMotion {
                     ForEach(fallingFoodManager.emojis.prefix(deviceManager.recommendedParticleCount)) { emoji in
                         Text(emoji.emoji)
                             .font(.system(size: 30))
@@ -102,6 +111,22 @@ struct HomeView: View {
                         .offset(y: homeEntranceActive ? 0 : 18)
                         .padding(.top, 30)
 
+                        if let snapshot = momentumSnapshot, showMomentumCard {
+                            ShareMomentumCard(
+                                platform: momentumPlatformDisplayName(snapshot.platform),
+                                copiedInvite: didCopyInviteLink,
+                                onCopyInvite: copyInviteLink,
+                                onViewFeed: navigateToSocialFeed,
+                                onDismiss: dismissMomentumCard
+                            )
+                            .padding(.horizontal, 20)
+                            .transition(
+                                reduceMotion
+                                    ? .opacity
+                                    : .move(edge: .top).combined(with: .opacity)
+                            )
+                        }
+
                         // Main CTA Section with prominent spacing
                         VStack(spacing: 0) {
                             // Equal spacing above button
@@ -114,6 +139,7 @@ struct HomeView: View {
                                 action: {
                                     Task {
                                         pulseSnapButton()
+                                        triggerSnapHaloBurst()
                                         let granted = await requestCameraPermission()
                                         if granted {
                                             showingCamera = true
@@ -130,7 +156,35 @@ struct HomeView: View {
                                 radius: snapButtonPulse ? 24 : 12,
                                 y: 8
                             )
-                            .animation(.spring(response: 0.42, dampingFraction: 0.72), value: snapButtonPulse)
+                            .animation(MotionTuning.settleSpring(response: 0.42, damping: 0.72), value: snapButtonPulse)
+                            .overlay {
+                                if deviceManager.animationsEnabled && !reduceMotion {
+                                    ZStack {
+                                        Circle()
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1.5)
+                                            .frame(width: 232, height: 232)
+                                            .scaleEffect(snapHaloBreathing ? 1.09 : 0.95)
+                                            .opacity(snapHaloBreathing ? 0.08 : 0.22)
+
+                                        Circle()
+                                            .stroke(Color(hex: "#38f9d7").opacity(0.38), lineWidth: 1.2)
+                                            .frame(width: 206, height: 206)
+                                            .scaleEffect(snapHaloBreathing ? 1.18 : 0.9)
+                                            .opacity(snapHaloBreathing ? 0 : 0.24)
+
+                                        Circle()
+                                            .stroke(Color.white.opacity(0.54), lineWidth: 2.4)
+                                            .frame(width: 180, height: 180)
+                                            .scaleEffect(snapTapBurstScale)
+                                            .opacity(snapTapBurstOpacity)
+                                    }
+                                    .animation(
+                                        MotionTuning.crispCurve(1.9).repeatForever(autoreverses: true),
+                                        value: snapHaloBreathing
+                                    )
+                                    .allowsHitTesting(false)
+                                }
+                            }
                             .background(
                                 GeometryReader { geometry in
                                     Color.clear
@@ -192,6 +246,7 @@ struct HomeView: View {
                     HStack {
                         Spacer()
                         FloatingActionButton(icon: "sparkles") {
+                            NotificationCenter.default.post(name: .snapchefGrowthHubOpened, object: nil)
                             showingGrowthHub = true
                         }
                         .padding(30)
@@ -214,27 +269,31 @@ struct HomeView: View {
                 }
                 
                 // Simple fade in for mystery meal animation (only if animations enabled)
-                if deviceManager.animationsEnabled {
-                    withAnimation(.easeInOut(duration: 6).repeatForever(autoreverses: true)) {
+                if deviceManager.animationsEnabled && !reduceMotion {
+                    withAnimation(MotionTuning.crispCurve(6).repeatForever(autoreverses: true)) {
                         ambientDrift = true
                     }
-                    withAnimation(.easeOut(duration: 0.5)) {
+                    withAnimation(MotionTuning.crispCurve(1.8).repeatForever(autoreverses: true)) {
+                        snapHaloBreathing = true
+                    }
+                    withAnimation(MotionTuning.crispCurve(0.46)) {
                         homeEntranceActive = true
                     }
                     // print("🔍 DEBUG: HomeView - Setting mysteryMealAnimation")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        withAnimation(.easeInOut(duration: deviceManager.recommendedAnimationDuration * 2)) {
+                        withAnimation(MotionTuning.crispCurve(deviceManager.recommendedAnimationDuration * 2)) {
                             mysteryMealAnimation = true
                         }
                     }
                 } else {
-                    ambientDrift = true
+                    ambientDrift = false
+                    snapHaloBreathing = false
                     homeEntranceActive = true
                     mysteryMealAnimation = true
                 }
                 
                 // Start button shake after 3 seconds (only if continuous animations enabled)
-                if deviceManager.shouldUseContinuousAnimations {
+                if deviceManager.shouldUseContinuousAnimations && !reduceMotion {
                     // print("🔍 DEBUG: HomeView - Scheduling button shake")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                         startButtonShake()
@@ -242,9 +301,13 @@ struct HomeView: View {
                 }
                 
                 // Start falling food animation (only if particles enabled)
-                if deviceManager.shouldShowParticles {
+                if deviceManager.shouldShowParticles && !reduceMotion {
                     // print("🔍 DEBUG: HomeView - Starting falling food animation")
                     fallingFoodManager.startFallingFood()
+                }
+
+                if let snapshot = ShareMomentumStore.latest(maxAge: 60 * 60 * 12) {
+                    presentMomentumCard(for: snapshot.platform, persist: false)
                 }
                 
                 // print("🔍 DEBUG: HomeView - Async block completed")
@@ -255,6 +318,12 @@ struct HomeView: View {
         }
         .onDisappear {
             fallingFoodManager.cleanup()
+            momentumDismissTask?.cancel()
+            momentumDismissTask = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .snapchefShareCompleted)) { notification in
+            let platform = (notification.userInfo?["platform"] as? String) ?? "Share"
+            presentMomentumCard(for: platform, persist: true)
         }
         .fullScreenCover(isPresented: $showingCamera) {
             CameraView(isPresented: $showingCamera)
@@ -310,7 +379,7 @@ struct HomeView: View {
 
     private func startButtonShake() {
         // Only shake if continuous animations are enabled
-        guard deviceManager.shouldUseContinuousAnimations else { return }
+        guard deviceManager.shouldUseContinuousAnimations, !reduceMotion else { return }
         
         // Subtle shake effect
         withAnimation(.default) {
@@ -330,15 +399,159 @@ struct HomeView: View {
     }
 
     private func pulseSnapButton() {
-        guard deviceManager.animationsEnabled else { return }
+        guard deviceManager.animationsEnabled, !reduceMotion else { return }
         snapButtonPulse = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             snapButtonPulse = false
         }
     }
 
+    private func triggerSnapHaloBurst() {
+        guard deviceManager.animationsEnabled, !reduceMotion else { return }
+
+        snapTapBurstScale = 0.9
+        snapTapBurstOpacity = 0.44
+
+        withAnimation(MotionTuning.settleSpring(response: 0.38, damping: 0.78)) {
+            snapTapBurstScale = 1.26
+            snapTapBurstOpacity = 0
+        }
+    }
+
     private func updateButtonFrames(_ frame: CGRect) {
         fallingFoodManager.updateButtonFrames([frame])
+    }
+
+    private func presentMomentumCard(for platform: String, persist: Bool) {
+        if persist {
+            ShareMomentumStore.record(platform: platform)
+        }
+        momentumSnapshot = ShareMomentumSnapshot(platform: platform, sharedAt: Date())
+
+        if reduceMotion {
+            showMomentumCard = true
+        } else {
+            withAnimation(MotionTuning.settleSpring(response: 0.4, damping: 0.82)) {
+                showMomentumCard = true
+            }
+        }
+
+        momentumDismissTask?.cancel()
+        momentumDismissTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 9_000_000_000)
+            guard !Task.isCancelled else { return }
+            dismissMomentumCard()
+        }
+    }
+
+    private func dismissMomentumCard() {
+        momentumDismissTask?.cancel()
+        momentumDismissTask = nil
+        if reduceMotion {
+            showMomentumCard = false
+        } else {
+            withAnimation(MotionTuning.softExit(0.24)) {
+                showMomentumCard = false
+            }
+        }
+    }
+
+    private func copyInviteLink() {
+        let inviteURL = SocialShareManager.shared.referralInviteURL().absoluteString
+        UIPasteboard.general.string = inviteURL
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        NotificationCenter.default.post(name: .snapchefInviteLinkCopied, object: nil)
+        didCopyInviteLink = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            didCopyInviteLink = false
+        }
+    }
+
+    private func navigateToSocialFeed() {
+        NotificationCenter.default.post(
+            name: .snapchefNavigateToTab,
+            object: nil,
+            userInfo: ["tab": AppTab.socialFeed.rawValue]
+        )
+    }
+
+    private func momentumPlatformDisplayName(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Social" }
+
+        if trimmed.uppercased() == trimmed, trimmed.count <= 4 {
+            return trimmed
+        }
+        if trimmed.lowercased() == "tiktok" { return "TikTok" }
+        if trimmed.lowercased() == "instagramstory" { return "Instagram Story" }
+        if trimmed.lowercased() == "whatsapp" { return "WhatsApp" }
+        return trimmed.capitalized
+    }
+}
+
+private struct ShareMomentumCard: View {
+    let platform: String
+    let copiedInvite: Bool
+    let onCopyInvite: () -> Void
+    let onViewFeed: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        StudioMomentumCardContainer {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Momentum live on \(platform)")
+                            .font(StudioMomentumTypography.title)
+                            .foregroundColor(.white)
+                        Text("Keep the loop going with one tap.")
+                            .font(StudioMomentumTypography.subtitle)
+                            .foregroundColor(.white.opacity(0.82))
+                    }
+                    Spacer()
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(8)
+                            .background(Circle().fill(Color.white.opacity(0.14)))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                HStack(spacing: 10) {
+                    Button(action: onCopyInvite) {
+                        HStack(spacing: 8) {
+                            Image(systemName: copiedInvite ? "checkmark.circle.fill" : "link")
+                                .font(.system(size: 13, weight: .bold))
+                            Text(copiedInvite ? "Copied" : "Copy Invite")
+                                .font(StudioMomentumTypography.action)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(StudioMomentumVisual.chipOpacity))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onViewFeed) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.up.right.square.fill")
+                                .font(.system(size: 13, weight: .bold))
+                            Text("Open Feed")
+                                .font(StudioMomentumTypography.action)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(0.24))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 }
 
@@ -1383,7 +1596,7 @@ struct RecipeDetectiveTile: View {
             }
         }
         .fullScreenCover(isPresented: $showingDetectiveView) {
-            RecipeDetectiveView()
+            DetectiveView()
         }
     }
 }
@@ -1391,21 +1604,27 @@ struct RecipeDetectiveTile: View {
 // MARK: - Detective Feature Tile
 struct DetectiveFeatureTile: View {
     @State private var showingDetective = false
+    @State private var showingPremiumPrompt = false
     @State private var isAnimating = false
+    @StateObject private var usageTracker = UsageTracker.shared
     @StateObject private var userLifecycle = UserLifecycleManager.shared
     @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
     @State private var showingCameraPermissionAlert = false
-    
-    // Track detective uses (10 for testing, should be 3 for production)
-    @AppStorage("detectiveFeatureUses") private var detectiveUses: Int = 0
-    private let freeUsesLimit = 10 // TODO: Change to 3 for production
-    
+
+    private var canUseDetective: Bool {
+        usageTracker.canUseDetective()
+    }
+
     private var isPremiumLocked: Bool {
-        detectiveUses >= freeUsesLimit && (!cloudKitAuth.isAuthenticated || userLifecycle.currentPhase == .standard)
+        !canUseDetective && (!cloudKitAuth.isAuthenticated || userLifecycle.currentPhase == .standard)
     }
     
     var body: some View {
         Button(action: {
+            guard canUseDetective else {
+                showingPremiumPrompt = true
+                return
+            }
             Task {
                 let granted = await requestCameraPermission()
                 if granted {
@@ -1525,6 +1744,12 @@ struct DetectiveFeatureTile: View {
         }
         .fullScreenCover(isPresented: $showingDetective) {
             DetectiveView()
+        }
+        .sheet(isPresented: $showingPremiumPrompt) {
+            PremiumUpgradePrompt(
+                isPresented: $showingPremiumPrompt,
+                reason: .premiumFeature("Recipe Detective")
+            )
         }
         .alert("Camera Access Required", isPresented: $showingCameraPermissionAlert) {
             Button("Settings") {

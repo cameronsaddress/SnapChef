@@ -121,7 +121,9 @@ final class iCloudStatusManager: ObservableObject {
     
     // MARK: - Private Properties
     
-    private let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
+    private lazy var container: CKContainer? = {
+        CloudKitRuntimeSupport.makeContainer()
+    }()
     private let checkInterval: TimeInterval = 86400 // 24 hours
     private let promptCooldown: TimeInterval = 21600 // 6 hours
     private var checkTimer: Timer?
@@ -139,6 +141,20 @@ final class iCloudStatusManager: ObservableObject {
     
     /// Check iCloud status and show prompt if needed
     func checkiCloudStatus(context: PromptContext? = nil) async {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            accountStatus = .noAccount
+            hasSetupiCloud = false
+            shouldShowiCloudPrompt = false
+            return
+        }
+
+        guard let container else {
+            accountStatus = .couldNotDetermine
+            hasSetupiCloud = false
+            shouldShowiCloudPrompt = false
+            return
+        }
+
         do {
             accountStatus = try await container.accountStatus()
             

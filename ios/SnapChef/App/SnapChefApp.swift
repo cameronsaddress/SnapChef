@@ -79,11 +79,13 @@ struct SnapChefApp: App {
                 }
 
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+                    guard cloudKitRuntimeEnabled else { return }
                     Task {
                         await cloudKitDataManager.endAppSession()
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
+                    guard cloudKitRuntimeEnabled else { return }
                     Task {
                         await cloudKitDataManager.endAppSession()
                     }
@@ -201,6 +203,14 @@ struct SnapChefApp: App {
         
         KeychainManager.shared.ensureAPIKeyExists()
         NetworkManager.shared.configure()
+        Task {
+            let backendHealthy = await NetworkManager.shared.checkServerHealth()
+            if backendHealthy {
+                print("✅ Backend health check succeeded")
+            } else {
+                print("⚠️ Backend health check failed - requests will retry with backoff")
+            }
+        }
         deviceManager.checkDeviceStatus()
 
         // Initialize notification system without launch-time permission prompt.
@@ -489,10 +499,14 @@ struct SnapChefApp: App {
     // MARK: - CloudKit Environment Detection
     
     private func detectCloudKitEnvironment() {
+        guard cloudKitRuntimeEnabled else { return }
         // The CloudKit environment is determined by Xcode's build configuration
         // Debug builds use Development, Release/TestFlight/App Store use Production
         
-        let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
+        guard let container = CloudKitRuntimeSupport.makeContainer() else {
+            print("⚠️ CloudKit environment detection skipped: container unavailable")
+            return
+        }
         
         // Check account status to verify CloudKit is available
         container.accountStatus { status, error in
@@ -581,57 +595,50 @@ struct SnapChefApp: App {
     // MARK: - API Key Configuration
     
     private func setupAPIKeyIfNeeded() {
-        // Check if API key already exists in Keychain
-        if let existingKey = KeychainManager.shared.getAPIKey(), !existingKey.isEmpty {
-            print("🔑 API key already configured in Keychain")
+        let existingKey = KeychainManager.shared.getAPIKey()?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let configuredEntry = snapChefResolvedConfiguredAPIKey()
+
+        if let configuredEntry {
+            let configuredKey = configuredEntry.value
+            guard validateAPIKeyFormat(configuredKey) else {
+                print("❌ Invalid API key format detected in configuration")
+                return
+            }
+
+            print("🔑 Using API key from \(configuredEntry.source) \(configuredEntry.name)")
+
+            if existingKey != configuredKey {
+                let didPersist = KeychainManager.shared.storeAPIKey(configuredKey)
+                if didPersist {
+                    print(existingKey == nil ? "🔑 API key stored in Keychain" : "🔄 API key updated in Keychain")
+                } else {
+                    print("⚠️ Keychain persistence unavailable; using \(configuredEntry.source) \(configuredEntry.name) for runtime credentials")
+                }
+            } else {
+                print("🔑 API key already configured")
+            }
+
+            if KeychainManager.shared.getAPIKey() != nil {
+                print("✅ API key verification successful")
+            } else {
+                print("❌ Failed to verify API key storage")
+            }
             return
         }
-        
-        // Get API key from build configuration
-        var apiKey: String = ""
-        
-        #if DEBUG
-        // For development: Try environment variable first, then Info.plist
-        if let envKey = ProcessInfo.processInfo.environment["SNAPCHEF_API_KEY"], !envKey.isEmpty {
-            apiKey = envKey
-            print("🔑 Using API key from environment variable")
-        } else if let plistKey = Bundle.main.object(forInfoDictionaryKey: "SNAPCHEF_API_KEY") as? String, !plistKey.isEmpty {
-            apiKey = plistKey
-            print("🔑 Using API key from Info.plist")
-        } else {
-            print("⚠️ WARNING: No API key found. Server calls will fail.")
-            print("📋 Set SNAPCHEF_API_KEY environment variable in Xcode scheme")
-            print("   1. Edit Scheme → Run → Arguments → Environment Variables")
-            print("   2. Add SNAPCHEF_API_KEY with your API key value")
+
+        if let existingKey, validateAPIKeyFormat(existingKey) {
+            print("🔑 Using existing API key from Keychain")
             return
         }
-        #else
-        // For production: Must come from Info.plist (injected at build time)
-        if let plistKey = Bundle.main.object(forInfoDictionaryKey: "SNAPCHEF_API_KEY") as? String, !plistKey.isEmpty {
-            apiKey = plistKey
-            print("🔑 Using API key from build configuration")
-        } else {
-            print("❌ CRITICAL: No API key found in production build")
-            return
-        }
+
+        #if !DEBUG
+        print("❌ CRITICAL: No API key found in production build")
         #endif
-        
-        // Validate API key format before storing
-        guard validateAPIKeyFormat(apiKey) else {
-            print("❌ Invalid API key format detected")
-            return
-        }
-        
-        // Store in Keychain for secure access
-        KeychainManager.shared.storeAPIKey(apiKey)
-        print("🔑 API key stored in Keychain")
-        
-        // Verify storage
-        if KeychainManager.shared.getAPIKey() != nil {
-            print("✅ API key verification successful")
-        } else {
-            print("❌ Failed to verify API key storage")
-        }
+        print("⚠️ WARNING: No valid API key found. Server calls will fail.")
+        print("📋 Set SNAPCHEF_API_KEY (or APP_API_KEY) in scheme env or build settings")
+        print("   1. Edit Scheme → Run → Arguments → Environment Variables")
+        print("   2. Add SNAPCHEF_API_KEY or APP_API_KEY with your API key value")
     }
     
     private func validateAPIKeyFormat(_ key: String) -> Bool {

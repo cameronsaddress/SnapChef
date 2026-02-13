@@ -134,8 +134,9 @@ struct ChallengeHubView: View {
             // Note: Basic challenge viewing is allowed for anonymous users
             // Premium features require authentication
 
-            // Create mock challenges if needed
-            if gamificationManager.activeChallenges.isEmpty {
+            // Optional debug-only mock seeding for local development.
+            if ChallengeService.shouldSeedMockChallenges(),
+               gamificationManager.activeChallenges.isEmpty {
                 Task {
                     await ChallengeService.shared.createMockChallenges()
                 }

@@ -866,7 +866,7 @@ extension ChallengeNotificationManager {
             userInfo: [:],
             trigger: nil,
             priority: .medium,
-            deliveryPolicy: .transactional
+            deliveryPolicy: .transactionalCritical
         )
     }
 }

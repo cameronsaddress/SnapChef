@@ -254,6 +254,7 @@ struct CloudKitConfig {
     static let recipeViewRecordType = "RecipeView"
     static let recipeCommentRecordType = "RecipeComment"
     static let recipeRecordType = "Recipe"
+    static let savedRecipeRecordType = "SavedRecipe"
     static let activityRecordType = "Activity"
 
     // Zone Names
@@ -268,14 +269,78 @@ struct CloudKitConfig {
 }
 
 enum CloudKitRuntimeSupport {
+    private static let disableOnSimulatorEnvKey = "SNAPCHEF_DISABLE_CLOUDKIT_ON_SIMULATOR"
+    private static let enableOnSimulatorEnvKey = "SNAPCHEF_ENABLE_CLOUDKIT_ON_SIMULATOR"
+    private static let disableAllEnvKey = "SNAPCHEF_DISABLE_CLOUDKIT"
+    private static let fallbackContainerIdentifier = "iCloud.com.snapchefapp.app"
+
+    static var resolvedContainerIdentifier: String {
+        let configured = CloudKitConfig.containerIdentifier
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if configured.isEmpty {
+            return fallbackContainerIdentifier
+        }
+        return configured
+    }
+
     static var hasCloudKitEntitlement: Bool {
-        #if targetEnvironment(simulator)
-        if ProcessInfo.processInfo.environment["SNAPCHEF_DISABLE_CLOUDKIT_ON_SIMULATOR"] == "1" {
+        let environment = ProcessInfo.processInfo.environment
+        if environment[disableAllEnvKey] == "1" {
             return false
         }
-        return true
+        #if targetEnvironment(simulator)
+        if environment[disableOnSimulatorEnvKey] == "1" {
+            return false
+        }
+        // CloudKit can SIGTRAP in simulator/CI builds when the app isn't signed with iCloud entitlements
+        // (e.g. `CODE_SIGNING_ALLOWED=NO`). Keep it disabled by default; opt-in explicitly when needed.
+        return environment[enableOnSimulatorEnvKey] == "1"
         #else
         return true
+        #endif
+    }
+
+    static func makeContainer(identifier: String? = nil) -> CKContainer? {
+        guard hasCloudKitEntitlement else {
+            return nil
+        }
+
+        #if targetEnvironment(simulator)
+        // On simulator, always use the default container (derived from entitlements).
+        return CKContainer.default()
+        #else
+        let trimmedIdentifier = identifier?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let effectiveIdentifier: String
+        if let trimmedIdentifier, !trimmedIdentifier.isEmpty {
+            effectiveIdentifier = trimmedIdentifier
+        } else {
+            effectiveIdentifier = resolvedContainerIdentifier
+        }
+        return CKContainer(identifier: effectiveIdentifier)
+        #endif
+    }
+
+    static var diagnostics: (hasEntitlement: Bool, mode: String) {
+        #if targetEnvironment(simulator)
+        let mode = hasCloudKitEntitlement ? "simulator-explicit-enabled" : "simulator-disabled-default"
+        #else
+        let mode = "device-entitled"
+        #endif
+        return (
+            hasEntitlement: hasCloudKitEntitlement,
+            mode: mode
+        )
+    }
+
+    static func logDiagnosticsIfNeeded() {
+        #if DEBUG
+        let info = diagnostics
+        if !info.hasEntitlement {
+            print("⚠️ CloudKit runtime disabled (\(info.mode)). Running in local-only mode.")
+        }
+        #else
+        _ = diagnostics
         #endif
     }
 }
@@ -489,6 +554,13 @@ struct CKField {
         static let proTips = "proTips"
         static let visualClues = "visualClues"
         static let shareCaption = "shareCaption"
+    }
+
+    // SavedRecipe Fields
+    struct SavedRecipe {
+        static let userID = "userID"
+        static let recipeID = "recipeID"
+        static let savedAt = "savedAt"
     }
 
     // Activity Fields

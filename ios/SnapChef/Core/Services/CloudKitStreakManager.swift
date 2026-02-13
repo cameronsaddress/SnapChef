@@ -6,19 +6,31 @@ import CloudKit
 class CloudKitStreakManager: ObservableObject {
     static let shared = CloudKitStreakManager()
 
-    private let container = CKContainer(identifier: "iCloud.com.snapchefapp.app")
-    private let publicDB: CKDatabase
-    private let privateDB: CKDatabase
+    private lazy var container: CKContainer? = {
+        CloudKitRuntimeSupport.makeContainer()
+    }()
+
+    private func requirePublicDB(for operation: String) -> CKDatabase? {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return nil }
+        return container?.publicCloudDatabase
+    }
+
+    private func requirePrivateDB(for operation: String) -> CKDatabase? {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return nil }
+        return container?.privateCloudDatabase
+    }
 
     private init() {
-        self.publicDB = container.publicCloudDatabase
-        self.privateDB = container.privateCloudDatabase
+        if !CloudKitRuntimeSupport.hasCloudKitEntitlement {
+            print("⚠️ CloudKitStreakManager running in local-only mode: streak sync disabled")
+        }
     }
 
     // MARK: - Streak Management
 
     /// Update streak data in CloudKit
     func updateStreak(_ streak: StreakData) async {
+        guard let privateDB = requirePrivateDB(for: "updateStreak") else { return }
         let recordID = CKRecord.ID(recordName: "streak_\(streak.type.rawValue)_\(getCurrentUserID())")
 
         let record: CKRecord
@@ -65,6 +77,7 @@ class CloudKitStreakManager: ObservableObject {
 
     /// Record streak break in history
     func recordStreakBreak(_ history: StreakHistory) async {
+        guard let privateDB = requirePrivateDB(for: "recordStreakBreak") else { return }
         let record = CKRecord(recordType: "StreakHistory")
 
         record["userID"] = getCurrentUserID()
@@ -93,6 +106,7 @@ class CloudKitStreakManager: ObservableObject {
 
     /// Record achievement unlock
     func recordAchievement(_ achievement: StreakAchievement) async {
+        guard let publicDB = requirePublicDB(for: "recordAchievement") else { return }
         let record = CKRecord(recordType: "StreakAchievement")
 
         record["userID"] = getCurrentUserID()
@@ -120,6 +134,13 @@ class CloudKitStreakManager: ObservableObject {
 
     /// Sync all streaks from CloudKit
     func syncStreaks() async -> [StreakType: StreakData] {
+        guard let privateDB = requirePrivateDB(for: "syncStreaks") else {
+            var defaultStreaks: [StreakType: StreakData] = [:]
+            for streakType in StreakType.allCases {
+                defaultStreaks[streakType] = StreakData(type: streakType)
+            }
+            return defaultStreaks
+        }
         let userID = getCurrentUserID()
 
         let predicate = NSPredicate(format: "userID == %@", userID)
@@ -180,6 +201,7 @@ class CloudKitStreakManager: ObservableObject {
 
     /// Get streak leaderboard
     func getStreakLeaderboard(type: StreakType, limit: Int = 100) async -> [(userID: String, streak: Int, username: String)] {
+        guard let publicDB = requirePublicDB(for: "getStreakLeaderboard") else { return [] }
         let predicate = NSPredicate(format: "streakType == %@", type.rawValue)
         let query = CKQuery(recordType: "UserStreak", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "currentStreak", ascending: false)]
@@ -219,6 +241,7 @@ class CloudKitStreakManager: ObservableObject {
     }
 
     private func getUserName(userID: String) async -> String {
+        guard let publicDB = requirePublicDB(for: "getUserName") else { return "Unknown Chef" }
         // Fetch username from User record
         let recordID = CKRecord.ID(recordName: userID)
 

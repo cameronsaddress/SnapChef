@@ -1,0 +1,13 @@
+// Shared SnapChef target configuration.
+// Local, untracked secrets should live in Config/LocalSecrets.xcconfig.
+#include? "LocalSecrets.xcconfig"
+
+// Backend defaults. Override in LocalSecrets.xcconfig for staging/dev as needed.
+SNAPCHEF_SLASH = /
+API_BASE_URL = https:$(SNAPCHEF_SLASH)$(SNAPCHEF_SLASH)snapchef-server.onrender.com
+
+// Optional integration settings (may remain empty).
+SNAPCHEF_CRASH_REPORT_URL =
+SNAPCHEF_CRASH_REPORT_API_KEY =
+FACEBOOK_APP_ID =
+FACEBOOK_CLIENT_TOKEN =

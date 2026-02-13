@@ -5,18 +5,25 @@ SnapChef uses secure API key management to protect sensitive credentials. API ke
 
 ## Quick Setup for Developers
 
-### 1. Initial Setup
+### 1. Initial Setup (Recommended)
 ```bash
-# Run the setup script
-./Scripts/setup-dev-environment.sh
+# Create local, untracked Xcode secrets file
+cp Config/LocalSecrets.xcconfig.example Config/LocalSecrets.xcconfig
 ```
 
-### 2. Configure API Key in Xcode
+### 2. Configure API Key
+Set one or both values in `Config/LocalSecrets.xcconfig`:
+```xcconfig
+SNAPCHEF_API_KEY = your-actual-api-key-here
+APP_API_KEY = your-actual-api-key-here
+```
+
+Optional debug override:
 1. Open `SnapChef.xcodeproj` in Xcode
 2. Select the SnapChef scheme
 3. Edit Scheme (⌘<)
 4. Go to Run → Arguments → Environment Variables
-5. Add: `SNAPCHEF_API_KEY` = `your-actual-api-key-here`
+5. Add: `SNAPCHEF_API_KEY` (or `APP_API_KEY`)
 
 ### 3. Verify Setup
 Build and run the app. Check the console for:
@@ -27,14 +34,16 @@ Build and run the app. Check the console for:
 
 ### Debug Builds:
 1. **Environment Variable** (highest priority)
-   - Set in Xcode scheme
-   - `SNAPCHEF_API_KEY` environment variable
+   - `SNAPCHEF_API_KEY` or `APP_API_KEY` in scheme/terminal
 
-2. **Info.plist** 
-   - Injected at build time
-   - Used in CI/CD pipelines
+2. **Build Configuration (`xcconfig`)**
+   - `Config/LocalSecrets.xcconfig` (gitignored)
+   - Included via `Config/SnapChef.xcconfig`
 
-3. **Keychain** (cached)
+3. **Info.plist / Build Setting Expansion**
+   - Values expanded from build settings during build
+
+4. **Keychain** (cached)
    - Stored after first successful load
    - Persists between app launches
 
@@ -78,8 +87,8 @@ ENV['SNAPCHEF_API_KEY'] = ENV['CI_SNAPCHEF_API_KEY']
 ## Troubleshooting
 
 ### "No API key found" Error:
-1. Check environment variable is set in Xcode scheme
-2. Verify .env file exists and has valid key
+1. Verify `Config/LocalSecrets.xcconfig` exists and has a valid key
+2. Check scheme environment variables for overrides
 3. Clean build folder (⇧⌘K) and rebuild
 
 ### "Invalid API key format" Error:

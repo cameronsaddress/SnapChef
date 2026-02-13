@@ -6,19 +6,52 @@ import UIKit
 class CloudKitUserManager: ObservableObject {
     static let shared = CloudKitUserManager()
 
-    private let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
-    private let database = CKContainer(identifier: CloudKitConfig.containerIdentifier).publicCloudDatabase
+    private lazy var container: CKContainer? = {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return nil }
+        return CloudKitRuntimeSupport.makeContainer()
+    }()
+
+    private lazy var database: CKDatabase? = {
+        container?.publicCloudDatabase
+    }()
 
     // Record type and field names
     private let userRecordType = CloudKitConfig.userRecordType
 
     // Use CKField.User for consistency with the rest of the app
 
-    private init() {}
+    private init() {
+        if !CloudKitRuntimeSupport.hasCloudKitEntitlement {
+            print("⚠️ CloudKitUserManager running in local-only mode: CloudKit disabled")
+        }
+    }
+
+    private func requireContainer(for operation: String) throws -> CKContainer {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            print("⚠️ CloudKitUserManager.\(operation): CloudKit unavailable in this runtime")
+            throw CloudKitUserError.notAuthenticated
+        }
+        guard let container else {
+            throw CloudKitUserError.notAuthenticated
+        }
+        return container
+    }
+
+    private func requireDatabase(for operation: String) throws -> CKDatabase {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            print("⚠️ CloudKitUserManager.\(operation): CloudKit unavailable in this runtime")
+            throw CloudKitUserError.notAuthenticated
+        }
+        guard let database else {
+            throw CloudKitUserError.notAuthenticated
+        }
+        return database
+    }
 
     // MARK: - Username Availability
 
     func isUsernameAvailable(_ username: String) async throws -> Bool {
+        let database = try requireDatabase(for: "isUsernameAvailable")
         let logger = CloudKitDebugLogger.shared
         let startTime = Date()
         
@@ -43,18 +76,29 @@ class CloudKitUserManager: ObservableObject {
     // MARK: - Save User Profile
 
     func saveUserProfile(username: String, profileImage: UIImage?) async throws {
+        let database = try requireDatabase(for: "saveUserProfile")
         guard let userID = try await getCurrentUserID() else {
             throw CloudKitUserError.notAuthenticated
         }
 
-        // Check if profile already exists
-        let existingProfile = try? await fetchUserProfile(userID: userID)
-
-        let record = existingProfile ?? CKRecord(recordType: userRecordType)
+        let canonicalRecordID = CKRecord.ID(recordName: "user_\(userID)")
+        let record: CKRecord
+        do {
+            record = try await database.record(for: canonicalRecordID)
+        } catch let ckError as CKError where ckError.code == .unknownItem {
+            record = CKRecord(recordType: userRecordType, recordID: canonicalRecordID)
+        } catch {
+            // Fall back to legacy lookup before creating a duplicate user record.
+            if let legacyRecord = try? await fetchUserProfile(userID: userID) {
+                record = legacyRecord
+            } else {
+                record = CKRecord(recordType: userRecordType, recordID: canonicalRecordID)
+            }
+        }
 
         // Set fields
         record[CKField.User.username] = username.lowercased()
-        record["userID"] = userID
+        record[CKField.User.userID] = userID
         record[CKField.User.displayName] = username
         record[CKField.User.createdAt] = record[CKField.User.createdAt] ?? Date()
         record[CKField.User.lastActiveAt] = Date()
@@ -63,13 +107,23 @@ class CloudKitUserManager: ObservableObject {
         // For now, we'll skip profile image upload and implement it later
         // TODO: Implement image upload to CloudKit assets and set profileImageURL
 
-        // Initialize counters if new profile
-        if existingProfile == nil {
-            record[CKField.User.totalPoints] = 0
-            record[CKField.User.recipesShared] = 0
-            record[CKField.User.followerCount] = 0
-            record[CKField.User.followingCount] = 0
-            record[CKField.User.isVerified] = false
+        // Initialize counters if missing (avoid schema-type mismatches).
+        if record[CKField.User.totalPoints] == nil {
+            record[CKField.User.totalPoints] = Int64(0)
+        }
+        if record[CKField.User.recipesShared] == nil {
+            record[CKField.User.recipesShared] = Int64(0)
+        }
+        if record[CKField.User.followerCount] == nil {
+            record[CKField.User.followerCount] = Int64(0)
+        }
+        if record[CKField.User.followingCount] == nil {
+            record[CKField.User.followingCount] = Int64(0)
+        }
+        if record[CKField.User.isVerified] == nil {
+            record[CKField.User.isVerified] = Int64(0)
+        }
+        if record[CKField.User.subscriptionTier] == nil {
             record[CKField.User.subscriptionTier] = "free"
         }
 
@@ -81,11 +135,9 @@ class CloudKitUserManager: ObservableObject {
             _ = try await database.save(record)
             let duration = Date().timeIntervalSince(startTime)
             logger.logSaveSuccess(recordType: userRecordType, recordID: record.recordID.recordName, database: database.debugName, duration: duration)
-            print("Successfully saved user profile for username: \(username)")
         } catch {
             let duration = Date().timeIntervalSince(startTime)
             logger.logSaveFailure(recordType: userRecordType, database: database.debugName, error: error, duration: duration)
-            print("Error saving user profile: \(error)")
             throw error
         }
     }
@@ -93,10 +145,27 @@ class CloudKitUserManager: ObservableObject {
     // MARK: - Fetch User Profile
 
     func fetchUserProfile(userID: String) async throws -> CKRecord? {
+        let database = try requireDatabase(for: "fetchUserProfile(userID:)")
+        let trimmed = userID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawID = trimmed.hasPrefix("user_") ? String(trimmed.dropFirst(5)) : trimmed
+
         let logger = CloudKitDebugLogger.shared
         let startTime = Date()
-        
-        let predicate = NSPredicate(format: "userID == %@", userID)
+
+        // Fast-path: canonical record id format used throughout the app.
+        let recordID = CKRecord.ID(recordName: "user_\(rawID)")
+        do {
+            let record = try await database.record(for: recordID)
+            let duration = Date().timeIntervalSince(startTime)
+            logger.logFetchSuccess(recordType: userRecordType, recordCount: 1, database: database.debugName, duration: duration)
+            return record
+        } catch let ckError as CKError where ckError.code == .unknownItem {
+            // Fall through to legacy query path.
+        } catch {
+            // Fall through to legacy query path (record might exist under a different ID).
+        }
+
+        let predicate = NSPredicate(format: "%K == %@", CKField.User.userID, rawID)
         let query = CKQuery(recordType: userRecordType, predicate: predicate)
         
         logger.logQueryStart(query: query, database: database.debugName)
@@ -118,12 +187,12 @@ class CloudKitUserManager: ObservableObject {
         } catch {
             let duration = Date().timeIntervalSince(startTime)
             logger.logQueryFailure(query: query, database: database.debugName, error: error, duration: duration)
-            print("Error fetching user profile: \(error)")
             throw error
         }
     }
 
     func fetchUserProfile(username: String) async throws -> CKRecord? {
+        let database = try requireDatabase(for: "fetchUserProfile(username:)")
         let logger = CloudKitDebugLogger.shared
         let startTime = Date()
         
@@ -157,6 +226,7 @@ class CloudKitUserManager: ObservableObject {
     // MARK: - Update Profile
 
     func updateProfileImage(_ image: UIImage) async throws {
+        let database = try requireDatabase(for: "updateProfileImage")
         guard let userID = try await getCurrentUserID(),
               let profile = try await fetchUserProfile(userID: userID) else {
             throw CloudKitUserError.notAuthenticated
@@ -182,6 +252,7 @@ class CloudKitUserManager: ObservableObject {
     }
 
     func updateBio(_ bio: String) async throws {
+        let database = try requireDatabase(for: "updateBio")
         guard let userID = try await getCurrentUserID(),
               let profile = try await fetchUserProfile(userID: userID) else {
             throw CloudKitUserError.notAuthenticated
@@ -208,6 +279,7 @@ class CloudKitUserManager: ObservableObject {
     // MARK: - Profile Stats
 
     func incrementRecipesShared() async throws {
+        let database = try requireDatabase(for: "incrementRecipesShared")
         guard let userID = try await getCurrentUserID(),
               let profile = try await fetchUserProfile(userID: userID) else {
             throw CloudKitUserError.notAuthenticated
@@ -233,6 +305,7 @@ class CloudKitUserManager: ObservableObject {
     }
 
     func updatePoints(_ points: Int) async throws {
+        let database = try requireDatabase(for: "updatePoints")
         guard let userID = try await getCurrentUserID(),
               let profile = try await fetchUserProfile(userID: userID) else {
             throw CloudKitUserError.notAuthenticated
@@ -259,6 +332,7 @@ class CloudKitUserManager: ObservableObject {
     // MARK: - Helper Methods
 
     func getCurrentUserID() async throws -> String? {
+        let container = try requireContainer(for: "getCurrentUserID")
         do {
             let userRecordID = try await container.userRecordID()
             return userRecordID.recordName
@@ -282,6 +356,7 @@ class CloudKitUserManager: ObservableObject {
     // MARK: - Search Users
 
     func searchUsers(query: String) async throws -> [CloudKitUserProfile] {
+        let database = try requireDatabase(for: "searchUsers")
         let predicate = NSPredicate(format: "\(CKField.User.username) CONTAINS[cd] %@ OR \(CKField.User.displayName) CONTAINS[cd] %@", query, query)
         let ckQuery = CKQuery(recordType: userRecordType, predicate: predicate)
         ckQuery.sortDescriptors = [NSSortDescriptor(key: CKField.User.totalPoints, ascending: false)]
@@ -315,28 +390,15 @@ class CloudKitUserManager: ObservableObject {
     
     /// Fetch user by UID to get username for recipe tiles
     func fetchUserByUID(_ uid: String) async throws -> CloudKitUserProfile? {
-        let predicate = NSPredicate(format: "userID == %@", uid)
-        let query = CKQuery(recordType: userRecordType, predicate: predicate)
-        
-        do {
-            let results = try await database.records(matching: query)
-            if let firstResult = results.matchResults.first {
-                switch firstResult.1 {
-                case .success(let record):
-                    return CloudKitUserProfile(from: record)
-                case .failure:
-                    return nil
-                }
-            }
+        guard let record = try await fetchUserProfile(userID: uid) else {
             return nil
-        } catch {
-            print("Error fetching user by UID: \(error)")
-            throw error
         }
+        return CloudKitUserProfile(from: record)
     }
     
     /// Get follower count for a user
     func getFollowerCount(for userID: String) async throws -> Int {
+        let database = try requireDatabase(for: "getFollowerCount")
         let predicate = NSPredicate(format: "\(CKField.Follow.followingID) == %@ AND \(CKField.Follow.isActive) == %d", userID, 1)
         let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
         
@@ -359,6 +421,7 @@ class CloudKitUserManager: ObservableObject {
     
     /// Get following count for a user
     func getFollowingCount(for userID: String) async throws -> Int {
+        let database = try requireDatabase(for: "getFollowingCount")
         let predicate = NSPredicate(format: "\(CKField.Follow.followerID) == %@ AND \(CKField.Follow.isActive) == %d", userID, 1)
         let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
         
@@ -381,6 +444,7 @@ class CloudKitUserManager: ObservableObject {
     
     /// Get recipe count for a user
     func getRecipeCount(for userID: String) async throws -> Int {
+        let database = try requireDatabase(for: "getRecipeCount")
         let predicate = NSPredicate(format: "\(CKField.Recipe.ownerID) == %@ AND \(CKField.Recipe.isPublic) == %d", userID, 1)
         let query = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: predicate)
         
@@ -403,6 +467,7 @@ class CloudKitUserManager: ObservableObject {
     
     /// Get user achievements (badges earned)
     func getUserAchievements(for userID: String) async throws -> [CloudKitAchievement] {
+        let database = try requireDatabase(for: "getUserAchievements")
         let predicate = NSPredicate(format: "%K == %@", CKField.Achievement.userID, userID)
         let query = CKQuery(recordType: CloudKitConfig.achievementRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.Achievement.earnedAt, ascending: false)]
@@ -434,6 +499,7 @@ class CloudKitUserManager: ObservableObject {
     
     /// Update follower/following counts in user profile for performance
     func updateFollowerCounts(userID: String, followerCount: Int, followingCount: Int) async throws {
+        let database = try requireDatabase(for: "updateFollowerCounts")
         guard let profile = try await fetchUserProfile(userID: userID) else {
             throw CloudKitUserError.notAuthenticated
         }
@@ -459,6 +525,7 @@ class CloudKitUserManager: ObservableObject {
     
     /// Update recipe count in user profile for performance
     func updateRecipeCount(userID: String, recipeCount: Int) async throws {
+        let database = try requireDatabase(for: "updateRecipeCount")
         guard let profile = try await fetchUserProfile(userID: userID) else {
             throw CloudKitUserError.notAuthenticated
         }
@@ -483,6 +550,7 @@ class CloudKitUserManager: ObservableObject {
     
     /// Calculate current recipe creation streak based on consecutive days
     func calculateRecipeStreak(for userID: String) async throws -> Int {
+        let database = try requireDatabase(for: "calculateRecipeStreak")
         let predicate = NSPredicate(format: "\(CKField.Recipe.ownerID) == %@", userID)
         let query = CKQuery(recordType: CloudKitConfig.recipeRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.Recipe.createdAt, ascending: false)]
@@ -592,28 +660,76 @@ public struct CloudKitUserProfile {
     let followingCount: Int
 
     init?(from record: CKRecord) {
-        guard let username = record["username"] as? String,
-              let userID = record["userID"] as? String else {
-            return nil
+        func intValue(forKey key: String) -> Int {
+            if let value = record[key] as? Int64 { return Int(value) }
+            if let value = record[key] as? Int { return value }
+            if let value = record[key] as? NSNumber { return value.intValue }
+            return 0
         }
 
+        func int64Value(forKey key: String) -> Int64 {
+            if let value = record[key] as? Int64 { return value }
+            if let value = record[key] as? Int { return Int64(value) }
+            if let value = record[key] as? NSNumber { return value.int64Value }
+            return 0
+        }
+
+        let recordName = record.recordID.recordName
+        let derivedUserIDFromRecordName: String = {
+            if recordName.hasPrefix("user_") {
+                return String(recordName.dropFirst(5))
+            }
+            return recordName
+        }()
+
+        let storedUserID = (record[CKField.User.userID] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedUserID = (storedUserID?.isEmpty == false) ? storedUserID! : derivedUserIDFromRecordName
+
+        let storedUsername = (record[CKField.User.username] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let storedDisplayName = (record[CKField.User.displayName] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let resolvedDisplayName: String = {
+            if let storedDisplayName, !storedDisplayName.isEmpty { return storedDisplayName }
+            if let storedUsername, !storedUsername.isEmpty { return storedUsername }
+            return "Chef"
+        }()
+
+        let resolvedUsername: String = {
+            if let storedUsername, !storedUsername.isEmpty { return storedUsername.lowercased() }
+
+            let base = resolvedDisplayName
+                .lowercased()
+                .replacingOccurrences(of: #"[^a-z0-9_-]+"#, with: "", options: .regularExpression)
+            if base.count >= 3 {
+                return base
+            }
+
+            let suffix = String(resolvedUserID.suffix(4))
+            return "chef\(suffix)"
+        }()
+
         self.recordID = record.recordID
-        self.username = username
-        self.userID = userID
-        self.displayName = record["displayName"] as? String ?? username
-        self.bio = record["bio"] as? String
+        self.username = resolvedUsername
+        self.userID = resolvedUserID
+        self.displayName = resolvedDisplayName
+        self.bio = record[CKField.User.bio] as? String
 
         // User record type uses profileImageURL (STRING) not profileImageAsset (ASSET)
-        self.profileImageURL = record["profileImageURL"] as? String
+        self.profileImageURL = record[CKField.User.profileImageURL] as? String
 
-        self.createdAt = record["createdAt"] as? Date ?? Date()
-        self.lastActiveAt = record["lastActiveAt"] as? Date ?? Date()
-        self.isVerified = (record["isVerified"] as? Int64 == 1) // User record stores as Int64
-        self.subscriptionTier = record["subscriptionTier"] as? String ?? "free"
-        self.totalPoints = record["totalPoints"] as? Int ?? 0
-        self.recipesShared = record["recipesShared"] as? Int ?? 0
-        self.followerCount = record["followerCount"] as? Int ?? 0
-        self.followingCount = record["followingCount"] as? Int ?? 0
+        self.createdAt = record[CKField.User.createdAt] as? Date ?? Date()
+        self.lastActiveAt = record[CKField.User.lastActiveAt] as? Date ?? Date()
+
+        let verifiedFlag = int64Value(forKey: CKField.User.isVerified)
+        self.isVerified = verifiedFlag == 1 || (record[CKField.User.isVerified] as? Bool == true)
+        self.subscriptionTier = (record[CKField.User.subscriptionTier] as? String) ?? "free"
+        self.totalPoints = intValue(forKey: CKField.User.totalPoints)
+        self.recipesShared = intValue(forKey: CKField.User.recipesShared)
+        self.followerCount = intValue(forKey: CKField.User.followerCount)
+        self.followingCount = intValue(forKey: CKField.User.followingCount)
     }
 }
 

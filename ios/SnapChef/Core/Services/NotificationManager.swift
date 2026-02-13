@@ -97,7 +97,7 @@ final class NotificationManager: ObservableObject {
         userInfo: [String: Any] = [:],
         trigger: UNNotificationTrigger?,
         priority: NotificationPriority = .medium,
-        deliveryPolicy: NotificationDeliveryPolicy = .transactional
+        deliveryPolicy: NotificationDeliveryPolicy = .transactionalNudge
     ) -> Bool {
         guard isEnabled else {
             print("🔕 Notifications disabled - skipping: \(title)")
@@ -110,10 +110,11 @@ final class NotificationManager: ObservableObject {
             return false
         }
         
+        let effectivePolicy = normalizedDeliveryPolicy(deliveryPolicy)
         let resolvedTrigger: UNNotificationTrigger?
         var monthlyReservationDate: Date?
 
-        switch deliveryPolicy {
+        switch effectivePolicy {
         case .monthlyEngagement:
             let monthlyTrigger = resolveTriggerForMonthlyPolicy(trigger: trigger, category: category)
             resolvedTrigger = monthlyTrigger
@@ -133,8 +134,26 @@ final class NotificationManager: ObservableObject {
                 return false
             }
             monthlyReservationDate = targetDate
-        case .transactional:
-            resolvedTrigger = resolveTriggerForTransactionalPolicy(trigger: trigger)
+        case .transactionalCritical:
+            fallthrough
+        case .transactionalNudge, .transactional:
+            // SnapChef policy: all pushes are monthly-capped and normalized into a single monthly window.
+            let monthlyTrigger = resolveTriggerForMonthlyPolicy(trigger: trigger, category: category)
+            resolvedTrigger = monthlyTrigger
+            let targetDate = notificationTargetDate(for: monthlyTrigger)
+            guard reserveMonthlySlot(for: targetDate) else {
+                print("📅 Monthly notification already reserved for \(targetDate) - queuing: \(title)")
+                queueNotificationForSmartSelection(
+                    identifier: identifier,
+                    title: title,
+                    body: body,
+                    category: category,
+                    priority: priority,
+                    trigger: trigger
+                )
+                return false
+            }
+            monthlyReservationDate = targetDate
         }
 
         let content = UNMutableNotificationContent()
@@ -144,7 +163,7 @@ final class NotificationManager: ObservableObject {
         content.sound = .default
         content.categoryIdentifier = category.rawValue
         var mergedUserInfo = userInfo
-        mergedUserInfo[deliveryPolicyUserInfoKey] = deliveryPolicy.rawValue
+        mergedUserInfo[deliveryPolicyUserInfoKey] = effectivePolicy.rawValue
         content.userInfo = mergedUserInfo
         
         let request = UNNotificationRequest(
@@ -163,7 +182,7 @@ final class NotificationManager: ObservableObject {
                     print("❌ Failed to schedule notification: \(error)")
                 } else {
                     await self.updatePendingNotifications()
-                    print("✅ Scheduled \(deliveryPolicy.rawValue) notification: \(title)")
+                    print("✅ Scheduled \(effectivePolicy.rawValue) notification: \(title)")
                 }
             }
         }
@@ -171,7 +190,7 @@ final class NotificationManager: ObservableObject {
         return true
     }
     
-    /// Convenience API that routes through transactional delivery.
+    /// Convenience API that routes through monthly-capped delivery.
     func scheduleImmediateNotification(
         identifier: String,
         title: String,
@@ -189,7 +208,7 @@ final class NotificationManager: ObservableObject {
             userInfo: userInfo,
             trigger: nil,
             priority: .high,
-            deliveryPolicy: .transactional
+            deliveryPolicy: .transactionalCritical
         )
     }
     
@@ -279,7 +298,7 @@ final class NotificationManager: ObservableObject {
         notifications: [(title: String, body: String)],
         category: NotificationCategory,
         trigger: UNNotificationTrigger?,
-        deliveryPolicy: NotificationDeliveryPolicy = .transactional
+        deliveryPolicy: NotificationDeliveryPolicy = .transactionalNudge
     ) -> Bool {
         guard !notifications.isEmpty else { return false }
         
@@ -362,13 +381,7 @@ final class NotificationManager: ObservableObject {
         let queueCount = getNotificationQueue().count
         
         let items: [NotificationAuditItem] = pending.map { request in
-            let deliveryPolicy: NotificationDeliveryPolicy = {
-                if let rawValue = request.content.userInfo[deliveryPolicyUserInfoKey] as? String,
-                   let parsed = NotificationDeliveryPolicy(rawValue: rawValue) {
-                    return parsed
-                }
-                return .monthlyEngagement
-            }()
+            let deliveryPolicy = deliveryPolicy(for: request)
             let nextDate: Date? = {
                 if let calendarTrigger = request.trigger as? UNCalendarNotificationTrigger {
                     return calendarTrigger.nextTriggerDate()
@@ -389,11 +402,17 @@ final class NotificationManager: ObservableObject {
             }()
             
             let appearsMonthlyCompliant: Bool = {
-                guard deliveryPolicy == .monthlyEngagement else { return true }
-                guard let nextDate else { return false }
-                let day = calendar.component(.day, from: nextDate)
-                let hour = calendar.component(.hour, from: nextDate)
-                return day == monthlyScheduleDay && !repeats && (preferredWindowStartHour...preferredWindowEndHour).contains(hour)
+                switch deliveryPolicy {
+                case .monthlyEngagement:
+                    guard let nextDate else { return false }
+                    let day = calendar.component(.day, from: nextDate)
+                    let hour = calendar.component(.hour, from: nextDate)
+                    return day == monthlyScheduleDay && !repeats && (preferredWindowStartHour...preferredWindowEndHour).contains(hour)
+                case .transactionalNudge, .transactional:
+                    return !repeats
+                case .transactionalCritical:
+                    return true
+                }
             }()
             
             return NotificationAuditItem(
@@ -413,13 +432,15 @@ final class NotificationManager: ObservableObject {
         }
         
         var violations: [String] = []
-        if items.contains(where: { $0.deliveryPolicy == .monthlyEngagement && $0.repeats }) {
-            violations.append("Found repeating pending notification(s); monthly policy requires one-shot delivery.")
+        if items.contains(where: { $0.deliveryPolicy.enforcesOneShotDelivery && $0.repeats }) {
+            violations.append("Found repeating pending notification(s); monthly and nudge policies require one-shot delivery.")
         }
         if items.contains(where: { $0.deliveryPolicy == .monthlyEngagement && $0.nextTriggerDate == nil }) {
             violations.append("Found pending request(s) with no next trigger date.")
         }
-        let scheduledDates = items.compactMap(\.nextTriggerDate)
+        let scheduledDates = items
+            .filter { $0.deliveryPolicy.enforcesMonthlyCap }
+            .compactMap(\.nextTriggerDate)
         if let overloaded = NotificationPolicyDebug.firstMonthlyOverload(
             for: scheduledDates,
             maxPerMonth: maxMonthlyNotifications,
@@ -527,7 +548,8 @@ final class NotificationManager: ObservableObject {
                 (identifier.hasPrefix("challenge_") && identifier != "challenge_monthly_checkin")
 
             let hasPolicyTag = request.content.userInfo[deliveryPolicyUserInfoKey] as? String != nil
-            let isPolicyManaged = hasPolicyTag || isManagedMonthlyRequest(request)
+            let policy = deliveryPolicy(for: request)
+            let isPolicyManaged = policy.enforcesMonthlyCap
             let repeats = {
                 if let calendarTrigger = request.trigger as? UNCalendarNotificationTrigger {
                     return calendarTrigger.repeats
@@ -546,13 +568,16 @@ final class NotificationManager: ObservableObject {
             }()
             let nextDate = nextTriggerDate(for: request.trigger)
             let violatesMonthlyWindow: Bool = {
-                guard isPolicyManaged, let nextDate else { return false }
+                guard policy == .monthlyEngagement, let nextDate else { return false }
                 let day = calendar.component(.day, from: nextDate)
                 let hour = calendar.component(.hour, from: nextDate)
                 return day != monthlyScheduleDay || !(preferredWindowStartHour...preferredWindowEndHour).contains(hour)
             }()
 
-            if hasLegacyIdentifier || repeats || (!hasPolicyTag && isLegacy8PM) || violatesMonthlyWindow {
+            if hasLegacyIdentifier ||
+                (policy.enforcesOneShotDelivery && repeats) ||
+                (!hasPolicyTag && isLegacy8PM && isPolicyManaged) ||
+                violatesMonthlyWindow {
                 return identifier
             }
             return nil
@@ -653,9 +678,7 @@ extension NotificationManager {
     /// Check if we can schedule a notification for the target month.
     private func canSendMonthlyNotification(for targetDate: Date) -> Bool {
         let reservedDate = userDefaults.object(forKey: monthlyNotificationDateKey) as? Date
-        let pendingDates: [Date] = pendingNotifications.compactMap { request in
-            nextTriggerDate(for: request.trigger)
-        }
+        let pendingDates = pendingMonthlyCapDates()
         return NotificationPolicyDebug.canScheduleMonthlyNotification(
             targetDate: targetDate,
             reservedDate: reservedDate,
@@ -927,6 +950,7 @@ extension NotificationManager {
     private func pendingNotificationCount(forMonthOf targetDate: Date) -> Int {
         let calendar = Calendar.current
         return pendingNotifications.reduce(into: 0) { count, request in
+            guard deliveryPolicy(for: request).enforcesMonthlyCap else { return }
             guard let nextDate = nextTriggerDate(for: request.trigger) else { return }
             guard calendar.isDate(nextDate, equalTo: targetDate, toGranularity: .month) else { return }
             count += 1
@@ -934,7 +958,7 @@ extension NotificationManager {
     }
 
     private func isManagedMonthlyRequest(_ request: UNNotificationRequest) -> Bool {
-        if request.content.userInfo[deliveryPolicyUserInfoKey] as? String != nil {
+        if deliveryPolicy(for: request).enforcesMonthlyCap {
             return true
         }
 
@@ -947,13 +971,70 @@ extension NotificationManager {
 
         return false
     }
+
+    private func pendingMonthlyCapDates() -> [Date] {
+        pendingNotifications.compactMap { request in
+            guard deliveryPolicy(for: request).enforcesMonthlyCap else { return nil }
+            return nextTriggerDate(for: request.trigger)
+        }
+    }
+
+    private func deliveryPolicy(for request: UNNotificationRequest) -> NotificationDeliveryPolicy {
+        if let rawValue = request.content.userInfo[deliveryPolicyUserInfoKey] as? String,
+           let parsed = NotificationDeliveryPolicy(rawValue: rawValue) {
+            return normalizedDeliveryPolicy(parsed)
+        }
+
+        // Legacy requests without an explicit policy tag:
+        // - Known monthly IDs stay monthly-engagement.
+        // - nil trigger means immediate/transactional.
+        // - everything else defaults to capped nudge behavior.
+        if isLegacyMonthlyIdentifier(request.identifier) {
+            return .monthlyEngagement
+        }
+        if request.trigger == nil {
+            return .transactionalCritical
+        }
+        return .transactionalNudge
+    }
+
+    private func isLegacyMonthlyIdentifier(_ identifier: String) -> Bool {
+        identifier == "monthly_streak_reminder" ||
+            identifier == "monthly_smart_selection" ||
+            identifier == "challenge_monthly_checkin"
+    }
+
+    private func normalizedDeliveryPolicy(_ policy: NotificationDeliveryPolicy) -> NotificationDeliveryPolicy {
+        switch policy {
+        case .transactional:
+            return .transactionalCritical
+        default:
+            return policy
+        }
+    }
 }
 
 // MARK: - Notification Priority
 
 enum NotificationDeliveryPolicy: String, Codable {
     case monthlyEngagement = "monthly_engagement"
-    case transactional = "transactional"
+    case transactionalNudge = "transactional_nudge"
+    case transactionalCritical = "transactional_critical"
+    case transactional = "transactional" // Legacy alias for immediate transactional delivery.
+
+    var enforcesMonthlyCap: Bool {
+        switch self {
+        case .monthlyEngagement, .transactionalNudge, .transactionalCritical, .transactional:
+            return true
+        }
+    }
+
+    var enforcesOneShotDelivery: Bool {
+        switch self {
+        case .monthlyEngagement, .transactionalNudge, .transactionalCritical, .transactional:
+            return true
+        }
+    }
 }
 
 enum NotificationPolicyDebug {

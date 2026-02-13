@@ -1,3 +1,8 @@
+// Deprecated: superseded by `CloudKitService`.
+// This legacy implementation is intentionally excluded from compilation to avoid drift and
+// accidental CloudKit initialization in runtimes where CloudKit isn't available (e.g. unsigned simulator builds).
+#if false
+
 import Foundation
 import CloudKit
 import Combine
@@ -24,7 +29,7 @@ final class CloudKitSyncService: ObservableObject {
     private var syncQueue = DispatchQueue(label: "com.snapchef.cloudkit.sync", qos: .background)
 
     private init() {
-        container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
+        container = CloudKitRuntimeSupport.makeContainer()
         publicDatabase = container.publicCloudDatabase
         privateDatabase = container.privateCloudDatabase
 
@@ -924,7 +929,12 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     func syncUserProgress() async {
-        guard let userID = AuthenticationManager().currentUser?.id else { return }
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return }
+        guard let userID = UnifiedAuthManager.shared.currentUser?.recordID?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !userID.isEmpty else {
+            return
+        }
 
         do {
             // Fetch all UserChallenge records and filter locally
@@ -1340,70 +1350,4 @@ final class CloudKitSyncService: ObservableObject {
     }
 }
 
-// MARK: - CloudKit Model Extensions
-
-extension Challenge {
-    init?(from record: CKRecord) {
-        guard let id = record[CKField.Challenge.id] as? String,
-              let title = record[CKField.Challenge.title] as? String,
-              let description = record[CKField.Challenge.description] as? String,
-              let typeRaw = record[CKField.Challenge.type] as? String,
-              let category = record[CKField.Challenge.category] as? String,
-              let difficultyInt = record[CKField.Challenge.difficulty] as? Int64,
-              let difficulty = DifficultyLevel(rawValue: Int(difficultyInt)),
-              let points = record[CKField.Challenge.points] as? Int64,
-              let coins = record[CKField.Challenge.coins] as? Int64,
-              let startDate = record[CKField.Challenge.startDate] as? Date,
-              let endDate = record[CKField.Challenge.endDate] as? Date,
-              let isActiveInt = record[CKField.Challenge.isActive] as? Int64,
-              let isPremiumInt = record[CKField.Challenge.isPremium] as? Int64,
-              let participantCount = record[CKField.Challenge.participantCount] as? Int64,
-              let completionCount = record[CKField.Challenge.completionCount] as? Int64 else {
-            print("❌ Failed to parse challenge from CloudKit record")
-            return nil
-        }
-
-        // Parse type
-        let type: ChallengeType
-        switch typeRaw.lowercased() {
-        case "daily":
-            type = .daily
-        case "weekly":
-            type = .weekly
-        case "special":
-            type = .special
-        case "community":
-            type = .community
-        default:
-            type = .daily
-        }
-
-        // Parse requirements from pipe-separated string
-        var requirements: [String] = []
-        if let requirementsString = record[CKField.Challenge.requirements] as? String {
-            requirements = requirementsString.split(separator: "|").map { String($0) }
-        }
-
-        self.init(
-            id: id,
-            title: title,
-            description: description,
-            type: type,
-            category: category,
-            difficulty: difficulty,
-            points: Int(points),
-            coins: Int(coins),
-            startDate: startDate,
-            endDate: endDate,
-            requirements: requirements,
-            currentProgress: 0,
-            isCompleted: false,
-            isActive: isActiveInt == 1,
-            isJoined: false,
-            participants: Int(participantCount),
-            completions: Int(completionCount),
-            imageURL: record[CKField.Challenge.imageURL] as? String,
-            isPremium: isPremiumInt == 1
-        )
-    }
-}
+#endif
