@@ -699,6 +699,11 @@ struct CameraView: View {
                 return
             }
 
+            // Render warmup: overlap /health check with local work to reduce cold-start failures ("chef is busy").
+            let warmupTask = Task {
+                await SnapChefAPIManager.shared.warmupBackendIfNeeded()
+            }
+
             // No need to consume free uses - we track daily count in SubscriptionManager
 
             // Generate session ID
@@ -771,6 +776,7 @@ struct CameraView: View {
             let llmProvider = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini"
 
             // Call the API
+            await warmupTask.value
             updateProcessingMilestone(.uploadingPhotos)
             SnapChefAPIManager.shared.sendImageForRecipeGeneration(
                 image: image,
@@ -1085,6 +1091,11 @@ struct CameraView: View {
                 return
             }
 
+            // Render warmup: overlap /health check with local work to reduce cold-start failures.
+            let warmupTask = Task {
+                await SnapChefAPIManager.shared.warmupBackendIfNeeded()
+            }
+
             // Generate session ID
             let sessionId = UUID().uuidString
 
@@ -1143,6 +1154,7 @@ struct CameraView: View {
             let llmProvider = UserDefaults.standard.string(forKey: "SelectedLLMProvider") ?? "gemini"
 
             // Call the new API function for both images
+            await warmupTask.value
             updateProcessingMilestone(.uploadingPhotos)
             cameraDebugLog("🔍 DEBUG: About to call API with both images")
             cameraDebugLog("🔍 DEBUG: Fridge image size: \(fridgeImage.size)")

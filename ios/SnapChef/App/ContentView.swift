@@ -242,8 +242,16 @@ struct MainTabView: View {
                 .environmentObject(authManager)
         }
         .sheet(isPresented: $authManager.showAuthSheet) {
-            UnifiedAuthView()
+            UnifiedAuthView(requiredFor: authManager.authSheetRequiredFeature)
                 .environmentObject(authManager)
+                .onDisappear {
+                    authManager.authSheetRequiredFeature = nil
+                }
+        }
+        .onChange(of: authManager.showAuthSheet) { isPresented in
+            if !isPresented {
+                authManager.authSheetRequiredFeature = nil
+            }
         }
         .alert("Camera Access Required", isPresented: $showingCameraPermissionAlert) {
             Button("Settings") {
@@ -1755,7 +1763,7 @@ struct SocialFeedView: View {
                     
                     // Sign in button
                     Button(action: {
-                        authManager.showAuthSheet = true
+                        authManager.promptAuthForFeature(.socialSharing)
                     }) {
                         HStack(spacing: 12) {
                             Image(systemName: "person.crop.circle.badge.checkmark")

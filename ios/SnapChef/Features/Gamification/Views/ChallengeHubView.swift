@@ -123,9 +123,6 @@ struct ChallengeHubView: View {
             .sheet(isPresented: $showingPremiumView) {
                 PremiumFeaturesView()
             }
-            .sheet(isPresented: $authManager.showAuthSheet) {
-                UnifiedAuthView(requiredFor: .challenges)
-            }
         }
         .onAppear {
             // Track that user viewed challenges for progressive auth
@@ -513,7 +510,7 @@ struct ChallengeHubView: View {
 
         // If the nudge is suppressed by cooldown/frequency rules, still honor explicit user intent.
         if !authTrigger.shouldShowPrompt {
-            authManager.showAuthSheet = true
+            authManager.promptAuthForFeature(.challenges)
         }
     }
 

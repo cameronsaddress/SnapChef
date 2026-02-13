@@ -135,9 +135,11 @@ final class NotificationManager: ObservableObject {
             }
             monthlyReservationDate = targetDate
         case .transactionalCritical:
-            fallthrough
+            // Transactional-critical notifications must be delivered exactly as requested (often immediate).
+            // These should NOT be normalized into the monthly engagement window.
+            resolvedTrigger = trigger
         case .transactionalNudge, .transactional:
-            // SnapChef policy: all pushes are monthly-capped and normalized into a single monthly window.
+            // Nudges are monthly-capped and normalized into a single monthly window.
             let monthlyTrigger = resolveTriggerForMonthlyPolicy(trigger: trigger, category: category)
             resolvedTrigger = monthlyTrigger
             let targetDate = notificationTargetDate(for: monthlyTrigger)
@@ -1024,8 +1026,10 @@ enum NotificationDeliveryPolicy: String, Codable {
 
     var enforcesMonthlyCap: Bool {
         switch self {
-        case .monthlyEngagement, .transactionalNudge, .transactionalCritical, .transactional:
+        case .monthlyEngagement, .transactionalNudge:
             return true
+        case .transactionalCritical, .transactional:
+            return false
         }
     }
 

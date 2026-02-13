@@ -483,7 +483,7 @@ struct EnhancedProfileHeader: View {
             if authManager.isAuthenticated {
                 showingPhotoOptions = true
             } else {
-                authManager.showAuthSheet = true
+                authManager.promptAuthForFeature(.socialSharing)
             }
         }) {
             ZStack {
@@ -573,7 +573,7 @@ struct EnhancedProfileHeader: View {
                 Button(action: {
                     // If not authenticated, show auth view instead of edit profile
                     if !authManager.isAuthenticated {
-                        authManager.showAuthSheet = true
+                        authManager.promptAuthForFeature(.socialSharing)
                     } else {
                         // For authenticated users, always show username edit for CloudKit username
                         // EditProfile is for local customization only
@@ -615,7 +615,7 @@ struct EnhancedProfileHeader: View {
                 // Sign In button if not authenticated
                 if !authManager.isAuthenticated {
                     Button(action: {
-                        authManager.showAuthSheet = true
+                        authManager.promptAuthForFeature(.socialSharing)
                     }) {
                         HStack(spacing: 12) {
                             Image(systemName: "sparkles")
@@ -727,16 +727,6 @@ struct EnhancedProfileHeader: View {
         .task {
             // Load profile photo on appear
             await profilePhotoManager.loadCurrentUserPhoto()
-        }
-        .sheet(isPresented: $authManager.showAuthSheet) {
-            UnifiedAuthView()
-                .onDisappear {
-                    // Refresh profile data after authentication
-                    if authManager.isAuthenticated {
-                        // Trigger UI refresh by updating the refresh trigger
-                        refreshTrigger += 1
-                    }
-                }
         }
         .onAppear {
             profileDebugLog("🔍 DEBUG: EnhancedProfileHeader appeared - Start")

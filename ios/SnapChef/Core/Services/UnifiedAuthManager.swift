@@ -28,6 +28,7 @@ final class UnifiedAuthManager: ObservableObject {
     @Published var tikTokUser: TikTokUser?
     @Published var isLoading = false
     @Published var showAuthSheet = false
+    @Published var authSheetRequiredFeature: AuthRequiredFeature? = nil
     
     // Serial queue to prevent concurrent updates
     private var isUpdatingSocialData = false
@@ -1159,6 +1160,7 @@ final class UnifiedAuthManager: ObservableObject {
     func promptAuthForFeature(_ feature: AuthRequiredFeature, completion: (() -> Void)? = nil) {
         if isAuthRequiredFor(feature: feature) {
             authCompletionHandler = completion
+            authSheetRequiredFeature = feature
             showAuthSheet = true
         } else {
             completion?()
@@ -1399,6 +1401,7 @@ final class UnifiedAuthManager: ObservableObject {
     
     private func completeAuthentication() {
         showAuthSheet = false
+        authSheetRequiredFeature = nil
         shouldShowProgressivePrompt = false
         
         // Call completion handler if set

@@ -659,10 +659,10 @@ class SimpleDiscoverUsersManager: ObservableObject {
 struct DiscoverUsersView: View {
     // Use shared singleton instance for preloaded data
     @StateObject private var manager = SimpleDiscoverUsersManager.shared
+    @StateObject private var iCloudStatus = iCloudStatusManager.shared
     @EnvironmentObject var appState: AppState
     @State private var searchText = ""
     @State private var selectedCategory: DiscoverCategory = .suggested
-    @State private var showAuthSheet = false
 
     enum DiscoverCategory: String, CaseIterable {
         case suggested = "Suggested"
@@ -717,6 +717,13 @@ struct DiscoverUsersView: View {
                         .padding(.horizontal, 20)
                     }
                     .padding(.vertical, 16)
+
+                    // If iCloud isn't configured, discovery will fall back to local demo profiles.
+                    if CloudKitRuntimeSupport.hasCloudKitEntitlement, !iCloudStatus.hasSetupiCloud {
+                        iCloudSetupCard
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 10)
+                    }
 
                     // Users List
                     if manager.showingSkeletonViews && manager.users.isEmpty {
@@ -816,9 +823,6 @@ struct DiscoverUsersView: View {
                 LocalChefPreviewView(user: user)
             }
         }
-        .sheet(isPresented: $showAuthSheet) {
-            UnifiedAuthView()
-        }
     }
 
     private var filteredUsers: [UserProfile] {
@@ -833,6 +837,65 @@ struct DiscoverUsersView: View {
                 $0.displayName.localizedCaseInsensitiveContains(searchText)
             }
         }
+    }
+
+    private var iCloudSetupCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.14))
+                    .frame(width: 44, height: 44)
+
+                Image(systemName: "icloud.slash")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Sign in to iCloud to browse real chefs")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+
+                Text("Without iCloud, SnapChef shows demo profiles. Follow, likes, and saved recipes sync require iCloud.")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.78))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+
+            Button(action: { iCloudStatus.openiCloudSettings() }) {
+                Text("Settings")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.12))
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                            )
+                    )
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
     }
 }
 
@@ -1072,6 +1135,7 @@ struct UserDiscoveryCard: View {
     let onFollow: () -> Void
     let onTap: () -> Void
 
+    @ObservedObject private var authManager = UnifiedAuthManager.shared
     @State private var isFollowing: Bool
 
     init(user: UserProfile, onFollow: @escaping () -> Void, onTap: @escaping () -> Void) {
@@ -1083,7 +1147,7 @@ struct UserDiscoveryCard: View {
     
     // Computed properties to simplify type-checking
     private var buttonText: String {
-        if !UnifiedAuthManager.shared.isAuthenticated {
+        if !authManager.isAuthenticated {
             return "Sign In to Follow"
         } else if isFollowing {
             return "Following"
@@ -1093,15 +1157,15 @@ struct UserDiscoveryCard: View {
     }
     
     private var buttonTextColor: Color {
-        return (isFollowing || !UnifiedAuthManager.shared.isAuthenticated) ? .white : .black
+        return (isFollowing || !authManager.isAuthenticated) ? .white : .black
     }
     
     private var buttonMinWidth: CGFloat {
-        return UnifiedAuthManager.shared.isAuthenticated ? 80 : 120
+        return authManager.isAuthenticated ? 80 : 120
     }
     
     private var buttonBackgroundColor: Color {
-        if !UnifiedAuthManager.shared.isAuthenticated {
+        if !authManager.isAuthenticated {
             return Color(hex: "#667eea") // Simplified to single color
         } else if isFollowing {
             return Color.white.opacity(0.2)
@@ -1111,127 +1175,132 @@ struct UserDiscoveryCard: View {
     }
     
     private var shouldShowGradient: Bool {
-        return !UnifiedAuthManager.shared.isAuthenticated
+        return !authManager.isAuthenticated
     }
     
     private var buttonBorderColor: Color {
-        return (isFollowing && UnifiedAuthManager.shared.isAuthenticated) ? Color.white.opacity(0.5) : Color.clear
+        return (isFollowing && authManager.isAuthenticated) ? Color.white.opacity(0.5) : Color.clear
     }
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 16) {
-                // Profile Image using UserAvatarView (same as SocialFeedView)
-                ZStack {
-                    UserAvatarView(
-                        userID: user.id,
-                        username: user.username,
-                        displayName: user.displayName,
-                        size: 60
-                    )
-
-                    if user.isVerified {
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(.blue)
-                            .background(Circle().fill(Color.white).frame(width: 24, height: 24))
-                            .offset(x: 20, y: 20)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    // Name and Username
-                    HStack {
-                        Text(user.displayName)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
+        HStack(spacing: 16) {
+            // Split: tappable card content + separate follow button (avoid nested Button crash).
+            Button(action: onTap) {
+                HStack(spacing: 16) {
+                    // Profile Image using UserAvatarView (same as SocialFeedView)
+                    ZStack {
+                        UserAvatarView(
+                            userID: user.id,
+                            username: user.username,
+                            displayName: user.displayName,
+                            size: 60
+                        )
 
                         if user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
-                                .font(.system(size: 14))
+                                .font(.system(size: 20))
                                 .foregroundColor(.blue)
+                                .background(Circle().fill(Color.white).frame(width: 24, height: 24))
+                                .offset(x: 20, y: 20)
                         }
                     }
 
-                    Text("@\(user.username)")
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 3) {
+                        // Name and Username
+                        HStack {
+                            Text(user.displayName)
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
 
-                    // Stats
-                    HStack(spacing: 12) {
-                        Text(user.followerText)
-                            .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.8))
-                            .lineLimit(1)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text("\(user.recipesCreated) recipes")
-                            .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.8))
-                            .lineLimit(1)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-
-                Spacer()
-
-                // Follow Button
-                Button(action: {
-                    if UnifiedAuthManager.shared.isAuthenticated {
-                        withAnimation(.spring(response: 0.3)) {
-                            isFollowing.toggle()
-                            onFollow()
-                        }
-                    } else {
-                        // Show authentication prompt
-                        UnifiedAuthManager.shared.showAuthSheet = true
-                    }
-                }) {
-                    Text(buttonText)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(buttonTextColor)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .frame(minWidth: buttonMinWidth)
-                        .background(
-                            Group {
-                                if shouldShowGradient {
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                } else {
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .fill(buttonBackgroundColor)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 20)
-                                                .stroke(buttonBorderColor, lineWidth: 1)
-                                        )
-                                }
+                            if user.isVerified {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.blue)
                             }
-                        )
+                        }
+
+                        Text("@\(user.username)")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.7))
+                            .lineLimit(1)
+
+                        // Stats
+                        HStack(spacing: 12) {
+                            Text(user.followerText)
+                                .font(.system(size: 13))
+                                .foregroundColor(.white.opacity(0.8))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            Text("\(user.recipesCreated) recipes")
+                                .font(.system(size: 13))
+                                .foregroundColor(.white.opacity(0.8))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(PlainButtonStyle())
+                .contentShape(Rectangle())
             }
-            .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.05))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            .buttonStyle(PlainButtonStyle())
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Follow Button
+            Button(action: {
+                if authManager.isAuthenticated {
+                    withAnimation(.spring(response: 0.3)) {
+                        isFollowing.toggle()
+                        onFollow()
+                    }
+                } else {
+                    // Show authentication prompt
+                    authManager.promptAuthForFeature(.socialSharing)
+                }
+            }) {
+                Text(buttonText)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(buttonTextColor)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(minWidth: buttonMinWidth)
+                    .background(
+                        Group {
+                            if shouldShowGradient {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                            } else {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(buttonBackgroundColor)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 20)
+                                            .stroke(buttonBorderColor, lineWidth: 1)
+                                    )
+                            }
+                        }
                     )
-            )
+            }
+            .buttonStyle(PlainButtonStyle())
         }
-        .buttonStyle(PlainButtonStyle())
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
         .onChange(of: user.isFollowing) { newValue in
             isFollowing = newValue
         }
