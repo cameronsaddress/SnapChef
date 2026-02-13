@@ -7,6 +7,12 @@ struct SubscriptionView: View {
     @State private var selectedPlan: SubscriptionPlan = .monthly
     @State private var isProcessing = false
     @State private var errorMessage: String?
+    @State private var safariSheet: SafariSheet?
+
+    private struct SafariSheet: Identifiable {
+        let id = UUID()
+        let url: URL
+    }
 
     enum SubscriptionPlan: String, CaseIterable {
         case monthly = "com.snapchef.premium.monthly"
@@ -178,6 +184,9 @@ struct SubscriptionView: View {
                     }
                 }
             }
+            .sheet(item: $safariSheet) { sheet in
+                SafariView(url: sheet.url)
+            }
         }
     }
 
@@ -230,9 +239,8 @@ struct SubscriptionView: View {
     }
 
     private func openURL(_ urlString: String) {
-        if let url = URL(string: urlString) {
-            UIApplication.shared.open(url)
-        }
+        guard let url = URL(string: urlString) else { return }
+        safariSheet = SafariSheet(url: url)
     }
 }
 
