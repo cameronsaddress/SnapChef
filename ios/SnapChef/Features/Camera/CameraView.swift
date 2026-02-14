@@ -87,6 +87,7 @@ struct CameraView: View {
 
     @State private var captureMode: CaptureMode = .fridge
     @State private var fridgePhoto: UIImage?
+    @State private var pantryPhoto: UIImage?
     @State private var showPantryStep = false
 
     // User preferences for API
@@ -100,10 +101,125 @@ struct CameraView: View {
 
     // Error handling
     @State private var currentError: SnapChefError?
+    @State private var warmupRetry: WarmupRetryState?
+    @State private var warmupRetryTask: Task<Void, Never>?
+    @State private var warmupRetryAttempts = 0
     @State private var showSuccess = false
     @State private var successMessage = ""
     @State private var showPremiumPrompt = false
     @State private var premiumPromptReason: PremiumUpgradePrompt.UpgradeReason = .dailyLimitReached
+
+    private struct WarmupRetryState: Identifiable, Equatable {
+        let id = UUID()
+        let message: String
+        let totalSeconds: Int
+        var remainingSeconds: Int
+    }
+
+    private struct WarmupRetryCard: View {
+        let state: WarmupRetryState
+        let onRetryNow: () -> Void
+        let onCancel: () -> Void
+
+        private var progress: Double {
+            guard state.totalSeconds > 0 else { return 0 }
+            return 1.0 - (Double(state.remainingSeconds) / Double(state.totalSeconds))
+        }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: "#f6d365").opacity(0.18))
+                            .overlay(
+                                Circle()
+                                    .stroke(Color(hex: "#fda085").opacity(0.55), lineWidth: 1)
+                            )
+                            .frame(width: 36, height: 36)
+
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(Color(hex: "#f6d365"))
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Chef Is Warming Up")
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                            .foregroundColor(.white)
+                        Text(state.remainingSeconds > 0 ? "Retrying in \(state.remainingSeconds)s" : "Retrying now...")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.72))
+                            .monospacedDigit()
+                    }
+
+                    Spacer()
+
+                    ProgressView(value: progress)
+                        .progressViewStyle(.circular)
+                        .tint(Color(hex: "#f6d365"))
+                        .frame(width: 28, height: 28)
+                }
+
+                if !state.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(state.message)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.82))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: 12) {
+                    Button(role: .cancel, action: onCancel) {
+                        Text("Cancel")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.85))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color.white.opacity(0.10))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                                    )
+                            )
+                    }
+
+                    Button(action: onRetryNow) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 14, weight: .bold))
+                            Text("Retry Now")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#f6d365"), Color(hex: "#fda085")],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                        )
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.black.opacity(0.55))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.35), radius: 18, y: 10)
+        }
+    }
 
     // Backward-compatibility shim for tests and legacy call sites.
     // Internal test capture is permanently disabled in production flows.
@@ -181,17 +297,47 @@ struct CameraView: View {
                 MagicalBackground()
                     .ignoresSafeArea()
                     .overlay(
-                        MagicalProcessingOverlay(capturedImage: capturedImage, processingMilestone: processingMilestone, onClose: {
-                            cameraDebugLog("🔍 DEBUG: MagicalProcessingOverlay onClose called")
-                            // Stop processing and go back
-                            isProcessing = false
-                            processingMilestone = .idle
-                            capturedImage = nil
-                            fridgePhoto = nil
-                            captureMode = .fridge
-                            showPantryStep = false
-                            routeOutOfCamera()
-                        })
+                        ZStack {
+                            MagicalProcessingOverlay(
+                                capturedImage: capturedImage,
+                                processingMilestone: processingMilestone,
+                                onClose: {
+                                    cameraDebugLog("🔍 DEBUG: MagicalProcessingOverlay onClose called")
+                                    cancelWarmupRetry()
+                                    // Stop processing and go back
+                                    isProcessing = false
+                                    processingMilestone = .idle
+                                    capturedImage = nil
+                                    fridgePhoto = nil
+                                    pantryPhoto = nil
+                                    captureMode = .fridge
+                                    showPantryStep = false
+                                    routeOutOfCamera()
+                                }
+                            )
+
+                            if let state = warmupRetry {
+                                VStack(spacing: 0) {
+                                    Spacer()
+                                    WarmupRetryCard(
+                                        state: state,
+                                        onRetryNow: {
+                                            retryWarmupNow()
+                                        },
+                                        onCancel: {
+                                            cancelWarmupRetry()
+                                            isProcessing = false
+                                            processingMilestone = .idle
+                                            cameraModel.requestCameraPermission()
+                                        }
+                                    )
+                                    .padding(.horizontal, 18)
+                                    .padding(.bottom, 44)
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                                }
+                            }
+                        }
+                        .animation(MotionTuning.settleSpring(response: 0.4, damping: 0.86), value: warmupRetry != nil)
                     )
                     .onAppear {
                         cameraDebugLog("🔍 DEBUG: Showing MagicalProcessingOverlay - isProcessing: true")
@@ -278,6 +424,14 @@ struct CameraView: View {
             }
         } onRetry: {
             // Handle retry action - re-process the last captured image
+            warmupRetryAttempts = 0
+            cancelWarmupRetry()
+
+            if let fridge = fridgePhoto, let pantry = pantryPhoto {
+                processBothImages(fridgeImage: fridge, pantryImage: pantry)
+                return
+            }
+
             if let image = capturedImage {
                 processImage(image)
             }
@@ -500,6 +654,7 @@ struct CameraView: View {
         }
 
         if let fridgeImage = fridgePhoto {
+            pantryPhoto = latestCapture
             processBothImages(fridgeImage: fridgeImage, pantryImage: latestCapture)
             return
         }
@@ -629,6 +784,9 @@ struct CameraView: View {
             return
         }
 
+        warmupRetryAttempts = 0
+        cancelWarmupRetry()
+
         // Trigger capture animation
         captureAnimation = true
 
@@ -660,6 +818,7 @@ struct CameraView: View {
         cameraDebugLog("🔍 DEBUG: processImage called for single image")
         cameraDebugLog("🔍 DEBUG: Setting isProcessing = true for single image")
         isProcessing = true
+        cancelWarmupRetry()
         GrowthLoopManager.shared.resetRecipeWaitMeasurement()
         updateProcessingMilestone(.preparingRequest)
         capturedImage = image // Store the captured image
@@ -1028,11 +1187,15 @@ struct CameraView: View {
 
                     case .failure(let error):
                         cameraDebugLog("🔍 DEBUG: API FAILURE: \(error)")
+                        let mappedError = self.mapAPIErrorToSnapChefError(error)
+                        if self.beginWarmupRetryIfNeeded(for: mappedError) {
+                            return
+                        }
+
                         cameraDebugLog("🔍 DEBUG: Setting isProcessing = false due to error")
                         self.updateProcessingMilestone(.failed)
                         self.isProcessing = false
-
-                        self.currentError = self.mapAPIErrorToSnapChefError(error)
+                        self.currentError = mappedError
 
                         // Restart camera session on error
                         self.cameraModel.requestCameraPermission()
@@ -1046,9 +1209,11 @@ struct CameraView: View {
         cameraDebugLog("🔍 DEBUG: processBothImages called")
         cameraDebugLog("🔍 DEBUG: Setting isProcessing = true")
         isProcessing = true
+        cancelWarmupRetry()
         GrowthLoopManager.shared.resetRecipeWaitMeasurement()
         updateProcessingMilestone(.preparingRequest)
         capturedImage = fridgeImage // Store the fridge image as the primary image
+        pantryPhoto = pantryImage
         cameraDebugLog("🔍 DEBUG: isProcessing is now: \(isProcessing)")
         cameraDebugLog("🔍 DEBUG: capturedImage set: \(capturedImage != nil)")
 
@@ -1408,11 +1573,15 @@ struct CameraView: View {
 
                     case .failure(let error):
                         cameraDebugLog("🔍 DEBUG: API FAILURE: \(error)")
+                        let mappedError = self.mapAPIErrorToSnapChefError(error)
+                        if self.beginWarmupRetryIfNeeded(for: mappedError) {
+                            return
+                        }
+
                         cameraDebugLog("🔍 DEBUG: Setting isProcessing = false due to error")
                         self.updateProcessingMilestone(.failed)
                         self.isProcessing = false
-
-                        self.currentError = self.mapAPIErrorToSnapChefError(error)
+                        self.currentError = mappedError
 
                         // Restart camera session on error
                         self.cameraModel.requestCameraPermission()
@@ -1540,19 +1709,94 @@ struct CameraView: View {
         return value
     }
 
+    private func beginWarmupRetryIfNeeded(for error: SnapChefError) -> Bool {
+        guard case .apiError(let message, let statusCode, let recovery) = error else { return false }
+        guard statusCode == 503 else { return false }
+        guard case .retryAfter(let delay) = recovery else { return false }
+
+        // Limit auto-retries so we never loop forever.
+        guard warmupRetryAttempts < 2 else { return false }
+
+        let totalSeconds = max(3, min(60, Int(round(delay))))
+        guard totalSeconds > 0 else { return false }
+
+        // Need something to retry with.
+        guard (capturedImage != nil) || (fridgePhoto != nil && pantryPhoto != nil) else { return false }
+
+        warmupRetryAttempts += 1
+        updateProcessingMilestone(.warmingUpKitchen)
+
+        warmupRetryTask?.cancel()
+        warmupRetry = WarmupRetryState(
+            message: message,
+            totalSeconds: totalSeconds,
+            remainingSeconds: totalSeconds
+        )
+
+        Task {
+            await SnapChefAPIManager.shared.warmupBackendIfNeeded(force: true)
+        }
+
+        warmupRetryTask = Task { @MainActor in
+            while let state = warmupRetry, state.remainingSeconds > 0 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                guard var updated = warmupRetry else { return }
+                updated.remainingSeconds = max(0, updated.remainingSeconds - 1)
+                warmupRetry = updated
+            }
+
+            guard !Task.isCancelled else { return }
+            warmupRetry = nil
+            retryWarmupNow()
+        }
+
+        return true
+    }
+
+    private func retryWarmupNow() {
+        cancelWarmupRetry()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
+        if let fridge = fridgePhoto, let pantry = pantryPhoto {
+            processBothImages(fridgeImage: fridge, pantryImage: pantry)
+            return
+        }
+
+        if let image = capturedImage {
+            processImage(image)
+            return
+        }
+
+        isProcessing = false
+        updateProcessingMilestone(.idle)
+        cameraModel.requestCameraPermission()
+    }
+
+    private func cancelWarmupRetry() {
+        warmupRetryTask?.cancel()
+        warmupRetryTask = nil
+        warmupRetry = nil
+    }
+
     private func resetCaptureFlow() {
         captureMode = .fridge
         fridgePhoto = nil
+        pantryPhoto = nil
         showPantryStep = false
         capturedImage = nil
         showingPreview = false
         GrowthLoopManager.shared.resetRecipeWaitMeasurement()
         processingMilestone = .idle
+        cancelWarmupRetry()
+        warmupRetryAttempts = 0
     }
 
     private func updateProcessingMilestone(_ phase: CameraProcessingPhase) {
         processingMilestone = CameraProcessingMilestone(phase: phase)
         switch phase {
+        case .warmingUpKitchen:
+            GrowthLoopManager.shared.markRecipeWaitStarted()
         case .waitingForRecipes:
             GrowthLoopManager.shared.markRecipeWaitStarted()
         case .decodingResponse, .completed, .failed:

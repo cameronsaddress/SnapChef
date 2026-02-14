@@ -3,6 +3,7 @@ import SwiftUI
 enum CameraProcessingPhase: String, Equatable {
     case idle
     case preparingRequest
+    case warmingUpKitchen
     case uploadingPhotos
     case waitingForRecipes
     case decodingResponse
@@ -16,6 +17,8 @@ enum CameraProcessingPhase: String, Equatable {
             return "Preparing..."
         case .preparingRequest:
             return "Preparing request..."
+        case .warmingUpKitchen:
+            return "Warming up the kitchen..."
         case .uploadingPhotos:
             return "Uploading photos..."
         case .waitingForRecipes:
@@ -37,6 +40,8 @@ enum CameraProcessingPhase: String, Equatable {
             return 0.05
         case .preparingRequest:
             return 0.12
+        case .warmingUpKitchen:
+            return 0.18
         case .uploadingPhotos:
             return 0.25
         case .waitingForRecipes:

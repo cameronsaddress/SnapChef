@@ -55,13 +55,9 @@ final class CloudKitDataManager: ObservableObject {
     private init() {
         guard !Self.isRunningTests else { return }
         CloudKitRuntimeSupport.logDiagnosticsIfNeeded()
-        if CloudKitRuntimeSupport.hasCloudKitEntitlement {
-            Task { @MainActor in
-                await ensureSubscriptionsConfigured()
-            }
-        } else {
-            print("⚠️ CloudKitDataManager subscription bootstrap skipped: missing iCloud CloudKit entitlement")
-        }
+        // Intentionally do not auto-configure CloudKit subscriptions on init.
+        // Subscription setup can trigger iCloud system prompts (especially on devices/simulators
+        // without an active iCloud session). We bootstrap subscriptions only after explicit auth.
         // Removed automatic periodic sync - only sync when needed
     }
 

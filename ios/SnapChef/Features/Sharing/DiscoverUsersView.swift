@@ -1,5 +1,6 @@
 import SwiftUI
 import CloudKit
+import UIKit
 
 // MARK: - User Profile Model
 struct UserProfile: Identifiable, Codable {
@@ -664,7 +665,6 @@ class SimpleDiscoverUsersManager: ObservableObject {
 struct DiscoverUsersView: View {
     // Use shared singleton instance for preloaded data
     @StateObject private var manager = SimpleDiscoverUsersManager.shared
-    @StateObject private var iCloudStatus = iCloudStatusManager.shared
     @EnvironmentObject var appState: AppState
     @State private var searchText = ""
     @State private var selectedCategory: DiscoverCategory = .suggested
@@ -877,7 +877,7 @@ struct DiscoverUsersView: View {
 
             Spacer(minLength: 0)
 
-            Button(action: { iCloudStatus.openiCloudSettings() }) {
+            Button(action: openAppSettings) {
                 Text("Settings")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white)
@@ -903,6 +903,11 @@ struct DiscoverUsersView: View {
                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
         )
+    }
+
+    private func openAppSettings() {
+        guard let settingsUrl = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(settingsUrl)
     }
 }
 

@@ -210,112 +210,105 @@ struct ActivityFeedView: View {
 
     var body: some View {
         let _ = activityFeedDebugLog("🔍 DEBUG: ActivityFeedView body called")
-        return NavigationStack {
-            ZStack {
-                MagicalBackground()
-                    .ignoresSafeArea()
+        return ZStack {
+            MagicalBackground()
+                .ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    // Filter Pills
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(ActivityFilter.allCases, id: \.self) { filter in
-                                FilterPill(
-                                    title: filter.rawValue,
-                                    icon: filter.icon,
-                                    isSelected: selectedFilter == filter,
-                                    action: {
-                                        withAnimation(.spring(response: 0.3)) {
-                                            selectedFilter = filter
-                                        }
+            VStack(spacing: 0) {
+                // Filter Pills
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(ActivityFilter.allCases, id: \.self) { filter in
+                            FilterPill(
+                                title: filter.rawValue,
+                                icon: filter.icon,
+                                isSelected: selectedFilter == filter,
+                                action: {
+                                    withAnimation(.spring(response: 0.3)) {
+                                        selectedFilter = filter
                                     }
-                                )
+                                }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+                .padding(.vertical, 16)
+
+                // PHASE 6: Optimized loading states
+                if feedManager.showingSkeletonViews && feedManager.activities.isEmpty {
+                    // Only show skeleton for initial load when no cached data
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(0..<5, id: \.self) { _ in
+                                SkeletonActivityView()
                             }
                         }
                         .padding(.horizontal, 20)
+                        .padding(.bottom, 20)
                     }
-                    .padding(.vertical, 16)
-
-                    // PHASE 6: Optimized loading states
-                    if feedManager.showingSkeletonViews && feedManager.activities.isEmpty {
-                        // Only show skeleton for initial load when no cached data
-                        ScrollView {
-                            LazyVStack(spacing: 16) {
-                                ForEach(0..<5, id: \.self) { _ in
-                                    SkeletonActivityView()
-                                }
+                } else if feedManager.activities.isEmpty && !feedManager.isLoading {
+                    // Show empty state only when not loading
+                    EmptyActivityView()
+                } else {
+                    // Show content (with optional refresh indicator)
+                    ScrollView {
+                        // PHASE 6: Subtle refresh indicator at top when refreshing
+                        if feedManager.isLoading && !feedManager.activities.isEmpty {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .tint(.white)
+                                Text("Updating...")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.7))
                             }
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(8)
                             .padding(.horizontal, 20)
-                            .padding(.bottom, 20)
+                            .padding(.bottom, 8)
                         }
-                    } else if feedManager.activities.isEmpty && !feedManager.isLoading {
-                        // Show empty state only when not loading
-                        EmptyActivityView()
-                    } else {
-                        // Show content (with optional refresh indicator)
-                        ScrollView {
-                            // PHASE 6: Subtle refresh indicator at top when refreshing
-                            if feedManager.isLoading && !feedManager.activities.isEmpty {
-                                HStack {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                        .tint(.white)
-                                    Text("Updating...")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.white.opacity(0.7))
+                        
+                        LazyVStack(spacing: 16) {
+                            ForEach(filteredActivities) { activity in
+                                Button(action: {
+                                    handleActivityTap(activity)
+                                }) {
+                                    ActivityItemView(activity: activity)
                                 }
-                                .padding(.vertical, 8)
-                                .frame(maxWidth: .infinity)
-                                .background(Color.white.opacity(0.1))
-                                .cornerRadius(8)
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 8)
-                            }
-                            
-                            LazyVStack(spacing: 16) {
-                                ForEach(filteredActivities) { activity in
-                                    Button(action: {
-                                        handleActivityTap(activity)
-                                    }) {
-                                        ActivityItemView(activity: activity)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .onAppear {
-                                        // Mark activity as read when it appears on screen
-                                        if !activity.isRead {
-                                            Task {
-                                                await feedManager.markActivityAsRead(activity.id)
-                                            }
+                                .buttonStyle(PlainButtonStyle())
+                                .onAppear {
+                                    // Mark activity as read when it appears on screen
+                                    if !activity.isRead, UnifiedAuthManager.shared.isAuthenticated {
+                                        Task {
+                                            await feedManager.markActivityAsRead(activity.id)
                                         }
-                                        
-                                        // Load more when approaching end
-                                        if activity.id == filteredActivities.last?.id {
-                                            Task {
-                                                await feedManager.loadMore()
-                                            }
+                                    }
+                                    
+                                    // Load more when approaching end
+                                    if activity.id == filteredActivities.last?.id {
+                                        Task {
+                                            await feedManager.loadMore()
                                         }
                                     }
                                 }
-
-                                if feedManager.hasMore && feedManager.isLoading {
-                                    ProgressView()
-                                        .tint(.white)
-                                        .padding()
-                                }
                             }
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 20)
+
+                            if feedManager.hasMore && feedManager.isLoading {
+                                ProgressView()
+                                    .tint(.white)
+                                    .padding()
+                            }
                         }
-                        .refreshable {
-                            await feedManager.refresh()
-                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 20)
+                    }
+                    .refreshable {
+                        await feedManager.refresh()
                     }
                 }
-            }
-            .navigationTitle("Activity")
-            .navigationBarTitleDisplayMode(.large)
-            .refreshable {
-                await feedManager.refresh()
             }
         }
         .onAppear {
@@ -921,15 +914,21 @@ class ActivityFeedManager: ObservableObject {
             return
         }
 
-        guard let currentUser = UnifiedAuthManager.shared.currentUser,
-              let userID = currentUser.recordID else {
-            print("❌ No authenticated user for activity fetch")
-            return
-        }
-        
         // Get the timestamp of our newest local activity
         let newestTimestamp = activities.first?.timestamp ?? Date.distantPast
         print("🔍 Fetching activities newer than: \(newestTimestamp)")
+
+        // Guest mode: keep the feed snappy and avoid iCloud system prompts.
+        // We show curated demo activities until the user signs in.
+        guard UnifiedAuthManager.shared.isAuthenticated,
+              let currentUser = UnifiedAuthManager.shared.currentUser,
+              let userID = currentUser.recordID else {
+            if activities.isEmpty {
+                activities = generateMockActivities()
+            }
+            hasMore = false
+            return
+        }
         
         do {
             // Fetch followed users

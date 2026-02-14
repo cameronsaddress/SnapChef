@@ -100,6 +100,7 @@ struct SnapChefApp: App {
                     guard cloudKitRuntimeEnabled else { return }
                     guard isAuthenticated else { return }
                     Task { @MainActor in
+                        cloudKitService.bootstrapIfNeeded()
                         socialShareManager.markReferralConversionIfEligible()
                         await socialShareManager.claimReferrerRewardsIfEligible()
                         await cloudKitDataManager.ensureSubscriptionsConfigured()
@@ -114,6 +115,7 @@ struct SnapChefApp: App {
 
                         // Preload fresh data when coming to foreground
                         if cloudKitRuntimeEnabled, UnifiedAuthManager.shared.isAuthenticated {
+                            cloudKitService.bootstrapIfNeeded()
                             await cloudKitDataManager.ensureSubscriptionsConfigured()
                             await ActivityFeedManager.shared.preloadInBackground()
                             await SimpleDiscoverUsersManager.shared.loadUsers(for: .suggested)
@@ -141,12 +143,14 @@ struct SnapChefApp: App {
             }
         }
 
-        // Check CloudKit environment (determined by Xcode build configuration)
-        if cloudKitRuntimeEnabled {
+        // CloudKit environment logging can trigger iCloud system prompts (account status checks).
+        // Keep app startup quiet; developers can enable explicitly when debugging.
+        #if DEBUG
+        if cloudKitRuntimeEnabled,
+           ProcessInfo.processInfo.environment["SNAPCHEF_DEBUG_CLOUDKIT_ENV"] == "1" {
             detectCloudKitEnvironment()
-        } else {
-            print("⚠️ CloudKit runtime disabled: missing iCloud CloudKit entitlement")
         }
+        #endif
 
         // Set default LLM provider to Gemini if not already set
         if UserDefaults.standard.object(forKey: "SelectedLLMProvider") == nil {
@@ -260,8 +264,8 @@ struct SnapChefApp: App {
                 print("✅ RecipeLikeManager initialized with user's liked recipes")
             }
             
-            // Check iCloud status for progressive auth
-            await iCloudStatusManager.shared.checkiCloudStatus()
+            // Intentionally avoid iCloud/CloudKit account status checks on app launch.
+            // These can trigger intrusive system prompts ("Apple Account Verification").
             
             // Track daily app usage and update streak
             if UnifiedAuthManager.shared.isAuthenticated {
@@ -502,58 +506,28 @@ struct SnapChefApp: App {
     
     private func detectCloudKitEnvironment() {
         guard cloudKitRuntimeEnabled else { return }
-        // The CloudKit environment is determined by Xcode's build configuration
-        // Debug builds use Development, Release/TestFlight/App Store use Production
-        
-        guard let container = CloudKitRuntimeSupport.makeContainer() else {
-            print("⚠️ CloudKit environment detection skipped: container unavailable")
-            return
-        }
-        
-        // Check account status to verify CloudKit is available
-        container.accountStatus { status, error in
-            var environmentString = ""
-            
-            // Determine environment based on build configuration
-            #if DEBUG
-                environmentString = "🔧 CloudKit Environment: DEVELOPMENT"
-                print("════════════════════════════════════════════════")
-                print(environmentString)
-                print("   Container: iCloud.com.snapchefapp.app")
-                print("   Build Config: Debug")
-                print("   Note: Using CloudKit Development database")
-                print("════════════════════════════════════════════════")
-            #else
-                environmentString = "🚀 CloudKit Environment: PRODUCTION"
-                print("════════════════════════════════════════════════")
-                print(environmentString)
-                print("   Container: iCloud.com.snapchefapp.app")
-                print("   Build Config: Release/Archive")
-                print("   Note: Using CloudKit Production database")
-                print("════════════════════════════════════════════════")
-            #endif
-            
-            // Also show account status
-            switch status {
-            case .available:
-                print("✅ CloudKit Account: Available")
-            case .noAccount:
-                print("⚠️ CloudKit Account: No iCloud account")
-            case .restricted:
-                print("⚠️ CloudKit Account: Restricted")
-            case .couldNotDetermine:
-                print("❌ CloudKit Account: Could not determine")
-                if let error = error {
-                    print("   Error: \(error.localizedDescription)")
-                }
-            case .temporarilyUnavailable:
-                print("⚠️ CloudKit Account: Temporarily unavailable")
-            @unknown default:
-                print("❓ CloudKit Account: Unknown status")
-            }
-            
-            print("════════════════════════════════════════════════")
-        }
+        // The CloudKit environment is determined by Xcode's build configuration:
+        // Debug builds use Development, Release/TestFlight/App Store use Production.
+        //
+        // IMPORTANT: Avoid calling `CKContainer.accountStatus` here. It can trigger iCloud system
+        // prompts, which we explicitly avoid during normal app startup.
+
+        var environmentString = ""
+
+        #if DEBUG
+        environmentString = "🔧 CloudKit Environment: DEVELOPMENT"
+        #else
+        environmentString = "🚀 CloudKit Environment: PRODUCTION"
+        #endif
+
+        let tokenPresent = FileManager.default.ubiquityIdentityToken != nil
+
+        print("════════════════════════════════════════════════")
+        print(environmentString)
+        print("   Container: \(CloudKitRuntimeSupport.resolvedContainerIdentifier)")
+        print("   iCloud Identity Token: \(tokenPresent ? "present" : "missing")")
+        print("   UnifiedAuth: \(UnifiedAuthManager.shared.isAuthenticated ? "authenticated" : "guest")")
+        print("════════════════════════════════════════════════")
     }
     
     // MARK: - Local-First Migration

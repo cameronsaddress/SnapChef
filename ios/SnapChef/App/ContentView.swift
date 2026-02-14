@@ -72,168 +72,164 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        // Single NavigationStack at the root level
-        NavigationStack {
-            ZStack {
-                // Content based on selected tab
-                Group {
-                    switch AppTab(rawValue: selectedTab) ?? .home {
-                    case .home:
-                        HomeView()
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                removal: .opacity.combined(with: .scale(scale: 1.02))
-                            ))
-                    case .camera:
-                        CameraView(selectedTab: $selectedTab)
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                removal: .opacity.combined(with: .scale(scale: 1.02))
-                            ))
-                    case .detective:
-                        DetectiveView()
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                removal: .opacity.combined(with: .scale(scale: 1.02))
-                            ))
-                    case .recipes:
-                        RecipesView(selectedTab: $selectedTab)
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                removal: .opacity.combined(with: .scale(scale: 1.02))
-                            ))
-                    case .socialFeed:
-                        SocialFeedView()
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                removal: .opacity.combined(with: .scale(scale: 1.02))
-                            ))
-                    case .profile:
-                        ProfileView()
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98)),
-                                removal: .opacity.combined(with: .scale(scale: 1.02))
-                            ))
-                    }
-                }
-                .offset(x: tabContentOffset)
-                .scaleEffect(isTabTransitioning ? 0.994 : 1.0)
-
-                // Custom morphing tab bar (hide when camera is selected)
-                if selectedTab != AppTab.camera.rawValue {
-                    VStack {
-                        Spacer()
-
-                        MorphingTabBar(selectedTab: $selectedTab, onTabSelection: handleTabSelection)
-                            .padding(.horizontal, 30)
-                            .padding(.bottom, 30)
-                            .shadow(
-                                color: Color.black.opacity(0.2),
-                                radius: 20,
-                                y: 10
-                            )
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-
-                if showTabMoment {
-                    VStack {
-                        KeyMomentChip(
-                            title: tabMomentLabel,
-                            icon: tabMomentIcon,
-                            color: tabMomentColor
-                        )
-                        .padding(.top, 16)
-                        Spacer()
-                    }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(20)
-                }
-
-                if let moment = heroMomentCenter.currentMoment {
-                    VStack {
-                        HeroMomentBanner(moment: moment)
-                            .padding(.top, 12)
-                        Spacer()
-                    }
-                    .id(moment.id)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(25)
-                    .allowsHitTesting(false)
-                }
-
-                if let burst = celebrationBurst {
-                    CelebrationConfettiOverlay(
-                        tint: burst.tint,
-                        accent: burst.accent,
-                        pieceCount: burst.pieceCount,
-                        spread: burst.spread,
-                        duration: burst.duration
-                    )
-                    .id(burst.id)
-                    .transition(.opacity)
-                    .zIndex(24)
-                    .allowsHitTesting(false)
-                }
-
-                if let milestoneCelebration {
-                    MilestoneCelebrationOverlay(
-                        milestone: milestoneCelebration.milestone,
-                        conversions: milestoneCelebration.conversions,
-                        tint: milestoneCelebration.tint,
-                        accent: milestoneCelebration.accent
-                    )
-                    .id(milestoneCelebration.id)
-                    .transition(.opacity.combined(with: .scale(scale: 1.02)))
-                    .zIndex(26)
-                    .allowsHitTesting(false)
-                }
-
-                if tabFlashOpacity > 0.001 {
-                    LinearGradient(
-                        colors: [
-                            .clear,
-                            tabFlashColor.opacity(0.5),
-                            .clear
-                        ],
-                        startPoint: tabTransitionDirection > 0 ? .leading : .trailing,
-                        endPoint: tabTransitionDirection > 0 ? .trailing : .leading
-                    )
-                    .ignoresSafeArea()
-                    .blendMode(.screen)
-                    .opacity(tabFlashOpacity)
-                    .allowsHitTesting(false)
-                    .zIndex(10)
-                }
-
-                if let launch = tabLaunchOverlay {
-                    StudioTabLaunchOverlay(
-                        title: launch.title,
-                        icon: launch.icon,
-                        tint: launch.color
-                    )
-                    .id(launch.id)
-                    .transition(.opacity.combined(with: .scale(scale: 1.04)))
-                    .zIndex(28)
-                    .allowsHitTesting(false)
+        ZStack {
+            // Content based on selected tab
+            Group {
+                switch AppTab(rawValue: selectedTab) ?? .home {
+                case .home:
+                    HomeView()
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                            removal: .opacity.combined(with: .scale(scale: 1.02))
+                        ))
+                case .camera:
+                    CameraView(selectedTab: $selectedTab)
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                            removal: .opacity.combined(with: .scale(scale: 1.02))
+                        ))
+                case .detective:
+                    DetectiveView()
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                            removal: .opacity.combined(with: .scale(scale: 1.02))
+                        ))
+                case .recipes:
+                    RecipesView(selectedTab: $selectedTab)
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                            removal: .opacity.combined(with: .scale(scale: 1.02))
+                        ))
+                case .socialFeed:
+                    SocialFeedView()
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                            removal: .opacity.combined(with: .scale(scale: 1.02))
+                        ))
+                case .profile:
+                    ProfileView()
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                            removal: .opacity.combined(with: .scale(scale: 1.02))
+                        ))
                 }
             }
-            .navigationBarHidden(true) // Hide the default navigation bar
-            .overlayPreferenceValue(ViralCoachSpotlightAnchorsKey.self) { anchors in
-                GeometryReader { proxy in
-                    if let step = viralCoachStep {
-                        ViralCoachMarksOverlay(
-                            step: step,
-                            index: step.rawValue + 1,
-                            total: ViralCoachStep.allCases.count,
-                            spotlightRect: spotlightRect(for: step, anchors: anchors, proxy: proxy),
-                            onPrimary: handleViralCoachPrimaryAction,
-                            onSkip: skipViralCoach
+            .offset(x: tabContentOffset)
+            .scaleEffect(isTabTransitioning ? 0.994 : 1.0)
+
+            // Custom morphing tab bar (hide when camera is selected)
+            if selectedTab != AppTab.camera.rawValue {
+                VStack {
+                    Spacer()
+
+                    MorphingTabBar(selectedTab: $selectedTab, onTabSelection: handleTabSelection)
+                        .padding(.horizontal, 30)
+                        .padding(.bottom, 30)
+                        .shadow(
+                            color: Color.black.opacity(0.2),
+                            radius: 20,
+                            y: 10
                         )
-                        .id(step.rawValue)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                        .zIndex(30)
-                    }
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            if showTabMoment {
+                VStack {
+                    KeyMomentChip(
+                        title: tabMomentLabel,
+                        icon: tabMomentIcon,
+                        color: tabMomentColor
+                    )
+                    .padding(.top, 16)
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(20)
+            }
+
+            if let moment = heroMomentCenter.currentMoment {
+                VStack {
+                    HeroMomentBanner(moment: moment)
+                        .padding(.top, 12)
+                    Spacer()
+                }
+                .id(moment.id)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(25)
+                .allowsHitTesting(false)
+            }
+
+            if let burst = celebrationBurst {
+                CelebrationConfettiOverlay(
+                    tint: burst.tint,
+                    accent: burst.accent,
+                    pieceCount: burst.pieceCount,
+                    spread: burst.spread,
+                    duration: burst.duration
+                )
+                .id(burst.id)
+                .transition(.opacity)
+                .zIndex(24)
+                .allowsHitTesting(false)
+            }
+
+            if let milestoneCelebration {
+                MilestoneCelebrationOverlay(
+                    milestone: milestoneCelebration.milestone,
+                    conversions: milestoneCelebration.conversions,
+                    tint: milestoneCelebration.tint,
+                    accent: milestoneCelebration.accent
+                )
+                .id(milestoneCelebration.id)
+                .transition(.opacity.combined(with: .scale(scale: 1.02)))
+                .zIndex(26)
+                .allowsHitTesting(false)
+            }
+
+            if tabFlashOpacity > 0.001 {
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        tabFlashColor.opacity(0.5),
+                        .clear
+                    ],
+                    startPoint: tabTransitionDirection > 0 ? .leading : .trailing,
+                    endPoint: tabTransitionDirection > 0 ? .trailing : .leading
+                )
+                .ignoresSafeArea()
+                .blendMode(.screen)
+                .opacity(tabFlashOpacity)
+                .allowsHitTesting(false)
+                .zIndex(10)
+            }
+
+            if let launch = tabLaunchOverlay {
+                StudioTabLaunchOverlay(
+                    title: launch.title,
+                    icon: launch.icon,
+                    tint: launch.color
+                )
+                .id(launch.id)
+                .transition(.opacity.combined(with: .scale(scale: 1.04)))
+                .zIndex(28)
+                .allowsHitTesting(false)
+            }
+        }
+        .overlayPreferenceValue(ViralCoachSpotlightAnchorsKey.self) { anchors in
+            GeometryReader { proxy in
+                if let step = viralCoachStep {
+                    ViralCoachMarksOverlay(
+                        step: step,
+                        index: step.rawValue + 1,
+                        total: ViralCoachStep.allCases.count,
+                        spotlightRect: spotlightRect(for: step, anchors: anchors, proxy: proxy),
+                        onPrimary: handleViralCoachPrimaryAction,
+                        onSkip: skipViralCoach
+                    )
+                    .id(step.rawValue)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .zIndex(30)
                 }
             }
         }

@@ -60,6 +60,7 @@ final class CloudKitService: ObservableObject {
     
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
+    private var didBootstrap = false
     
     // MARK: - Initialization
     private init() {
@@ -93,7 +94,6 @@ final class CloudKitService: ObservableObject {
         self.syncModule = SyncModule(container: container, publicDB: container.publicCloudDatabase, privateDB: container.privateCloudDatabase, parent: self)
         
         setupModuleBindings()
-        setupInitialConfiguration()
     }
 
     private func requireModule<T>(_ module: T?, operation: String) throws -> T {
@@ -131,41 +131,21 @@ final class CloudKitService: ObservableObject {
             .store(in: &cancellables)
     }
     
-    private func setupInitialConfiguration() {
+    // MARK: - Bootstrap
+
+    /// Lazily bootstraps CloudKit modules that may trigger iCloud system prompts.
+    ///
+    /// Calling `CKContainer.accountStatus` / subscription setup can cause iOS to display
+    /// Apple Account/iCloud verification prompts. We keep startup "quiet" and only bootstrap
+    /// once the user has explicitly authenticated or entered CloudKit-required flows.
+    func bootstrapIfNeeded() {
+        guard !didBootstrap else { return }
+        didBootstrap = true
+
         authModule?.checkAuthStatus()
         setupSubscriptions()
-        checkAccountStatus()
     }
-    
-    // MARK: - Account Status
-    private func checkAccountStatus() {
-        guard let container else { return }
-        container.accountStatus { [weak self] status, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    self?.syncError = error
-                    print("CloudKit account status error: \(error)")
-                    return
-                }
-                
-                switch status {
-                case .available:
-                    print("CloudKit account available")
-                case .noAccount:
-                    print("No CloudKit account")
-                case .restricted:
-                    print("CloudKit access restricted")
-                case .couldNotDetermine:
-                    print("Could not determine CloudKit status")
-                case .temporarilyUnavailable:
-                    print("CloudKit temporarily unavailable")
-                @unknown default:
-                    print("Unknown CloudKit status")
-                }
-            }
-        }
-    }
-    
+
     // MARK: - Subscriptions
     private func setupSubscriptions() {
         syncModule?.setupSubscriptions()

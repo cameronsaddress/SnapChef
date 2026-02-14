@@ -257,22 +257,38 @@ struct UserProfileView: View {
     // MARK: - Follow Button
     private func followButton(userID: String) -> some View {
         Button(action: {
+            if !cloudKitAuth.isAuthenticated {
+                UnifiedAuthManager.shared.promptAuthForFeature(.socialSharing)
+                return
+            }
+
             Task {
                 await viewModel.toggleFollow(userID: userID)
             }
         }) {
             HStack(spacing: 8) {
-                Image(systemName: viewModel.isFollowing ? "person.badge.minus" : "person.badge.plus")
-                    .font(.system(size: 16, weight: .semibold))
-                Text(viewModel.isFollowing ? "Unfollow" : "Follow")
-                    .font(.system(size: 16, weight: .semibold))
+                if cloudKitAuth.isAuthenticated {
+                    Image(systemName: viewModel.isFollowing ? "person.badge.minus" : "person.badge.plus")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text(viewModel.isFollowing ? "Unfollow" : "Follow")
+                        .font(.system(size: 16, weight: .semibold))
+                } else {
+                    Image(systemName: "person.badge.plus")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Sign In to Follow")
+                        .font(.system(size: 16, weight: .semibold))
+                }
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(viewModel.isFollowing ? Color.gray.opacity(0.3) : Color(hex: "#667eea"))
+                    .fill(
+                        cloudKitAuth.isAuthenticated
+                            ? (viewModel.isFollowing ? Color.gray.opacity(0.3) : Color(hex: "#667eea"))
+                            : Color(hex: "#667eea")
+                    )
             )
         }
         .disabled(viewModel.isLoadingFollow)
