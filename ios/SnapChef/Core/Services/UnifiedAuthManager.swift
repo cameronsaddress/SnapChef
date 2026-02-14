@@ -114,17 +114,16 @@ final class UnifiedAuthManager: ObservableObject {
             return
         }
 
-        // Check CloudKit auth - silently on app launch
+        // IMPORTANT (production):
+        // Avoid making *any* CloudKit network calls at app launch. CloudKit account checks can trigger
+        // iOS system prompts ("Apple Account Verification") unexpectedly, which is a bad UX.
+        //
+        // If the user previously authenticated, we keep their IDs on disk but only attempt CloudKit
+        // restoration when they explicitly opt into social/sync features (user-initiated action).
         if let storedUserID = UserDefaults.standard.string(forKey: "currentUserRecordID") {
-            print("🔍 Found stored CloudKit userRecordID: \(storedUserID)")
-            Task {
-                await loadCloudKitUser(recordID: storedUserID, silent: true)
-            }
+            print("🔍 Found stored CloudKit userRecordID (deferred restore): \(storedUserID)")
         } else if let legacyUserID = UserDefaults.standard.string(forKey: "currentUserID") {
-            print("🔍 Found legacy currentUserID: \(legacyUserID)")
-            Task {
-                await loadCloudKitUser(recordID: legacyUserID, silent: true)
-            }
+            print("🔍 Found legacy currentUserID (deferred restore): \(legacyUserID)")
         } else {
             print("ℹ️ No stored CloudKit user ID found")
         }
@@ -1345,7 +1344,7 @@ final class UnifiedAuthManager: ObservableObject {
             return
         }
 
-        guard let container = cloudKitContainer,
+        guard cloudKitContainer != nil,
               let database = cloudKitDatabase else {
             print("⚠️ UnifiedAuthManager.loadCloudKitUser: CloudKit container unavailable")
             if !silent {
@@ -1355,17 +1354,6 @@ final class UnifiedAuthManager: ObservableObject {
         }
 
         do {
-            // First verify CloudKit account is still available
-            let accountStatus = try await container.accountStatus()
-            guard accountStatus == .available else {
-                print("⚠️ CloudKit account not available, status: \(accountStatus)")
-                // Only clear auth and show errors if not silent (user-initiated action)
-                if !silent {
-                    await clearStoredAuth()
-                }
-                return
-            }
-            
             // Use compound key for user records
             let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
             
