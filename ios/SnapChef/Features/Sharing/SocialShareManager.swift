@@ -653,25 +653,58 @@ class SocialShareManager: ObservableObject {
     // MARK: - Referral Parsing
 
     private func extractTabDestination(from url: URL) -> AppTab? {
-        guard url.scheme?.lowercased() == "snapchef" else { return nil }
-
+        let scheme = (url.scheme ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let host = (url.host ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        switch host {
-        case "home":
-            return .home
-        case "camera", "snap":
-            return .camera
-        case "detective":
-            return .detective
-        case "recipes":
-            return .recipes
-        case "feed", "social", "community":
-            return .socialFeed
-        case "profile", "me":
-            return .profile
-        default:
-            return nil
+
+        if scheme == "snapchef" {
+            switch host {
+            case "home":
+                return .home
+            case "camera", "snap":
+                return .camera
+            case "detective":
+                return .detective
+            case "recipes":
+                return .recipes
+            case "feed", "social", "community":
+                return .socialFeed
+            case "profile", "me":
+                return .profile
+            default:
+                return nil
+            }
         }
+
+        // Support universal links when Associated Domains are enabled.
+        if scheme == "https",
+           host == "snapchef.app" || host == "www.snapchef.app" {
+            let pathParts = url.pathComponents
+                .filter { $0 != "/" }
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+
+            guard let first = pathParts.first else { return .home }
+            switch first {
+            case "home":
+                return .home
+            case "camera", "snap":
+                return .camera
+            case "detective":
+                return .detective
+            case "recipes":
+                return .recipes
+            case "feed", "social", "community":
+                return .socialFeed
+            case "profile", "me":
+                return .profile
+            case "leaderboard":
+                // Leaderboard lives inside the challenges area; route to Profile for now.
+                return .profile
+            default:
+                return nil
+            }
+        }
+
+        return nil
     }
     
     private func extractRecipeID(from url: URL) -> String? {

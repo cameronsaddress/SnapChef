@@ -72,6 +72,17 @@ public struct ShareContent: Sendable {
         self.beforeImage = beforeImage
         self.afterImage = afterImage
 
+        func universalLink(_ path: String, queryItems: [URLQueryItem] = []) -> URL? {
+            var components = URLComponents()
+            components.scheme = "https"
+            components.host = "snapchef.app"
+            components.path = path.hasPrefix("/") ? path : "/\(path)"
+            if !queryItems.isEmpty {
+                components.queryItems = queryItems
+            }
+            return components.url
+        }
+
         // Generate content based on type or use provided text
         switch type {
         case .recipe(let recipe):
@@ -81,7 +92,7 @@ public struct ShareContent: Sendable {
             ⏱ Ready in just \(recipe.prepTime + recipe.cookTime) minutes
             """
             self.hashtags = ["SnapChef", "FridgeChallenge", "HomeCooking", recipe.difficulty.rawValue + "Recipe"]
-            self.deepLink = URL(string: "snapchef://recipe/\(recipe.id)")
+            self.deepLink = universalLink("/recipe/\(recipe.id.uuidString)")
 
         case .challenge(let challenge):
             self.text = text ?? """
@@ -89,7 +100,7 @@ public struct ShareContent: Sendable {
             Just crushed the "\(challenge.title)" challenge on SnapChef!
             """
             self.hashtags = ["SnapChef", "CookingChallenge", "ChefLife"]
-            self.deepLink = URL(string: "snapchef://challenge/\(challenge.id)")
+            self.deepLink = universalLink("/challenge/\(challenge.id)")
 
         case .achievement(let badge):
             self.text = text ?? """
@@ -97,7 +108,8 @@ public struct ShareContent: Sendable {
             Just earned the \(badge) badge on SnapChef!
             """
             self.hashtags = ["SnapChef", "Achievement", "CookingGoals"]
-            self.deepLink = URL(string: "snapchef://achievements")
+            let encoded = badge.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "achievement"
+            self.deepLink = universalLink("/achievement/\(encoded)")
 
         case .profile:
             self.text = text ?? """
@@ -105,7 +117,7 @@ public struct ShareContent: Sendable {
             Follow me for amazing recipes and cooking challenges.
             """
             self.hashtags = ["SnapChef", "FollowMe", "ChefProfile"]
-            self.deepLink = URL(string: "snapchef://profile")
+            self.deepLink = universalLink("/profile")
 
         case .teamInvite(let teamName, let joinCode):
             self.text = text ?? """
@@ -116,7 +128,7 @@ public struct ShareContent: Sendable {
             Let's compete together in cooking challenges!
             """
             self.hashtags = ["SnapChef", "TeamChallenge", "CookingTeam"]
-            self.deepLink = URL(string: "snapchef://team/join/\(joinCode)")
+            self.deepLink = universalLink("/team/join", queryItems: [URLQueryItem(name: "code", value: joinCode)])
             
         case .leaderboard:
             self.text = text ?? """
@@ -124,7 +136,7 @@ public struct ShareContent: Sendable {
             See who's the top chef this week!
             """
             self.hashtags = ["SnapChef", "Leaderboard", "TopChef", "CookingChallenge"]
-            self.deepLink = URL(string: "snapchef://leaderboard")
+            self.deepLink = universalLink("/leaderboard")
         }
     }
 }
@@ -462,10 +474,8 @@ class ShareService: ObservableObject {
             items.append(image)
         }
 
-        // Add URL
-        if let url = content.deepLink {
-            items.append(url)
-        }
+        // Add URL (always include a tracked universal link to avoid custom-scheme prompts).
+        items.append(trackedShareURL(for: content))
 
         // Use the new ShareSheetPresenter to avoid conflicts
         ShareSheetPresenter.shared.present(items: items)

@@ -2,6 +2,15 @@ import SwiftUI
 import CloudKit
 import UIKit
 
+private let recipeDetailDebugLoggingEnabled = false
+
+private func recipeDetailDebugLog(_ message: @autoclosure () -> String) {
+#if DEBUG
+    guard recipeDetailDebugLoggingEnabled else { return }
+    print(message())
+#endif
+}
+
 struct RecipeDetailView: View {
     let recipe: Recipe
     var cloudKitRecipe: CloudKitRecipe?
@@ -33,6 +42,7 @@ struct RecipeDetailView: View {
     
     enum AuthAction {
         case like
+        case comment
     }
     
     // MARK: - ViewBuilder Helper Functions
@@ -791,77 +801,10 @@ struct RecipeDetailView: View {
                 Text("Are you sure you want to delete \"\(recipe.name)\"? This action cannot be undone.")
             }
             .onAppear {
-                print("🎯 RECIPEDETAILVIEW ONAPPEAR TRIGGERED")
-                print("🔍 DEBUG: RecipeDetailView appeared for recipe: \(recipe.name)")
-                print("🔍 RECIPE MEMORY ADDRESS: \(Unmanaged.passUnretained(recipe as AnyObject).toOpaque())")
-                print("🔍 RECIPE BASIC FIELDS:")
-                print("🔍   - name: \"\(recipe.name)\" (isEmpty: \(recipe.name.isEmpty))")
-                print("🔍   - description: \"\(recipe.description)\" (isEmpty: \(recipe.description.isEmpty))")
-                print("🔍   - ingredients count: \(recipe.ingredients.count)")
-                if recipe.ingredients.isEmpty {
-                    print("🔍   - ⚠️ INGREDIENTS ARRAY IS EMPTY!")
-                } else {
-                    print("🔍   - First 3 ingredients: \(recipe.ingredients.prefix(3).map { $0.name })")
-                }
-                print("🔍   - instructions count: \(recipe.instructions.count)")
-                if recipe.instructions.isEmpty {
-                    print("🔍   - ⚠️ INSTRUCTIONS ARRAY IS EMPTY!")
-                } else {
-                    print("🔍   - First instruction: \(recipe.instructions.first ?? "nil")")
-                }
-                print("🔍   - prepTime: \(recipe.prepTime), cookTime: \(recipe.cookTime)")
-                print("🔍   - servings: \(recipe.servings)")
-                print("🔍   - difficulty: \(recipe.difficulty.rawValue)")
-                print("🔍   - nutrition calories: \(recipe.nutrition.calories)")
-                
-                print("🔍 RECIPE ENHANCED FIELDS:")
-                print("🔍   - cookingTechniques: \(recipe.cookingTechniques.isEmpty ? "EMPTY" : "\(recipe.cookingTechniques)")")
-                print("🔍   - flavorProfile: \(recipe.flavorProfile != nil ? "PRESENT" : "NIL")")
-                if let fp = recipe.flavorProfile {
-                    print("🔍     • sweet: \(fp.sweet), salty: \(fp.salty), sour: \(fp.sour), bitter: \(fp.bitter), umami: \(fp.umami)")
-                }
-                print("🔍   - secretIngredients: \(recipe.secretIngredients.isEmpty ? "EMPTY" : "\(recipe.secretIngredients)")")
-                print("🔍   - proTips: \(recipe.proTips.isEmpty ? "EMPTY" : "\(recipe.proTips)")")
-                print("🔍   - visualClues: \(recipe.visualClues.isEmpty ? "EMPTY" : "\(recipe.visualClues)")")
-                print("🔍   - shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : String(describing: recipe.shareCaption))")
-                print("🔍   - isDetectiveRecipe: \(recipe.isDetectiveRecipe ?? false)")
-                
-                print("🔍 DIETARY INFO:")
-                print("🔍   - isVegetarian: \(recipe.dietaryInfo.isVegetarian)")
-                print("🔍   - isVegan: \(recipe.dietaryInfo.isVegan)")
-                print("🔍   - isGlutenFree: \(recipe.dietaryInfo.isGlutenFree)")
-                print("🔍   - isDairyFree: \(recipe.dietaryInfo.isDairyFree)")
-                
-                print("🔍 UI SECTIONS VISIBILITY:")
-                print("🔍   - headerSection will show: Recipe name and basic info")
-                print("🔍   - ingredientsSection will show: \(recipe.ingredients.count) ingredients")
-                print("🔍   - instructionsSection will show: \(recipe.instructions.count) steps")
-                print("🔍   - cookingTechniquesSection will show: \(!recipe.cookingTechniques.isEmpty)")
-                print("🔍   - secretIngredientsSection will show: \(!recipe.secretIngredients.isEmpty)")
-                print("🔍   - proTipsSection will show: \(!recipe.proTips.isEmpty)")
-                print("🔍   - visualCluesSection will show: \(!recipe.visualClues.isEmpty)")
-                print("🔍   - nutritionSection will show: Always (calories: \(recipe.nutrition.calories))")
-                
-                print("🔍 VALIDATION CHECK:")
-                print("🔍   - Recipe should display properly: \(!recipe.name.isEmpty && (!recipe.ingredients.isEmpty || !recipe.instructions.isEmpty))")
-                if recipe.name.isEmpty {
-                    print("🚨 CRITICAL: Recipe name is empty - this will cause UI issues!")
-                }
-                if recipe.ingredients.isEmpty && recipe.instructions.isEmpty {
-                    print("🚨 CRITICAL: Both ingredients and instructions are empty - recipe will appear blank!")
-                }
+                recipeDetailDebugLog("RecipeDetailView appeared: '\(recipe.name)' id=\(recipe.id.uuidString) ingredients=\(recipe.ingredients.count) instructions=\(recipe.instructions.count)")
             }
             .task {
                 await loadAuthorInfo()
-                
-                print("🔍 RecipeDetailView: Loading comments for recipe: \(recipe.name) (ID: \(recipe.id.uuidString))")
-                print("🔍 Authentication status: \(cloudKitAuth.isAuthenticated)")
-                if let user = cloudKitAuth.currentUser {
-                    print("🔍 Current user: \(String(describing: user.displayName)) (ID: \(String(describing: user.recordID)))")
-                } else {
-                    print("🔍 No current user found")
-                }
-                
                 await commentsViewModel.loadComments(for: recipe.id.uuidString)
             }
         }
@@ -927,23 +870,40 @@ struct RecipeDetailView: View {
         switch action {
         case .like:
             toggleLike()
+        case .comment:
+            submitComment()
         }
     }
 
 
     private func loadAuthorInfo() async {
         guard let cloudKitRecipe = cloudKitRecipe, !cloudKitRecipe.ownerID.isEmpty else { return }
+        // Avoid triggering iCloud system prompts in guest/offline flows.
+        guard FileManager.default.ubiquityIdentityToken != nil else { return }
 
-        do {
-            guard let container = CloudKitRuntimeSupport.makeContainer() else { return }
-            let database = container.publicCloudDatabase
-            let record = try await database.record(for: CKRecord.ID(recordName: cloudKitRecipe.ownerID))
-            let user = CloudKitUser(from: record)
-            await MainActor.run {
-                authorName = user.displayName
+        guard let container = CloudKitRuntimeSupport.makeContainer() else { return }
+        let database = container.publicCloudDatabase
+        let rawOwnerID = cloudKitRecipe.ownerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawOwnerID.isEmpty else { return }
+
+        let preferredRecordName = rawOwnerID.hasPrefix("user_") ? rawOwnerID : "user_\(rawOwnerID)"
+        var recordNamesToTry: [String] = []
+        for candidate in [preferredRecordName, rawOwnerID] {
+            if !recordNamesToTry.contains(candidate) {
+                recordNamesToTry.append(candidate)
             }
-        } catch {
-            print("Failed to load author info: \(error)")
+        }
+
+        for recordName in recordNamesToTry {
+            do {
+                let record = try await database.record(for: CKRecord.ID(recordName: recordName))
+                let user = CloudKitUser(from: record)
+                authorName = user.displayName
+                break
+            } catch {
+                // Try next candidate.
+                continue
+            }
         }
     }
 
@@ -953,17 +913,16 @@ struct RecipeDetailView: View {
         
         // Check if user is authenticated
         guard cloudKitAuth.isAuthenticated else {
-            print("❌ Cannot submit comment: User not authenticated")
-            // TODO: Show authentication prompt
+            pendingAuthAction = .comment
+            showAuthPrompt = true
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.warning)
             return
         }
 
         Task {
             isSubmittingComment = true
             defer { isSubmittingComment = false }
-
-            print("🔍 Submitting comment for recipe: \(recipe.id.uuidString)")
-            print("📝 Comment content: \(trimmedText)")
 
             await commentsViewModel.addComment(
                 to: recipe.id.uuidString,

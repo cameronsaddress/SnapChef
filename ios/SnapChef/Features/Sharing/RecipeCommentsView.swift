@@ -479,21 +479,21 @@ class RecipeCommentsViewModel: ObservableObject {
         lastFetchedRecord = nil
         hasMore = true
 
-        print("🔍 Loading comments for recipe: \(recipeID)")
+        // Avoid triggering iCloud system prompts on devices without iCloud configured.
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement,
+              FileManager.default.ubiquityIdentityToken != nil else {
+            comments = []
+            hasMore = false
+            isLoading = false
+            return
+        }
 
         do {
             let ckRecords = try await cloudKitSync.fetchComments(for: recipeID, limit: 50)
-            print("✅ Fetched \(ckRecords.count) comment records from CloudKit")
-            
             let commentItems = await parseCommentsFromRecords(ckRecords)
-            print("✅ Parsed \(commentItems.count) comment items")
-            
             comments = organizeCommentsWithReplies(commentItems)
-            print("✅ Organized into \(comments.count) top-level comments")
-            
             hasMore = ckRecords.count >= 50
         } catch {
-            print("❌ Failed to load comments for recipe \(recipeID): \(error)")
             // Fall back to empty state on error
             comments = []
             hasMore = false
@@ -521,7 +521,11 @@ class RecipeCommentsViewModel: ObservableObject {
     func addComment(to recipeID: String, content: String, parentCommentID: String? = nil) async {
         guard let userID = cloudKitAuth.currentUser?.recordID,
               let userName = cloudKitAuth.currentUser?.displayName else { 
-            print("❌ Cannot add comment: User not authenticated")
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowToast"),
+                object: nil,
+                userInfo: ["message": "Sign in to comment."]
+            )
             return 
         }
 
@@ -576,11 +580,8 @@ class RecipeCommentsViewModel: ObservableObject {
                 content: content,
                 parentCommentID: parentCommentID
             )
-            print("✅ Comment successfully saved to CloudKit")
             
         } catch {
-            print("❌ Failed to save comment to CloudKit: \(error)")
-            
             // Remove from UI if CloudKit save failed
             if let parentCommentID = parentCommentID,
                let parentIndex = comments.firstIndex(where: { $0.id == parentCommentID }) {
@@ -607,7 +608,11 @@ class RecipeCommentsViewModel: ObservableObject {
                 comments.removeAll { $0.id == commentID }
             }
             
-            // TODO: Show error toast to user
+            NotificationCenter.default.post(
+                name: Notification.Name("ShowToast"),
+                object: nil,
+                userInfo: ["message": "Couldn't post comment. Please try again."]
+            )
         }
     }
 
