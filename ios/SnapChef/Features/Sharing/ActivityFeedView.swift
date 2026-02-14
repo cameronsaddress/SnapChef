@@ -1096,45 +1096,12 @@ class ActivityFeedManager: ObservableObject {
             }
             return
         }
-        
-        // First check if iCloud is available
-        guard let container = CloudKitRuntimeSupport.makeContainer() else {
-            await MainActor.run {
-                activities = generateMockActivities()
-                hasMore = false
-            }
-            return
-        }
-        do {
-            let accountStatus = try await container.accountStatus()
-            if accountStatus != .available {
-                print("⚠️ iCloud not available, status: \(accountStatus)")
-                await MainActor.run {
-                    activities = generateMockActivities()
-                    hasMore = false
-                }
-                return
-            }
-        } catch {
-            print("❌ Failed to check iCloud status: \(error)")
-            await MainActor.run {
-                activities = generateMockActivities()
-                hasMore = false
-            }
-            return
-        }
-        
-        guard let currentUser = UnifiedAuthManager.shared.currentUser else {
-            print("❌ No current user found")
-            await MainActor.run {
-                activities = generateMockActivities()
-                hasMore = false
-            }
-            return
-        }
-        
-        guard let userID = currentUser.recordID else {
-            print("❌ Current user has no recordID")
+
+        // Guest mode: keep the feed snappy and avoid iCloud system prompts.
+        // We show curated demo activities until the user signs in.
+        guard UnifiedAuthManager.shared.isAuthenticated,
+              let currentUser = UnifiedAuthManager.shared.currentUser,
+              let userID = currentUser.recordID else {
             await MainActor.run {
                 activities = generateMockActivities()
                 hasMore = false

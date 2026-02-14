@@ -65,7 +65,8 @@ class SimpleDiscoverUsersManager: ObservableObject {
     // Cache configuration
     private let cacheKey = "DiscoverUsersCache"
     private let cacheTimestampKey = "DiscoverUsersCacheTimestamp"
-    private let cacheTTL: TimeInterval = Double.greatestFiniteMagnitude // Never expire - keep data forever
+    // Cache CloudKit discovery for a while to keep the UI snappy, but still allow periodic freshness.
+    private let cacheTTL: TimeInterval = 6 * 60 * 60 // 6 hours
     private var lastRefreshTime: Date?
     private let minimumRefreshInterval: TimeInterval = 30 // 30 seconds
     private var currentCategory: DiscoverUsersView.DiscoverCategory = .suggested
@@ -216,24 +217,27 @@ class SimpleDiscoverUsersManager: ObservableObject {
         }
     }
     
-    func loadUsers(for category: DiscoverUsersView.DiscoverCategory) async {
+    func loadUsers(for category: DiscoverUsersView.DiscoverCategory, forceRefresh: Bool = false) async {
         currentCategory = category
-
-        // Check if we have fresh cached data
-        if !users.isEmpty && !needsRefresh() {
-            print("📱 Using cached discover users (\(users.count) users)")
-            return
-        }
         
         // Try to load from cache first
-        if loadCachedUsers(for: category) {
+        if !forceRefresh, loadCachedUsers(for: category) {
             print("✅ Loaded \(users.count) users from cache")
             // Still refresh in background if cache is getting old
-            if needsRefresh() {
+            if needsRefresh(for: category) {
                 Task {
                     await fetchUsersInBackground(for: category)
                 }
             }
+            return
+        }
+
+        // Avoid triggering iCloud system prompts in guest flows.
+        // If the device isn't signed into iCloud, show demo profiles instead of attempting CloudKit.
+        if FileManager.default.ubiquityIdentityToken == nil {
+            applyLocalFallback(for: category)
+            saveCachedUsers(users, for: category)
+            lastRefreshTime = Date()
             return
         }
         
@@ -332,13 +336,42 @@ class SimpleDiscoverUsersManager: ObservableObject {
     
     // MARK: - Cache Methods
     
-    func needsRefresh() -> Bool {
-        // Check if cache is older than TTL
-        if let cacheTimestamp = UserDefaults.standard.object(forKey: cacheTimestampKey) as? Date {
-            _ = cacheTimestamp
-            return false // Never expire - was: cacheAge > cacheTTL
+    private func cachedTimestamp(for category: DiscoverUsersView.DiscoverCategory) -> Date? {
+        UserDefaults.standard.object(forKey: "\(cacheKey)_\(category.rawValue)_timestamp") as? Date
+    }
+
+    func needsRefresh(for category: DiscoverUsersView.DiscoverCategory? = nil) -> Bool {
+        if let lastRefreshTime, Date().timeIntervalSince(lastRefreshTime) < minimumRefreshInterval {
+            return false
         }
-        return true // No cache timestamp means we need to refresh
+
+        // If iCloud isn't available, never attempt background CloudKit refreshes.
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else {
+            return false
+        }
+        guard FileManager.default.ubiquityIdentityToken != nil else {
+            return false
+        }
+
+        let effectiveCategory = category ?? currentCategory
+        guard let timestamp = cachedTimestamp(for: effectiveCategory) else {
+            return true
+        }
+
+        let cacheAge = Date().timeIntervalSince(timestamp)
+        if cacheAge > cacheTTL {
+            return true
+        }
+
+        // If we're showing local fallback profiles, re-attempt CloudKit discovery once iCloud is available.
+        let showingLocalFallback = !users.isEmpty && users.allSatisfy { $0.id.hasPrefix("local_") }
+        if showingLocalFallback,
+           CloudKitRuntimeSupport.hasCloudKitEntitlement,
+           FileManager.default.ubiquityIdentityToken != nil {
+            return true
+        }
+
+        return false
     }
     
     private func loadCachedUsers(for category: DiscoverUsersView.DiscoverCategory) -> Bool {
@@ -471,6 +504,18 @@ class SimpleDiscoverUsersManager: ObservableObject {
             searchResults = []
             return
         }
+
+        // If CloudKit isn't available (simulator/offline/no iCloud), fall back to local filtering
+        // without attempting any network calls that could trigger system prompts.
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement,
+              FileManager.default.ubiquityIdentityToken != nil else {
+            let allFallbackUsers = fallbackUsers(for: currentCategory)
+            searchResults = allFallbackUsers.filter {
+                $0.username.localizedCaseInsensitiveContains(query) ||
+                $0.displayName.localizedCaseInsensitiveContains(query)
+            }
+            return
+        }
         
         Task {
             isSearching = true
@@ -573,8 +618,11 @@ class SimpleDiscoverUsersManager: ObservableObject {
         searchResults.removeAll()
         hasMore = false
         isLoading = false
+        isSearching = false
         showingSkeletonViews = false
         lastRefreshTime = nil
+        selectedUser = nil
+        currentCategory = .suggested
         
         // Clear all category caches
         let categories = DiscoverUsersView.DiscoverCategory.allCases
@@ -651,12 +699,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
     
     /// Clear all cached data (for account deletion)
     func clearCache() {
-        users.removeAll()
-        searchResults.removeAll()
-        UserDefaults.standard.removeObject(forKey: cacheKey)
-        UserDefaults.standard.removeObject(forKey: cacheTimestampKey)
-        lastRefreshTime = nil
-        selectedUser = nil
+        reset()
         print("✅ SimpleDiscoverUsersManager: Cache cleared")
     }
 }
@@ -802,7 +845,7 @@ struct DiscoverUsersView: View {
                             .padding(.bottom, 20)
                         }
                         .refreshable {
-                            await manager.loadUsers(for: selectedCategory)
+                            await manager.loadUsers(for: selectedCategory, forceRefresh: true)
                         }
                     }
                 }
