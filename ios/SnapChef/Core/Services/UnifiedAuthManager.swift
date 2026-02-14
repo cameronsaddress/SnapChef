@@ -1887,9 +1887,13 @@ final class UnifiedAuthManager: ObservableObject {
         guard let database = cloudKitDatabase else { return [] }
 
         do {
-            // Ensure userID has "user_" prefix for CloudKit query
-            let fullUserID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
-            let predicate = NSPredicate(format: "followerID == %@", fullUserID)
+            // Follow records store normalized IDs without the "user_" prefix.
+            let normalizedFollowerID = normalizeUserID(userID)
+            let predicate = NSPredicate(
+                format: "%K == %@ AND %K == %d",
+                CKField.Follow.followerID, normalizedFollowerID,
+                CKField.Follow.isActive, 1
+            )
             let query = CKQuery(recordType: "Follow", predicate: predicate)
             
             let (results, _) = try await database.records(
@@ -1903,14 +1907,25 @@ final class UnifiedAuthManager: ObservableObject {
             for (_, result) in results {
                 if case .success(let record) = result,
                    let followingID = record["followingID"] as? String {
+                    let normalizedFollowingID = normalizeUserID(followingID)
+                    let recordNamesToTry = [
+                        "user_\(normalizedFollowingID)",
+                        normalizedFollowingID
+                    ]
+
                     // Fetch the user record
-                    do {
-                        // followingID already has "user_" prefix from Follow record, use it directly
-                        let userRecordID = CKRecord.ID(recordName: followingID)
-                        let userRecord = try await database.record(for: userRecordID)
+                    var userRecord: CKRecord?
+                    for recordName in recordNamesToTry {
+                        do {
+                            userRecord = try await database.record(for: CKRecord.ID(recordName: recordName))
+                            break
+                        } catch {
+                            continue
+                        }
+                    }
+
+                    if let userRecord {
                         users.append(CloudKitUser(from: userRecord))
-                    } catch {
-                        print("Failed to fetch user \(followingID): \(error)")
                     }
                 }
             }
