@@ -262,9 +262,9 @@ class SimpleDiscoverUsersManager: ObservableObject {
             var convertedUsers: [UserProfile] = []
             
             if UnifiedAuthManager.shared.isAuthenticated {
-                // Parallel follow state checking for better performance
-                await withTaskGroup(of: UserProfile.self) { group in
-                    for cloudKitUser in fetchedUsers {
+                // Parallel follow state checking for better performance (keep CloudKit sort order stable).
+                await withTaskGroup(of: (Int, UserProfile).self) { group in
+                    for (index, cloudKitUser) in fetchedUsers.enumerated() {
                         // Capture the values we need before the task
                         let userID = cloudKitUser.recordID ?? ""
                         let username = cloudKitUser.username
@@ -290,14 +290,15 @@ class SimpleDiscoverUsersManager: ObservableObject {
                             )
                             let isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: userProfile.id)
                             userProfile.isFollowing = isFollowing
-                            return userProfile
+                            return (index, userProfile)
                         }
                     }
                     
-                    // Collect results in order
-                    for await userProfile in group {
-                        convertedUsers.append(userProfile)
+                    var ordered: [UserProfile?] = Array(repeating: nil, count: fetchedUsers.count)
+                    for await (index, userProfile) in group {
+                        ordered[index] = userProfile
                     }
+                    convertedUsers = ordered.compactMap { $0 }
                 }
             } else {
                 // No authentication, just convert without follow status
@@ -438,9 +439,9 @@ class SimpleDiscoverUsersManager: ObservableObject {
             var convertedUsers: [UserProfile] = []
             
             if UnifiedAuthManager.shared.isAuthenticated {
-                // Parallel follow state checking for better performance
-                await withTaskGroup(of: UserProfile.self) { group in
-                    for cloudKitUser in fetchedUsers {
+                // Parallel follow state checking for better performance (keep CloudKit sort order stable).
+                await withTaskGroup(of: (Int, UserProfile).self) { group in
+                    for (index, cloudKitUser) in fetchedUsers.enumerated() {
                         // Capture the values we need before the task
                         let userID = cloudKitUser.recordID ?? ""
                         let username = cloudKitUser.username
@@ -466,14 +467,15 @@ class SimpleDiscoverUsersManager: ObservableObject {
                             )
                             let isFollowing = await UnifiedAuthManager.shared.isFollowing(userID: userProfile.id)
                             userProfile.isFollowing = isFollowing
-                            return userProfile
+                            return (index, userProfile)
                         }
                     }
                     
-                    // Collect results in order
-                    for await userProfile in group {
-                        convertedUsers.append(userProfile)
+                    var ordered: [UserProfile?] = Array(repeating: nil, count: fetchedUsers.count)
+                    for await (index, userProfile) in group {
+                        ordered[index] = userProfile
                     }
+                    convertedUsers = ordered.compactMap { $0 }
                 }
             } else {
                 // No authentication, just convert without follow status
