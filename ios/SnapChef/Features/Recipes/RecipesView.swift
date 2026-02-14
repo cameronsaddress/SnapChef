@@ -957,7 +957,7 @@ struct RecipeGridCard: View {
             return currentUser.username ?? currentUser.displayName
         }
         
-        return "Me"
+        return "Anonymous Chef"
     }
     
 }
