@@ -33,6 +33,9 @@ fi
 echo "==> Install"
 xcrun simctl install "$SIM_UDID" "$APP_PATH" >/dev/null 2>&1
 
+# Skip onboarding for deterministic screenshots (ContentView gates on hasLaunchedBefore).
+xcrun simctl spawn "$SIM_UDID" defaults write "$BUNDLE_ID" hasLaunchedBefore -bool YES >/dev/null 2>&1 || true
+
 mkdir -p "$OUT_DIR"
 
 shot() {

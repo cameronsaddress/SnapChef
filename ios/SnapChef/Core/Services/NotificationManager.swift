@@ -135,9 +135,9 @@ final class NotificationManager: ObservableObject {
             }
             monthlyReservationDate = targetDate
         case .transactionalCritical:
-            // Transactional-critical notifications must be delivered exactly as requested (often immediate).
-            // These should NOT be normalized into the monthly engagement window.
-            resolvedTrigger = trigger
+            // Transactional-critical notifications must be delivered on the requested timeline (often immediate),
+            // but still enforce one-shot delivery (no repeats).
+            resolvedTrigger = resolveTriggerForTransactionalPolicy(trigger: trigger)
         case .transactionalNudge, .transactional:
             // Nudges are monthly-capped and normalized into a single monthly window.
             let monthlyTrigger = resolveTriggerForMonthlyPolicy(trigger: trigger, category: category)
@@ -192,7 +192,7 @@ final class NotificationManager: ObservableObject {
         return true
     }
     
-    /// Convenience API that routes through monthly-capped delivery.
+    /// Convenience API for immediate transactional delivery (not monthly-capped).
     func scheduleImmediateNotification(
         identifier: String,
         title: String,

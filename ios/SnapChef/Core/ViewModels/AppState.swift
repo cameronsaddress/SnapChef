@@ -358,7 +358,9 @@ final class RecipesViewModel: ObservableObject {
     }
     
     func toggleRecipeSave(_ recipe: Recipe) {
-        if LocalRecipeManager.shared.isRecipeSaved(recipe.id) {
+        let currentlySaved = LocalRecipeManager.shared.isRecipeSaved(recipe.id)
+
+        if currentlySaved {
             // Unsave the recipe
             LocalRecipeManager.shared.unsaveRecipe(recipe.id)
             savedRecipes.removeAll { $0.id == recipe.id }
@@ -368,6 +370,26 @@ final class RecipesViewModel: ObservableObject {
             LocalRecipeManager.shared.saveRecipe(recipe)
             if !savedRecipes.contains(where: { $0.id == recipe.id }) {
                 savedRecipes.append(recipe)
+            }
+        }
+
+        // CloudKit: sync SavedRecipe reference so saves follow the user across devices.
+        guard unifiedAuthManager.isAuthenticated else { return }
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return }
+
+        Task {
+            let recipeID = recipe.id.uuidString
+            do {
+                if currentlySaved {
+                    try await CloudKitService.shared.removeRecipeFromUserProfile(recipeID, type: .saved)
+                } else {
+                    if !(await CloudKitService.shared.recipeExists(with: recipeID)) {
+                        _ = try await CloudKitService.shared.uploadRecipe(recipe, fromLLM: false, beforePhoto: nil)
+                    }
+                    try await CloudKitService.shared.addRecipeToUserProfile(recipeID, type: .saved)
+                }
+            } catch {
+                print("⚠️ RecipesViewModel: Failed to sync SavedRecipe reference: \(error)")
             }
         }
     }

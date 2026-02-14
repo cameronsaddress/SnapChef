@@ -413,8 +413,32 @@ struct RecipeResultsView: View {
                 }
             }
         }
-        
-        // CloudKit sync happens automatically in background via RecipeSyncQueue
+
+        // CloudKit: keep SavedRecipe references in sync so saves follow the user across devices.
+        Task {
+            guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return }
+            guard authManager.isAuthenticated else { return }
+            let recipeID = recipe.id.uuidString
+
+            do {
+                if currentlySaved {
+                    try await CloudKitService.shared.removeRecipeFromUserProfile(recipeID, type: .saved)
+                } else {
+                    // Ensure the recipe exists in CloudKit before adding a SavedRecipe reference.
+                    if !(await CloudKitService.shared.recipeExists(with: recipeID)) {
+                        _ = try await CloudKitService.shared.uploadRecipe(
+                            recipe,
+                            fromLLM: false,
+                            beforePhoto: capturedImage
+                        )
+                    }
+                    try await CloudKitService.shared.addRecipeToUserProfile(recipeID, type: .saved)
+                }
+            } catch {
+                // Keep local save authoritative; CloudKit will recover when connectivity/auth improves.
+                print("⚠️ Failed to sync SavedRecipe reference: \(error)")
+            }
+        }
     }
 
     private func completePendingActionAfterAuthentication() {

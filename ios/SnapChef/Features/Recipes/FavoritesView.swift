@@ -2,31 +2,27 @@ import SwiftUI
 
 struct FavoritesView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var cloudKitRecipeManager = CloudKitService.shared
-    @StateObject private var cloudKitAuth = UnifiedAuthManager.shared
-    @State private var cloudKitFavorites: [Recipe] = []
-    @State private var isLoadingCloudKit = false
+    @StateObject private var authManager = UnifiedAuthManager.shared
+    @StateObject private var likeManager = RecipeLikeManager.shared
+    @StateObject private var cloudKit = CloudKitService.shared
+    @State private var cloudLikedRecipes: [Recipe] = []
+    @State private var isLoading = false
 
     var favoriteRecipes: [Recipe] {
-        // Get favorited recipes from local state
-        let localFavorites = appState.allRecipes.filter { recipe in
-            appState.isFavorited(recipe.id)
+        // Heart likes are backed by RecipeLikeManager (CloudKit RecipeLike records),
+        // not the legacy AppState "favorited" set.
+        let localPool = appState.allRecipes + appState.recentRecipes + appState.savedRecipes
+        let localLiked = localPool.filter { likeManager.likedRecipeIDs.contains($0.id.uuidString) }
+
+        var combined = localLiked + cloudLikedRecipes
+
+        var seen = Set<UUID>()
+        combined = combined.filter { recipe in
+            seen.insert(recipe.id).inserted
         }
 
-        // Combine with CloudKit favorites
-        var allFavorites = localFavorites + cloudKitFavorites
-
-        // Remove duplicates
-        var seenIds = Set<UUID>()
-        allFavorites = allFavorites.filter { recipe in
-            if seenIds.contains(recipe.id) {
-                return false
-            }
-            seenIds.insert(recipe.id)
-            return true
-        }
-
-        return allFavorites
+        combined.sort { $0.createdAt > $1.createdAt }
+        return combined
     }
 
     var body: some View {
@@ -34,7 +30,43 @@ struct FavoritesView: View {
             MagicalBackground()
                 .ignoresSafeArea()
 
-            if favoriteRecipes.isEmpty && !isLoadingCloudKit {
+            if !authManager.isAuthenticated {
+                VStack(spacing: 18) {
+                    Image(systemName: "person.crop.circle.badge.exclamationmark")
+                        .font(.system(size: 56))
+                        .foregroundColor(.white.opacity(0.6))
+
+                    Text("Sign In to See Likes")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+
+                    Text("Likes sync with iCloud + CloudKit so they show up on every device.")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 36)
+
+                    Button {
+                        authManager.promptAuthForFeature(.socialSharing)
+                    } label: {
+                        Text("Sign In")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 22)
+                            .padding(.vertical, 12)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(hex: "#667eea"), Color(hex: "#764ba2")],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(Capsule())
+                    }
+                }
+                .padding(.top, 30)
+            } else if favoriteRecipes.isEmpty && !isLoading {
                 VStack(spacing: 20) {
                     Image(systemName: "heart.slash")
                         .font(.system(size: 60))
@@ -54,7 +86,7 @@ struct FavoritesView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 16) {
-                        if isLoadingCloudKit {
+                        if isLoading {
                             HStack {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "#667eea")))
@@ -79,35 +111,46 @@ struct FavoritesView: View {
                 }
             }
         }
-        .onAppear {
-            if cloudKitAuth.isAuthenticated {
-                loadCloudKitFavorites()
-                // Trigger manual sync when favorites page is visited
-                Task {
-                    await CloudKitDataManager.shared.triggerManualSync()
-                }
+        .task {
+            guard authManager.isAuthenticated else { return }
+            await refreshLikedRecipes()
+            if CloudKitRuntimeSupport.hasCloudKitEntitlement {
+                await CloudKitDataManager.shared.triggerManualSync()
             }
         }
     }
 
-    private func loadCloudKitFavorites() {
-        guard !isLoadingCloudKit else { return }
-        isLoadingCloudKit = true
+    private func refreshLikedRecipes() async {
+        guard !isLoading else { return }
+        isLoading = true
 
-        Task {
-            do {
-                let favorites = try await cloudKitRecipeManager.getUserFavoritedRecipes()
-                await MainActor.run {
-                    self.cloudKitFavorites = favorites
-                    self.isLoadingCloudKit = false
-                }
-                print("✅ Loaded \(favorites.count) favorite recipes from CloudKit")
-            } catch {
-                print("❌ Failed to load CloudKit favorites: \(error)")
-                await MainActor.run {
-                    self.isLoadingCloudKit = false
-                }
-            }
+        defer { isLoading = false }
+
+        // Ensure we have the latest liked recipe IDs.
+        await likeManager.loadUserLikes()
+
+        let likedIDs = Array(likeManager.likedRecipeIDs)
+        guard !likedIDs.isEmpty else {
+            cloudLikedRecipes = []
+            return
+        }
+
+        let localPool = appState.allRecipes + appState.recentRecipes + appState.savedRecipes
+        let localIDs = Set(localPool.map { $0.id.uuidString })
+        let alreadyFetched = Set(cloudLikedRecipes.map { $0.id.uuidString })
+        let missingIDs = likedIDs.filter { !localIDs.contains($0) && !alreadyFetched.contains($0) }
+
+        guard !missingIDs.isEmpty else { return }
+
+        do {
+            let fetched = try await cloudKit.fetchRecipes(by: missingIDs)
+            var merged = cloudLikedRecipes + fetched
+            var seen = Set<UUID>()
+            merged = merged.filter { seen.insert($0.id).inserted }
+            cloudLikedRecipes = merged
+        } catch {
+            // CloudKit might be unavailable in the current runtime (simulator/local-only). Keep local-only favorites.
+            print("⚠️ FavoritesView: Failed to fetch liked recipes from CloudKit: \(error)")
         }
     }
 }
