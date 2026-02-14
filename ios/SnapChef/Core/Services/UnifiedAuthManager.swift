@@ -50,17 +50,13 @@ final class UnifiedAuthManager: ObservableObject {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
         NSClassFromString("XCTestCase") != nil
     }
-    private lazy var cloudKitContainer: CKContainer = {
-        guard let container = CloudKitRuntimeSupport.makeContainer() else {
-            // There is no safe fallback CKContainer when entitlements are missing. This should never be
-            // accessed when `CloudKitRuntimeSupport.hasCloudKitEntitlement == false`.
-            fatalError("CloudKit container requested without required entitlements")
-        }
-        return container
+    private lazy var cloudKitContainer: CKContainer? = {
+        guard CloudKitRuntimeSupport.hasCloudKitEntitlement else { return nil }
+        return CloudKitRuntimeSupport.makeContainer()
     }()
-    private lazy var cloudKitDatabase: CKDatabase = {
-        cloudKitContainer.publicCloudDatabase
-    }()
+    private var cloudKitDatabase: CKDatabase? {
+        cloudKitContainer?.publicCloudDatabase
+    }
     private lazy var cloudKitActor = CloudKitActor()  // Swift 6 compliant CloudKit operations
     internal let profileManager = KeychainProfileManager.shared
     private let tikTokAuthManager = TikTokAuthManager.shared
@@ -77,6 +73,20 @@ final class UnifiedAuthManager: ObservableObject {
         guard hasCloudKitAccess(for: operation) else {
             throw UnifiedAuthError.cloudKitNotAvailable
         }
+    }
+
+    private func requireCloudKitContainer(for operation: String) throws -> CKContainer {
+        try requireCloudKitAccess(for: operation)
+        guard let container = cloudKitContainer else {
+            print("⚠️ UnifiedAuthManager.\(operation): CloudKit container unavailable")
+            throw UnifiedAuthError.cloudKitNotAvailable
+        }
+        return container
+    }
+
+    private func requireCloudKitDatabase(for operation: String) throws -> CKDatabase {
+        let container = try requireCloudKitContainer(for: operation)
+        return container.publicCloudDatabase
     }
     
     // MARK: - Auth completion callback
@@ -134,7 +144,8 @@ final class UnifiedAuthManager: ObservableObject {
     // MARK: - CloudKit Authentication
     
     func signInWithApple(authorization: ASAuthorization) async throws {
-        try requireCloudKitAccess(for: "signInWithApple")
+        let container = try requireCloudKitContainer(for: "signInWithApple")
+        let database = container.publicCloudDatabase
 
         guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
             throw UnifiedAuthError.invalidCredential
@@ -152,7 +163,7 @@ final class UnifiedAuthManager: ObservableObject {
         // CRITICAL FIX: Get the actual CloudKit userRecordID, not the Apple ID credential user ID
         let accountStatus: CKAccountStatus
         do {
-            accountStatus = try await cloudKitContainer.accountStatus()
+            accountStatus = try await container.accountStatus()
         } catch {
             print("❌ Failed to check CloudKit account status: \(error)")
             errorMessage = "Unable to access iCloud. Please check your iCloud settings."
@@ -177,7 +188,7 @@ final class UnifiedAuthManager: ObservableObject {
         }
         
         // Get the CloudKit user record ID (this is the stable ID we need)
-        let userRecord = try await cloudKitContainer.userRecordID()
+        let userRecord = try await container.userRecordID()
         let cloudKitUserID = userRecord.recordName
         
         print("✅ CloudKit userRecordID: \(cloudKitUserID)")
@@ -191,7 +202,7 @@ final class UnifiedAuthManager: ObservableObject {
         
         do {
             // Try to fetch existing user
-            let existingRecord = try await cloudKitDatabase.record(for: userRecordID)
+            let existingRecord = try await database.record(for: userRecordID)
             
             // Check if record has correct type
             if existingRecord.recordType == CloudKitConfig.userRecordType {
@@ -202,7 +213,7 @@ final class UnifiedAuthManager: ObservableObject {
                     existingRecord[CKField.User.userID] = cloudKitUserID
                 }
                 existingRecord[CKField.User.lastLoginAt] = Date()
-                try await cloudKitDatabase.save(existingRecord)
+                try await database.save(existingRecord)
                 
                 // Update state
                 self.currentUser = CloudKitUser(from: existingRecord)
@@ -211,7 +222,7 @@ final class UnifiedAuthManager: ObservableObject {
                 print("⚠️ User record has incorrect type '\(existingRecord.recordType)', expected '\(CloudKitConfig.userRecordType)'. Will delete and recreate.")
                 // Try to delete the old record with wrong type
                 do {
-                    _ = try await cloudKitDatabase.deleteRecord(withID: existingRecord.recordID)
+                    _ = try await database.deleteRecord(withID: existingRecord.recordID)
                     print("✅ Deleted old record with incorrect type")
                 } catch {
                     print("⚠️ Could not delete old record: \(error.localizedDescription)")
@@ -291,11 +302,11 @@ final class UnifiedAuthManager: ObservableObject {
             
             do {
                 print("📤 Attempting to save new user record to CloudKit...")
-                print("   Database: \(cloudKitDatabase == cloudKitContainer.publicCloudDatabase ? "Public" : "Private")")
+                print("   Database: \(database == container.publicCloudDatabase ? "Public" : "Private")")
                 print("   Record Type: \(newRecord.recordType)")
                 print("   Record ID: \(newRecord.recordID)")
                 
-                try await cloudKitDatabase.save(newRecord)
+                try await database.save(newRecord)
                 print("✅ Successfully saved new user record")
             } catch let saveError as CKError {
                 // Handle specific CloudKit errors
@@ -309,7 +320,7 @@ final class UnifiedAuthManager: ObservableObject {
                     
                     // Fetch the existing record
                     do {
-                        let existingRecord = try await cloudKitDatabase.record(for: newRecord.recordID)
+                        let existingRecord = try await database.record(for: newRecord.recordID)
                         print("✅ Successfully fetched existing user record")
                         
                         // Update state with existing record
@@ -406,7 +417,10 @@ final class UnifiedAuthManager: ObservableObject {
         
         // STEP 2: Sync to CloudKit in background (don't block UI)
         Task.detached(priority: .background) { [weak self] in
+            guard let self else { return }
             do {
+                let database = try await self.requireCloudKitDatabase(for: "setUsername.sync")
+
                 // Try BOTH possible record IDs - with and without prefix
                 let recordIDsToTry = [
                     "user_\(recordID)",  // Standard format
@@ -419,7 +433,7 @@ final class UnifiedAuthManager: ObservableObject {
                 for tryID in recordIDsToTry {
                     do {
                         print("🔍 DEBUG: Trying to fetch record with ID: \(tryID)")
-                        let record = try await self?.cloudKitDatabase.record(for: CKRecord.ID(recordName: tryID))
+                        let record = try await database.record(for: CKRecord.ID(recordName: tryID))
                         recordFound = record
                         usedRecordID = tryID
                         print("✅ Found record with ID: \(tryID)")
@@ -445,7 +459,6 @@ final class UnifiedAuthManager: ObservableObject {
                 record[CKField.User.displayName] = username
                 print("   Setting BOTH username and displayName to '\(username)'")
                 
-                guard let database = await self?.cloudKitDatabase else { return }
                 let savedRecord = try await database.save(record)
                 
                 // Debug what was actually saved
@@ -455,9 +468,7 @@ final class UnifiedAuthManager: ObservableObject {
                 print("   displayName field: '\(savedRecord[CKField.User.displayName] as? String ?? "nil")'")
                 
                 // Create an activity to notify other devices
-                if let self = self {
-                    await self.createProfileUpdateActivity()
-                }
+                await self.createProfileUpdateActivity()
                 
             } catch {
                 print("⚠️ Failed to sync username to CloudKit: \(error)")
@@ -469,12 +480,12 @@ final class UnifiedAuthManager: ObservableObject {
     }
     
     func checkUsernameAvailability(_ username: String) async throws -> Bool {
-        try requireCloudKitAccess(for: "checkUsernameAvailability")
+        let database = try requireCloudKitDatabase(for: "checkUsernameAvailability")
 
         let predicate = NSPredicate(format: "%K == %@", CKField.User.username, username.lowercased())
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         
-        let results = try await cloudKitDatabase.records(matching: query)
+        let results = try await database.records(matching: query)
         return results.matchResults.isEmpty
     }
     
@@ -565,9 +576,12 @@ final class UnifiedAuthManager: ObservableObject {
             return []
         }
 
+        let container = try requireCloudKitContainer(for: "getSuggestedUsers")
+        let database = container.publicCloudDatabase
+
         // Check CloudKit availability first
         do {
-            let status = try await cloudKitContainer.accountStatus()
+            let status = try await container.accountStatus()
             if status != .available {
                 print("⚠️ CloudKit not available. Status: \(status.rawValue)")
                 if status == .noAccount {
@@ -584,7 +598,7 @@ final class UnifiedAuthManager: ObservableObject {
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
         
         do {
-            let results = try await cloudKitDatabase.records(matching: query)
+            let results = try await database.records(matching: query)
             let users = results.matchResults.compactMap { result in
                 switch result.1 {
                 case .success(let record):
@@ -617,12 +631,14 @@ final class UnifiedAuthManager: ObservableObject {
             return []
         }
 
+        let database = try requireCloudKitDatabase(for: "getTrendingUsers")
+
         let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.recipesShared, ascending: false)]
         
         do {
-            let results = try await cloudKitDatabase.records(matching: query)
+            let results = try await database.records(matching: query)
             let users = results.matchResults.compactMap { result in
                 switch result.1 {
                 case .success(let record):
@@ -655,6 +671,8 @@ final class UnifiedAuthManager: ObservableObject {
             return []
         }
 
+        let database = try requireCloudKitDatabase(for: "getVerifiedUsers")
+
         let predicate = NSPredicate(format: "%K == %d AND %K == %d", 
                                   CKField.User.isVerified, 1,
                                   CKField.User.isProfilePublic, 1)
@@ -662,7 +680,7 @@ final class UnifiedAuthManager: ObservableObject {
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
         
         do {
-            let results = try await cloudKitDatabase.records(matching: query)
+            let results = try await database.records(matching: query)
             let users = results.matchResults.compactMap { result in
                 switch result.1 {
                 case .success(let record):
@@ -695,12 +713,14 @@ final class UnifiedAuthManager: ObservableObject {
             return []
         }
 
+        let database = try requireCloudKitDatabase(for: "getNewUsers")
+
         let predicate = NSPredicate(format: "%K == %d", CKField.User.isProfilePublic, 1)
         let query = CKQuery(recordType: CloudKitConfig.userRecordType, predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: CKField.User.createdAt, ascending: false)]
         
         do {
-            let results = try await cloudKitDatabase.records(matching: query)
+            let results = try await database.records(matching: query)
             let users = results.matchResults.compactMap { result in
                 switch result.1 {
                 case .success(let record):
@@ -735,6 +755,8 @@ final class UnifiedAuthManager: ObservableObject {
         guard hasCloudKitAccess(for: "searchUsers") else {
             return []
         }
+
+        let database = try requireCloudKitDatabase(for: "searchUsers")
         
         let predicate = NSPredicate(
             format: "(%K CONTAINS[cd] %@ OR %K CONTAINS[cd] %@) AND %K == %d",
@@ -747,7 +769,7 @@ final class UnifiedAuthManager: ObservableObject {
         queryObj.sortDescriptors = [NSSortDescriptor(key: CKField.User.followerCount, ascending: false)]
         
         do {
-            let results = try await cloudKitDatabase.records(matching: queryObj)
+            let results = try await database.records(matching: queryObj)
             let users = results.matchResults.compactMap { result in
                 switch result.1 {
                 case .success(let record):
@@ -805,7 +827,7 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Fix CloudKit user record that has missing username
     func fixUserUsername(userID: String, username: String) async throws {
-        try requireCloudKitAccess(for: "fixUserUsername")
+        let database = try requireCloudKitDatabase(for: "fixUserUsername")
         print("🔧 Fixing username for user \(userID) to '\(username)'")
         
         // Try both record ID formats
@@ -818,7 +840,7 @@ final class UnifiedAuthManager: ObservableObject {
         
         for tryID in recordIDsToTry {
             do {
-                let record = try await cloudKitDatabase.record(for: CKRecord.ID(recordName: tryID))
+                let record = try await database.record(for: CKRecord.ID(recordName: tryID))
                 recordFound = record
                 print("✅ Found record with ID: \(tryID)")
                 break
@@ -836,7 +858,7 @@ final class UnifiedAuthManager: ObservableObject {
         record[CKField.User.username] = username.lowercased()
         record[CKField.User.displayName] = username
         
-        let savedRecord = try await cloudKitDatabase.save(record)
+        let savedRecord = try await database.save(record)
         print("✅ Fixed username for user \(userID): username='\(savedRecord[CKField.User.username] as? String ?? "nil")'")
     }
     
@@ -849,7 +871,11 @@ final class UnifiedAuthManager: ObservableObject {
 
         guard let currentUser = currentUser,
               let userID = currentUser.recordID else { return }
-        
+
+        guard let database = try? requireCloudKitDatabase(for: "createProfileUpdateActivity") else {
+            return
+        }
+
         do {
             // Create a special activity type that triggers cache refresh
             let activity = CKRecord(recordType: "Activity")
@@ -862,7 +888,7 @@ final class UnifiedAuthManager: ObservableObject {
             // Use metadata field for additional info if needed
             activity[CKField.Activity.metadata] = "{\"action\":\"profileUpdated\"}"
             
-            _ = try await cloudKitDatabase.save(activity)
+            _ = try await database.save(activity)
             print("📢 Created profile update activity to notify other devices")
         } catch {
             print("⚠️ Failed to create profile update activity: \(error)")
@@ -871,6 +897,10 @@ final class UnifiedAuthManager: ObservableObject {
     
     func notifyProfilePhotoUpdate(for userID: String) async {
         guard hasCloudKitAccess(for: "notifyProfilePhotoUpdate") else {
+            return
+        }
+
+        guard let database = try? requireCloudKitDatabase(for: "notifyProfilePhotoUpdate") else {
             return
         }
 
@@ -891,7 +921,7 @@ final class UnifiedAuthManager: ObservableObject {
             // Use metadata field for additional info if needed
             activity[CKField.Activity.metadata] = "{\"action\":\"profilePhotoUpdated\"}"
             
-            _ = try await cloudKitDatabase.save(activity)
+            _ = try await database.save(activity)
             print("📢 Created profile photo update activity to notify other devices")
         } catch {
             print("⚠️ Failed to create profile photo update activity: \(error)")
@@ -906,9 +936,11 @@ final class UnifiedAuthManager: ObservableObject {
             return
         }
 
+        guard let database = try? requireCloudKitDatabase(for: "updateProfilePhoto") else {
+            return
+        }
+
         do {
-            let database = cloudKitDatabase
-            
             // Fetch user record
             let recordID = CKRecord.ID(recordName: "user_\(userID)")
             let record = try await database.record(for: recordID)
@@ -936,9 +968,11 @@ final class UnifiedAuthManager: ObservableObject {
             return nil
         }
 
+        guard let database = try? requireCloudKitDatabase(for: "fetchProfilePhoto") else {
+            return nil
+        }
+
         do {
-            let database = cloudKitDatabase
-            
             // Fetch user record
             let recordID = CKRecord.ID(recordName: "user_\(userID)")
             let record = try await database.record(for: recordID)
@@ -965,9 +999,11 @@ final class UnifiedAuthManager: ObservableObject {
             return
         }
 
+        guard let database = try? requireCloudKitDatabase(for: "deleteProfilePhoto") else {
+            return
+        }
+
         do {
-            let database = cloudKitDatabase
-            
             // Fetch user record
             let recordID = CKRecord.ID(recordName: "user_\(userID)")
             let record = try await database.record(for: recordID)
@@ -997,6 +1033,10 @@ final class UnifiedAuthManager: ObservableObject {
             return false
         }
 
+        guard let database = try? requireCloudKitDatabase(for: "isFollowing") else {
+            return false
+        }
+
         guard let currentUser = currentUser,
               let currentUserID = currentUser.recordID else {
             return false
@@ -1016,7 +1056,7 @@ final class UnifiedAuthManager: ObservableObject {
         let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
         
         do {
-            let results = try await cloudKitDatabase.records(matching: query)
+            let results = try await database.records(matching: query)
             return !results.matchResults.isEmpty
         } catch {
             print("Error checking follow status: \(error)")
@@ -1026,7 +1066,7 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Follow a user
     func followUser(userID: String) async throws {
-        try requireCloudKitAccess(for: "followUser")
+        let database = try requireCloudKitDatabase(for: "followUser")
 
         guard let currentUser = currentUser,
               let currentUserID = currentUser.recordID else {
@@ -1051,7 +1091,7 @@ final class UnifiedAuthManager: ObservableObject {
         followRecord[CKField.Follow.followedAt] = Date()
         followRecord[CKField.Follow.isActive] = Int64(1)
         
-        _ = try await cloudKitDatabase.save(followRecord)
+        _ = try await database.save(followRecord)
         
         print("✅ User followed: \(userID)")
         
@@ -1068,7 +1108,7 @@ final class UnifiedAuthManager: ObservableObject {
     
     /// Unfollow a user
     func unfollowUser(userID: String) async throws {
-        try requireCloudKitAccess(for: "unfollowUser")
+        let database = try requireCloudKitDatabase(for: "unfollowUser")
 
         guard let currentUser = currentUser,
               let currentUserID = currentUser.recordID else {
@@ -1089,14 +1129,14 @@ final class UnifiedAuthManager: ObservableObject {
         let query = CKQuery(recordType: CloudKitConfig.followRecordType, predicate: predicate)
         
         do {
-            let results = try await cloudKitDatabase.records(matching: query)
+            let results = try await database.records(matching: query)
             
             for result in results.matchResults {
                 switch result.1 {
                 case .success(let record):
                     // Soft delete by setting isActive to 0
                     record[CKField.Follow.isActive] = Int64(0)
-                    _ = try await cloudKitDatabase.save(record)
+                    _ = try await database.save(record)
                 case .failure(let error):
                     print("Error processing follow record: \(error)")
                 }
@@ -1124,11 +1164,15 @@ final class UnifiedAuthManager: ObservableObject {
             return
         }
 
+        guard let database = try? requireCloudKitDatabase(for: "updateFollowedUserFollowerCount") else {
+            return
+        }
+
         do {
             // Normalize the user ID and add "user_" prefix for CloudKit record
             let normalizedID = normalizeUserID(userID)
             let userRecordID = CKRecord.ID(recordName: "user_\(normalizedID)")
-            let userRecord = try await cloudKitDatabase.record(for: userRecordID)
+            let userRecord = try await database.record(for: userRecordID)
             
             // Get current follower count
             let currentCount = Int(userRecord[CKField.User.followerCount] as? Int64 ?? 0)
@@ -1138,7 +1182,7 @@ final class UnifiedAuthManager: ObservableObject {
             userRecord[CKField.User.followerCount] = Int64(newCount)
             
             // Save the updated record
-            _ = try await cloudKitDatabase.save(userRecord)
+            _ = try await database.save(userRecord)
             
             print("✅ Updated user \(userID) follower count to \(newCount)")
         } catch {
@@ -1213,6 +1257,8 @@ final class UnifiedAuthManager: ObservableObject {
               let recordID = user.recordID else {
             throw UnifiedAuthError.notAuthenticated
         }
+
+        let database = try requireCloudKitDatabase(for: "deleteAccountLegacy")
         
         print("🗑️ Starting account deletion for user: \(recordID)")
         
@@ -1221,9 +1267,9 @@ final class UnifiedAuthManager: ObservableObject {
         let recipeQuery = CKQuery(recordType: "Recipe", predicate: recipePredicate)
         
         do {
-            let recipeResults = try await cloudKitDatabase.records(matching: recipeQuery)
+            let recipeResults = try await database.records(matching: recipeQuery)
             for (recordID, _) in recipeResults.matchResults {
-                try await cloudKitDatabase.deleteRecord(withID: recordID)
+                try await database.deleteRecord(withID: recordID)
                 print("   ✓ Deleted recipe: \(recordID)")
             }
         } catch {
@@ -1235,9 +1281,9 @@ final class UnifiedAuthManager: ObservableObject {
         let followQuery = CKQuery(recordType: "Follow", predicate: followerPredicate)
         
         do {
-            let followResults = try await cloudKitDatabase.records(matching: followQuery)
+            let followResults = try await database.records(matching: followQuery)
             for (recordID, _) in followResults.matchResults {
-                try await cloudKitDatabase.deleteRecord(withID: recordID)
+                try await database.deleteRecord(withID: recordID)
                 print("   ✓ Deleted follow relationship: \(recordID)")
             }
         } catch {
@@ -1249,9 +1295,9 @@ final class UnifiedAuthManager: ObservableObject {
         let activityQuery = CKQuery(recordType: "Activity", predicate: activityPredicate)
         
         do {
-            let activityResults = try await cloudKitDatabase.records(matching: activityQuery)
+            let activityResults = try await database.records(matching: activityQuery)
             for (recordID, _) in activityResults.matchResults {
-                try await cloudKitDatabase.deleteRecord(withID: recordID)
+                try await database.deleteRecord(withID: recordID)
                 print("   ✓ Deleted activity: \(recordID)")
             }
         } catch {
@@ -1263,9 +1309,9 @@ final class UnifiedAuthManager: ObservableObject {
         let challengeQuery = CKQuery(recordType: "UserChallenge", predicate: challengePredicate)
         
         do {
-            let challengeResults = try await cloudKitDatabase.records(matching: challengeQuery)
+            let challengeResults = try await database.records(matching: challengeQuery)
             for (recordID, _) in challengeResults.matchResults {
-                try await cloudKitDatabase.deleteRecord(withID: recordID)
+                try await database.deleteRecord(withID: recordID)
                 print("   ✓ Deleted challenge: \(recordID)")
             }
         } catch {
@@ -1275,13 +1321,13 @@ final class UnifiedAuthManager: ObservableObject {
         // 5. Delete user record itself
         let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
         do {
-            try await cloudKitDatabase.deleteRecord(withID: userRecordID)
+            try await database.deleteRecord(withID: userRecordID)
             print("   ✓ Deleted user record")
         } catch {
             print("   ⚠️ Error deleting user record: \(error)")
             // Try without user_ prefix
             let altRecordID = CKRecord.ID(recordName: recordID)
-            try await cloudKitDatabase.deleteRecord(withID: altRecordID)
+            try await database.deleteRecord(withID: altRecordID)
         }
         
         print("✅ Account deletion complete")
@@ -1299,9 +1345,18 @@ final class UnifiedAuthManager: ObservableObject {
             return
         }
 
+        guard let container = cloudKitContainer,
+              let database = cloudKitDatabase else {
+            print("⚠️ UnifiedAuthManager.loadCloudKitUser: CloudKit container unavailable")
+            if !silent {
+                await clearStoredAuth()
+            }
+            return
+        }
+
         do {
             // First verify CloudKit account is still available
-            let accountStatus = try await cloudKitContainer.accountStatus()
+            let accountStatus = try await container.accountStatus()
             guard accountStatus == .available else {
                 print("⚠️ CloudKit account not available, status: \(accountStatus)")
                 // Only clear auth and show errors if not silent (user-initiated action)
@@ -1315,7 +1370,7 @@ final class UnifiedAuthManager: ObservableObject {
             let userRecordID = CKRecord.ID(recordName: "user_\(recordID)")
             
             // Try to load the user record
-            let record = try await cloudKitDatabase.record(for: userRecordID)
+            let record = try await database.record(for: userRecordID)
             await MainActor.run {
                 self.currentUser = CloudKitUser(from: record)
                 self.isAuthenticated = true
@@ -1327,7 +1382,7 @@ final class UnifiedAuthManager: ObservableObject {
             Task {
                 do {
                     record[CKField.User.lastActiveAt] = Date()
-                    _ = try await cloudKitDatabase.save(record)
+                    _ = try await database.save(record)
                 } catch {
                     print("⚠️ Failed to update last active time: \(error)")
                 }
@@ -1829,13 +1884,15 @@ final class UnifiedAuthManager: ObservableObject {
             return []
         }
 
+        guard let database = cloudKitDatabase else { return [] }
+
         do {
             // Ensure userID has "user_" prefix for CloudKit query
             let fullUserID = userID.hasPrefix("user_") ? userID : "user_\(userID)"
             let predicate = NSPredicate(format: "followerID == %@", fullUserID)
             let query = CKQuery(recordType: "Follow", predicate: predicate)
             
-            let (results, _) = try await cloudKitDatabase.records(
+            let (results, _) = try await database.records(
                 matching: query,
                 desiredKeys: ["followingID"],
                 resultsLimit: 100
@@ -1850,7 +1907,7 @@ final class UnifiedAuthManager: ObservableObject {
                     do {
                         // followingID already has "user_" prefix from Follow record, use it directly
                         let userRecordID = CKRecord.ID(recordName: followingID)
-                        let userRecord = try await cloudKitDatabase.record(for: userRecordID)
+                        let userRecord = try await database.record(for: userRecordID)
                         users.append(CloudKitUser(from: userRecord))
                     } catch {
                         print("Failed to fetch user \(followingID): \(error)")

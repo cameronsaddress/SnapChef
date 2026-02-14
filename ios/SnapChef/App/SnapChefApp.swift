@@ -29,6 +29,8 @@ struct SnapChefApp: App {
     // Use the shared singleton instances, managed by @StateObject, to ensure
     // SwiftUI observes changes and triggers view updates.
     @StateObject private var socialShareManager = SocialShareManager.shared
+    // CloudKit can SIGTRAP at initialization on Simulator in certain signing/entitlement states.
+    // Avoid eagerly creating CloudKit singletons at app launch; inject them only when runtime is enabled.
     @StateObject private var cloudKitService = CloudKitService.shared
     @StateObject private var cloudKitDataManager = CloudKitDataManager.shared
     @StateObject private var notificationManager = NotificationManager.shared

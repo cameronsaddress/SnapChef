@@ -1366,6 +1366,7 @@ struct SocialFeedView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var authManager: UnifiedAuthManager
     @State private var showingDiscoverUsers = false
+    @State private var didAutoPresentDiscoverUsers = false
     @State private var isRefreshing = false
     @State private var hasLoadedInitialData = false
     @State private var inviteSnapshot: SocialShareManager.InviteCenterSnapshot?
@@ -1427,6 +1428,15 @@ struct SocialFeedView: View {
             GrowthHubView()
         }
         .task {
+#if DEBUG
+            if !didAutoPresentDiscoverUsers,
+               ProcessInfo.processInfo.arguments.contains("-presentDiscoverChefs") {
+                didAutoPresentDiscoverUsers = true
+                // Present after the first frame so the navigation stack is ready.
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                showingDiscoverUsers = true
+            }
+#endif
             await refreshInviteSnapshot(force: false)
         }
         .task {

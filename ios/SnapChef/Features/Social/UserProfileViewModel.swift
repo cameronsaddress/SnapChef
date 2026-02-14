@@ -128,51 +128,45 @@ class UserProfileViewModel: ObservableObject {
             return names.filter { seen.insert($0).inserted }
         }()
 
-        do {
-            userProfileDebugLog("🔄 DEBUG UserProfile: Attempting to load from User record type with ID: '\(normalizedUserID)'")
-            var userRecord: CKRecord?
-            for recordName in recordNamesToTry {
-                do {
-                    let recordID = CKRecord.ID(recordName: recordName)
-                    userProfileDebugLog("🔍 DEBUG UserProfile: Trying recordID: \(recordID.recordName)")
-                    userRecord = try await database.record(for: recordID)
-                    break
-                } catch {
-                    continue
-                }
+        userProfileDebugLog("🔄 DEBUG UserProfile: Attempting to load from User record type with ID: '\(normalizedUserID)'")
+        var userRecord: CKRecord?
+        for recordName in recordNamesToTry {
+            do {
+                let recordID = CKRecord.ID(recordName: recordName)
+                userProfileDebugLog("🔍 DEBUG UserProfile: Trying recordID: \(recordID.recordName)")
+                userRecord = try await database.record(for: recordID)
+                break
+            } catch {
+                continue
             }
-
-            guard let userRecord else {
-                userProfileDebugLog("❌ DEBUG UserProfile: Could not fetch User record for userID '\(normalizedUserID)'")
-                return
-            }
-            
-            userProfileDebugLog("✅ DEBUG UserProfile: Found User record for userID: '\(normalizedUserID)'")
-            userProfileDebugLog("🔍 DEBUG UserProfile: User record ID: \(userRecord.recordID.recordName)")
-            self.userProfile = CloudKitUser(from: userRecord)
-            
-            // Check if following
-            if cloudKitAuth.isAuthenticated {
-                userProfileDebugLog("🔍 DEBUG UserProfile: Checking follow status for userID: '\(normalizedUserID)'")
-                self.isFollowing = await checkIfFollowing(userID: canonicalUserID)
-            }
-
-            // Load user's recipes
-            userProfileDebugLog("🔍 DEBUG UserProfile: About to load recipes from User record fallback for userID: '\(normalizedUserID)'")
-            await loadUserRecipes(userID: canonicalUserID)
-
-            // Load and apply dynamic stats first
-            userProfileDebugLog("🔍 DEBUG UserProfile: About to load user stats from User record fallback for userID: '\(normalizedUserID)'")
-            await loadUserStats(userID: canonicalUserID)
-            
-            // Load achievements after stats are calculated
-            userProfileDebugLog("🔍 DEBUG UserProfile: About to load achievements from User record fallback")
-            loadAchievements()
-        } catch {
-            userProfileDebugLog("❌ DEBUG UserProfile: Failed to load from User record type: \(error)")
-            userProfileDebugLog("❌ DEBUG UserProfile: Error type: \(type(of: error))")
-            userProfileDebugLog("❌ DEBUG UserProfile: This might be due to record ID format mismatch or record not existing")
         }
+
+        guard let userRecord else {
+            userProfileDebugLog("❌ DEBUG UserProfile: Could not fetch User record for userID '\(normalizedUserID)'")
+            return
+        }
+
+        userProfileDebugLog("✅ DEBUG UserProfile: Found User record for userID: '\(normalizedUserID)'")
+        userProfileDebugLog("🔍 DEBUG UserProfile: User record ID: \(userRecord.recordID.recordName)")
+        self.userProfile = CloudKitUser(from: userRecord)
+
+        // Check if following
+        if cloudKitAuth.isAuthenticated {
+            userProfileDebugLog("🔍 DEBUG UserProfile: Checking follow status for userID: '\(normalizedUserID)'")
+            self.isFollowing = await checkIfFollowing(userID: canonicalUserID)
+        }
+
+        // Load user's recipes
+        userProfileDebugLog("🔍 DEBUG UserProfile: About to load recipes from User record fallback for userID: '\(normalizedUserID)'")
+        await loadUserRecipes(userID: canonicalUserID)
+
+        // Load and apply dynamic stats first
+        userProfileDebugLog("🔍 DEBUG UserProfile: About to load user stats from User record fallback for userID: '\(normalizedUserID)'")
+        await loadUserStats(userID: canonicalUserID)
+
+        // Load achievements after stats are calculated
+        userProfileDebugLog("🔍 DEBUG UserProfile: About to load achievements from User record fallback")
+        loadAchievements()
     }
 
     func toggleFollow(userID: String) async {

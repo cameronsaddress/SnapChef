@@ -1052,7 +1052,9 @@ final class SnapChefAPIManager {
         notFoodImageMessage: String,
         noIngredientsMessage: String
     ) async throws -> APIResponse {
-        let maxAttempts = 4
+        // Render cold-starts can take 20-40s; give the broker a few more chances before surfacing
+        // the "chef is busy" failure to the user.
+        let maxAttempts = 6
         var attempt = 1
 
         while true {
@@ -1118,6 +1120,11 @@ final class SnapChefAPIManager {
 
                 return apiResponse
             } catch {
+                if let urlError = error as? URLError, urlError.code == .timedOut, attempt >= 2 {
+                    // A timed-out attempt already waited for the full request timeout; avoid compounding
+                    // into multi-minute retry loops.
+                    throw normalizeRequestError(error)
+                }
                 if shouldRetryRequest(error: error, statusCode: nil), attempt < maxAttempts {
                     let delay = retryDelay(for: attempt, statusCode: nil)
                     apiDebugLog("🔁 Retrying \(debugContext) request (\(attempt + 1)/\(maxAttempts)) in \(String(format: "%.1f", delay))s due to network error: \(error.localizedDescription)")
@@ -1181,7 +1188,8 @@ final class SnapChefAPIManager {
         apiDebugLog("🔍 Sending detective analysis request with session ID: \(sessionID)")
         apiDebugLog("🔍 Request body size: \(request.httpBody?.count ?? 0) bytes")
 
-        let maxAttempts = 4
+        // Detective calls hit the same Render broker; allow a few more retries for cold-start recovery.
+        let maxAttempts = 6
         var attempt = 1
 
         while true {
@@ -1233,6 +1241,9 @@ final class SnapChefAPIManager {
 
                 return detectiveResponse
             } catch {
+                if let urlError = error as? URLError, urlError.code == .timedOut, attempt >= 2 {
+                    throw normalizeRequestError(error)
+                }
                 if shouldRetryRequest(error: error, statusCode: nil), attempt < maxAttempts {
                     let delay = retryDelay(for: attempt, statusCode: nil)
                     apiDebugLog("🔁 Retrying detective analysis (\(attempt + 1)/\(maxAttempts)) in \(String(format: "%.1f", delay))s due to network error: \(error.localizedDescription)")

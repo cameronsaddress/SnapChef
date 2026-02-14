@@ -31,7 +31,7 @@ if [[ ! -d "$APP_PATH" ]]; then
 fi
 
 echo "==> Install"
-xcrun simctl install booted "$APP_PATH" >/dev/null 2>&1
+xcrun simctl install "$SIM_UDID" "$APP_PATH" >/dev/null 2>&1
 
 mkdir -p "$OUT_DIR"
 
@@ -39,10 +39,12 @@ shot() {
   local label="$1"
   shift
   echo "==> Launch + screenshot: ${label}"
-  xcrun simctl terminate booted "$BUNDLE_ID" >/dev/null 2>&1 || true
-  xcrun simctl launch booted "$BUNDLE_ID" "$@" >/dev/null 2>&1 || true
-  sleep 2
-  xcrun simctl io booted screenshot "$OUT_DIR/${label}.png" >/dev/null 2>&1
+  xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+  xcrun simctl launch "$SIM_UDID" "$BUNDLE_ID" "$@" >/dev/null 2>&1 || true
+  # Give the launch animation + initial view transitions time to complete before capturing.
+  # (ContentView shows LaunchAnimationView for ~3s; there is also a brief fade gap).
+  sleep 8
+  xcrun simctl io "$SIM_UDID" screenshot "$OUT_DIR/${label}.png" >/dev/null 2>&1
 }
 
 shot "home" -startTab home

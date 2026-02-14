@@ -283,6 +283,19 @@ enum CloudKitRuntimeSupport {
         return configured
     }
 
+    private static var isCodeSigned: Bool {
+        // When running `xcodebuild ... CODE_SIGNING_ALLOWED=NO` the app bundle will not contain
+        // `_CodeSignature`. Attempting to initialize `CKContainer` without iCloud entitlements
+        // can SIGTRAP on Simulator, so treat "not signed" as "CloudKit unavailable".
+        let signatureURL = Bundle.main.bundleURL.appendingPathComponent("_CodeSignature")
+        return FileManager.default.fileExists(atPath: signatureURL.path)
+    }
+
+    // NOTE:
+    // There is no iOS-supported public API to introspect entitlements at runtime.
+    // On Simulator, initializing `CKContainer(...)` in certain signing states can SIGTRAP.
+    // To keep the app stable, CloudKit is *disabled by default on Simulator* unless explicitly enabled.
+
     static var hasCloudKitEntitlement: Bool {
         let environment = ProcessInfo.processInfo.environment
         if environment[disableAllEnvKey] == "1" {
@@ -292,14 +305,13 @@ enum CloudKitRuntimeSupport {
         if environment[disableOnSimulatorEnvKey] == "1" {
             return false
         }
-        // In Simulator, default to enabled so social/CloudKit features work out of the box.
-        // If you're building without code signing (e.g. `CODE_SIGNING_ALLOWED=NO`) and hit a
-        // CloudKit SIGTRAP, set `SNAPCHEF_DISABLE_CLOUDKIT_ON_SIMULATOR=1`.
         if environment["XCTestConfigurationFilePath"] != nil || NSClassFromString("XCTestCase") != nil {
             // Avoid CloudKit during tests unless explicitly enabled for an integration run.
-            return environment[enableOnSimulatorEnvKey] == "1"
+            return environment[enableOnSimulatorEnvKey] == "1" && isCodeSigned
         }
-        return true
+        // Simulator default: off (stability). Enable explicitly via env var when using a signing
+        // configuration known to be safe for CloudKit.
+        return environment[enableOnSimulatorEnvKey] == "1" && isCodeSigned
 #else
         return true
 #endif
@@ -311,8 +323,22 @@ enum CloudKitRuntimeSupport {
         }
 
         #if targetEnvironment(simulator)
-        // On simulator, always use the default container (derived from entitlements).
-        return CKContainer.default()
+        // IMPORTANT:
+        // Some simulator / build configurations can SIGTRAP inside `CKContainer(identifier:)`
+        // (seen with adhoc signatures / missing entitlements). Treat any runtime failure as
+        // "CloudKit unavailable" and fall back to local-only mode instead of crashing at launch.
+        let trimmedIdentifier = identifier?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let effectiveIdentifier: String
+        if let trimmedIdentifier, !trimmedIdentifier.isEmpty {
+            effectiveIdentifier = trimmedIdentifier
+        } else {
+            effectiveIdentifier = resolvedContainerIdentifier
+        }
+        // Defensive: avoid a hard crash if the runtime refuses to initialize CloudKit.
+        // We cannot catch a SIGTRAP, so we only attempt init in explicitly enabled builds.
+        guard isCodeSigned else { return nil }
+        return CKContainer(identifier: effectiveIdentifier)
         #else
         let trimmedIdentifier = identifier?
             .trimmingCharacters(in: .whitespacesAndNewlines)

@@ -151,14 +151,6 @@ class SimpleDiscoverUsersManager: ObservableObject {
         guard let container = CloudKitRuntimeSupport.makeContainer() else {
             throw UnifiedAuthError.cloudKitNotAvailable
         }
-        do {
-            let status = try await container.accountStatus()
-            guard status == .available else {
-                throw UnifiedAuthError.cloudKitNotAvailable
-            }
-        } catch {
-            throw UnifiedAuthError.cloudKitNotAvailable
-        }
 
         let query = publicUserQuery(for: category)
         do {
@@ -190,14 +182,6 @@ class SimpleDiscoverUsersManager: ObservableObject {
         }
 
         guard let container = CloudKitRuntimeSupport.makeContainer() else {
-            throw UnifiedAuthError.cloudKitNotAvailable
-        }
-        do {
-            let status = try await container.accountStatus()
-            guard status == .available else {
-                throw UnifiedAuthError.cloudKitNotAvailable
-            }
-        } catch {
             throw UnifiedAuthError.cloudKitNotAvailable
         }
 
@@ -318,17 +302,27 @@ class SimpleDiscoverUsersManager: ObservableObject {
                 }
             }
             
-            users = sanitizedUniqueUsers(convertedUsers)
-            // Maintain memory limits after setting users
-            maintainMemoryLimits()
-            
-            // Save to cache
-            saveCachedUsers(users, for: category)
-            lastRefreshTime = Date()
+            let sanitized = sanitizedUniqueUsers(convertedUsers)
+            if sanitized.isEmpty {
+                // CloudKit can legitimately return no rows (no iCloud account, no public profiles yet, etc).
+                // Never ship an empty "Discover" screen; fall back to curated demo profiles.
+                applyLocalFallback(for: category)
+                saveCachedUsers(users, for: category)
+                lastRefreshTime = Date()
+            } else {
+                users = sanitized
+                // Maintain memory limits after setting users
+                maintainMemoryLimits()
+
+                // Save to cache
+                saveCachedUsers(users, for: category)
+                lastRefreshTime = Date()
+            }
             
         } catch {
             print("❌ Failed to load users: \(error)")
             applyLocalFallback(for: category)
+            saveCachedUsers(users, for: category)
         }
         
         showingSkeletonViews = false
@@ -361,7 +355,11 @@ class SimpleDiscoverUsersManager: ObservableObject {
         do {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            users = try decoder.decode([UserProfile].self, from: data)
+            let decoded = try decoder.decode([UserProfile].self, from: data)
+            guard !decoded.isEmpty else {
+                return false
+            }
+            users = decoded
             return true
         } catch {
             print("❌ Failed to decode cached users: \(error)")
@@ -370,6 +368,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
     }
     
     private func saveCachedUsers(_ users: [UserProfile], for category: DiscoverUsersView.DiscoverCategory) {
+        guard !users.isEmpty else { return }
         let key = "\(cacheKey)_\(category.rawValue)"
         
         do {
@@ -450,7 +449,13 @@ class SimpleDiscoverUsersManager: ObservableObject {
                 }
             }
             
-            users = sanitizedUniqueUsers(convertedUsers)
+            let sanitized = sanitizedUniqueUsers(convertedUsers)
+            guard !sanitized.isEmpty else {
+                // Don't wipe existing content with an empty refresh.
+                return
+            }
+
+            users = sanitized
             // Maintain memory limits after setting users
             maintainMemoryLimits()
             saveCachedUsers(users, for: category)
@@ -718,8 +723,10 @@ struct DiscoverUsersView: View {
                     }
                     .padding(.vertical, 16)
 
-                    // If iCloud isn't configured, discovery will fall back to local demo profiles.
-                    if CloudKitRuntimeSupport.hasCloudKitEntitlement, !iCloudStatus.hasSetupiCloud {
+                    // If CloudKit public discovery isn't available, we fall back to local demo profiles.
+                    // Show an iCloud hint only when we're actually showing fallback users.
+                    let showingLocalFallback = !manager.users.isEmpty && manager.users.allSatisfy { $0.id.hasPrefix("local_") }
+                    if CloudKitRuntimeSupport.hasCloudKitEntitlement, showingLocalFallback, !manager.isLoading {
                         iCloudSetupCard
                             .padding(.horizontal, 20)
                             .padding(.bottom, 10)

@@ -228,17 +228,10 @@ final class iCloudStatusManager: ObservableObject {
     
     /// Open Settings app to iCloud sign-in
     func openiCloudSettings() {
-        // Try to open iCloud settings directly
-        if let url = URL(string: "App-prefs:CASTLE") {
-            UIApplication.shared.open(url) { success in
-                if !success {
-                    // Fallback to general settings
-                    if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(settingsUrl)
-                    }
-                }
-            }
-        }
+        // App Store-safe: deep-linking into specific Settings panes via "App-prefs:" is private API
+        // and can get the app rejected. We can only open the app's Settings page reliably.
+        guard let settingsUrl = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(settingsUrl)
     }
     
     /// Handle user dismissing the prompt
