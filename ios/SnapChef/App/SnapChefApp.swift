@@ -123,7 +123,9 @@ struct SnapChefApp: App {
                         }
                     }
                     Task {
-                        await GrowthRemoteConfig.shared.refreshFromCloudKit()
+                        if cloudKitRuntimeEnabled, UnifiedAuthManager.shared.isAuthenticated {
+                            await GrowthRemoteConfig.shared.refreshFromCloudKit()
+                        }
                     }
                 }
         }
@@ -137,11 +139,7 @@ struct SnapChefApp: App {
         configureWindow()
         configureImageCache()
         GrowthRemoteConfig.shared.bootstrap()
-        if cloudKitRuntimeEnabled {
-            Task {
-                await GrowthRemoteConfig.shared.refreshFromCloudKit()
-            }
-        }
+        // Keep startup quiet: avoid CloudKit fetches until the user authenticates.
 
         // CloudKit environment logging can trigger iCloud system prompts (account status checks).
         // Keep app startup quiet; developers can enable explicitly when debugging.
