@@ -53,6 +53,18 @@ class UserProfileViewModel: ObservableObject {
             return
         }
 
+        // Avoid triggering iCloud system prompts when the device isn't signed into iCloud.
+        guard FileManager.default.ubiquityIdentityToken != nil else {
+            isLoading = false
+            userProfile = nil
+            userRecipes = []
+            achievements = []
+            dynamicStats = nil
+            totalLikes = 0
+            totalCookingTime = 0
+            return
+        }
+
         isLoading = true
         userProfileDebugLog("🔍 DEBUG UserProfile: Starting loadUserProfile for userID: '\(normalizedUserID)'")
         userProfileDebugLog("🔍 DEBUG UserProfile: UserID length: \(normalizedUserID.count)")

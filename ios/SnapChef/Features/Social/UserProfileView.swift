@@ -1,5 +1,6 @@
 import SwiftUI
 import CloudKit
+import UIKit
 
 struct UserProfileView: View {
     let userID: String
@@ -51,9 +52,42 @@ struct UserProfileView: View {
                         Image(systemName: "person.crop.circle.badge.exclamationmark")
                             .font(.system(size: 60))
                             .foregroundColor(.white.opacity(0.5))
-                        Text("Unable to load profile")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
+                        if FileManager.default.ubiquityIdentityToken == nil {
+                            Text("Sign in to iCloud to view profiles")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.85))
+
+                            Text("SnapChef uses CloudKit for chef profiles, follows, and saved recipe sync.")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.72))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 24)
+
+                            Button {
+                                if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                                    UIApplication.shared.open(settingsUrl)
+                                }
+                            } label: {
+                                Text("Open Settings")
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.white.opacity(0.16))
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                            )
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Text("Unable to load profile")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                        }
                     }
                 }
             }
