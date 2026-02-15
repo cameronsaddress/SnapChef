@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Xcode / iOS
+Pods/
+.build/
+DerivedData/
+*.xcuserstate
