@@ -537,11 +537,11 @@ final class PaywallTriggerManager: ObservableObject, @unchecked Sendable {
         }
 
         UserDefaults.standard.set(events, forKey: "paywall_analytics_events")
-        logMessage("📊 Analytics: \(event) - \(eventData)")
+        logMessage("Stored analytics event: \(event)")
     }
 
     private func logMessage(_ message: String) {
-        NSLog("💰 PaywallTriggerManager: \(message)")
+        AppLog.debug(AppLog.ui, "PaywallTriggerManager: \(message)")
     }
 }
 

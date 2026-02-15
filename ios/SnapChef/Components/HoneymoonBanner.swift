@@ -7,7 +7,6 @@
 //
 
 import SwiftUI
-import os.log
 import UIKit
 
 /// Beautiful animated banner that appears during honeymoon phase (days 1-7)
@@ -331,15 +330,7 @@ struct HoneymoonBanner: View {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
 
-        // Analytics tracking
-        #if DEBUG
-        NSLog("🎯 Honeymoon banner tapped - Day \(currentDay)")
-        #endif
-
-        // Navigate to subscription/premium upgrade view
-        // Note: Navigation integration with subscription view would be implemented here
-        // For now, log the event and potentially trigger premium paywall
-        os_log("User tapped honeymoon banner - showing premium upgrade opportunity", log: .default, type: .info)
+        AppLog.debug(AppLog.ui, "Honeymoon banner tapped (day=\(currentDay))")
 
         // Store analytics event for premium upgrade interest
         UserDefaults.standard.set(Date(), forKey: "honeymoon.upgrade_interest_shown")

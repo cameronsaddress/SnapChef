@@ -1,5 +1,4 @@
 import SwiftUI
-import os.log
 import CloudKit
 import UIKit
 import PhotosUI
@@ -3311,9 +3310,9 @@ struct ProfileAchievementGalleryView: View {
                     self.isLoadingAchievements = false
                 }
 
-                os_log("Loaded %d achievements from CloudKit", log: .default, type: .info, loadedAchievements.count)
+                AppLog.info(AppLog.cloudKit, "Loaded \(loadedAchievements.count) achievements from CloudKit")
             } catch {
-                os_log("Failed to load CloudKit achievements: %@", log: .default, type: .error, error.localizedDescription)
+                AppLog.error(AppLog.cloudKit, "Failed to load CloudKit achievements: \(error.localizedDescription)")
                 await MainActor.run {
                     self.isLoadingAchievements = false
                 }
@@ -3588,9 +3587,9 @@ struct ActiveChallengesSection: View {
                     self.isLoadingChallenges = false
                 }
 
-                os_log("Loaded %d user challenges from CloudKit", log: .default, type: .info, challenges.count)
+                AppLog.info(AppLog.cloudKit, "Loaded \(challenges.count) user challenges from CloudKit")
             } catch {
-                os_log("Failed to load user challenges: %@", log: .default, type: .error, error.localizedDescription)
+                AppLog.error(AppLog.cloudKit, "Failed to load user challenges: \(error.localizedDescription)")
                 await MainActor.run {
                     self.isLoadingChallenges = false
                 }
@@ -3859,15 +3858,15 @@ private func saveCustomPhotoToFile(_ data: Data) {
     guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
     let filePath = documentsPath.appendingPathComponent("customChefPhoto.jpg")
 
-    do {
-        try data.write(to: filePath)
-        // Remove from UserDefaults if it exists
-        UserDefaults.standard.removeObject(forKey: "CustomChefPhoto")
-        os_log("Custom photo saved to file system", log: .default, type: .info)
-    } catch {
-        os_log("Failed to save custom photo: %@", log: .default, type: .error, error.localizedDescription)
-    }
-}
+	    do {
+	        try data.write(to: filePath)
+	        // Remove from UserDefaults if it exists
+	        UserDefaults.standard.removeObject(forKey: "CustomChefPhoto")
+	        AppLog.info(AppLog.persistence, "Custom photo saved to file system")
+	    } catch {
+	        AppLog.error(AppLog.persistence, "Failed to save custom photo: \(error.localizedDescription)")
+	    }
+	}
 
 struct ProfilePhotoHelper {
     static func loadCustomPhotoFromFile() -> Data? {

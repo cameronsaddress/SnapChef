@@ -11,7 +11,6 @@ import CloudKit
 import AuthenticationServices
 import SwiftUI
 import TikTokOpenAuthSDK
-import os
 
 /// Unified authentication manager that handles all authentication flows
 /// Combines CloudKit, TikTok, and progressive authentication into a single, clean interface
@@ -1438,8 +1437,7 @@ final class UnifiedAuthManager: ObservableObject {
     private func linkTikTokAccount() async {
         // This would update the CloudKit user record with TikTok integration info
         // For now, just log the linking
-        // Log TikTok account linking
-        os_log("TikTok account linked to CloudKit user", log: .default, type: .info)
+        AppLog.info(AppLog.auth, "TikTok account linked to CloudKit user")
     }
     
     private func completeAuthentication() {

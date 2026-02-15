@@ -2,7 +2,6 @@ import Foundation
 import SwiftUI
 import TikTokOpenAuthSDK
 import TikTokOpenSDKCore
-import os
 
 // Import the TikTokAuthManager if needed for proper reference
 // This helps with the compilation when TikTokContentPostingAPI references it
@@ -234,7 +233,10 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
                     try await clearTikTokIntegration()
                 } catch {
                     // Log error but don't fail logout
-                    os_log("Failed to clear TikTok integration from CloudKit: %@", log: .default, type: .error, error.localizedDescription)
+                    AppLog.error(
+                        AppLog.cloudKit,
+                        "Failed to clear TikTok integration from CloudKit: \(error.localizedDescription)"
+                    )
                 }
             }
         }
@@ -456,7 +458,7 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
     private func clearTikTokIntegration() async throws {
         // This would update CloudKit to remove TikTok integration
         // Implementation would depend on CloudKit schema updates
-        os_log("Clearing TikTok integration from CloudKit", log: .default, type: .info)
+        AppLog.debug(AppLog.cloudKit, "Clearing TikTok integration from CloudKit")
     }
 
     // MARK: - Token Storage Methods
@@ -479,10 +481,10 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
             // Add new item
             let status = SecItemAdd(query as CFDictionary, nil)
             if status != errSecSuccess {
-                os_log("Failed to store TikTok tokens: %d", log: .default, type: .error, status)
+                AppLog.error(AppLog.persistence, "Failed to store TikTok tokens (status=\(status))")
             }
         } catch {
-            os_log("Failed to encode TikTok tokens: %@", log: .default, type: .error, error.localizedDescription)
+            AppLog.error(AppLog.persistence, "Failed to encode TikTok tokens: \(error.localizedDescription)")
         }
     }
 
@@ -506,7 +508,7 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
         do {
             return try JSONDecoder().decode(TikTokTokens.self, from: data)
         } catch {
-            os_log("Failed to decode stored TikTok tokens: %@", log: .default, type: .error, error.localizedDescription)
+            AppLog.error(AppLog.persistence, "Failed to decode stored TikTok tokens: \(error.localizedDescription)")
             return nil
         }
     }

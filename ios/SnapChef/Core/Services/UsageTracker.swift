@@ -365,7 +365,7 @@ final class UsageTracker: ObservableObject {
         }
 
         UserDefaults.standard.set(events, forKey: "usage_analytics_events")
-        logMessage("📊 Analytics: \(eventName) - \(eventData)")
+        logMessage("Stored analytics event: \(eventName)")
     }
 
     private func loadDetectiveData() {
@@ -397,8 +397,7 @@ final class UsageTracker: ObservableObject {
     }
 
     private func logMessage(_ message: String) {
-        // Use NSLog for proper logging instead of print
-        NSLog("📊 UsageTracker: \(message)")
+        AppLog.debug(AppLog.app, "UsageTracker: \(message)")
     }
 }
 
