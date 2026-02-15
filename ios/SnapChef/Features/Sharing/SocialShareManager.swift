@@ -645,8 +645,8 @@ class SocialShareManager: ObservableObject {
         } else if let fallbackURL = URL(string: baseURL) {
             return fallbackURL
         } else {
-            // Final fallback to snapchef.com
-            return URL(string: "https://snapchef.com")!
+            // Final fallback to the homepage.
+            return URL(string: "https://snapchef.app")!
         }
     }
 

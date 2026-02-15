@@ -82,7 +82,7 @@ struct InlineAuthPrompt: View {
                             // Authentication handled in SignInWithAppleButton
                             onAuthenticated?()
                         case .failure(let error):
-                            print("Sign in failed: \(error)")
+                            AppLog.warning(AppLog.auth, "Inline sign-in failed: \(error.localizedDescription)")
                         }
                     }
                 )
@@ -255,7 +255,7 @@ struct AuthenticationSheet: View {
                                     // Authentication handled in SignInWithAppleButton
                                     dismiss()
                                 case .failure(let error):
-                                    print("Sign in failed: \(error)")
+                                    AppLog.warning(AppLog.auth, "Inline sign-in failed: \(error.localizedDescription)")
                                     isAuthenticating = false
                                 }
                             }

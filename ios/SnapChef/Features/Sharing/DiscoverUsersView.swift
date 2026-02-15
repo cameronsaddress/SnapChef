@@ -222,7 +222,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
         
         // Try to load from cache first
         if !forceRefresh, loadCachedUsers(for: category) {
-            print("✅ Loaded \(users.count) users from cache")
+            AppLog.debug(AppLog.persistence, "Loaded discover users from cache (count=\(users.count))")
             // Still refresh in background if cache is getting old
             if needsRefresh(for: category) {
                 Task {
@@ -326,7 +326,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
             }
             
         } catch {
-            print("❌ Failed to load users: \(error)")
+            AppLog.debug(AppLog.cloudKit, "Failed to load discover users: \(error.localizedDescription)")
             applyLocalFallback(for: category)
             saveCachedUsers(users, for: category)
         }
@@ -397,7 +397,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
             users = decoded
             return true
         } catch {
-            print("❌ Failed to decode cached users: \(error)")
+            AppLog.debug(AppLog.persistence, "Failed to decode cached discover users: \(error.localizedDescription)")
             return false
         }
     }
@@ -414,12 +414,12 @@ class SimpleDiscoverUsersManager: ObservableObject {
             UserDefaults.standard.set(Date(), forKey: "\(key)_timestamp")
             UserDefaults.standard.set(Date(), forKey: cacheTimestampKey)
         } catch {
-            print("❌ Failed to cache users: \(error)")
+            AppLog.debug(AppLog.persistence, "Failed to cache discover users: \(error.localizedDescription)")
         }
     }
     
     private func fetchUsersInBackground(for category: DiscoverUsersView.DiscoverCategory) async {
-        print("🔄 Background refresh of discover users...")
+        AppLog.debug(AppLog.cloudKit, "Background refresh of discover users")
         
         do {
             var fetchedUsers: [CloudKitUser] = []
@@ -497,7 +497,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
             saveCachedUsers(users, for: category)
             
         } catch {
-            print("❌ Background refresh failed: \(error)")
+            AppLog.debug(AppLog.cloudKit, "Background refresh failed: \(error.localizedDescription)")
         }
     }
     
@@ -543,7 +543,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
                 }
                 
             } catch {
-                print("❌ Search failed: \(error)")
+                AppLog.debug(AppLog.cloudKit, "Discover search failed: \(error.localizedDescription)")
                 await MainActor.run {
                     let allFallbackUsers = fallbackUsers(for: currentCategory)
                     searchResults = allFallbackUsers.filter {
@@ -575,7 +575,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
             }
             
         } catch {
-            print("❌ Failed to toggle follow: \(error)")
+            AppLog.debug(AppLog.cloudKit, "Failed to toggle follow: \(error.localizedDescription)")
         }
     }
     
@@ -603,19 +603,19 @@ class SimpleDiscoverUsersManager: ObservableObject {
         // Keep only the maxUsers newest users
         if users.count > maxUsers {
             users = Array(users.prefix(maxUsers))
-            print("📊 Trimmed users to \(maxUsers) newest items")
+            AppLog.debug(AppLog.ui, "Trimmed discover users to \(maxUsers) items")
         }
         
         // Keep only the maxSearchResults newest search results
         if searchResults.count > maxSearchResults {
             searchResults = Array(searchResults.prefix(maxSearchResults))
-            print("📊 Trimmed search results to \(maxSearchResults) items")
+            AppLog.debug(AppLog.ui, "Trimmed discover search results to \(maxSearchResults) items")
         }
     }
     
     /// Reset singleton for logout
     func reset() {
-        print("🔄 Resetting SimpleDiscoverUsersManager singleton")
+        AppLog.debug(AppLog.app, "Resetting SimpleDiscoverUsersManager")
         users.removeAll()
         searchResults.removeAll()
         hasMore = false
@@ -702,7 +702,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
     /// Clear all cached data (for account deletion)
     func clearCache() {
         reset()
-        print("✅ SimpleDiscoverUsersManager: Cache cleared")
+        AppLog.debug(AppLog.app, "SimpleDiscoverUsersManager cache cleared")
     }
 }
 
@@ -710,6 +710,7 @@ class SimpleDiscoverUsersManager: ObservableObject {
 struct DiscoverUsersView: View {
     // Use shared singleton instance for preloaded data
     @StateObject private var manager = SimpleDiscoverUsersManager.shared
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var appState: AppState
     @State private var searchText = ""
     @State private var selectedCategory: DiscoverCategory = .suggested
@@ -854,6 +855,27 @@ struct DiscoverUsersView: View {
             }
             .navigationTitle("Discover Chefs")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white.opacity(0.9))
+                            .padding(8)
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.12))
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close")
+                    .accessibilityIdentifier("discover_chefs_close")
+                }
+            }
         }
         .task {
             await manager.loadUsers(for: selectedCategory)
@@ -1090,6 +1112,7 @@ struct LocalChefPreviewView: View {
                         dismiss()
                     }
                     .foregroundColor(.white)
+                    .accessibilityIdentifier("chef_profile_done")
                 }
             }
         }
@@ -1304,6 +1327,8 @@ struct UserDiscoveryCard: View {
             }
             .buttonStyle(PlainButtonStyle())
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("discover_user_card")
+            .accessibilityLabel(Text(user.displayName))
 
             // Follow Button
             Button(action: {
@@ -1348,6 +1373,7 @@ struct UserDiscoveryCard: View {
                     )
             }
             .buttonStyle(PlainButtonStyle())
+            .accessibilityIdentifier("discover_follow_button")
         }
         .padding(20)
         .background(

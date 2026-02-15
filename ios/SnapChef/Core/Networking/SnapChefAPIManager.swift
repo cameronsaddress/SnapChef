@@ -85,25 +85,24 @@ extension Data {
 
 // MARK: - API Response Models (to match FastAPI Pydantic models)
 
-@MainActor
-struct APIResponse: Codable {
+struct APIResponse: Codable, Sendable {
     let data: GrokParsedResponse
     let message: String
 }
 
-struct GrokParsedResponse: Codable {
+struct GrokParsedResponse: Codable, Sendable {
     let image_analysis: ImageAnalysis
     let ingredients: [IngredientAPI]
     let recipes: [RecipeAPI]
 }
 
-struct ImageAnalysis: Codable {
+struct ImageAnalysis: Codable, Sendable {
     let is_food_image: Bool
     let confidence: String
     let image_description: String
 }
 
-struct IngredientAPI: Codable {
+struct IngredientAPI: Codable, Sendable {
     let name: String
     let quantity: String
     let unit: String
@@ -112,7 +111,7 @@ struct IngredientAPI: Codable {
     let location: String? // Optional as per your Pydantic model
 }
 
-struct RecipeAPI: Codable, Identifiable {
+struct RecipeAPI: Codable, Identifiable, Sendable {
     let id: String // Matches the UUID string from Python
     let name: String
     let description: String
@@ -138,12 +137,12 @@ struct RecipeAPI: Codable, Identifiable {
     let visual_clues: [String]?
 }
 
-struct IngredientUsed: Codable {
+struct IngredientUsed: Codable, Sendable {
     let name: String
     let amount: String
 }
 
-struct NutritionAPI: Codable {
+struct NutritionAPI: Codable, Sendable {
     let calories: Int
     let protein: Int
     let carbs: Int
@@ -153,7 +152,7 @@ struct NutritionAPI: Codable {
     let sodium: Int?
 }
 
-struct FlavorProfileAPI: Codable {
+struct FlavorProfileAPI: Codable, Sendable {
     let sweet: Int?
     let salty: Int?
     let sour: Int?
@@ -190,7 +189,21 @@ final class SnapChefAPIManager {
         }
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return fallbackServerBaseURL }
-        return trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+
+        // Ignore unresolved placeholders like "$(API_BASE_URL)" when build settings are missing.
+        if trimmed.contains("$(") {
+            return fallbackServerBaseURL
+        }
+
+        let normalized = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+        guard let url = URL(string: normalized),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host != nil else {
+            return fallbackServerBaseURL
+        }
+
+        return normalized
     }
 
     func ensureCredentialsConfigured() throws {
@@ -740,7 +753,7 @@ final class SnapChefAPIManager {
     }
     
     /// Execute request with exponential backoff retry logic
-    private func executeRequestWithRetry<T: Codable>(
+    private func executeRequestWithRetry<T: Codable & Sendable>(
         request: URLRequest,
         responseType: T.Type,
         operationId: String,
@@ -789,7 +802,9 @@ final class SnapChefAPIManager {
                 
                 // Success case - decode response
                 do {
-                    let decoded = try JSONDecoder().decode(responseType, from: data)
+                    let decoded = try await Task.detached(priority: .userInitiated) {
+                        try JSONDecoder().decode(responseType, from: data)
+                    }.value
                     apiDebugLog("[API] Request succeeded on attempt \(attempt + 1)")
                     return decoded
                 } catch {
@@ -1097,7 +1112,9 @@ final class SnapChefAPIManager {
 
                 let apiResponse: APIResponse
                 do {
-                    apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
+                    apiResponse = try await Task.detached(priority: .userInitiated) {
+                        try JSONDecoder().decode(APIResponse.self, from: data)
+                    }.value
                 } catch {
                     throw APIError.decodingError(error.localizedDescription)
                 }
@@ -1229,7 +1246,9 @@ final class SnapChefAPIManager {
                     throw APIError.serverError(statusCode: httpResponse.statusCode, message: responseMessage)
                 }
 
-                let detectiveResponse = try JSONDecoder().decode(DetectiveRecipeResponse.self, from: data)
+                let detectiveResponse = try await Task.detached(priority: .userInitiated) {
+                    try JSONDecoder().decode(DetectiveRecipeResponse.self, from: data)
+                }.value
                 apiDebugLog("✅ Successfully decoded detective response")
                 apiDebugLog("✅ Success: \(detectiveResponse.success)")
 

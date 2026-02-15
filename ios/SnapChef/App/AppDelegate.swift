@@ -28,7 +28,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, @preconcurrency UNUserNotifi
         // print("✅ TikTok OpenShareSDK available for use")
         #endif
 
-        print("✅ AppDelegate initialized")
+        AppLog.debug(AppLog.app, "AppDelegate initialized")
         UNUserNotificationCenter.current().delegate = self
 
         return true
@@ -116,7 +116,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, @preconcurrency UNUserNotifi
     private func scheduleSnoozeReminder(from request: UNNotificationRequest) {
         let originalIdentifier = request.identifier
         guard let category = NotificationCategory(rawValue: request.content.categoryIdentifier) else {
-            print("⚠️ Skipping snooze - unknown category: \(request.content.categoryIdentifier)")
+            AppLog.warning(AppLog.notifications, "Skipping snooze (unknown category)")
             return
         }
 
@@ -146,9 +146,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, @preconcurrency UNUserNotifi
             )
 
             if didSchedule {
-                print("✅ Scheduled snoozed reminder for request: \(originalIdentifier)")
+                AppLog.debug(AppLog.notifications, "Scheduled snoozed reminder")
             } else {
-                print("⏭️ Snoozed reminder was not scheduled for request: \(originalIdentifier)")
+                AppLog.debug(AppLog.notifications, "Snoozed reminder was not scheduled")
             }
         }
     }

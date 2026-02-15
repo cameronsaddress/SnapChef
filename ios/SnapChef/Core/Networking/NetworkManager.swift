@@ -113,7 +113,7 @@ class NetworkManager {
 
     // MARK: - Generic HTTP Methods
 
-    private func get<T: Decodable>(_ endpoint: String, headers: [String: String] = [:]) async throws -> T {
+    private func get<T: Decodable & Sendable>(_ endpoint: String, headers: [String: String] = [:]) async throws -> T {
         guard let url = URL(string: endpoint) else {
             throw NetworkError.invalidURL
         }
@@ -122,13 +122,10 @@ class NetworkManager {
         applyDefaultHeaders(to: &request, additionalHeaders: headers)
 
         let (data, _) = try await performDataRequest(request)
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(T.self, from: data)
+        return try await decodeJSON(T.self, from: data)
     }
 
-    private func post<T: Decodable, U: Encodable>(_ endpoint: String, body: U, additionalHeaders: [String: String] = [:]) async throws -> T {
+    private func post<T: Decodable & Sendable, U: Encodable>(_ endpoint: String, body: U, additionalHeaders: [String: String] = [:]) async throws -> T {
         guard let url = URL(string: endpoint) else {
             throw NetworkError.invalidURL
         }
@@ -140,13 +137,10 @@ class NetworkManager {
         request.httpBody = try encoder.encode(body)
 
         let (data, _) = try await performDataRequest(request)
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(T.self, from: data)
+        return try await decodeJSON(T.self, from: data)
     }
 
-    private func post<T: Decodable>(_ endpoint: String, body: [String: Any]) async throws -> T {
+    private func post<T: Decodable & Sendable>(_ endpoint: String, body: [String: Any]) async throws -> T {
         guard let url = URL(string: endpoint) else {
             throw NetworkError.invalidURL
         }
@@ -157,19 +151,36 @@ class NetworkManager {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, _) = try await performDataRequest(request)
+        return try await decodeJSON(T.self, from: data)
+    }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(T.self, from: data)
+    private func decodeJSON<T: Decodable & Sendable>(_ type: T.Type, from data: Data) async throws -> T {
+        try await Task.detached(priority: .userInitiated) {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode(type, from: data)
+        }
+        .value
     }
 
     private func normalizeBaseURL(_ raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        if trimmed.hasSuffix("/") {
-            return String(trimmed.dropLast())
+
+        // Ignore unresolved build setting placeholders like "$(API_BASE_URL)".
+        if trimmed.contains("$(") {
+            return nil
         }
-        return trimmed
+
+        let normalized = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+        guard let url = URL(string: normalized),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host != nil else {
+            return nil
+        }
+
+        return normalized
     }
 
     private func applyDefaultHeaders(
@@ -257,26 +268,26 @@ class NetworkManager {
 
 // MARK: - Response Models
 
-struct DeviceStatus: Decodable {
+struct DeviceStatus: Decodable, Sendable {
     let deviceId: String
     let freeUsesRemaining: Int
     let isBlocked: Bool
     let hasSubscription: Bool
 }
 
-struct FreeUseResponse: Decodable {
+struct FreeUseResponse: Decodable, Sendable {
     let success: Bool
     let remainingUses: Int
     let isBlocked: Bool
 }
 
-struct ShareResponse: Decodable {
+struct ShareResponse: Decodable, Sendable {
     let success: Bool
     let creditsEarned: Int
     let totalCredits: Int
 }
 
-struct EmptyRequest: Encodable {}
+struct EmptyRequest: Encodable, Sendable {}
 
 // MARK: - Errors
 

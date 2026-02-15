@@ -804,11 +804,6 @@ final class RecipeModule: ObservableObject {
             return url
         }
 
-        // Backward compatible fallback for older shares / test environments.
-        if let fallbackURL = URL(string: "snapchef://recipe/\(recipeID)") {
-            return fallbackURL
-        }
-
         return URL(string: "https://snapchef.app")!
     }
     

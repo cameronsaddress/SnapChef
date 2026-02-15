@@ -162,17 +162,17 @@ struct SnapChefApp: App {
             
             // Check authentication status
             if cloudKitRuntimeEnabled, UnifiedAuthManager.shared.isAuthenticated {
-                print("🚀 Starting background social feed preload...")
-                print("   - User authenticated: ✓")
-                print("   - Preloading into shared singleton instance")
+                AppLog.debug(AppLog.app, "Starting background social feed preload")
                 
                 // Use the shared singleton instance
                 await ActivityFeedManager.shared.preloadInBackground()
                 
-                print("✅ Social feed preload complete")
-                print("   - Activities loaded: \(ActivityFeedManager.shared.activities.count)")
+                AppLog.debug(
+                    AppLog.app,
+                    "Social feed preload complete (activities=\(ActivityFeedManager.shared.activities.count))"
+                )
             } else {
-                print("⏸️ Skipping social feed preload - user not authenticated")
+                AppLog.debug(AppLog.app, "Skipping social feed preload (unauthenticated)")
             }
         }
         
@@ -182,17 +182,17 @@ struct SnapChefApp: App {
             
             // Check authentication status
             if cloudKitRuntimeEnabled, UnifiedAuthManager.shared.isAuthenticated {
-                print("🚀 Starting background discover users preload...")
-                print("   - User authenticated: ✓")
-                print("   - Preloading into shared singleton instance")
+                AppLog.debug(AppLog.app, "Starting background discover users preload")
                 
                 // Use the shared singleton instance
                 await SimpleDiscoverUsersManager.shared.loadUsers(for: .suggested)
                 
-                print("✅ Discover users preload complete")
-                print("   - Users loaded: \(SimpleDiscoverUsersManager.shared.users.count)")
+                AppLog.debug(
+                    AppLog.app,
+                    "Discover users preload complete (users=\(SimpleDiscoverUsersManager.shared.users.count))"
+                )
             } else {
-                print("⏸️ Skipping discover users preload - user not authenticated")
+                AppLog.debug(AppLog.app, "Skipping discover users preload (unauthenticated)")
             }
         }
 
@@ -201,18 +201,18 @@ struct SnapChefApp: App {
         SDKInitializer.verifyURLSchemes()
 
         // Configure API key for development/production
-        print("🚀 App initialization: Setting up API key...")
+        AppLog.debug(AppLog.app, "App initialization: setting up API key")
         setupAPIKeyIfNeeded()
-        print("🚀 App initialization: API key setup complete")
+        AppLog.debug(AppLog.app, "App initialization: API key setup complete")
         
         KeychainManager.shared.ensureAPIKeyExists()
         NetworkManager.shared.configure()
         Task {
             let backendHealthy = await NetworkManager.shared.checkServerHealth()
             if backendHealthy {
-                print("✅ Backend health check succeeded")
+                AppLog.debug(AppLog.network, "Backend health check succeeded")
             } else {
-                print("⚠️ Backend health check failed - requests will retry with backoff")
+                AppLog.warning(AppLog.network, "Backend health check failed; requests will retry with backoff")
             }
         }
         deviceManager.checkDeviceStatus()
@@ -220,7 +220,7 @@ struct SnapChefApp: App {
         // Initialize notification system without launch-time permission prompt.
         Task {
             await notificationManager.bootstrapMonthlyScheduleIfAuthorized()
-            print("✅ Notification system bootstrap complete")
+            AppLog.debug(AppLog.notifications, "Notification system bootstrap complete")
         }
 
         Task {
@@ -228,7 +228,7 @@ struct SnapChefApp: App {
             appState.currentSessionID = sessionID
 
             guard cloudKitRuntimeEnabled else {
-                print("⚠️ CloudKit runtime disabled - running local-only startup flow")
+                AppLog.warning(AppLog.cloudKit, "CloudKit runtime disabled; running local-only startup flow")
                 await migrateToLocalFirstStorage()
                 return
             }
@@ -248,18 +248,18 @@ struct SnapChefApp: App {
             }
             
             if UnifiedAuthManager.shared.isAuthenticated {
-                print("✅ Authentication confirmed, proceeding with CloudKit operations")
+                AppLog.debug(AppLog.auth, "Authentication confirmed; proceeding with CloudKit operations")
                 socialShareManager.markReferralConversionIfEligible()
                 await socialShareManager.claimReferrerRewardsIfEligible()
                 await cloudKitDataManager.ensureSubscriptionsConfigured()
             } else {
-                print("⚠️ Authentication not completed after 2 seconds, proceeding anyway")
+                AppLog.debug(AppLog.auth, "Authentication not completed after 2 seconds; proceeding anyway")
             }
             
             // Initialize RecipeLikeManager to load user's liked recipes
             if UnifiedAuthManager.shared.isAuthenticated {
                 await RecipeLikeManager.shared.loadUserLikes()
-                print("✅ RecipeLikeManager initialized with user's liked recipes")
+                AppLog.debug(AppLog.app, "RecipeLikeManager initialized with user's liked recipes")
             }
             
             // Intentionally avoid iCloud/CloudKit account status checks on app launch.
@@ -274,7 +274,7 @@ struct SnapChefApp: App {
             if UnifiedAuthManager.shared.isAuthenticated {
                 await syncCloudKitPhotosToStorage()
             } else {
-                print("⚠️ Skipping CloudKit photo sync - user not authenticated")
+                AppLog.debug(AppLog.cloudKit, "Skipping CloudKit photo sync (unauthenticated)")
             }
             
             // MIGRATION: Run CloudKit data migration (Remove after successful run)
@@ -334,7 +334,10 @@ struct SnapChefApp: App {
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
         
-        print("📸 Image cache configured: \(memoryCapacity / 1024 / 1024)MB memory, \(diskCapacity / 1024 / 1024)MB disk")
+        AppLog.debug(
+            AppLog.persistence,
+            "Image cache configured: \(memoryCapacity / 1024 / 1024)MB memory, \(diskCapacity / 1024 / 1024)MB disk"
+        )
     }
 
     private func handleIncomingURL(_ url: URL) {
@@ -349,7 +352,7 @@ struct SnapChefApp: App {
 
     /// Initialize authentication systems
     private func initializeAuthentication() async {
-        print("🔐 Initializing authentication systems...")
+        AppLog.debug(AppLog.auth, "Initializing authentication systems")
         
         // Check if user was previously authenticated using the existing auth manager
         // Note: checkAuthStatus() is called automatically in AuthenticationManager's init
@@ -357,7 +360,7 @@ struct SnapChefApp: App {
         // The AuthenticationManager handles authentication flows
         // and will restore authentication state if the user was previously signed in
         
-        print("🔐 Authentication initialization completed")
+        AppLog.debug(AppLog.auth, "Authentication initialization completed")
     }
     
     @MainActor
@@ -366,7 +369,7 @@ struct SnapChefApp: App {
         
         // Check if authenticated
         guard authManager.isAuthenticated, let currentUser = authManager.currentUser else {
-            print("⚠️ User not authenticated, skipping streak update")
+            AppLog.debug(AppLog.auth, "User not authenticated; skipping streak update")
             return
         }
         
@@ -377,7 +380,7 @@ struct SnapChefApp: App {
         
         // If we haven't opened the app today, update the streak
         if lastOpenDate == nil || !Calendar.current.isDate(lastOpenDate!, inSameDayAs: today) {
-            print("🔥 New day detected, updating streak...")
+            AppLog.debug(AppLog.app, "New day detected; updating streak")
             
             // Calculate new streak
             var newStreak = currentUser.currentStreak
@@ -388,16 +391,16 @@ struct SnapChefApp: App {
                 if daysSinceLastOpen == 1 {
                     // Consecutive day - increment streak
                     newStreak += 1
-                    print("✅ Consecutive day! Streak increased to \(newStreak)")
+                    AppLog.debug(AppLog.app, "Consecutive day; streak increased to \(newStreak)")
                 } else if daysSinceLastOpen > 1 {
                     // Streak broken - reset to 1
                     newStreak = 1
-                    print("❌ Streak broken. Reset to 1 day")
+                    AppLog.debug(AppLog.app, "Streak broken; reset to 1 day")
                 }
             } else {
                 // First time tracking - start at 1
                 newStreak = 1
-                print("🎉 Starting streak tracking at 1 day")
+                AppLog.debug(AppLog.app, "Starting streak tracking at 1 day")
             }
             
             // Update UserDefaults
@@ -411,18 +414,18 @@ struct SnapChefApp: App {
             
             do {
                 try await authManager.updateUserStats(updates)
-                print("✅ Streak updated in CloudKit to \(newStreak) days")
+                AppLog.debug(AppLog.cloudKit, "Streak updated in CloudKit to \(newStreak) days")
                 
                 // Refresh current user data to reflect the update
                 await authManager.refreshCurrentUser()
             } catch {
-                print("❌ Failed to update streak in CloudKit: \(error)")
+                AppLog.error(AppLog.cloudKit, "Failed to update streak in CloudKit: \(error.localizedDescription)")
             }
             
             // Also update StreakManager for gamification
             await StreakManager.shared.recordActivity(for: .dailySnap)
         } else {
-            print("✅ Already opened app today, streak maintained at \(currentUser.currentStreak) days")
+            AppLog.debug(AppLog.app, "Already opened app today; streak maintained at \(currentUser.currentStreak) days")
             
             // Sync existing streak from StreakManager if CloudKit shows 0
             if currentUser.currentStreak == 0 {
@@ -433,7 +436,7 @@ struct SnapChefApp: App {
     
     @MainActor
     private func syncStreakFromManager() async {
-        print("🔄 Syncing streak from StreakManager to CloudKit...")
+        AppLog.debug(AppLog.cloudKit, "Syncing streak from StreakManager to CloudKit")
         
         // Get the daily snap streak from StreakManager
         let streakManager = StreakManager.shared
@@ -442,7 +445,7 @@ struct SnapChefApp: App {
             let longestStreak = dailyStreak.longestStreak
             
             if currentStreak > 0 {
-                print("📊 Found existing streak in StreakManager: \(currentStreak) days")
+                AppLog.debug(AppLog.app, "Found streak in StreakManager (\(currentStreak) days)")
                 
                 let updates = UserStatUpdates(
                     currentStreak: currentStreak,
@@ -451,10 +454,10 @@ struct SnapChefApp: App {
                 
                 do {
                     try await authManager.updateUserStats(updates)
-                    print("✅ Synced streak to CloudKit: \(currentStreak) days")
+                    AppLog.debug(AppLog.cloudKit, "Synced streak to CloudKit (\(currentStreak) days)")
                     await authManager.refreshCurrentUser()
                 } catch {
-                    print("❌ Failed to sync streak to CloudKit: \(error)")
+                    AppLog.error(AppLog.cloudKit, "Failed to sync streak to CloudKit: \(error.localizedDescription)")
                 }
             }
         }
@@ -462,18 +465,18 @@ struct SnapChefApp: App {
     
     @MainActor
     private func syncCloudKitPhotosToStorage() async {
-        print("📸 Starting CloudKit photo sync to PhotoStorageManager...")
+        AppLog.debug(AppLog.cloudKit, "Starting CloudKit photo sync to PhotoStorageManager")
 
         // Get all CloudKit recipes
         let cloudKitRecipes = await CloudKitRecipeCache.shared.getRecipes(forceRefresh: false)
 
-        print("📸 Found \(cloudKitRecipes.count) CloudKit recipes to check for photos")
+        AppLog.debug(AppLog.cloudKit, "Found \(cloudKitRecipes.count) CloudKit recipes to check for photos")
 
         // Fetch photos for recipes that don't have them in PhotoStorageManager
+        var syncedCount = 0
         for recipe in cloudKitRecipes {
             // Check if we already have photos in PhotoStorageManager
             if PhotoStorageManager.shared.hasCompletePhotos(for: recipe.id) {
-                print("📸 Recipe \(recipe.name) already has complete photos in storage")
                 continue
             }
 
@@ -488,16 +491,14 @@ struct SnapChefApp: App {
                         mealPhoto: photos.after,
                         for: recipe.id
                     )
-                    print("✅ Synced photos for recipe: \(recipe.name)")
-                    print("    - Before: \(photos.before != nil ? "✓" : "✗")")
-                    print("    - After: \(photos.after != nil ? "✓" : "✗")")
+                    syncedCount += 1
                 }
             } catch {
-                print("❌ Failed to sync photos for recipe \(recipe.name): \(error)")
+                AppLog.debug(AppLog.cloudKit, "Failed to sync recipe photos: \(error.localizedDescription)")
             }
         }
 
-        print("✅ CloudKit photo sync completed")
+        AppLog.debug(AppLog.cloudKit, "CloudKit photo sync completed (synced=\(syncedCount))")
     }
     
     // MARK: - CloudKit Environment Detection
@@ -520,12 +521,10 @@ struct SnapChefApp: App {
 
         let tokenPresent = FileManager.default.ubiquityIdentityToken != nil
 
-        print("════════════════════════════════════════════════")
-        print(environmentString)
-        print("   Container: \(CloudKitRuntimeSupport.resolvedContainerIdentifier)")
-        print("   iCloud Identity Token: \(tokenPresent ? "present" : "missing")")
-        print("   UnifiedAuth: \(UnifiedAuthManager.shared.isAuthenticated ? "authenticated" : "guest")")
-        print("════════════════════════════════════════════════")
+        AppLog.debug(AppLog.cloudKit, environmentString)
+        AppLog.debug(AppLog.cloudKit, "Container: \(CloudKitRuntimeSupport.resolvedContainerIdentifier)")
+        AppLog.debug(AppLog.cloudKit, "iCloud Identity Token: \(tokenPresent ? "present" : "missing")")
+        AppLog.debug(AppLog.cloudKit, "UnifiedAuth: \(UnifiedAuthManager.shared.isAuthenticated ? "authenticated" : "guest")")
     }
     
     // MARK: - Local-First Migration
@@ -533,11 +532,11 @@ struct SnapChefApp: App {
     private func migrateToLocalFirstStorage() async {
         let migrationKey = "local_first_migration_completed_v1"
         guard !UserDefaults.standard.bool(forKey: migrationKey) else { 
-            print("✅ Local-first migration already completed")
+            AppLog.debug(AppLog.persistence, "Local-first migration already completed")
             return 
         }
         
-        print("🔄 Starting migration to local-first storage...")
+        AppLog.debug(AppLog.persistence, "Starting migration to local-first storage")
         
         // Perform comprehensive data migration
         await DataMigrator.shared.performMigrationIfNeeded()
@@ -548,22 +547,22 @@ struct SnapChefApp: App {
             
             let savedCount = appState.savedRecipes.count
             if savedCount > 0 {
-                print("✅ Found \(savedCount) recipes in LocalRecipeManager")
+                AppLog.debug(AppLog.persistence, "Found \(savedCount) recipes in LocalRecipeManager")
             } else {
-                print("ℹ️ No saved recipes found")
+                AppLog.debug(AppLog.persistence, "No saved recipes found")
             }
         }
         
         // Verify migration
         let (success, report) = DataMigrator.shared.verifyMigration()
-        print(report)
+        AppLog.debug(AppLog.persistence, report)
         
         if !success {
-            print("⚠️ Migration verification failed - please check the report")
+            AppLog.warning(AppLog.persistence, "Migration verification failed; check the report")
         }
         
         UserDefaults.standard.set(true, forKey: migrationKey)
-        print("✅ Local-first migration completed")
+        AppLog.debug(AppLog.persistence, "Local-first migration completed")
     }
     
     // MARK: - API Key Configuration
@@ -576,43 +575,40 @@ struct SnapChefApp: App {
         if let configuredEntry {
             let configuredKey = configuredEntry.value
             guard validateAPIKeyFormat(configuredKey) else {
-                print("❌ Invalid API key format detected in configuration")
+                AppLog.error(AppLog.network, "Invalid API key format detected in configuration")
                 return
             }
 
-            print("🔑 Using API key from \(configuredEntry.source) \(configuredEntry.name)")
+            AppLog.debug(AppLog.network, "Using API key from \(configuredEntry.source) \(configuredEntry.name)")
 
             if existingKey != configuredKey {
                 let didPersist = KeychainManager.shared.storeAPIKey(configuredKey)
                 if didPersist {
-                    print(existingKey == nil ? "🔑 API key stored in Keychain" : "🔄 API key updated in Keychain")
+                    AppLog.debug(AppLog.network, existingKey == nil ? "API key stored in Keychain" : "API key updated in Keychain")
                 } else {
-                    print("⚠️ Keychain persistence unavailable; using \(configuredEntry.source) \(configuredEntry.name) for runtime credentials")
+                    AppLog.warning(AppLog.network, "Keychain persistence unavailable; using \(configuredEntry.source) \(configuredEntry.name) for runtime credentials")
                 }
             } else {
-                print("🔑 API key already configured")
+                AppLog.debug(AppLog.network, "API key already configured")
             }
 
             if KeychainManager.shared.getAPIKey() != nil {
-                print("✅ API key verification successful")
+                AppLog.debug(AppLog.network, "API key verification successful")
             } else {
-                print("❌ Failed to verify API key storage")
+                AppLog.error(AppLog.network, "Failed to verify API key storage")
             }
             return
         }
 
         if let existingKey, validateAPIKeyFormat(existingKey) {
-            print("🔑 Using existing API key from Keychain")
+            AppLog.debug(AppLog.network, "Using existing API key from Keychain")
             return
         }
 
         #if !DEBUG
-        print("❌ CRITICAL: No API key found in production build")
+        AppLog.error(AppLog.network, "CRITICAL: No API key found in production build")
         #endif
-        print("⚠️ WARNING: No valid API key found. Server calls will fail.")
-        print("📋 Set SNAPCHEF_API_KEY (or APP_API_KEY) in scheme env or build settings")
-        print("   1. Edit Scheme → Run → Arguments → Environment Variables")
-        print("   2. Add SNAPCHEF_API_KEY or APP_API_KEY with your API key value")
+        AppLog.warning(AppLog.network, "No valid API key found. Server calls will fail.")
     }
     
     private func validateAPIKeyFormat(_ key: String) -> Bool {
@@ -625,7 +621,7 @@ struct SnapChefApp: App {
                      !key.contains("YOUR_API_KEY")
         
         if !isValid {
-            print("⚠️ API key validation failed: Invalid format")
+            AppLog.debug(AppLog.network, "API key validation failed: invalid format")
         }
         
         return isValid
@@ -716,7 +712,7 @@ struct DeepLinkRecipeView: View {
         } catch {
             errorMessage = "Could not load this recipe. It may have been removed or you may not have permission to view it."
             isLoading = false
-            print("Failed to load recipe: \(error)")
+            AppLog.warning(AppLog.share, "Failed to load recipe deep link: \(error.localizedDescription)")
         }
     }
 }

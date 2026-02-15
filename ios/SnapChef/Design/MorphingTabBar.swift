@@ -82,6 +82,23 @@ enum AppTab: Int, CaseIterable {
             return false
         }
     }
+
+    var accessibilityIdentifier: String {
+        switch self {
+        case .home:
+            return "tab_home"
+        case .camera:
+            return "tab_camera"
+        case .detective:
+            return "tab_detective"
+        case .recipes:
+            return "tab_recipes"
+        case .socialFeed:
+            return "tab_feed"
+        case .profile:
+            return "tab_profile"
+        }
+    }
 }
 
 enum ViralCoachSpotlightTarget: Hashable {
@@ -130,6 +147,7 @@ struct MorphingTabBar: View {
                     color: tab.tabBarColor,
                     isSelected: selectedTab == index,
                     namespace: animation,
+                    accessibilityID: tab.accessibilityIdentifier,
                     action: {
                         if let onTabSelection = onTabSelection {
                             onTabSelection(index)
@@ -158,6 +176,7 @@ struct MorphingTabItem: View {
     let color: Color
     let isSelected: Bool
     let namespace: Namespace.ID
+    let accessibilityID: String
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -214,6 +233,8 @@ struct MorphingTabItem: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(StudioSpringButtonStyle(pressedScale: 0.9, pressedYOffset: 1.2, activeRotation: 2.4))
+        .accessibilityIdentifier(accessibilityID)
+        .accessibilityLabel(Text(title))
     }
 }
 

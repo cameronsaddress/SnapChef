@@ -14,7 +14,7 @@ struct PersistenceController {
             try viewContext.save()
         } catch {
             // In preview mode, log error but don't crash
-            print("Preview Core Data save error: \(error.localizedDescription)")
+            AppLog.debug(AppLog.persistence, "Preview Core Data save error: \(error.localizedDescription)")
             // Preview data is transient, so failure is acceptable
         }
         return result
@@ -27,7 +27,7 @@ struct PersistenceController {
 
         if inMemory {
             guard let firstStoreDescription = container.persistentStoreDescriptions.first else {
-                print("Warning: No persistent store descriptions found")
+                AppLog.warning(AppLog.persistence, "No persistent store descriptions found")
                 return
             }
             firstStoreDescription.url = URL(fileURLWithPath: "/dev/null")
@@ -43,7 +43,7 @@ struct PersistenceController {
         container.loadPersistentStores { _, error in
             if let error = error as NSError? {
                 // In production, handle this error appropriately
-                print("Core Data failed to load: \(error), \(error.userInfo)")
+                AppLog.error(AppLog.persistence, "Core Data failed to load: \(error.localizedDescription)")
 
                 // For development, we'll continue without persistence
                 // This allows the app to run even if Core Data setup fails

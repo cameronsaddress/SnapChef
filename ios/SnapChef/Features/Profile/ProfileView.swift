@@ -600,6 +600,7 @@ struct EnhancedProfileHeader: View {
                         }
                     }
                 }
+                .accessibilityIdentifier("profile_display_name")
                 .buttonStyle(PlainButtonStyle())
 
                 Text(emailDisplay)

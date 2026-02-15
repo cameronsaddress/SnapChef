@@ -131,10 +131,10 @@ final class NotificationPolicyTests: XCTestCase {
         XCTAssertEqual(components.minute, 30)
     }
 
-    func testNotificationCategoryChallengeActionsContainSnooze() {
+    func testNotificationCategoryChallengeActionsExcludeSnooze() {
         let ids = NotificationCategory.challengeReminder.actions.map(\.identifier)
-        XCTAssertTrue(ids.contains("SNOOZE_REMINDER"))
         XCTAssertTrue(ids.contains("VIEW_CHALLENGE"))
+        XCTAssertFalse(ids.contains("SNOOZE_REMINDER"))
     }
 
     func testQuietHoursHelperHandlesOvernightWindow() {
@@ -218,15 +218,15 @@ final class NotificationPolicyTests: XCTestCase {
     }
 
     func testTransactionalCriticalPolicyEnforcesMonthlyCap() {
-        XCTAssertFalse(NotificationDeliveryPolicy.transactionalCritical.enforcesMonthlyCap)
+        XCTAssertTrue(NotificationDeliveryPolicy.transactionalCritical.enforcesMonthlyCap)
         XCTAssertTrue(NotificationDeliveryPolicy.transactionalCritical.enforcesOneShotDelivery)
     }
     
     func testMonthlyAndTransactionalPoliciesEnforceMonthlyCap() {
         XCTAssertTrue(NotificationDeliveryPolicy.monthlyEngagement.enforcesMonthlyCap)
         XCTAssertTrue(NotificationDeliveryPolicy.transactionalNudge.enforcesMonthlyCap)
-        XCTAssertFalse(NotificationDeliveryPolicy.transactionalCritical.enforcesMonthlyCap)
-        XCTAssertFalse(NotificationDeliveryPolicy.transactional.enforcesMonthlyCap)
+        XCTAssertTrue(NotificationDeliveryPolicy.transactionalCritical.enforcesMonthlyCap)
+        XCTAssertTrue(NotificationDeliveryPolicy.transactional.enforcesMonthlyCap)
     }
 }
 

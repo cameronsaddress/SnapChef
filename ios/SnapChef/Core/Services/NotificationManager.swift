@@ -62,7 +62,7 @@ final class NotificationManager: ObservableObject {
             
             return granted
         } catch {
-            print("❌ Notification permission error: \(error)")
+            AppLog.error(AppLog.notifications, "Notification permission error: \(error.localizedDescription)")
             return false
         }
     }
@@ -100,13 +100,13 @@ final class NotificationManager: ObservableObject {
         deliveryPolicy: NotificationDeliveryPolicy = .transactionalNudge
     ) -> Bool {
         guard isEnabled else {
-            print("🔕 Notifications disabled - skipping: \(title)")
+            AppLog.debug(AppLog.notifications, "Notifications disabled; skipping scheduling")
             return false
         }
         
         // Check if notification type is enabled in preferences
         guard isNotificationTypeEnabled(category) else {
-            print("🔕 Notification type disabled in preferences: \(category.rawValue)")
+            AppLog.debug(AppLog.notifications, "Notification type disabled in preferences (\(category.rawValue))")
             return false
         }
         
@@ -122,7 +122,7 @@ final class NotificationManager: ObservableObject {
 
             // Reserve the monthly slot up front to prevent duplicate scheduling from concurrent calls.
             guard reserveMonthlySlot(for: targetDate) else {
-                print("📅 Monthly notification already reserved for \(targetDate) - queuing: \(title)")
+                AppLog.debug(AppLog.notifications, "Monthly notification slot already reserved; queuing for later")
                 queueNotificationForSmartSelection(
                     identifier: identifier,
                     title: title,
@@ -144,7 +144,7 @@ final class NotificationManager: ObservableObject {
             resolvedTrigger = monthlyTrigger
             let targetDate = notificationTargetDate(for: monthlyTrigger)
             guard reserveMonthlySlot(for: targetDate) else {
-                print("📅 Monthly notification already reserved for \(targetDate) - queuing: \(title)")
+                AppLog.debug(AppLog.notifications, "Monthly notification slot already reserved; queuing for later")
                 queueNotificationForSmartSelection(
                     identifier: identifier,
                     title: title,
@@ -181,10 +181,10 @@ final class NotificationManager: ObservableObject {
                     if let monthlyReservationDate {
                         self.releaseMonthlyReservation(for: monthlyReservationDate)
                     }
-                    print("❌ Failed to schedule notification: \(error)")
+                    AppLog.error(AppLog.notifications, "Failed to schedule notification: \(error.localizedDescription)")
                 } else {
                     await self.updatePendingNotifications()
-                    print("✅ Scheduled \(effectivePolicy.rawValue) notification: \(title)")
+                    AppLog.debug(AppLog.notifications, "Scheduled notification (\(effectivePolicy.rawValue))")
                 }
             }
         }
@@ -277,7 +277,7 @@ final class NotificationManager: ObservableObject {
         
         // Keep the current month schedule intact; don't replace it with a next-month candidate.
         guard canSendMonthlyNotification(for: preferredDate) else {
-            print("📅 Monthly slot already reserved for \(preferredDate); preserving existing notification.")
+            AppLog.debug(AppLog.notifications, "Monthly slot already reserved; preserving existing notification")
             return
         }
 
@@ -508,7 +508,7 @@ final class NotificationManager: ObservableObject {
                 userDefaults.set(0, forKey: "daily_notification_count")
                 userDefaults.set(0, forKey: "challenge_notification_count")
                 userDefaults.set(today, forKey: "last_notification_reset_date")
-                print("🔄 Reset daily notification count for new day")
+                AppLog.debug(AppLog.notifications, "Reset daily notification count for new day")
             }
         } else {
             // First time, set reset date
@@ -535,7 +535,7 @@ final class NotificationManager: ObservableObject {
     private func updatePendingNotifications() async {
         let pending = await notificationCenter.pendingNotificationRequests()
         pendingNotifications = pending
-        print("📱 \(pending.count) pending notifications")
+        AppLog.debug(AppLog.notifications, "Pending notifications: \(pending.count)")
     }
 
     private func purgeLegacyNotificationSchedules() async {
@@ -706,7 +706,7 @@ extension NotificationManager {
         let now = Date()
         if !calendar.isDate(lastNotificationDate, equalTo: now, toGranularity: .month) {
             userDefaults.set(0, forKey: monthlyNotificationCountKey)
-            print("📅 Monthly notification count reset")
+            AppLog.debug(AppLog.notifications, "Monthly notification count reset")
         }
     }
     
@@ -821,7 +821,7 @@ extension NotificationManager {
                 await updatePendingNotifications()
             } catch {
                 releaseMonthlyReservation(for: targetDate)
-                print("❌ Failed to schedule queued monthly notification: \(error)")
+                AppLog.error(AppLog.notifications, "Failed to schedule queued monthly notification: \(error.localizedDescription)")
             }
         }
     }
@@ -1008,8 +1008,10 @@ extension NotificationManager {
 
     private func normalizedDeliveryPolicy(_ policy: NotificationDeliveryPolicy) -> NotificationDeliveryPolicy {
         switch policy {
-        case .transactional:
-            return .transactionalCritical
+        case .transactional, .transactionalCritical:
+            // Product requirement: no more than one notification per month.
+            // Normalize all transactional requests into the monthly-capped nudge policy.
+            return .transactionalNudge
         default:
             return policy
         }
@@ -1026,10 +1028,8 @@ enum NotificationDeliveryPolicy: String, Codable {
 
     var enforcesMonthlyCap: Bool {
         switch self {
-        case .monthlyEngagement, .transactionalNudge:
+        case .monthlyEngagement, .transactionalNudge, .transactionalCritical, .transactional:
             return true
-        case .transactionalCritical, .transactional:
-            return false
         }
     }
 
@@ -1263,11 +1263,6 @@ enum NotificationCategory: String, CaseIterable, Codable {
                     identifier: "VIEW_CHALLENGE",
                     title: "View Challenge",
                     options: [.foreground]
-                ),
-                UNNotificationAction(
-                    identifier: "SNOOZE_REMINDER",
-                    title: "Remind me later",
-                    options: []
                 )
             ]
         case .streakReminder:

@@ -79,9 +79,9 @@ extension CloudKitService {
                         let existing = appState.savedRecipesWithPhotos[index]
 
                         // Only update if we have new photos that were missing
-                        if existing.afterPhoto == nil && photos.after != nil {
+                        if existing.afterPhoto == nil, let afterPhoto = photos.after {
                             // Use the public updateAfterPhoto method
-                            appState.updateAfterPhoto(for: recipe.id, afterPhoto: photos.after!)
+                            appState.updateAfterPhoto(for: recipe.id, afterPhoto: afterPhoto)
                             print("✅ Updated CloudKit recipe with after photo: \(recipe.name)")
                         }
 

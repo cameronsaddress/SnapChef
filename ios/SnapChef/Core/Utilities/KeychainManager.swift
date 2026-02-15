@@ -201,22 +201,19 @@ class KeychainManager {
     
     /// Store any sensitive string value securely in keychain
     func store(value: String, forKey identifier: String) -> Bool {
-        let data = value.data(using: .utf8)!
+        guard let data = value.data(using: .utf8) else { return false }
         
-        // First, try to update if it exists
-        let updateQuery: [String: Any] = [
+        // First, try to update if it exists.
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: identifier,
+            kSecAttrAccount as String: identifier
+        ]
+
+        let updateAttributes: [String: Any] = [
             kSecValueData as String: data
         ]
-        
-        let updateStatus = SecItemUpdate(
-            [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrAccount as String: identifier
-            ] as CFDictionary,
-            updateQuery as CFDictionary
-        )
+
+        let updateStatus = SecItemUpdate(query as CFDictionary, updateAttributes as CFDictionary)
         
         // If update failed (item doesn't exist), add it
         if updateStatus == errSecItemNotFound {

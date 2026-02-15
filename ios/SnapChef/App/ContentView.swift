@@ -7,7 +7,7 @@ struct ContentView: View {
     @EnvironmentObject var authManager: UnifiedAuthManager
     @EnvironmentObject var deviceManager: DeviceManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showingLaunchAnimation = true
+    @State private var showingLaunchAnimation = !ProcessInfo.processInfo.arguments.contains("-uiTesting")
 
     var body: some View {
         ZStack {
@@ -1705,6 +1705,7 @@ struct SocialFeedView: View {
                         )
                         .cornerRadius(12)
                     }
+                    .accessibilityIdentifier("cta_discover_chefs")
                 }
                 .padding(20)
                 .background(
@@ -1790,6 +1791,7 @@ struct SocialFeedView: View {
                         .cornerRadius(14)
                         .shadow(color: Color(hex: "#667eea").opacity(0.4), radius: 12, y: 6)
                     }
+                    .accessibilityIdentifier("cta_sign_in_community")
                     
                     // Discover button (still accessible)
                     Button(action: {
@@ -1803,6 +1805,7 @@ struct SocialFeedView: View {
                         }
                         .foregroundColor(.white.opacity(0.8))
                     }
+                    .accessibilityIdentifier("cta_browse_chefs")
                 }
                 .padding(24)
                 .background(

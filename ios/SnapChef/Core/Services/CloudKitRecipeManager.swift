@@ -1256,29 +1256,38 @@ class CloudKitRecipeManager: ObservableObject {
     /// Generate a shareable link for a recipe
     func generateShareLink(for recipeID: String) -> URL {
         var components = URLComponents()
-        components.scheme = "snapchef"
-        components.host = "recipe"
-        components.path = "/\(recipeID)"
+        components.scheme = "https"
+        components.host = "snapchef.app"
+        components.path = "/recipe/\(recipeID)"
 
         if let url = components.url {
             return url
-        } else if let fallbackURL = URL(string: "snapchef://recipe/\(recipeID)") {
-            return fallbackURL
-        } else {
-            // Final fallback to a generic URL
-            return URL(string: "snapchef://error")!
         }
+
+        // Final fallback to a generic URL
+        return URL(string: "https://snapchef.app")!
     }
 
     /// Handle incoming recipe share link
     func handleRecipeShareLink(_ url: URL) async throws -> Recipe {
-        guard url.scheme == "snapchef",
-              url.host == "recipe" else {
-            throw RecipeError.invalidShareLink
+        let scheme = (url.scheme ?? "").lowercased()
+        let host = (url.host ?? "").lowercased()
+        let pathParts = url.pathComponents.filter { $0 != "/" }
+
+        if scheme == "snapchef", host == "recipe", let recipeID = pathParts.last, !recipeID.isEmpty {
+            return try await fetchRecipe(by: recipeID)
         }
 
-        let recipeID = url.pathComponents.last ?? ""
-        return try await fetchRecipe(by: recipeID)
+        if scheme == "https",
+           (host == "snapchef.app" || host == "www.snapchef.app"),
+           pathParts.count >= 2,
+           pathParts[0].lowercased() == "recipe" {
+            let recipeID = pathParts[1]
+            guard !recipeID.isEmpty else { throw RecipeError.invalidShareLink }
+            return try await fetchRecipe(by: recipeID)
+        }
+
+        throw RecipeError.invalidShareLink
     }
 
     // MARK: - Recipe Search

@@ -1,6 +1,6 @@
 import Foundation
 
-struct User: Codable {
+struct User: Codable, Sendable {
     let id: String
     let email: String?
     let name: String?
@@ -24,13 +24,13 @@ struct User: Codable {
     let showOnLeaderboard: Bool
 }
 
-struct Subscription: Codable {
+struct Subscription: Codable, Sendable {
     let tier: SubscriptionTier
     let status: SubscriptionStatus
     let expiresAt: Date?
     let autoRenew: Bool
 
-    enum SubscriptionTier: String, Codable, CaseIterable {
+    enum SubscriptionTier: String, Codable, CaseIterable, Sendable {
         case free = "free"
         case basic = "basic"
         case premium = "premium"
@@ -63,7 +63,7 @@ struct Subscription: Codable {
         }
     }
 
-    enum SubscriptionStatus: String, Codable {
+    enum SubscriptionStatus: String, Codable, Sendable {
         case active = "active"
         case expired = "expired"
         case cancelled = "cancelled"
@@ -71,7 +71,7 @@ struct Subscription: Codable {
     }
 }
 
-struct DeviceInfo: Codable {
+struct DeviceInfo: Codable, Sendable {
     let deviceId: String
     let freeUsesRemaining: Int
     let firstUsedAt: Date

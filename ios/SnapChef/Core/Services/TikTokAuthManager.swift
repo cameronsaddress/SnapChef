@@ -29,12 +29,22 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
     private let redirectURI = "snapchef://tiktok/callback"
 
     // TikTok OAuth Configuration
-    private var clientID: String {
-        return Bundle.main.object(forInfoDictionaryKey: "TikTokClientKey") as? String ?? ""
+    private var clientKey: String? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "TikTokClientKey") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else { return nil }
+        return trimmed
     }
 
-    private var clientSecret: String {
-        return Bundle.main.object(forInfoDictionaryKey: "TikTokClientSecret") as? String ?? ""
+    private var clientSecret: String? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "TikTokClientSecret") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else { return nil }
+        return trimmed
     }
 
     // OAuth URLs
@@ -60,6 +70,10 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
     /// Initiates TikTok OAuth authentication flow
     /// - Returns: TikTokUser if authentication succeeds
     func authenticate() async throws -> TikTokUser {
+        guard clientKey != nil, clientSecret != nil else {
+            throw TikTokAuthError.missingClientConfiguration
+        }
+
         isLoading = true
         defer { isLoading = false }
 
@@ -71,6 +85,7 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
                 scopes: requiredScopes,
                 redirectURI: redirectURI
             )
+            let codeVerifier = authRequest.pkce.codeVerifier
             
             print("🔐 TikTok Auth: Creating auth request with redirect URI: \(redirectURI)")
 
@@ -91,7 +106,7 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
                     if let authResponse = response as? TikTokAuthResponse {
                         print("🔐 TikTok Auth: Received auth response")
                         do {
-                            let user = try await self.handleAuthResponse(authResponse)
+                            let user = try await self.handleAuthResponse(authResponse, codeVerifier: codeVerifier)
                             continuation.resume(returning: user)
                         } catch {
                             print("🔐 TikTok Auth: Error handling response: \(error)")
@@ -113,7 +128,8 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
             }
             
             // Add a timeout to prevent hanging forever
-            Task {
+            // Ensure `hasResumed` is accessed on MainActor to avoid a data race / double-resume crash.
+            Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
                 guard !hasResumed else { return }
                 hasResumed = true
@@ -132,13 +148,17 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
             throw TikTokAuthError.noRefreshToken
         }
 
+        guard let clientKey, let clientSecret else {
+            throw TikTokAuthError.missingClientConfiguration
+        }
+
         isLoading = true
         defer { isLoading = false }
 
         let parameters = [
             "grant_type": "refresh_token",
             "refresh_token": refreshToken,
-            "client_id": clientID,
+            "client_key": clientKey,
             "client_secret": clientSecret
         ]
 
@@ -291,14 +311,14 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
     // MARK: - Private Helper Methods
 
     /// Handles the OAuth response from TikTok
-    private func handleAuthResponse(_ response: TikTokAuthResponse) async throws -> TikTokUser {
+    private func handleAuthResponse(_ response: TikTokAuthResponse, codeVerifier: String) async throws -> TikTokUser {
         guard response.errorCode == .noError,
               let authCode = response.authCode else {
             throw TikTokAuthError.authenticationFailed
         }
 
         // Exchange authorization code for access token
-        let tokenResponse = try await exchangeCodeForToken(authCode: authCode)
+        let tokenResponse = try await exchangeCodeForToken(authCode: authCode, codeVerifier: codeVerifier)
 
         // Store tokens securely
         let tokens = TikTokTokens(
@@ -322,16 +342,30 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
     }
 
     /// Exchanges authorization code for access token
-    private func exchangeCodeForToken(authCode: String) async throws -> TokenResponse {
+    private func exchangeCodeForToken(authCode: String, codeVerifier: String) async throws -> TokenResponse {
+        guard let clientKey, let clientSecret else {
+            throw TikTokAuthError.missingClientConfiguration
+        }
+
         let parameters = [
             "grant_type": "authorization_code",
             "code": authCode,
+            "code_verifier": codeVerifier,
             "redirect_uri": redirectURI,
-            "client_id": clientID,
+            "client_key": clientKey,
             "client_secret": clientSecret
         ]
 
         return try await performTokenRequest(parameters: parameters)
+    }
+
+    private func formURLEncodedBody(_ parameters: [String: String]) -> Data {
+        var components = URLComponents()
+        components.queryItems = parameters
+            .sorted { $0.key < $1.key }
+            .map { URLQueryItem(name: $0.key, value: $0.value) }
+        let encoded = components.percentEncodedQuery ?? ""
+        return Data(encoded.utf8)
     }
 
     /// Performs token request to TikTok API with enhanced error handling
@@ -345,9 +379,7 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30.0
 
-        // Convert parameters to URL encoded string
-        let paramString = parameters.map { "\($0.key)=\($0.value)" }.joined(separator: "&")
-        request.httpBody = paramString.data(using: .utf8)
+        request.httpBody = formURLEncodedBody(parameters)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -413,8 +445,7 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
         // Store TikTok user info in CloudKit user profile
         // This would require adding TikTok fields to the CloudKit User schema
         // For now, we'll just log the integration
-        os_log("TikTok authenticated for CloudKit user: %@", log: .default, type: .info, cloudKitUser.displayName)
-        os_log("TikTok user: %@", log: .default, type: .info, user.displayName)
+        AppLog.debug(AppLog.auth, "TikTok authenticated (cloudKitUser=\(cloudKitUser.displayName), tikTokUser=\(user.displayName))")
     }
 
     /// Clears TikTok integration from CloudKit
@@ -612,6 +643,7 @@ struct TikTokUser: Identifiable, Codable, Sendable {
 
 enum TikTokAuthError: LocalizedError, Sendable {
     case authenticationFailed
+    case missingClientConfiguration
     case invalidURL
     case tokenRequestFailed
     case tokenRequestFailedWithDetails(String)
@@ -629,6 +661,8 @@ enum TikTokAuthError: LocalizedError, Sendable {
         switch self {
         case .authenticationFailed:
             return "TikTok authentication failed. Please try signing in again."
+        case .missingClientConfiguration:
+            return "TikTok sign in isn't configured in this build."
         case .invalidURL:
             return "Invalid TikTok API URL"
         case .tokenRequestFailed:

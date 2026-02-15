@@ -179,7 +179,7 @@ enum AuthError: LocalizedError {
     }
 }
 
-struct AppleAuthData: Encodable {
+struct AppleAuthData: Encodable, Sendable {
     let userId: String
     let email: String?
     let givenName: String?
@@ -187,21 +187,21 @@ struct AppleAuthData: Encodable {
     let identityToken: Data?
 }
 
-struct GoogleAuthData: Encodable {
+struct GoogleAuthData: Encodable, Sendable {
     let userId: String
     let email: String?
     let name: String?
     let idToken: String?
 }
 
-struct FacebookAuthData: Encodable {
+struct FacebookAuthData: Encodable, Sendable {
     let userId: String
     let email: String?
     let name: String?
     let accessToken: String
 }
 
-struct AuthResponse: Decodable {
+struct AuthResponse: Decodable, Sendable {
     let token: String
     let user: User
 }

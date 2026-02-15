@@ -2,6 +2,19 @@ import SwiftUI
 import Combine
 import CloudKit
 
+private let appStateVerboseLoggingEnabled: Bool = {
+    #if DEBUG
+    return ProcessInfo.processInfo.environment["SNAPCHEF_DEBUG_APPSTATE"] == "1"
+    #else
+    return false
+    #endif
+}()
+
+private func appStateVerboseLog(_ message: @autoclosure () -> String) {
+    guard appStateVerboseLoggingEnabled else { return }
+    AppLog.debug(AppLog.app, message())
+}
+
 @MainActor
 final class AppState: ObservableObject {
     // Core app state
@@ -211,8 +224,8 @@ final class AppState: ObservableObject {
     func syncWithLocalStorage() {
         // Sync with LocalRecipeManager
         recipesViewModel.syncWithLocalRecipeManager()
-        
-        print("📱 AppState synced with LocalRecipeManager: \(savedRecipes.count) saved recipes")
+
+        AppLog.debug(AppLog.persistence, "AppState synced with LocalRecipeManager (saved=\(savedRecipes.count))")
     }
     
     /// Add recipe to saved (local-first)
@@ -335,14 +348,7 @@ final class RecipesViewModel: ObservableObject {
     // MARK: - Recipe Management
     
     func addRecentRecipe(_ recipe: Recipe) {
-        // 🔍 DEBUG: Log when recipe is added to app state
-        print("🔍 DEBUG: Adding recipe '\(recipe.name)' to AppState")
-        print("🔍   - Enhanced fields at storage time:")
-        print("🔍     • cookingTechniques: \(recipe.cookingTechniques.isEmpty ? "EMPTY" : "\(recipe.cookingTechniques)")")
-        print("🔍     • secretIngredients: \(recipe.secretIngredients.isEmpty ? "EMPTY" : "\(recipe.secretIngredients)")")
-        print("🔍     • proTips: \(recipe.proTips.isEmpty ? "EMPTY" : "\(recipe.proTips)")")
-        print("🔍     • visualClues: \(recipe.visualClues.isEmpty ? "EMPTY" : "\(recipe.visualClues)")")
-        print("🔍     • shareCaption: \(recipe.shareCaption.isEmpty ? "EMPTY" : "\"\(recipe.shareCaption)\"")")
+        appStateVerboseLog("Adding recent recipe: \(recipe.name)")
         
         recentRecipes.insert(recipe, at: 0)
         if recentRecipes.count > 10 {
@@ -389,14 +395,13 @@ final class RecipesViewModel: ObservableObject {
                     try await CloudKitService.shared.addRecipeToUserProfile(recipeID, type: .saved)
                 }
             } catch {
-                print("⚠️ RecipesViewModel: Failed to sync SavedRecipe reference: \(error)")
+                AppLog.debug(AppLog.cloudKit, "Failed to sync saved recipe reference: \(error.localizedDescription)")
             }
         }
     }
     
     func saveRecipeWithPhotos(_ recipe: Recipe, beforePhoto: UIImage?, afterPhoto: UIImage?) {
-        print("🔍 DEBUG: saveRecipeWithPhotos called for '\(recipe.name)'")
-        print("🔍   - savedRecipes count before: \(savedRecipes.count)")
+        appStateVerboseLog("saveRecipeWithPhotos called")
         
         // Save to LocalRecipeManager (single source of truth)
         LocalRecipeManager.shared.saveRecipe(recipe, capturedImage: beforePhoto)
@@ -419,26 +424,19 @@ final class RecipesViewModel: ObservableObject {
         // Also update the simple lists
         if !savedRecipes.contains(where: { $0.id == recipe.id }) {
             savedRecipes.append(recipe)
-            print("🔍   - Added recipe to savedRecipes array")
-        } else {
-            print("🔍   - Recipe already in savedRecipes array")
         }
-        
-        print("🔍   - savedRecipes count after: \(savedRecipes.count)")
         
         // Immediately upload to CloudKit if authenticated (don't wait for sync)
         if UnifiedAuthManager.shared.isAuthenticated {
             Task {
                 do {
-                    print("📤 Immediately uploading recipe to CloudKit: '\(recipe.name)'")
-                    
                     // Upload the recipe with before photo if available
                     let recipeID = try await CloudKitService.shared.uploadRecipe(
                         recipe,
                         fromLLM: false,
                         beforePhoto: beforePhoto
                     )
-                    print("✅ Recipe uploaded to CloudKit with ID: \(recipeID)")
+                    AppLog.debug(AppLog.cloudKit, "Recipe uploaded to CloudKit")
                     
                     // If we have an after photo, update it immediately
                     if let afterPhoto = afterPhoto {
@@ -448,15 +446,15 @@ final class RecipesViewModel: ObservableObject {
                                 for: recipeID,
                                 afterPhoto: afterPhoto
                             )
-                            print("✅ After photo uploaded to CloudKit")
+                            AppLog.debug(AppLog.cloudKit, "After photo uploaded to CloudKit")
                         }
                     }
                     
                     // Add to user's saved recipes list
                     try await CloudKitService.shared.addRecipeToUserProfile(recipeID, type: .saved)
-                    print("✅ Recipe added to user's CloudKit profile")
+                    AppLog.debug(AppLog.cloudKit, "Recipe added to user's CloudKit profile")
                 } catch {
-                    print("❌ CloudKit upload failed (will retry on next sync): \(error)")
+                    AppLog.debug(AppLog.cloudKit, "CloudKit upload failed (will retry): \(error.localizedDescription)")
                     // Don't show error to user - recipe is saved locally
                 }
             }
@@ -481,8 +479,6 @@ final class RecipesViewModel: ObservableObject {
             if UnifiedAuthManager.shared.isAuthenticated {
                 Task {
                     do {
-                        print("📤 Immediately uploading after photo to CloudKit for recipe ID: \(recipeId)")
-                        
                         // Check if recipe exists in CloudKit first
                         let recipeExists = await CloudKitService.shared.recipeExists(with: recipeId.uuidString)
                         
@@ -491,10 +487,9 @@ final class RecipesViewModel: ObservableObject {
                                 for: recipeId.uuidString,
                                 afterPhoto: afterPhoto
                             )
-                            print("✅ After photo uploaded to CloudKit")
+                            AppLog.debug(AppLog.cloudKit, "After photo uploaded to CloudKit")
                         } else {
                             // Recipe doesn't exist in CloudKit yet, upload the whole recipe
-                            print("📤 Recipe not in CloudKit, uploading full recipe with photos")
                             let recipeID = try await CloudKitService.shared.uploadRecipe(
                                 existingRecipe.recipe,
                                 fromLLM: false,
@@ -506,10 +501,10 @@ final class RecipesViewModel: ObservableObject {
                                 for: recipeID,
                                 afterPhoto: afterPhoto
                             )
-                            print("✅ Recipe and after photo uploaded to CloudKit")
+                            AppLog.debug(AppLog.cloudKit, "Recipe and after photo uploaded to CloudKit")
                         }
                     } catch {
-                        print("❌ CloudKit after photo upload failed: \(error)")
+                        AppLog.debug(AppLog.cloudKit, "CloudKit after photo upload failed: \(error.localizedDescription)")
                         // Don't show error - photo is saved locally
                     }
                 }
@@ -582,9 +577,9 @@ final class RecipesViewModel: ObservableObject {
                             type: .favorited
                         )
                     }
-                    print("✅ Synced favorite status to CloudKit")
+                    AppLog.debug(AppLog.cloudKit, "Synced favorite status to CloudKit")
                 } catch {
-                    print("❌ Failed to sync favorite status to CloudKit: \(error)")
+                    AppLog.debug(AppLog.cloudKit, "Failed to sync favorite status to CloudKit: \(error.localizedDescription)")
                 }
             }
         }
@@ -639,7 +634,7 @@ final class RecipesViewModel: ObservableObject {
         let migrationKey = "migratedToLocalRecipeManager"
         guard !userDefaults.bool(forKey: migrationKey) else { return }
         
-        print("🔄 Migrating recipes to LocalRecipeManager...")
+        AppLog.debug(AppLog.persistence, "Migrating recipes to LocalRecipeManager")
         
         // Load old saved recipes from disk
         guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
@@ -649,12 +644,13 @@ final class RecipesViewModel: ObservableObject {
            let decoded = try? JSONDecoder().decode([SavedRecipe].self, from: data) {
             
             // Migrate each recipe to LocalRecipeManager
+            var migratedCount = 0
             for savedRecipe in decoded {
                 LocalRecipeManager.shared.saveRecipe(savedRecipe.recipe, capturedImage: savedRecipe.beforePhoto)
-                print("🔄 Migrated recipe: \(savedRecipe.recipe.name)")
+                migratedCount += 1
             }
             
-            print("✅ Migration complete: \(decoded.count) recipes migrated")
+            AppLog.debug(AppLog.persistence, "Migration complete (\(migratedCount) recipes migrated)")
             
             // Mark migration as complete
             userDefaults.set(true, forKey: migrationKey)
@@ -676,7 +672,10 @@ final class RecipesViewModel: ObservableObject {
             return SavedRecipe(recipe: recipe, beforePhoto: photos?.fridgePhoto, afterPhoto: photos?.mealPhoto)
         }
         
-        print("📦 Synced with LocalRecipeManager: \(allRecipes.count) total, \(savedRecipes.count) saved")
+        AppLog.debug(
+            AppLog.persistence,
+            "Synced with LocalRecipeManager (total=\(allRecipes.count), saved=\(savedRecipes.count))"
+        )
     }
 }
 
@@ -712,6 +711,9 @@ final class AuthViewModel: ObservableObject {
     private let totalSnapsTakenKey = "totalSnapsTaken"
     
     init() {
+        if ProcessInfo.processInfo.arguments.contains("-uiTesting") {
+            userDefaults.set(true, forKey: firstLaunchKey)
+        }
         self.isFirstLaunch = !userDefaults.bool(forKey: firstLaunchKey)
         
         // Load or set user join date
@@ -742,9 +744,9 @@ final class AuthViewModel: ObservableObject {
             Task {
                 do {
                     try await CloudKitService.shared.incrementRecipesShared()
-                    print("✅ Updated share count in CloudKit")
+                    AppLog.debug(AppLog.cloudKit, "Updated share count in CloudKit")
                 } catch {
-                    print("⚠️ Failed to update share count in CloudKit: \(error)")
+                    AppLog.debug(AppLog.cloudKit, "Failed to update share count in CloudKit: \(error.localizedDescription)")
                 }
             }
         }

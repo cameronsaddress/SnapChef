@@ -81,15 +81,9 @@ final class ChallengeNotificationManager: ObservableObject {
                 options: [.foreground]
             )
 
-            let snoozeAction = UNNotificationAction(
-                identifier: "SNOOZE_REMINDER",
-                title: "Remind me later",
-                options: []
-            )
-
             let challengeCategory = UNNotificationCategory(
                 identifier: LegacyNotificationCategory.challengeReminder.rawValue,
-                actions: [viewAction, snoozeAction],
+                actions: [viewAction],
                 intentIdentifiers: [],
                 options: []
             )

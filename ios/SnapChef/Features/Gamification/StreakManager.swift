@@ -151,22 +151,6 @@ class StreakManager: ObservableObject {
         activeFreezes[type] = freeze
         saveStreaksToCache()
 
-        // Schedule notification for freeze expiry
-        let trigger = UNTimeIntervalNotificationTrigger(
-            timeInterval: max(freeze.expiresAt.addingTimeInterval(-3_600).timeIntervalSinceNow, 1.0),
-            repeats: false
-        )
-        
-        _ = notificationManager.scheduleNotification(
-            identifier: "freeze_expiry_\(type.rawValue)",
-            title: "❄️ Freeze Expiring Soon",
-            body: "Your \(type.displayName) streak freeze expires in 1 hour!",
-            category: .streakReminder,
-            trigger: trigger,
-            // Freeze reminders are tied to an explicit user action and should always be delivered.
-            deliveryPolicy: .transactionalCritical
-        )
-
         print("❄️ Streak frozen until \(freeze.expiresAt)")
         return true
     }
@@ -296,45 +280,7 @@ class StreakManager: ObservableObject {
     }
 
     private func checkAllStreaks() {
-        let calendar = Calendar.current
-
-        for (type, streak) in currentStreaks {
-            // Check for streak at risk - only send once per hour to avoid spam
-            if streak.isActive && !streak.isFrozen && !calendar.isDateInToday(streak.lastActivityDate) {
-                let hoursRemaining = streak.hoursUntilBreak
-
-                if hoursRemaining <= 2 && hoursRemaining > 0 {
-                    // Check if we already sent a notification recently for this streak
-                    let lastNotificationKey = "last_streak_notification_\(type.rawValue)"
-                    let lastNotification = userDefaults.object(forKey: lastNotificationKey) as? Date ?? Date.distantPast
-                    let hoursSinceLastNotification = Date().timeIntervalSince(lastNotification) / 3600
-                    
-                    // Only send notification if we haven't sent one in the last hour
-                    if hoursSinceLastNotification >= 1.0 {
-                        let trigger = UNTimeIntervalNotificationTrigger(
-                            timeInterval: 300, // 5 minutes from now
-                            repeats: false
-                        )
-                        
-                        let success = notificationManager.scheduleNotification(
-                            identifier: "streak_risk_\(type.rawValue)",
-                            title: "🔥 Streak at Risk!",
-                            body: "Your \(streak.currentStreak)-day \(type.displayName) streak ends in \(hoursRemaining) hours!",
-                            category: .streakReminder,
-                            trigger: trigger,
-                            deliveryPolicy: .transactionalNudge
-                        )
-                        
-                        if success {
-                            userDefaults.set(Date(), forKey: lastNotificationKey)
-                            print("📱 Scheduled streak risk notification for \(type.displayName)")
-                        }
-                    } else {
-                        print("⏭️ Skipping streak notification for \(type.displayName) - sent \(String(format: "%.1f", hoursSinceLastNotification)) hours ago")
-                    }
-                }
-            }
-
+        for (type, _) in currentStreaks {
             // Check freeze expiry
             if let freeze = activeFreezes[type], !freeze.isActive {
                 activeFreezes.removeValue(forKey: type)
@@ -416,15 +362,6 @@ class StreakManager: ObservableObject {
         NotificationCenter.default.post(
             name: Notification.Name("ShowStreakCelebration"),
             object: nil,
-            userInfo: ["milestone": milestone.days, "type": type.rawValue]
-        )
-
-        // Send push notification
-        _ = notificationManager.scheduleImmediateNotification(
-            identifier: "milestone_\(type.rawValue)_\(milestone.days)",
-            title: "🎉 Milestone Achieved!",
-            body: "\(milestone.days)-day streak! You earned \(milestone.coins) Chef Coins!",
-            category: .streakReminder,
             userInfo: ["milestone": milestone.days, "type": type.rawValue]
         )
 

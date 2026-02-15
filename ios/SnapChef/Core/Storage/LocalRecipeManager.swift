@@ -22,7 +22,8 @@ final class LocalRecipeManager: ObservableObject {
     // MARK: - Private Properties
     nonisolated(unsafe) private var db: OpaquePointer?
     private let dbPath: String
-    private let dbQueue = DispatchQueue(label: "com.snapchef.recipedb", attributes: .concurrent)
+    // Single sqlite connection: keep DB access serialized to avoid concurrent-use hazards.
+    private let dbQueue = DispatchQueue(label: "com.snapchef.recipedb")
     private let memoryCache = NSCache<NSString, NSData>()
     
     // Track save states efficiently
@@ -58,7 +59,7 @@ final class LocalRecipeManager: ObservableObject {
     
     private func setupDatabase() {
         if sqlite3_open(dbPath, &db) != SQLITE_OK {
-            print("❌ LocalRecipeManager: Failed to open database")
+            AppLog.error(AppLog.persistence, "LocalRecipeManager: failed to open database")
             return
         }
         
@@ -82,9 +83,9 @@ final class LocalRecipeManager: ObservableObject {
         """
         
         if sqlite3_exec(db, createTableSQL, nil, nil, nil) != SQLITE_OK {
-            print("❌ LocalRecipeManager: Failed to create recipes table")
+            AppLog.error(AppLog.persistence, "LocalRecipeManager: failed to create recipes table")
         } else {
-            print("✅ LocalRecipeManager: Database initialized successfully")
+            AppLog.debug(AppLog.persistence, "LocalRecipeManager: database initialized")
         }
     }
     
@@ -116,9 +117,9 @@ final class LocalRecipeManager: ObservableObject {
                     sqlite3_bind_double(statement, 5, Date().timeIntervalSince1970)
                     
                     if sqlite3_step(statement) == SQLITE_DONE {
-                        print("✅ LocalRecipeManager: Recipe saved to database: \(recipe.name)")
+                        AppLog.debug(AppLog.persistence, "LocalRecipeManager: recipe saved to database")
                     } else {
-                        print("❌ LocalRecipeManager: Failed to save recipe: \(String(cString: sqlite3_errmsg(self.db)))")
+                        AppLog.error(AppLog.persistence, "LocalRecipeManager: failed to save recipe (sqlite)")
                     }
                 }
                 sqlite3_finalize(statement)
@@ -144,7 +145,7 @@ final class LocalRecipeManager: ObservableObject {
                 }
                 
             } catch {
-                print("❌ LocalRecipeManager: Failed to save recipe: \(error)")
+                AppLog.error(AppLog.persistence, "LocalRecipeManager: failed to save recipe: \(error.localizedDescription)")
             }
         }
     }
@@ -162,7 +163,7 @@ final class LocalRecipeManager: ObservableObject {
                 sqlite3_bind_text(statement, 2, recipeID.uuidString, -1, nil)
                 
                 if sqlite3_step(statement) == SQLITE_DONE {
-                    print("✅ LocalRecipeManager: Recipe unsaved: \(recipeID)")
+                    AppLog.debug(AppLog.persistence, "LocalRecipeManager: recipe unsaved")
                 }
             }
             sqlite3_finalize(statement)
@@ -249,7 +250,10 @@ final class LocalRecipeManager: ObservableObject {
                 self.allRecipes = recipes
                 self.savedRecipeIDs = savedIDs
                 self.likedRecipeIDs = likedIDs
-                print("📱 LocalRecipeManager: Loaded \(recipes.count) recipes (\(savedIDs.count) saved, \(likedIDs.count) liked)")
+                AppLog.debug(
+                    AppLog.persistence,
+                    "LocalRecipeManager: loaded \(recipes.count) recipes (saved=\(savedIDs.count), liked=\(likedIDs.count))"
+                )
             }
         }
     }
@@ -311,13 +315,13 @@ final class LocalRecipeManager: ObservableObject {
                         sqlite3_finalize(statement)
                         
                     } catch {
-                        print("❌ LocalRecipeManager: Failed to merge CloudKit recipe: \(error)")
+                        AppLog.debug(AppLog.cloudKit, "LocalRecipeManager: failed to merge CloudKit recipe: \(error.localizedDescription)")
                     }
                 }
             }
             
             if addedCount > 0 {
-                print("✅ LocalRecipeManager: Merged \(addedCount) new recipes from CloudKit")
+                AppLog.debug(AppLog.cloudKit, "LocalRecipeManager: merged \(addedCount) new recipes from CloudKit")
                 // Reload recipes to include new ones
                 Task { @MainActor in
                     self.loadAllRecipes()
@@ -373,7 +377,7 @@ final class LocalRecipeManager: ObservableObject {
                 self.savedRecipeIDs.removeAll()
                 self.likedRecipeIDs.removeAll()
                 self.memoryCache.removeAllObjects()
-                print("🗑️ LocalRecipeManager: All recipes cleared from database")
+                AppLog.debug(AppLog.persistence, "LocalRecipeManager: cleared all recipes from database")
             }
         }
     }

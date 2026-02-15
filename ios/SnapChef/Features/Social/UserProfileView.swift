@@ -99,6 +99,7 @@ struct UserProfileView: View {
                         dismiss()
                     }
                     .foregroundColor(.white)
+                    .accessibilityIdentifier("chef_profile_done")
                 }
             }
         }
