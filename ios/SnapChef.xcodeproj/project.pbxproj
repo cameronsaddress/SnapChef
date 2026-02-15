@@ -211,11 +211,12 @@
 		F4BDC9F4687E1C060E1C4822 /* PaywallTriggerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B104C3ABB3D48B5A0AFB0310 /* PaywallTriggerManager.swift */; };
 		F5193ABD2E4AF86900922841 /* TikTokOpenAuthSDK in Frameworks */ = {isa = PBXBuildFile; productRef = F5193ABC2E4AF86900922841 /* TikTokOpenAuthSDK */; };
 		F5193ABF2E4AF86900922841 /* TikTokOpenSDKCore in Frameworks */ = {isa = PBXBuildFile; productRef = F5193ABE2E4AF86900922841 /* TikTokOpenSDKCore */; };
-		F5193AC12E4AF86900922841 /* TikTokOpenShareSDK in Frameworks */ = {isa = PBXBuildFile; productRef = F5193AC02E4AF86900922841 /* TikTokOpenShareSDK */; };
-		F5193AC32E4D437C00922841 /* Mixdown.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = F5193AC22E4D437C00922841 /* Mixdown.mp3 */; };
-		F56F890B2E3C509A00AF95B7 /* UserNotifications.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F56F890A2E3C509A00AF95B7 /* UserNotifications.framework */; };
-		F597DC72E7363D87E264F2BA /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94CF88BBD5E77A33A82328C4 /* HapticManager.swift */; };
-		F79E7AC1BBC0E8EE30C6834E /* SnapChefUISmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAABE38E4B45E559801C37C8 /* SnapChefUISmokeTests.swift */; };
+			F5193AC12E4AF86900922841 /* TikTokOpenShareSDK in Frameworks */ = {isa = PBXBuildFile; productRef = F5193AC02E4AF86900922841 /* TikTokOpenShareSDK */; };
+			F5193AC32E4D437C00922841 /* Mixdown.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = F5193AC22E4D437C00922841 /* Mixdown.mp3 */; };
+			C0FFEE1234567890ABCDEF02 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF01 /* PrivacyInfo.xcprivacy */; };
+			F56F890B2E3C509A00AF95B7 /* UserNotifications.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F56F890A2E3C509A00AF95B7 /* UserNotifications.framework */; };
+			F597DC72E7363D87E264F2BA /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94CF88BBD5E77A33A82328C4 /* HapticManager.swift */; };
+			F79E7AC1BBC0E8EE30C6834E /* SnapChefUISmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAABE38E4B45E559801C37C8 /* SnapChefUISmokeTests.swift */; };
 		FD38CE225949CF345B8EF964 /* RecipeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 290835ADFEFAD30086886F24 /* RecipeDetailView.swift */; };
 		FED3E5EB696AF8E7C4375464 /* PersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AC9B83A23805AF72F7FA1CC /* PersistenceController.swift */; };
 		FF107BE1B6CA934969C90F5A /* LocalRecipeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C31EBEB3CA82504B1F83EDA7 /* LocalRecipeManager.swift */; };
@@ -331,10 +332,11 @@
 		5669D883AE8383EB297D28EB /* DetectiveRecipe.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DetectiveRecipe.swift; path = SnapChef/Core/Models/DetectiveRecipe.swift; sourceTree = "<group>"; };
 		56B4E5C4FB1000CD95A465BD /* InstagramShareView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = InstagramShareView.swift; path = SnapChef/Features/Sharing/Platforms/Instagram/InstagramShareView.swift; sourceTree = "<group>"; };
 		56DF24D3280D9F5229B2C67C /* MockDataProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MockDataProvider.swift; path = SnapChef/Core/Utilities/MockDataProvider.swift; sourceTree = "<group>"; };
-		573B84C17E0DAF8D9FB6BF07 /* meal5.jpg */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.jpeg; name = meal5.jpg; path = SnapChef/Resources/meal5.jpg; sourceTree = "<group>"; };
-		59FDC970FB5C6C618DA4E006 /* NetworkManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NetworkManager.swift; path = SnapChef/Core/Networking/NetworkManager.swift; sourceTree = "<group>"; };
-		5BEC9339B9A05BF7ED41CE98 /* ChallengeProgressTracker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeProgressTracker.swift; path = SnapChef/Features/Gamification/ChallengeProgressTracker.swift; sourceTree = "<group>"; };
-		5CCE4613EFDDE18E38C9ACCA /* SimpleProgressivePrompt.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SimpleProgressivePrompt.swift; path = SnapChef/Features/Authentication/SimpleProgressivePrompt.swift; sourceTree = "<group>"; };
+			573B84C17E0DAF8D9FB6BF07 /* meal5.jpg */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.jpeg; name = meal5.jpg; path = SnapChef/Resources/meal5.jpg; sourceTree = "<group>"; };
+			C0FFEE1234567890ABCDEF01 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = SnapChef/Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+			59FDC970FB5C6C618DA4E006 /* NetworkManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NetworkManager.swift; path = SnapChef/Core/Networking/NetworkManager.swift; sourceTree = "<group>"; };
+			5BEC9339B9A05BF7ED41CE98 /* ChallengeProgressTracker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChallengeProgressTracker.swift; path = SnapChef/Features/Gamification/ChallengeProgressTracker.swift; sourceTree = "<group>"; };
+			5CCE4613EFDDE18E38C9ACCA /* SimpleProgressivePrompt.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SimpleProgressivePrompt.swift; path = SnapChef/Features/Authentication/SimpleProgressivePrompt.swift; sourceTree = "<group>"; };
 		5CFBC2797E2E29BB325A4F66 /* EmojiFlickGame.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EmojiFlickGame.swift; path = SnapChef/Features/Camera/EmojiFlickGame.swift; sourceTree = "<group>"; };
 		5D8EAD1BE2FCE386B92B3120 /* RecipeCommentsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RecipeCommentsView.swift; path = SnapChef/Features/Sharing/RecipeCommentsView.swift; sourceTree = "<group>"; };
 		5DA5F85BA1128E74A3D20C2C /* MorphingTabBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MorphingTabBar.swift; path = SnapChef/Design/MorphingTabBar.swift; sourceTree = "<group>"; };
@@ -634,13 +636,14 @@
 			name = Core;
 			sourceTree = "<group>";
 		};
-		33732196C1E7BBD9AED65598 /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				258CF31CFDA34009FD6ED5D8 /* fridge.jpg */,
-				6DE095E53679E0668984799F /* fridge1.jpg */,
-				87312B0481281640268D11F3 /* fridge2.jpg */,
-				ADDE0057FDAB5264593D3360 /* fridge3.jpg */,
+			33732196C1E7BBD9AED65598 /* Resources */ = {
+				isa = PBXGroup;
+				children = (
+					C0FFEE1234567890ABCDEF01 /* PrivacyInfo.xcprivacy */,
+					258CF31CFDA34009FD6ED5D8 /* fridge.jpg */,
+					6DE095E53679E0668984799F /* fridge1.jpg */,
+					87312B0481281640268D11F3 /* fridge2.jpg */,
+					ADDE0057FDAB5264593D3360 /* fridge3.jpg */,
 				04C81BED4046CF1D5072735C /* fridge4.jpg */,
 				7D2DC371147A731F6A128727 /* fridge5.jpg */,
 				749D158D8EA5E056935EE338 /* meal1.jpg */,
@@ -1419,15 +1422,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		979D0184B8832CCEE4790A8C /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				F5193AC32E4D437C00922841 /* Mixdown.mp3 in Resources */,
-				3D3E665FBADF8F0744D3031D /* Assets.xcassets in Resources */,
-				D3E8EEB197F2EC734C562F2A /* Preview Assets.xcassets in Resources */,
-				DD5120E2956062E461518E24 /* fridge.jpg in Resources */,
-				FFCAA2B0DE7B5BAD2D349B8F /* fridge1.jpg in Resources */,
+			979D0184B8832CCEE4790A8C /* Resources */ = {
+				isa = PBXResourcesBuildPhase;
+				buildActionMask = 2147483647;
+				files = (
+					F5193AC32E4D437C00922841 /* Mixdown.mp3 in Resources */,
+					C0FFEE1234567890ABCDEF02 /* PrivacyInfo.xcprivacy in Resources */,
+					3D3E665FBADF8F0744D3031D /* Assets.xcassets in Resources */,
+					D3E8EEB197F2EC734C562F2A /* Preview Assets.xcassets in Resources */,
+					DD5120E2956062E461518E24 /* fridge.jpg in Resources */,
+					FFCAA2B0DE7B5BAD2D349B8F /* fridge1.jpg in Resources */,
 				995BB052FBFE07B56F814A64 /* fridge2.jpg in Resources */,
 				7E8464B6ABF815644BDE5E62 /* fridge3.jpg in Resources */,
 				41F3DB404F88B829C4A22229 /* fridge4.jpg in Resources */,
