@@ -1,10 +1,27 @@
 .DS_Store
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+
+*.log
 
 # Xcode / iOS
 Pods/
 .build/
 DerivedData/
+ios/DerivedData/
+*.xcresult
+*.xcarchive
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.xcuserdatad/
 *.xcuserstate
+
+# Backups (keep locally, do not commit)
+*.backup
+*.bak
+*.old
+ios/SnapChef.xcodeproj.backup_*/
+ios/SnapChef.xcodeproj.backup_cleanup_*/
+ios/project_backups/
+ios/xcode_backups/
