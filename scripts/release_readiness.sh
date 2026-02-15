@@ -61,6 +61,18 @@ if [[ -f "$RELEASE_APP/Info.plist" ]]; then
   if [[ -z "$API_KEY_VALUE" || "$API_KEY_VALUE" == *'$('* ]]; then
     echo "⚠️ SNAPCHEF_API_KEY unresolved in Release Info.plist (expected for local unsigned builds)."
   fi
+
+  # Privacy manifest: required for "required reason" API declarations and increasingly expected by App Store tooling.
+  if [[ ! -f "$RELEASE_APP/PrivacyInfo.xcprivacy" ]]; then
+    echo "❌ PrivacyInfo.xcprivacy missing from Release app bundle"
+    exit 1
+  fi
+
+  # TikTok client secret should not be shipped in the app binary. Prefer server-side exchange/PKCE.
+  TIKTOK_SECRET_VALUE=$(/usr/libexec/PlistBuddy -c "Print :TikTokClientSecret" "$RELEASE_APP/Info.plist" 2>/dev/null || true)
+  if [[ -n "$TIKTOK_SECRET_VALUE" && "$TIKTOK_SECRET_VALUE" != *'$('* ]]; then
+    echo "⚠️ TikTokClientSecret is resolved in Release Info.plist. Shipping OAuth client secrets in an app is insecure."
+  fi
 fi
 
 echo "\n✅ Release readiness checks passed"
