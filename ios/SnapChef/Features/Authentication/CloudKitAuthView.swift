@@ -79,32 +79,34 @@ struct CloudKitAuthView: View {
                         .frame(height: 50)
                         .cornerRadius(25)
 
-                        // Sign in with TikTok
-                        Button(action: {
-                            handleTikTokSignIn()
-                        }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "music.note")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
+                        if tikTokAuthManager.isOAuthConfigured {
+                            // Sign in with TikTok (only when OAuth is configured for this build).
+                            Button(action: {
+                                handleTikTokSignIn()
+                            }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "music.note")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
 
-                                Text("Continue with TikTok")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.black, Color(hex: "#FF0050")],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                                    Text("Continue with TikTok")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.white)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color.black, Color(hex: "#FF0050")],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
                                 )
-                            )
-                            .cornerRadius(25)
+                                .cornerRadius(25)
+                            }
+                            .disabled(isLoading)
                         }
-                        .disabled(isLoading)
                     }
                     .padding(.horizontal, 24)
                     .disabled(isLoading)

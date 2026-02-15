@@ -47,6 +47,10 @@ final class TikTokAuthManager: ObservableObject, @unchecked Sendable {
         return trimmed
     }
 
+    var isOAuthConfigured: Bool {
+        clientKey != nil && clientSecret != nil
+    }
+
     // OAuth URLs
     private let authBaseURL = "https://www.tiktok.com/v2/auth/authorize/"
     private let tokenURL = "https://open.tiktokapis.com/v2/oauth/token/"

@@ -11,6 +11,7 @@ import AuthenticationServices
 
 struct SimpleProgressivePrompt: View {
     @StateObject private var authManager = UnifiedAuthManager.shared
+    @StateObject private var tikTokAuthManager = TikTokAuthManager.shared
     @Environment(\.dismiss) private var dismiss
     
     let context: PromptContext
@@ -138,34 +139,36 @@ struct SimpleProgressivePrompt: View {
                             .cornerRadius(22)
                             .disabled(isLoading)
                             
-                            // TikTok Sign In
-                            Button(action: handleTikTokSignIn) {
-                                HStack(spacing: 8) {
-                                    if isLoading {
-                                        ProgressView()
-                                            .scaleEffect(0.7)
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    } else {
-                                        Image(systemName: "music.note")
-                                            .font(.title3)
+                            if tikTokAuthManager.isOAuthConfigured {
+                                // TikTok Sign In (only when OAuth is configured for this build).
+                                Button(action: handleTikTokSignIn) {
+                                    HStack(spacing: 8) {
+                                        if isLoading {
+                                            ProgressView()
+                                                .scaleEffect(0.7)
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        } else {
+                                            Image(systemName: "music.note")
+                                                .font(.title3)
+                                        }
+                                        
+                                        Text(isLoading ? "Signing in..." : "Continue with TikTok")
+                                            .font(.system(size: 16, weight: .semibold))
                                     }
-                                    
-                                    Text(isLoading ? "Signing in..." : "Continue with TikTok")
-                                        .font(.system(size: 16, weight: .semibold))
-                                }
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(
-                                    LinearGradient(
-                                        colors: [Color.black, Color(hex: "#FF0050")],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 44)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [Color.black, Color(hex: "#FF0050")],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
                                     )
-                                )
-                                .cornerRadius(22)
+                                    .cornerRadius(22)
+                                }
+                                .disabled(isLoading)
                             }
-                            .disabled(isLoading)
                         }
                         
                         // Action buttons
@@ -277,14 +280,24 @@ struct SimpleProgressivePrompt: View {
     
     private func handleTikTokSignIn() {
         Task {
-            await MainActor.run {
-                isLoading = true
+            do {
+                await MainActor.run {
+                    isLoading = true
+                }
+
+                try await authManager.signInWithTikTok()
+
+                await MainActor.run {
+                    recordSuccess()
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "TikTok sign in failed. Please try again."
+                    showError = true
+                }
             }
 
-            // TikTok sign-in not available with CloudKitAuthManager.
             await MainActor.run {
-                errorMessage = "TikTok sign in requires UnifiedAuthManager."
-                showError = true
                 isLoading = false
             }
         }

@@ -266,37 +266,39 @@ struct ProgressiveAuthPrompt: View {
                             .cornerRadius(25)
                             .disabled(isLoading)
 
-                            // Sign in with TikTok
-                            Button(action: {
-                                handleTikTokSignIn()
-                            }) {
-                                HStack(spacing: 12) {
-                                    if isLoading {
-                                        ProgressView()
-                                            .scaleEffect(0.8)
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    } else {
-                                        Image(systemName: "music.note")
-                                            .font(.title2)
-                                    }
+                            if tikTokAuthManager.isOAuthConfigured {
+                                // Sign in with TikTok (only when OAuth is configured for this build).
+                                Button(action: {
+                                    handleTikTokSignIn()
+                                }) {
+                                    HStack(spacing: 12) {
+                                        if isLoading {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        } else {
+                                            Image(systemName: "music.note")
+                                                .font(.title2)
+                                        }
 
-                                    Text(isLoading ? "Signing in..." : "Continue with TikTok")
-                                        .font(.headline)
-                                        .fontWeight(.semibold)
-                                }
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(
-                                    LinearGradient(
-                                        colors: [Color.black, Color(hex: "#FF0050")],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
+                                        Text(isLoading ? "Signing in..." : "Continue with TikTok")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 50)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [Color.black, Color(hex: "#FF0050")],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
                                     )
-                                )
-                                .cornerRadius(25)
+                                    .cornerRadius(25)
+                                }
+                                .disabled(isLoading)
                             }
-                            .disabled(isLoading)
                         }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 20)
